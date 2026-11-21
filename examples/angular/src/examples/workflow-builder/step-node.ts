@@ -66,7 +66,16 @@ export class StepNode {
     private readonly edges = injectEdges<Types>();
     protected readonly icon = computed(() => iconOf(this.step()));
     protected readonly summary = computed(() => summaryOf(this.step()));
-    protected readonly issues = computed(() =>
-        issuesOf(this.step(), this.edges()),
+    // kept while its issues are the same: an edge made elsewhere leaves this card's mark as it is
+    protected readonly issues = computed(
+        () => issuesOf(this.step(), this.edges()),
+        { equal: sameList },
+    );
+}
+
+/** Two lists of the same entries, in order. */
+function sameList(a: readonly string[], b: readonly string[]): boolean {
+    return (
+        a.length === b.length && a.every((entry, index) => entry === b[index])
     );
 }

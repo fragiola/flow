@@ -57,16 +57,28 @@ function templatesOf(source: string): string {
 }
 
 /**
- * Where a template styles itself instead of binding `styles.ts`: a `class="…"`, a string inside
- * `[class]="…"`, a `[class.x]` or `[ngClass]` binding (a class from a part's state: the `data-*`
- * style it), or a `cn()`.
+ * Where a template styles itself instead of binding `styles.ts`: a `class="…"` or `class='…'`, a
+ * string inside `[class]="…"`, a `[class.x]`, `[attr.class]`, `[className]` or `[ngClass]` binding
+ * (a class from a part's state: the `data-*` style it), or a `cn()`.
  */
 function inlineClasses(template: string): string[] {
     return [
         ...template.matchAll(
-            /\sclass="[^"]*"|\[class\]="[^"]*['`][^"]*"|\[class\.[\w-]+\]|\[ngClass\]|\bcn\(/g,
+            /\sclass=("[^"]*"|'[^']*')|\[class\]="[^"]*['`][^"]*"|\[class\.[\w-]+\]|\[attr\.class\]|\[className\]|\[ngClass\]|\bcn\(/g,
         ),
     ].map((match) => match[0]);
+}
+
+/**
+ * The classes a component's `host` sets itself: only `contents` is allowed, which takes the
+ * component's own element out of the layout (the frame and the flow are its template's).
+ */
+function hostClasses(source: string): string[] {
+    return [
+        ...source.matchAll(/\bhost:\s*\{[^}]*?\bclass:\s*("[^"]*"|'[^']*')/g),
+    ]
+        .map((match) => (match[1] ?? "").slice(1, -1))
+        .filter((value) => value !== "contents");
 }
 
 let examples: ExampleEntry[] = [];
@@ -163,6 +175,9 @@ describe("the Angular examples", () => {
             expect(/\bcn\(/.test(source), relative(EXAMPLES_DIR, file)).toBe(
                 false,
             );
+            expect(hostClasses(source), relative(EXAMPLES_DIR, file)).toEqual(
+                [],
+            );
         }
     });
 
@@ -175,6 +190,13 @@ describe("the Angular examples", () => {
         expect(
             inlineClasses(`<div [class.active]="n.state()?.selected"></div>`),
         ).toHaveLength(1);
+        expect(inlineClasses("<div class='flex'></div>")).toHaveLength(1);
+        expect(inlineClasses(`<div [attr.class]="x"></div>`)).toHaveLength(1);
+        expect(inlineClasses(`<div [className]="x"></div>`)).toHaveLength(1);
+        expect(hostClasses(`host: { class: "contents" }`)).toEqual([]);
+        expect(
+            hostClasses(`host: { "data-x": "", class: "flex gap-2" }`),
+        ).toEqual(["flex gap-2"]);
         expect(inlineClasses(`<div [ngClass]="classes"></div>`)).toHaveLength(
             1,
         );

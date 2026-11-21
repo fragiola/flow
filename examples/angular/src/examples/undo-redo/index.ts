@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject, signal } from "@angular/core";
+import { Component, DestroyRef, DOCUMENT, inject, signal } from "@angular/core";
 import {
     createFlowModel,
     FLOW,
@@ -53,7 +53,7 @@ const edges: FlowEdgeInput<Types>[] = [{ id: "a-c", source: "a", target: "c" }];
     imports: [FLOW, LucideUndo2, LucideRedo2],
     // the shortcuts, on the window: a Delete leaves the focus on the page, not in the flow (an app
     // with other editable content would scope them to its editor)
-    host: { class: "contents", "(window:keydown)": "onKeyDown($event)" },
+    host: { class: "contents" },
     template: `
         <div flowRoot [model]="model" [fitView]="{ padding: 0.2, maxZoom: 1 }" [class]="styles.root">
             <svg flowBackground variant="dots" [size]="2" [class]="styles.dots"></svg>
@@ -135,13 +135,16 @@ export default class UndoRedo {
         const stop = this.history.subscribe(() =>
             this.snapshot.set(this.history.getSnapshot()),
         );
+        // the shortcuts, page-wide: a plain listener, not a host binding, which would check the
+        // whole template (every node) on every key press, an arrow's move included
+        const window = inject(DOCUMENT).defaultView;
+        const onKeyDown = (event: KeyboardEvent) =>
+            handleUndoKeys(this.history, event);
+        window?.addEventListener("keydown", onKeyDown);
         inject(DestroyRef).onDestroy(() => {
+            window?.removeEventListener("keydown", onKeyDown);
             stop();
             this.history.dispose();
         });
-    }
-
-    protected onKeyDown(event: KeyboardEvent): void {
-        handleUndoKeys(this.history, event);
     }
 }

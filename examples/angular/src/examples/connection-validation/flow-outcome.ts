@@ -16,7 +16,7 @@ import { styles } from "./styles";
         </div>
     `,
 })
-export class FlowOutcome {
+export class Outcome {
     protected readonly styles = styles;
     protected readonly ports = PORTS;
     protected readonly outcome = signal("Drag from an output to an input.");

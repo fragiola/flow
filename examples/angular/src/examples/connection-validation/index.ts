@@ -11,7 +11,7 @@ import {
 import { connection } from "@fragiola/flow-angular/connection";
 import { drag } from "@fragiola/flow-angular/drag";
 import { selection } from "@fragiola/flow-angular/selection";
-import { FlowOutcome } from "./flow-outcome";
+import { Outcome } from "./flow-outcome";
 import { styles } from "./styles";
 
 // Connection rules are middleware, not a callback: `model.use` sees every `edge.add`, from a drag
@@ -120,7 +120,7 @@ const portTop = (index: number, count: number) =>
 
 @Component({
     selector: "example-connection-validation",
-    imports: [FLOW, FlowOutcome],
+    imports: [FLOW, Outcome],
     host: { class: "contents" },
     template: `
         <div flowRoot [model]="model" [fitView]="{ padding: 0.2, maxZoom: 1 }" [class]="styles.root">

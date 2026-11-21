@@ -1,4 +1,4 @@
-import { Component } from "@angular/core";
+import { Component, inject } from "@angular/core";
 import {
     createFlowModel,
     FLOW,
@@ -7,7 +7,11 @@ import {
     type FlowTypes,
 } from "@fragiola/flow-angular";
 import { drag } from "@fragiola/flow-angular/drag";
-import { FLOW_MINIMAP, minimap } from "@fragiola/flow-angular/minimap";
+import {
+    FLOW_MINIMAP,
+    FlowMiniMapDirective,
+    minimap,
+} from "@fragiola/flow-angular/minimap";
 import { selection } from "@fragiola/flow-angular/selection";
 import {
     LucideLock,
@@ -71,11 +75,33 @@ const edges: FlowEdgeInput<Types>[] = ROUTE.slice(1).map((target, index) => ({
     type: "straight",
 }));
 
+/**
+ * The minimap's content: a `flowMiniMapNode` per node and the mask, from the minimap's view. A
+ * component of its own, on the minimap's element: its view changes on every pan and drag step, and
+ * only this template reads it (in the example's template it would check every node again).
+ */
+@Component({
+    selector: "svg[exampleRouteMinimap]",
+    imports: [FLOW_MINIMAP],
+    template: `
+        @for (item of map.state().view.nodes; track item.nodeId) {
+            <!-- a minimap node leaves the document until it is measured: a group keeps its place -->
+            <svg:g><svg:rect flowMiniMapNode [nodeId]="item.nodeId" [class]="styles.minimapNode" /></svg:g>
+        }
+        <svg:path flowMiniMapMask [class]="styles.minimapMask" />
+    `,
+})
+class RouteMinimap {
+    protected readonly styles = styles;
+    protected readonly map = inject(FlowMiniMapDirective);
+}
+
 @Component({
     selector: "example-minimap-and-controls",
     imports: [
         FLOW,
         FLOW_MINIMAP,
+        RouteMinimap,
         LucideLock,
         LucideLockOpen,
         LucideMaximize,
@@ -115,13 +141,13 @@ const edges: FlowEdgeInput<Types>[] = ROUTE.slice(1).map((target, index) => ({
             </div>
             <div flowControls role="group" aria-label="Zoom and lock" [class]="styles.controls">
                 <button flowZoomIn aria-label="Zoom in" [class]="styles.control">
-                    <svg lucidePlus></svg>
+                    <svg lucidePlus aria-hidden="true"></svg>
                 </button>
                 <button flowZoomOut aria-label="Zoom out" [class]="styles.control">
-                    <svg lucideMinus></svg>
+                    <svg lucideMinus aria-hidden="true"></svg>
                 </button>
                 <button flowFitView aria-label="Fit view" [class]="styles.control">
-                    <svg lucideMaximize></svg>
+                    <svg lucideMaximize aria-hidden="true"></svg>
                 </button>
                 <button
                     flowToggleInteractive
@@ -130,27 +156,21 @@ const edges: FlowEdgeInput<Types>[] = ROUTE.slice(1).map((target, index) => ({
                     [class]="styles.control"
                 >
                     @if (lock.state().interactive) {
-                        <svg lucideLockOpen></svg>
+                        <svg lucideLockOpen aria-hidden="true"></svg>
                     } @else {
-                        <svg lucideLock></svg>
+                        <svg lucideLock aria-hidden="true"></svg>
                     }
                 </button>
             </div>
             <svg
                 flowMiniMap
-                #map="flowMiniMap"
+                exampleRouteMinimap
                 [width]="180"
                 [height]="130"
                 role="img"
                 aria-label="Minimap of the route"
                 [class]="styles.minimap"
-            >
-                @for (item of map.state().view.nodes; track item.nodeId) {
-                    <!-- a minimap node leaves the document until it is measured: a group keeps its place -->
-                    <svg:g><svg:rect flowMiniMapNode [nodeId]="item.nodeId" [class]="styles.minimapNode" /></svg:g>
-                }
-                <svg:path flowMiniMapMask [class]="styles.minimapMask" />
-            </svg>
+            ></svg>
         </div>
     `,
 })

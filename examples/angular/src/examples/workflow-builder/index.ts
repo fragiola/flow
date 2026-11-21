@@ -1,4 +1,4 @@
-import { Component, computed, input } from "@angular/core";
+import { Component, computed, inject, input } from "@angular/core";
 import {
     createFlowModel,
     createFlowRef,
@@ -8,7 +8,11 @@ import {
 import { connection } from "@fragiola/flow-angular/connection";
 import { drag } from "@fragiola/flow-angular/drag";
 import { keyboard } from "@fragiola/flow-angular/keyboard";
-import { FLOW_MINIMAP, minimap } from "@fragiola/flow-angular/minimap";
+import {
+    FLOW_MINIMAP,
+    FlowMiniMapDirective,
+    minimap,
+} from "@fragiola/flow-angular/minimap";
 import { reconnection } from "@fragiola/flow-angular/reconnection";
 import { selection } from "@fragiola/flow-angular/selection";
 import {
@@ -71,11 +75,34 @@ class Status {
     });
 }
 
+/**
+ * The minimap's content, on the minimap's element: its view changes on every pan and drag step,
+ * and only this template reads it (in the example's template it would check every step again).
+ */
+@Component({
+    selector: "svg[exampleWorkflowMinimap]",
+    imports: [FLOW_MINIMAP],
+    template: `
+        @for (item of map.state().view.nodes; track item.nodeId) {
+            <!-- a minimap node leaves the document while hidden: never an @for's first element -->
+            <svg:g>
+                <svg:rect flowMiniMapNode [nodeId]="item.nodeId" [class]="styles.minimapNode" />
+            </svg:g>
+        }
+        <svg:path flowMiniMapMask [class]="styles.minimapMask" />
+    `,
+})
+class WorkflowMinimap {
+    protected readonly styles = styles;
+    protected readonly map = inject(FlowMiniMapDirective);
+}
+
 @Component({
     selector: "example-workflow-builder",
     imports: [
         FLOW,
         FLOW_MINIMAP,
+        WorkflowMinimap,
         LucideWorkflow,
         LucidePlus,
         LucideMinus,
@@ -162,21 +189,13 @@ class Status {
                 </div>
                 <svg
                     flowMiniMap
-                    #map="flowMiniMap"
+                    exampleWorkflowMinimap
                     [width]="120"
                     [height]="84"
                     role="img"
                     aria-label="Minimap of the workflow"
                     [class]="styles.minimap"
-                >
-                    @for (item of map.state().view.nodes; track item.nodeId) {
-                        <!-- a minimap node leaves the document while hidden: never an @for's first element -->
-                        <svg:g>
-                            <svg:rect flowMiniMapNode [nodeId]="item.nodeId" [class]="styles.minimapNode" />
-                        </svg:g>
-                    }
-                    <svg:path flowMiniMapMask [class]="styles.minimapMask" />
-                </svg>
+                ></svg>
             </div>
             <example-workflow-inspector [model]="model" />
         </div>
