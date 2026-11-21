@@ -137,7 +137,7 @@ What every node has, whatever its type (`NodeFields`):
 | `position` | `XY` | its top-left corner, in flow coordinates (relative to its parent with sub-flows) |
 | `width` | `number` | its width, when the document gives one (the engine measures the rendered one otherwise) |
 | `height` | `number` | its height, when the document gives one |
-| `zIndex` | `number` | its place in the nodes' stacking order: a greater one is drawn above (a child always above its parent); default 0 |
+| `zIndex` | `number` (an integer) | its place in the nodes' stacking order: a greater one is drawn above (a child always above its parent); default 0 |
 
 Its permission flags (`NodeFlags`); an absent flag is its default, and the commands enforce them,
 for the user's gestures and for your code alike:
@@ -182,7 +182,7 @@ What every edge has (`EdgeFields`):
 | `target` | `string` | the node it ends at |
 | `sourceHandle` | `string` | the source node's handle it starts at; none: the node's default source handle |
 | `targetHandle` | `string` | the target node's handle it ends at; none: the node's default target handle |
-| `zIndex` | `number` | its place in the edges' drawing order: a greater one is drawn above (edges stay under the nodes); default 0 |
+| `zIndex` | `number` (an integer) | its place in the edges' drawing order: a greater one is drawn above (edges stay under the nodes); default 0 |
 
 Its flags (`EdgeFlags`):
 

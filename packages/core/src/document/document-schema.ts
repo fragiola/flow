@@ -40,7 +40,7 @@ export const extentSchema = {
 
 /** A node's or an edge's place in its layer's stacking order. */
 export const zIndexSchema = {
-    type: "number",
+    type: "integer",
     description:
         "its place in the stacking order of its layer (nodes among nodes, edges among edges): a greater one is drawn above; default 0",
 } as const;

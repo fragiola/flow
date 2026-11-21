@@ -142,7 +142,7 @@ describe("the edges' drawing order", () => {
 });
 
 describe("zIndex in the document", () => {
-    it("is a number on a node and an edge", () => {
+    it("is an integer on a node and an edge", () => {
         const json = flowOf(
             { a: [0, 0], b: [10, 0] },
             { edges: [{ id: "ab", source: "a", target: "b", zIndex: 3 }] },
@@ -155,8 +155,10 @@ describe("zIndex in the document", () => {
         const bad = flowOf({ a: [0, 0] }) as {
             nodes: Record<string, unknown>[];
         };
-        bad.nodes[0] = { ...bad.nodes[0], zIndex: "1" };
-        expect(() => createFlowModel(bad as never)).toThrow(/zIndex/);
+        for (const zIndex of ["1", 1.5]) {
+            bad.nodes[0] = { ...bad.nodes[0], zIndex };
+            expect(() => createFlowModel(bad as never)).toThrow(/zIndex/);
+        }
     });
 
     it("changed by controlled props, replaces the entity", () => {

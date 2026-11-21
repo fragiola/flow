@@ -27,7 +27,7 @@ Adds a node at the end of the drawing order: its type, position and data, option
 | `data` | `object` | yes | the app's data, a JSON object typed by the node or edge type |
 | `width` | `number` | no | its width, when the document gives one |
 | `height` | `number` | no | its height, when the document gives one |
-| `zIndex` | `number` | no | its place in the stacking order of its layer (nodes among nodes, edges among edges): a greater one is drawn above; default 0 |
+| `zIndex` | `integer` | no | its place in the stacking order of its layer (nodes among nodes, edges among edges): a greater one is drawn above; default 0 |
 | `draggable` | `boolean` | no | it may be moved (`node.move`); default true |
 | `selectable` | `boolean` | no | it may be selected (`selection.set`); default true |
 | `connectable` | `boolean` | no | edges may start or end at it (`edge.add`, `edge.reconnect`); default true |
@@ -286,7 +286,7 @@ Adds an edge from a source node to a target node, optionally between two of thei
 | `targetHandle` | `string` | no | the target node's handle it ends at; none: the node's default target handle |
 | `type` | `string` | no | how it is drawn: "bezier" (the default), "smoothstep", "step", "straight" or an app type |
 | `data` | `object` | no | the app's data, a JSON object typed by the node or edge type |
-| `zIndex` | `number` | no | its place in the stacking order of its layer (nodes among nodes, edges among edges): a greater one is drawn above; default 0 |
+| `zIndex` | `integer` | no | its place in the stacking order of its layer (nodes among nodes, edges among edges): a greater one is drawn above; default 0 |
 | `selectable` | `boolean` | no | it may be selected (`selection.set`); default true |
 | `deletable` | `boolean` | no | it may be removed (`edge.remove`, `selection.remove`); default true |
 | `hidden` | `boolean` | no | it is not shown; default false |

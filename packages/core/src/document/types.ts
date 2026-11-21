@@ -122,7 +122,7 @@ export interface NodeFields extends NodeFlags, SelectionFields, SubflowFields {
     readonly width?: number;
     /** its height, when the document gives one (the engine measures the rendered one) */
     readonly height?: number;
-    /** its place in the nodes' stacking order: a greater one is drawn above; default 0 */
+    /** its place in the nodes' stacking order (an integer): a greater one is drawn above; default 0 */
     readonly zIndex?: number;
 }
 
@@ -148,7 +148,7 @@ export interface EdgeFields extends EdgeFlags, SelectionFields {
     readonly sourceHandle?: string;
     /** the target node's handle it ends at (none: the node's only, or default, target handle) */
     readonly targetHandle?: string;
-    /** its place in the edges' drawing order: a greater one is drawn above; default 0 */
+    /** its place in the edges' drawing order (an integer): a greater one is drawn above; default 0 */
     readonly zIndex?: number;
 }
 
