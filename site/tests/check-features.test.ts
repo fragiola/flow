@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -35,6 +35,43 @@ describe("the features' bundle guard", () => {
             .filter((key) => key !== "." && key !== "./package.json")
             .map((key) => key.slice(2));
         expect(FEATURES.map((feature) => feature.subpath)).toEqual(subpaths);
+    });
+
+    it("covers the adapters' feature entries too: each mirrors the core's", () => {
+        for (const pkg of readdirSync(join(root, "packages"))) {
+            const manifest = JSON.parse(
+                readFileSync(
+                    join(root, "packages", pkg, "package.json"),
+                    "utf8",
+                ),
+            ) as { exports: Record<string, unknown> };
+            const subpaths = Object.keys(manifest.exports)
+                .filter((key) => key !== "." && key !== "./package.json")
+                .map((key) => key.slice(2));
+            for (const subpath of subpaths) {
+                expect(
+                    FEATURES.map((feature) => feature.subpath),
+                    `${pkg}: ${subpath}`,
+                ).toContain(subpath);
+            }
+        }
+    });
+
+    it("fails an adapter's main entry built from the adapter's own feature folder", () => {
+        const { read, readMap } = built(
+            {
+                "index.js":
+                    'import { m } from "./mini-map-1.js";\nexport { m };',
+                "mini-map-1.js": "export const m = 1;",
+            },
+            {
+                "index.js": ["../src/index.ts"],
+                "mini-map-1.js": ["../src/minimap/mini-map.tsx"],
+            },
+        );
+        expect(featureLeaks("index.js", read, readMap)).toEqual([
+            "mini-map-1.js: minimap's ../src/minimap/mini-map.tsx",
+        ]);
     });
 
     it("passes a main entry, and its chunks, built from the core's own sources", () => {

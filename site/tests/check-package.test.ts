@@ -7,6 +7,8 @@ import {
     exportProblems,
     publishedExportsProblems,
     relativeTo,
+    servedImports,
+    smokeVersion,
     unlistedPackages,
     withoutSource,
 } from "../../scripts/check-package.ts";
@@ -107,6 +109,14 @@ describe("the packed package check", () => {
         expect(relativeTo(published, "out")).toEqual(published);
     });
 
+    it("lists the absolute imports of a module the dev server served", () => {
+        expect(
+            servedImports(
+                'import "/@vite/client";\nimport { Flow } from "/node_modules/.vite/deps/x.js?v=1";\nimport React from "react";',
+            ),
+        ).toEqual(["/@vite/client", "/node_modules/.vite/deps/x.js?v=1"]);
+    });
+
     it("passes on the core's own manifest", () => {
         const core = JSON.parse(
             readFileSync(
@@ -124,22 +134,53 @@ describe("the packed package check", () => {
 // Every package under packages/ but the core is an adapter, and each adapter is checked the same
 // way: its exact core pin and its own smoke app. Each adapter Epic adds its entry to ADAPTERS.
 describe("the adapters the package check covers", () => {
-    it("are every package of packages/ but the core", () => {
+    it("are every package of packages/ but the core, React first", () => {
         const dirs = readdirSync(join(import.meta.dirname, "../../packages"));
         expect(dirs).toContain("core");
         expect(unlistedPackages(dirs)).toEqual([]);
         expect(ADAPTERS.map((adapter) => adapter.dir).sort()).toEqual(
             dirs.filter((dir) => dir !== "core").sort(),
         );
+        expect(ADAPTERS[0]?.dir).toBe("react");
+    });
+
+    it("smoke-test each adapter with its own framework's app", () => {
+        expect(ADAPTERS.map(({ dir, framework }) => [dir, framework])).toEqual([
+            ["react", "react"],
+        ]);
+    });
+
+    it("pin the React smoke app at the repo's versions, so it installs nothing new", () => {
+        const react = JSON.parse(
+            readFileSync(
+                join(import.meta.dirname, "../../packages/react/package.json"),
+                "utf8",
+            ),
+        ) as { devDependencies: Record<string, string> };
+        for (const name of [
+            "react",
+            "react-dom",
+            "@types/react",
+            "typescript",
+            "vite",
+        ]) {
+            expect(smokeVersion("react", name), name).toBe(
+                react.devDependencies[name],
+            );
+        }
+        expect(smokeVersion("react", "@vitejs/plugin-react")).toMatch(
+            /^\d+\.\d+\.\d+$/,
+        );
+        expect(() => smokeVersion("react", "left-pad")).toThrow(/no pin/);
     });
 
     it("finds a package that is neither the core nor a listed adapter", () => {
-        const dirs = ["core", "react", "solid"];
-        expect(unlistedPackages(dirs)).toEqual(["react", "solid"]);
+        const dirs = ["core", "react", "vue", "solid"];
+        expect(unlistedPackages(dirs)).toEqual(["vue", "solid"]);
         expect(
             unlistedPackages(dirs, [
                 ...ADAPTERS,
-                { dir: "react", framework: "react", smoke: async () => {} },
+                { dir: "vue", framework: "vue", smoke: async () => {} },
             ]),
         ).toEqual(["solid"]);
     });
