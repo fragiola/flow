@@ -576,7 +576,9 @@ band after it), then Sections.
 **Kept honest by tests** (`site/tests/`): `contract.test.ts` (the sources pass the contract checks,
 and each check catches what it should), `docs-reference.test.ts` (every export of the React
 package and of its `/minimap` and `/resize` entries is on its page, every field of every exported
-props, state, options or result interface is a table row, every primitive has its page; every
+props, state, options or result interface is a table row, every primitive has its page, and the
+tables under a primitive's `## Props` and `## State` hold exactly its props and its state's
+fields, both ways (a stale row fails too); every
 core and feature-entry export is mentioned on an API page, every model and engine key and engine
 event is listed, and the members, error codes, document fields, engine payloads, feature options
 and path helper options have rows; every registry command has its section on the generated
@@ -592,6 +594,9 @@ Decisions of #7:
   package ships before its embed app.
 - **No sidebar icons** (contract v1.4, optional), like Dockable and Splitter: an icon for every
   section or none, so none until they are decided for every library.
+- **Known limit of the reference test:** the `## Data attributes` tables are hand-written and not
+  compared with `engine.adapter.attributes` (only `data-flow-part` is required on every primitive
+  page); a new state attribute needs its row by review.
 - **Primitive pages live under `api/primitives/`** (the examples' metadata already linked there),
   the core's under `api/` (where `api/commands.mdx` is generated).
 

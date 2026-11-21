@@ -262,6 +262,31 @@ function expectRows(
     return checked;
 }
 
+/** The part of a page under `## <heading>`, up to the next `##` heading. */
+function sectionOf(mdx: string, heading: string): string {
+    const start = mdx.search(new RegExp(`^## ${heading}$`, "m"));
+    expect(start, `## ${heading}`).toBeGreaterThanOrEqual(0);
+    const rest = mdx.slice(start + heading.length + 3);
+    const end = rest.search(/^## /m);
+    return end === -1 ? rest : rest.slice(0, end);
+}
+
+/**
+ * The fields of a primitive's state, wherever it is declared: `<Name>State` in any module (a
+ * node's is its hook's, `NodeState`), the control buttons' shared `ControlButtonState`.
+ */
+function stateFields(name: string): string[] {
+    const interfaceName = ["Controls", "ZoomIn", "ZoomOut", "FitView"].includes(
+        name,
+    )
+        ? "ControlButtonState"
+        : `${name}State`;
+    const declaring = REACT_FILES.find((file) =>
+        interfaceFields(file, interfaceName),
+    );
+    return declaring ? allFields(declaring, interfaceName) : [];
+}
+
 const index = read(join(REACT_SRC, "index.ts"));
 const parts = read(join(REACT_SRC, "parts.ts"));
 const indexExports = namedExports(index);
@@ -419,37 +444,51 @@ describe("the React reference", () => {
         expect(checked).toBeGreaterThan(140);
     });
 
-    it("has a row for every prop and every state field of every primitive", () => {
-        for (const { name, slug, source } of primitives) {
-            expect(source, `${name}Props`).toMatch(
-                new RegExp(`export interface ${name}Props\\b`),
-            );
-            const rows = tableRowNames(page(slug));
-            for (const field of allFields(source, `${name}Props`)) {
-                expect(
-                    rows.has(field),
-                    `${name}.${field} on api/${slug}.mdx`,
-                ).toBe(true);
-            }
-            for (const field of allFields(source, `${name}State`)) {
-                expect(
-                    rows.has(field),
-                    `${name}State.${field} on api/${slug}.mdx`,
-                ).toBe(true);
-            }
-        }
-        // the root's engine props are a Pick of the engine's options: each one is a row too
+    it("has a row for every prop and every state field of every primitive, and no other", () => {
+        // the root's engine props are a Pick of the engine's options: each one is a prop too
         const root = read(join(REACT_SRC, "components/root.tsx"));
         const picked =
             /export type RootEngineProps = Pick<[\s\S]*?,([\s\S]*?)>;/.exec(
                 root,
             )?.[1] ?? "";
-        const keys = [...picked.matchAll(/"(\w+)"/g)].map((m) => m[1] ?? "");
-        expect(keys.length).toBeGreaterThan(10);
-        const rows = tableRowNames(page("primitives/root"));
-        for (const key of keys) {
-            expect(rows.has(key), `Root.${key}`).toBe(true);
+        const engineProps = [...picked.matchAll(/"(\w+)"/g)].map(
+            (m) => m[1] ?? "",
+        );
+        expect(engineProps.length).toBeGreaterThan(10);
+        let states = 0;
+        for (const { name, slug, source } of primitives) {
+            expect(source, `${name}Props`).toMatch(
+                new RegExp(`export interface ${name}Props\\b`),
+            );
+            const mdx = page(slug);
+            const props = [
+                ...allFields(source, `${name}Props`),
+                ...(name === "Root" ? engineProps : []),
+            ];
+            const state = stateFields(name);
+            if (state.length > 0) states++;
+            for (const [section, fields] of [
+                ["Props", props],
+                ["State", state],
+            ] as const) {
+                const rows = tableRowNames(sectionOf(mdx, section));
+                for (const field of fields) {
+                    expect(
+                        rows.has(field),
+                        `${name}: ${field} under ## ${section} of api/${slug}.mdx`,
+                    ).toBe(true);
+                }
+                // a row of a prop or field that no longer exists fails too
+                for (const row of rows) {
+                    expect(
+                        fields,
+                        `${name}: ## ${section} of api/${slug}.mdx has a row for ${row}`,
+                    ).toContain(row);
+                }
+            }
         }
+        // every primitive shows a state (a lookup that finds nothing must not pass silently)
+        expect(states).toBe(primitives.length);
     });
 
     it("documents the common props on the root page, linked from every primitive", () => {

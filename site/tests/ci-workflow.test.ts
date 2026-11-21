@@ -133,7 +133,15 @@ describe("the CI workflow", () => {
                 (need) => all[need]?.if === "github.event_name != 'push'",
             );
             expect(skipsPush || needsOne, `${id} runs on a push`).toBe(true);
+            // a skipped need skips a job only while its condition does not override it
+            if (!skipsPush) {
+                expect(job.if ?? "", id).not.toMatch(
+                    /always\(\)|cancelled\(\)|failure\(\)/,
+                );
+            }
         }
+        // a job condition is one line: a block scalar would hide it from the check
+        expect(workflow).not.toMatch(/^ {4}if: [>|]/m);
         expect(
             jobs(
                 "jobs:\n  a:\n    if: x\n    needs: b\n    steps:\n  b:\n    needs: [a, c]\n",
