@@ -40,16 +40,36 @@ export interface ResizeHandleProps
     children?: React.ReactNode;
 }
 
-/** Where a handle sits: a corner's centre on the corner, a side's along the side. */
+/**
+ * Where a handle sits: a corner's centre on the corner, a side's along the side. A corner is above
+ * the two sides it joins (`zIndex`), so a press on it resizes both dimensions, whatever the order
+ * of the handles.
+ */
 const PLACE: Record<ResizePosition, React.CSSProperties> = {
-    "top-left": { top: 0, left: 0, transform: "translate(-50%, -50%)" },
-    "top-right": { top: 0, left: "100%", transform: "translate(-50%, -50%)" },
+    "top-left": {
+        top: 0,
+        left: 0,
+        transform: "translate(-50%, -50%)",
+        zIndex: 1,
+    },
+    "top-right": {
+        top: 0,
+        left: "100%",
+        transform: "translate(-50%, -50%)",
+        zIndex: 1,
+    },
     "bottom-right": {
         top: "100%",
         left: "100%",
         transform: "translate(-50%, -50%)",
+        zIndex: 1,
     },
-    "bottom-left": { top: "100%", left: 0, transform: "translate(-50%, -50%)" },
+    "bottom-left": {
+        top: "100%",
+        left: 0,
+        transform: "translate(-50%, -50%)",
+        zIndex: 1,
+    },
     top: { top: 0, left: 0, width: "100%", transform: "translateY(-50%)" },
     bottom: {
         top: "100%",

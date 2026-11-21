@@ -112,6 +112,12 @@ describe("features", () => {
         const corner = container.querySelector(
             '[data-position="bottom-right"]',
         ) as HTMLElement;
+        // a corner is above the full-length sides it joins: a press on it is the corner's
+        expect(corner.style.zIndex).toBe("1");
+        expect(
+            (container.querySelector('[data-position="right"]') as HTMLElement)
+                .style.zIndex,
+        ).toBe("");
         drag(corner, part(container, "root"), [
             { clientX: 100, clientY: 40 },
             { clientX: 300, clientY: 80 },
