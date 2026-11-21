@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createFlowModel, createFlowRef, type FlowModel } from "../src/index";
 import TestFlow from "./fixtures/test-flow.svelte";
 import { installLayout, pair, part, render, task } from "./flow";
 
@@ -74,5 +75,34 @@ describe("rendering a flow", () => {
         expect(part(container, "edge", "ab")).toBeInTheDocument();
         unmount();
         expect(container.querySelector('[data-flow-part="root"]')).toBeNull();
+    });
+
+    it("releases everything on unmount: the engine, the model's listeners, the flow ref and the labels it mounted", async () => {
+        const model = createFlowModel({
+            version: 1,
+            ...pair(),
+        }) as unknown as FlowModel;
+        const flow = createFlowRef();
+        const onnodeschange = vi.fn();
+        const { container, unmount } = await render(TestFlow, {
+            model,
+            flowRef: flow,
+            onnodeschange,
+            label: true,
+        });
+        expect(part(container, "edge-label", "ab")).toBeInTheDocument();
+        const engine = flow.current?.engine;
+        expect(engine?.get("viewport")).toEqual({ x: 0, y: 0, zoom: 1 });
+        unmount();
+        expect(flow.current).toBeNull();
+        expect(document.querySelector("[data-flow-part]")).toBeNull();
+        // the facade an app may still hold forwards to no engine: its actions are refused
+        expect(engine?.run("fit-view").ok).toBe(false);
+        // the model outlives the root, which no longer listens to it
+        expect(
+            model.run("node.move", { nodeId: "a", position: { x: 10, y: 10 } })
+                .ok,
+        ).toBe(true);
+        expect(onnodeschange).not.toHaveBeenCalled();
     });
 });
