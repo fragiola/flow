@@ -85,7 +85,8 @@ let mounted: (() => void)[] = [];
 
 /** Unmounts every flow mounted since the last call (in `afterEach`). */
 export function unmountAll(): void {
-    for (const unmount of mounted) unmount();
+    // last mounted first: frames installed before a flow outlive its destroy
+    for (const unmount of mounted.reverse()) unmount();
     mounted = [];
     document.body.innerHTML = "";
     FakeResizeObserver.instances = [];
@@ -103,6 +104,56 @@ function box(left: number, top: number, width: number, height: number) {
         bottom: top + height,
         toJSON: () => ({}),
     } as DOMRect;
+}
+
+/** Fake animation frames on the test window (the root's `defaultView`). */
+export interface FakeFrames {
+    /** the frames requested and not yet run nor cancelled */
+    readonly pending: number;
+    /** runs the frames pending now, `ms` milliseconds after the last ones */
+    frame(ms?: number): void;
+    /** runs frames, `ms` apart, until none is pending (at most `limit`) */
+    flush(ms?: number, limit?: number): void;
+}
+
+/** Installs fake `requestAnimationFrame` / `cancelAnimationFrame` on the window until `unmountAll`. */
+export function installFrames(): FakeFrames {
+    const view = window as Window & {
+        requestAnimationFrame: Window["requestAnimationFrame"] | undefined;
+        cancelAnimationFrame: Window["cancelAnimationFrame"] | undefined;
+    };
+    const request = view.requestAnimationFrame;
+    const cancel = view.cancelAnimationFrame;
+    const queue = new Map<number, FrameRequestCallback>();
+    let now = 1000;
+    let next = 1;
+    view.requestAnimationFrame = (callback) => {
+        const id = next++;
+        queue.set(id, callback);
+        return id;
+    };
+    view.cancelAnimationFrame = (id) => {
+        queue.delete(id);
+    };
+    mounted.push(() => {
+        view.requestAnimationFrame = request;
+        view.cancelAnimationFrame = cancel;
+    });
+    const frame = (ms = 16) => {
+        now += ms;
+        const due = [...queue.values()];
+        queue.clear();
+        for (const callback of due) callback(now);
+    };
+    return {
+        get pending() {
+            return queue.size;
+        },
+        frame,
+        flush: (ms = 16, limit = 1000) => {
+            for (let i = 0; i < limit && queue.size > 0; i++) frame(ms);
+        },
+    };
 }
 
 /** Mounts a flow: a model of `json`, its engine on a laid-out root. */
