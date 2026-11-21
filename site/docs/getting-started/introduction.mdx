@@ -6,8 +6,8 @@ description: What the package does for a node-based editor (panning, zooming, dr
 A node-based editor shows **nodes** joined by **edges** on a canvas you pan and zoom: a workflow
 builder, a data pipeline, a mind map, a state machine. Each node has **handles**, the points an
 edge starts or ends at, and a user draws a **connection** from one handle to another to add an
-edge. `@fragiola/flow-react` gives you that behaviour as headless primitives under one namespace,
-`Flow.*`, over a framework-free core, `@fragiola/flow`.
+edge. `@fragiola/flow-react` (React 19) and `@fragiola/flow-vue` (Vue 3.5) give you that behaviour
+as headless primitives under one namespace, `Flow.*`, over a framework-free core, `@fragiola/flow`.
 
 What the package gives you:
 
@@ -27,6 +27,8 @@ names and no text. It writes only structural inline style (a node's position, th
 transform) and exposes its state as `data-*` attributes, so Tailwind, plain CSS, CSS modules or
 CSS-in-JS all work. You render each node's content, name every part for assistive technology, and
 decide what an announcement says.
+
+<Framework name="react">
 
 ```tsx title="pipeline.tsx"
 import { Flow, type FlowNodeInput } from "@fragiola/flow-react";
@@ -72,6 +74,52 @@ export function Pipeline() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="pipeline.vue"
+<script setup lang="ts">
+import { Flow, type FlowNodeInput } from "@fragiola/flow-vue";
+import { connection } from "@fragiola/flow-vue/connection";
+import { drag } from "@fragiola/flow-vue/drag";
+
+const features = [drag(), connection()] as const;
+
+const nodes: FlowNodeInput[] = [
+    { id: "read", type: "step", position: { x: 0, y: 0 }, data: { label: "Read" } },
+    { id: "write", type: "step", position: { x: 0, y: 120 }, data: { label: "Write" } },
+];
+</script>
+
+<template>
+    <Flow.Root
+        :features="features"
+        :default-nodes="nodes"
+        :default-edges="[{ id: 'read-write', source: 'read', target: 'write' }]"
+        class="h-96 bg-gray-50"
+    >
+        <Flow.Viewport>
+            <Flow.Edges v-slot="{ edge }">
+                <Flow.Edge :edge="edge">
+                    <Flow.EdgePath class="stroke-gray-400" />
+                </Flow.Edge>
+            </Flow.Edges>
+            <Flow.Nodes v-slot="{ node }">
+                <Flow.Node :node="node" class="rounded border bg-white px-3 py-2 select-none">
+                    {{ String(node.data.label) }}
+                    <Flow.Handle type="target" side="top" class="size-2 rounded-full bg-gray-500" />
+                    <Flow.Handle type="source" side="bottom" class="size-2 rounded-full bg-gray-500" />
+                </Flow.Node>
+            </Flow.Nodes>
+            <Flow.ConnectionLine class="stroke-blue-500" />
+        </Flow.Viewport>
+    </Flow.Root>
+</template>
+```
+
+</Framework>
+
 Nothing above is styled by the package: remove the class names and you get the same structure,
 with the same behaviour, unstyled.
 
@@ -82,8 +130,8 @@ with the same behaviour, unstyled.
 | the document | `{ version: 1, nodes, edges }`, plain JSON | the model ([Nodes and edges](/docs/concepts/nodes-and-edges)) |
 | the model | the document and its rules: every change is a command | `@fragiola/flow` ([The model and commands](/docs/concepts/model-and-commands)) |
 | the engine | the flow on screen: the viewport, measurement, gestures, edge paths | `@fragiola/flow` ([Model and engine](/docs/concepts/model-and-engine)) |
-| the features | opt-in behaviour, each from its own entry | `@fragiola/flow-react/<feature>` ([Features](/docs/concepts/features)) |
-| the primitives | `Flow.Root`, `Flow.Node`, `Flow.Handle`, `Flow.Edge`, … | `@fragiola/flow-react` ([Composition](/docs/concepts/composition)) |
+| the features | opt-in behaviour, each from its own entry | `@fragiola/flow-react/<feature>`, `@fragiola/flow-vue/<feature>` ([Features](/docs/concepts/features)) |
+| the primitives | `Flow.Root`, `Flow.Node`, `Flow.Handle`, `Flow.Edge`, … | `@fragiola/flow-react`, `@fragiola/flow-vue` ([Composition](/docs/concepts/composition)) |
 
 ## What it never ships
 

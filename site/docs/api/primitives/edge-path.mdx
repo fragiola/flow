@@ -8,6 +8,8 @@ description: Flow.EdgePath is an edge's SVG path, its d computed by the engine f
 default child of `Flow.Edge`. Give it its stroke in your style, through `data-selected` for the
 selected look.
 
+<Framework name="react">
+
 ```tsx
 <Flow.Edge<Types> edge={edge}>
     {/* a wide transparent path: a bigger press target */}
@@ -16,8 +18,24 @@ selected look.
 </Flow.Edge>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Edge :edge="edge">
+    <!-- a wide transparent path: a bigger press target -->
+    <Flow.EdgePath class="stroke-transparent stroke-[16]" />
+    <Flow.EdgePath class="stroke-gray-400 stroke-2 data-selected:stroke-blue-500" />
+</Flow.Edge>
+```
+
+</Framework>
+
 A `d` of your own draws an app type: read the ends from `state.path` (`render` gets the state) or
 from [`useEdge`](/docs/api/primitives/hooks).
+
+<Framework name="react">
 
 ```tsx
 <Flow.EdgePath
@@ -28,6 +46,25 @@ from [`useEdge`](/docs/api/primitives/hooks).
     }}
 />
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.EdgePath>
+    <template #render="{ props, state }">
+        <path
+            v-bind="props"
+            :d="`M${state.path.source.x},${state.path.source.y} V${(state.path.source.y + state.path.target.y) / 2} H${state.path.target.x} V${state.path.target.y}`"
+        />
+    </template>
+</Flow.EdgePath>
+```
+
+In Vue, the render function is the `render` scoped slot: bind `v-bind="props"`, then your own `d`.
+
+</Framework>
 
 ## Props
 

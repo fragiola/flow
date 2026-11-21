@@ -3,13 +3,25 @@ title: MiniMapMask
 description: MiniMapMask covers the MiniMap everywhere but what the root shows, an evenodd SVG path you fill to dim what is off screen.
 ---
 
-`MiniMapMask` comes from `@fragiola/flow-react/minimap` and goes inside `MiniMap`, after its
+`MiniMapMask` comes from `@fragiola/flow-react/minimap` (`@fragiola/flow-vue/minimap`) and goes inside `MiniMap`, after its
 nodes. It renders an SVG `path` (the view's `maskPath`, `fill-rule="evenodd"`) covering the map
 but the rectangle the root shows. Give it its fill.
+
+<Framework name="react">
 
 ```tsx
 <MiniMapMask className="fill-black/10 stroke-blue-500" />
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<MiniMapMask class="fill-black/10 stroke-blue-500" />
+```
+
+</Framework>
 
 ## Props
 

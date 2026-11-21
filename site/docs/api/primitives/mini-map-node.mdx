@@ -3,9 +3,11 @@ title: MiniMapNode
 description: MiniMapNode is one node in the MiniMap, a rectangle of the node's box in flow coordinates, marked while the node is selected.
 ---
 
-`MiniMapNode` comes from `@fragiola/flow-react/minimap` and goes inside `MiniMap`. It renders an
+`MiniMapNode` comes from `@fragiola/flow-react/minimap` (`@fragiola/flow-vue/minimap`) and goes inside `MiniMap`. It renders an
 SVG `rect` of its node's box from the minimap's view, in flow coordinates, and nothing when the
 node is not shown. Give it its fill, through `data-selected` for the selected look.
+
+<Framework name="react">
 
 ```tsx
 <MiniMap>
@@ -16,6 +18,23 @@ node is not shown. Give it its fill, through `data-selected` for the selected lo
     }
 </MiniMap>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<MiniMap v-slot="{ view }">
+    <MiniMapNode
+        v-for="node in view.nodes"
+        :key="node.nodeId"
+        :node-id="node.nodeId"
+        class="fill-gray-300 data-selected:fill-blue-500"
+    />
+</MiniMap>
+```
+
+</Framework>
 
 ## Props
 

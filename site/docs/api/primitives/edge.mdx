@@ -9,6 +9,8 @@ nothing until the edge has a path (both nodes measured). Its children are its pa
 transparent one as a bigger press target). A press on its stroke selects it (`selection()`); with
 `keyboard()` it takes `tabIndex={0}`.
 
+<Framework name="react">
+
 ```tsx
 <Flow.Edges<Types>>
     {(edge) => (
@@ -19,6 +21,23 @@ transparent one as a bigger press target). A press on its stroke selects it (`se
     )}
 </Flow.Edges>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Edges v-slot="{ edge }">
+    <Flow.Edge :edge="edge" :aria-label="`${edge.source} to ${edge.target}`">
+        <Flow.EdgePath class="stroke-gray-400 stroke-2" />
+        <Flow.EdgeLabel v-if="edge.data?.label">{{ edge.data.label }}</Flow.EdgeLabel>
+    </Flow.Edge>
+</Flow.Edges>
+```
+
+In Vue, its default slot (its parts) gets `{ state }`, the `EdgeState` of the table below.
+
+</Framework>
 
 The path follows the edge's `type`: `bezier` (none is `bezier`), `smoothstep`, `step`,
 `straight`. An app type gets the bezier path and its ends, to draw its own `d` on

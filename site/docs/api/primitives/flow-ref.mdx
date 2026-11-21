@@ -5,12 +5,15 @@ description: A flow ref gives the model and the engine of a root to code outside
 
 A flow ref is how code outside `Flow.Root` reaches its model and engine: pass it as the root's
 `flowRef`, and `ref.current` is `{ model, engine }` while the root is mounted, `null` otherwise.
+In Vue it is `:flow-ref`, and `flow.value` holds them.
 Inside the root, [`useFlow`](/docs/api/primitives/hooks) is simpler.
 
 ## `useFlowRef`
 
 `useFlowRef<T, F>()` keeps a ref in the component and re-renders it when the root mounts or
 unmounts, so `flow.current` may be read in render (a toolbar next to the flow) or in handlers.
+
+<Framework name="react">
 
 ```tsx
 import { Flow, useFlowRef } from "@fragiola/flow-react";
@@ -30,16 +33,54 @@ export function Editor() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="editor.vue"
+<script setup lang="ts">
+import { typedFlow, useFlowRef } from "@fragiola/flow-vue";
+
+const Flow = typedFlow<Types, typeof features>();
+const flow = useFlowRef<Types, typeof features>();
+</script>
+
+<template>
+    <button type="button" :disabled="!flow.value" @click="flow.value?.engine.run('fit-view')">Fit</button>
+    <Flow.Root :flow-ref="flow" :features="features" :default-nodes="nodes">…</Flow.Root>
+</template>
+```
+
+In Vue, the flow ref's `value` is reactive (a template that reads it re-renders when the root
+mounts or unmounts), and it is not a Vue ref: a template does not unwrap it, so `:flow-ref="flow"`
+passes the flow ref itself and the template reads `flow.value`, as a script does.
+
+</Framework>
+
 ## `createFlowRef`
 
-`createFlowRef<T, F>()` makes one outside React (a module, a test). It does not re-render
+`createFlowRef<T, F>()` makes one outside a component (a module, a test). It does not re-render
 anything when it attaches.
+
+<Framework name="react">
 
 ```ts
 const flow = createFlowRef<Types, typeof features>();
 // <Flow.Root flowRef={flow} …>
 flow.current?.model.run("node.add", { type: "step", position: { x: 0, y: 0 }, data: { label: "New" } });
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+const flow = createFlowRef<Types, typeof features>();
+// <Flow.Root :flow-ref="flow" …>
+flow.value?.model.run("node.add", { type: "step", position: { x: 0, y: 0 }, data: { label: "New" } });
+```
+
+</Framework>
 
 ## Types
 
@@ -55,3 +96,6 @@ flow.current?.model.run("node.add", { type: "step", position: { x: 0, y: 0 }, da
 | --- | --- | --- |
 | `model` | `FlowModel<T, F>` | the root's model ([model](/docs/api/model)) |
 | `engine` | `FlowEngine<T, F>` | the root's engine ([engine](/docs/api/engine)) |
+
+In Vue, a `FlowRef<T, F>` holds the same `FlowRefValue<T, F>` in `value`, not `current`
+([Vue components](/docs/api/primitives/vue#flow-ref)).

@@ -105,7 +105,7 @@ model.is("node-deletable", { nodeId: "fetch" });
 ```
 
 In a component under the root, `useNodes()` and `useEdges()` re-render on every change, and
-`useSelection()` when the selection changes ([Hooks](/docs/api/primitives/hooks)).
+`useSelection()` when the selection changes (in Vue, computed refs that change then) ([Hooks](/docs/api/primitives/hooks)).
 
 ## Controlled or not
 
@@ -113,6 +113,8 @@ The root creates its model from `defaultNodes` and `defaultEdges`, read once. Or
 give `nodes` and `edges` with `onNodesChange` and `onEdgesChange`, and the root brings the model
 to your lists with the commands a user would have run, so middleware and listeners still see
 every change.
+
+<Framework name="react">
 
 ```tsx
 const [nodes, setNodes] = useState<readonly FlowNode<Types>[]>(initialNodes);
@@ -127,5 +129,29 @@ const [nodes, setNodes] = useState<readonly FlowNode<Types>[]>(initialNodes);
 </Flow.Root>;
 ```
 
-Controlled nodes need every id. Keep the children functions stable when the app re-renders on each
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import type { FlowNode } from "@fragiola/flow-vue";
+import { shallowRef } from "vue";
+
+// the model's lists are frozen: a shallowRef keeps them as they are
+const nodes = shallowRef<readonly FlowNode<Types>[]>(initialNodes);
+</script>
+
+<template>
+    <Flow.Root :features="features" v-model:nodes="nodes" :default-edges="edges">…</Flow.Root>
+</template>
+```
+
+In Vue, `nodes` + `onNodesChange` is `v-model:nodes` (and `v-model:edges`): the root emits
+`update:nodes` with the model's list after every change, and each node's slot is its own
+component, so a new list re-renders the nodes that changed only.
+
+</Framework>
+
+Controlled nodes need every id. In React, keep the children functions stable when the app re-renders on each
 change (a module function, `useCallback`), or every node re-renders.

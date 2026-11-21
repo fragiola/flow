@@ -3,7 +3,7 @@ title: NodeResizer
 description: NodeResizer holds the resize handles of a node, with that node's own size limits and aspect ratio over the resize() feature's.
 ---
 
-`NodeResizer` comes from `@fragiola/flow-react/resize`, with the `resize()` feature it needs. It
+`NodeResizer` comes from `@fragiola/flow-react/resize` (`@fragiola/flow-vue/resize`), with the `resize()` feature it needs. It
 must be rendered inside its node's element (`Flow.Node`): the engine finds the node a press
 resizes from the DOM, the closest node part, and `nodeId` only names the node for the state and
 the limits. It and renders a box over the node holding its `ResizeHandle`s: by default
@@ -14,6 +14,8 @@ stays inside its parent, and a parent never shrinks past its `extent: "parent"` 
 resizable (while it is selected, say).
 
 <Example id="node-resizer" />
+
+<Framework name="react">
 
 ```tsx title="resizable-node.tsx"
 import { Flow, type FlowNode, type FlowTypes } from "@fragiola/flow-react";
@@ -36,6 +38,46 @@ export function ResizableNode({ node }: { node: FlowNode<Types> }) {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="resizable-node.vue"
+<script lang="ts">
+import type { FlowTypes } from "@fragiola/flow-vue";
+import { drag } from "@fragiola/flow-vue/drag";
+import { resize } from "@fragiola/flow-vue/resize";
+import { selection } from "@fragiola/flow-vue/selection";
+
+export interface Types extends FlowTypes {
+    readonly nodes: { note: { label: string } };
+}
+
+export const features = [selection(), drag(), resize({ minWidth: 80, minHeight: 60 })] as const;
+</script>
+
+<script setup lang="ts">
+import { type FlowNode, typedFlow } from "@fragiola/flow-vue";
+import { NodeResizer } from "@fragiola/flow-vue/resize";
+
+const Flow = typedFlow<Types, typeof features>();
+defineProps<{ node: FlowNode<Types> }>();
+</script>
+
+<template>
+    <Flow.Node :node="node" class="relative">
+        {{ node.data.label }}
+        <NodeResizer v-if="node.selected" :min-width="120" :max-width="360" :keep-aspect-ratio="false" />
+    </Flow.Node>
+</template>
+```
+
+In Vue, `NodeResizer` comes from `@fragiola/flow-vue/resize`; its limits are kebab-case
+(`:min-width`), a bare `keep-aspect-ratio` attribute is `true`, and its default slot (its
+handles) gets `{ state }`.
+
+</Framework>
 
 ## Props
 

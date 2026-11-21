@@ -8,6 +8,8 @@ it zooms in by the root's `zoomStep` (1.2) around the root's centre. At the grea
 re-renders when the view changes. It sets no text and no name: give it an icon and an
 `aria-label`. Put it in `Flow.Controls`, or anywhere inside `Flow.Root`.
 
+<Framework name="react">
+
 ```tsx
 import { PlusIcon } from "lucide-react";
 
@@ -15,6 +17,26 @@ import { PlusIcon } from "lucide-react";
     <PlusIcon />
 </Flow.ZoomIn>;
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import { PlusIcon } from "@lucide/vue";
+</script>
+
+<template>
+    <Flow.ZoomIn aria-label="Zoom in" class="p-1 data-disabled:opacity-40">
+        <PlusIcon />
+    </Flow.ZoomIn>
+</template>
+```
+
+In Vue, its default slot gets `{ state }` (`ControlButtonState`).
+
+</Framework>
 
 The same action from code: `engine.run("zoom-in")` ([engine](/docs/api/engine)).
 

@@ -47,6 +47,8 @@ one), a drop on a handle runs `edge.add`, a resize `node.resize`, a box selectio
 `selection.set`, the Delete key `selection.remove`. That is why one middleware can refuse a
 connection whether it comes from a drag or from your code.
 
+<Framework name="react">
+
 ```tsx title="zoom-readout.tsx"
 import { useFlow, useViewport } from "@fragiola/flow-react";
 
@@ -61,6 +63,28 @@ export function ZoomReadout() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="zoom-readout.vue"
+<script setup lang="ts">
+import { useFlow, useViewport } from "@fragiola/flow-vue";
+
+const { engine } = useFlow();
+// a computed ref: the template re-renders when the zoom changes
+const viewport = useViewport();
+</script>
+
+<template>
+    <button type="button" :disabled="!engine.can('zoom-to', { zoom: 1 })" @click="engine.run('zoom-to', { zoom: 1 })">
+        {{ Math.round(viewport.zoom * 100) }}%
+    </button>
+</template>
+```
+
+</Framework>
+
 ## Events, not text
 
 `engine.subscribe` hears what happened on screen: `viewport-change`, `drag-start`, `nodes-move`,
@@ -71,10 +95,11 @@ controlled viewport.
 
 ## The engine's lifetime
 
-The root creates its engine once it is mounted, and destroys it when it unmounts. Before that (the
+The root creates its engine once it is mounted (React: in a layout effect; Vue: in its
+`onMounted`), and destroys it when it unmounts. Before that (the
 first render, a server render) there is no engine: nodes render at their model position, edges
-wait for their nodes' sizes. The `engine` `useFlow()` returns is there from the first render all
-the same: before the mount, an action is refused and a read is empty.
+wait for their nodes' sizes. The `engine` `useFlow()` returns is there from the first render (Vue: from
+`setup`) all the same: before the mount, an action is refused and a read is empty.
 
 The engine never touches the global `document` or `window`: it uses its root element's owner
 document and window (its `ResizeObserver`, its microtasks). The model never touches the DOM at

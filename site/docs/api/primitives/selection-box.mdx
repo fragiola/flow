@@ -8,12 +8,27 @@ the root), and renders a `div` only while a box is drawn (`selection()`: Shift +
 or any drag with `selection({ boxOnDrag: true })`). The nodes it covers are selected, wholly
 covered or touched by `selection({ boxMode })`. Give it its look.
 
+<Framework name="react">
+
 ```tsx
 <Flow.Root<Types, typeof features> features={features} defaultNodes={nodes}>
     <Flow.Viewport>…</Flow.Viewport>
     <Flow.SelectionBox className="border border-blue-500 bg-blue-500/10" />
 </Flow.Root>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Root :features="features" :default-nodes="nodes">
+    <Flow.Viewport>…</Flow.Viewport>
+    <Flow.SelectionBox class="border border-blue-500 bg-blue-500/10" />
+</Flow.Root>
+```
+
+</Framework>
 
 ## Props
 

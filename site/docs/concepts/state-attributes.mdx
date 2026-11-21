@@ -72,13 +72,27 @@ wheel (a scrolling list inside a node).
 }
 ```
 
-The same with Tailwind, on each part's `className`:
+The same with Tailwind, on each part's `className` (`class` in Vue):
+
+<Framework name="react">
 
 ```tsx
 <Flow.Node<Types> node={node} className="rounded-lg border bg-white select-none data-dragging:cursor-grabbing data-selected:border-blue-500" />
 <Flow.Handle type="target" side="top" className="size-2.5 rounded-full bg-slate-400 data-valid:bg-green-500 data-invalid:bg-red-500" />
 <Flow.EdgePath className="stroke-slate-400 data-selected:stroke-blue-500" />
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Node :node="node" class="rounded-lg border bg-white select-none data-dragging:cursor-grabbing data-selected:border-blue-500" />
+<Flow.Handle type="target" side="top" class="size-2.5 rounded-full bg-slate-400 data-valid:bg-green-500 data-invalid:bg-red-500" />
+<Flow.EdgePath class="stroke-slate-400 data-selected:stroke-blue-500" />
+```
+
+</Framework>
 
 See [Styling with plain CSS](/docs/guides/styling-css) and
 [Styling with Tailwind](/docs/guides/styling-tailwind).

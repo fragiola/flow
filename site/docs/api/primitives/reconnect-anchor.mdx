@@ -12,6 +12,8 @@ id); dropped nowhere or on a refused handle, it goes back. A press on the edge's
 
 <Example id="edge-reconnect" />
 
+<Framework name="react">
+
 ```tsx
 <Flow.Edge<Types> edge={edge}>
     <Flow.EdgePath />
@@ -19,6 +21,20 @@ id); dropped nowhere or on a refused handle, it goes back. A press on the edge's
     <Flow.ReconnectAnchor end="target" r={8} className="fill-transparent hover:stroke-blue-500" />
 </Flow.Edge>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Edge :edge="edge">
+    <Flow.EdgePath />
+    <Flow.ReconnectAnchor end="source" :r="8" class="fill-transparent hover:stroke-blue-500" />
+    <Flow.ReconnectAnchor end="target" :r="8" class="fill-transparent hover:stroke-blue-500" />
+</Flow.Edge>
+```
+
+</Framework>
 
 It is transparent by default: give it its radius and look. Edges are drawn before the nodes, so an
 anchor lies under its node's handle: the mouse grabs it beside the handle.

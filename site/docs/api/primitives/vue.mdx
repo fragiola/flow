@@ -1,0 +1,262 @@
+---
+title: Vue components
+description: The same primitives and hooks for Vue 3.5, from @fragiola/flow-vue, and how each React prop maps onto Vue props, events and slots.
+---
+
+`@fragiola/flow-vue` has every primitive of the React package as a Vue 3.5 component, and every
+hook as a composable, over the same core (re-exported whole). The elements, the `data-*`
+attributes, the structural styles, the props and the state of every part are the same, so every
+page of these docs applies: this page says how the React API is written in Vue.
+
+```ts
+import {
+    createFlowModel,
+    Flow,
+    type FlowTypes,
+    typedFlow,
+    useFlow,
+    useFlowRef,
+    useViewport,
+} from "@fragiola/flow-vue";
+import { MiniMap, minimap } from "@fragiola/flow-vue/minimap";
+import { NodeResizer, resize } from "@fragiola/flow-vue/resize";
+```
+
+The feature entries are React's: `@fragiola/flow-vue/selection`, `/drag`, `/connection`,
+`/reconnection`, `/resize`, `/subflows`, `/keyboard` and `/minimap`, each re-exporting the core's
+factory, `/minimap` and `/resize` with their components.
+
+## A flow in a template
+
+```vue title="editor.vue"
+<script setup lang="ts">
+import { type FlowNode, type FlowTypes, typedFlow } from "@fragiola/flow-vue";
+import { connection } from "@fragiola/flow-vue/connection";
+import { drag } from "@fragiola/flow-vue/drag";
+import { selection } from "@fragiola/flow-vue/selection";
+import { shallowRef } from "vue";
+
+interface Types extends FlowTypes {
+    readonly nodes: { step: { label: string } };
+}
+
+const features = [selection(), drag(), connection()] as const;
+const Flow = typedFlow<Types, typeof features>();
+
+// controlled nodes (every one with its id): the root emits the model's frozen list after every
+// change, so a shallowRef keeps it as it is
+const nodes = shallowRef<readonly FlowNode<Types>[]>([
+    { id: "fetch", type: "step", position: { x: 0, y: 0 }, data: { label: "Fetch" } },
+    { id: "save", type: "step", position: { x: 0, y: 140 }, data: { label: "Save" } },
+]);
+</script>
+
+<template>
+    <p>{{ nodes.length }} nodes</p>
+    <Flow.Root
+        v-model:nodes="nodes"
+        :features="features"
+        :default-edges="[{ id: 'fetch-save', source: 'fetch', target: 'save' }]"
+        fit-view
+        class="h-96"
+    >
+        <Flow.Background variant="dots" class="text-slate-300" />
+        <!-- the edges before the nodes: the nodes are drawn on top -->
+        <Flow.Viewport>
+            <Flow.Edges v-slot="{ edge }">
+                <Flow.Edge :edge="edge">
+                    <Flow.EdgePath class="stroke-slate-400 data-selected:stroke-blue-500" />
+                </Flow.Edge>
+            </Flow.Edges>
+            <Flow.Nodes v-slot="{ node }">
+                <Flow.Node :node="node" class="rounded border bg-white px-3 py-2 data-selected:border-blue-500">
+                    {{ node.data.label }}
+                    <Flow.Handle type="target" side="top" class="size-2 rounded-full bg-slate-500" />
+                    <Flow.Handle type="source" side="bottom" class="size-2 rounded-full bg-slate-500" />
+                </Flow.Node>
+            </Flow.Nodes>
+            <Flow.ConnectionLine class="stroke-blue-500" />
+        </Flow.Viewport>
+    </Flow.Root>
+</template>
+```
+
+`v-model:nodes` gives you the model's nodes on every change, drag steps included, and a list you
+write to it is brought into the model with the commands a user would have run (one `batch` with
+`meta: { source: "controlled" }`), so middleware still sees every change. The model's lists are
+frozen and never become reactive: keep them in a `shallowRef`.
+
+<Example id="basic" />
+
+## How React's props map
+
+| React | Vue |
+| --- | --- |
+| the parts' props | the same props, kebab-case in a template (`:default-nodes`, `:fit-view`, `handle-id`, `:min-width`); a bare boolean attribute is `true` (`pan-on-scroll`, `fit-view`, `open`, `connectable`, `keep-aspect-ratio`, `disabled`), an absent one stays `undefined` so the core's default applies |
+| `nodes` + `onNodesChange`, `edges` + `onEdgesChange` | `v-model:nodes`, `v-model:edges` (`update:nodes`, `update:edges`) |
+| `viewport` + `onViewportChange(viewport, gesture)` | `v-model:viewport` (`update:viewport`, with `(viewport, gesture)`) |
+| `flowRef={flow}`, `flow.current` | `:flow-ref="flow"`, `flow.value` (see [Flow ref](#flow-ref)) |
+| `render={<section />}` | `as="section"`, or `:as="MyComponent"`: the part's props are merged into it |
+| `render={(props, state) => …}` | the `render` scoped slot, `#render="{ props, state, children }"`: bind `v-bind="props"` on your element and render `<component :is="children" />` inside it |
+| children functions of `Flow.Nodes`, `Flow.Edges`, `Flow.ConnectionLine`, `MiniMap` | their default scoped slot: `v-slot="{ node }"`, `{ edge }`, `{ connection }`, `{ view }` |
+| `children` of a part | its default slot, given `{ state }` |
+| `className`, `style` | the `class` and `style` attributes, under the structural style |
+| `className={(state) => …}`, `style={(state) => …}` | no function form (Vue normalizes `class` and `style` before a component sees them): a `data-*` selector (`data-selected:ring-2`), or the default or `render` slot's `state` |
+| `onClick`, `onKeyDown`, … on a part | `@click`, `@keydown`, …: they run after the part's own, as in React |
+| `ref` on a part | a template `ref` is the component, as for any Vue component: its `$el` is the element |
+| `<Flow.Nodes<Types>>`, `<Flow.Root<Types, typeof features>>` | `const Flow = typedFlow<Types, typeof features>()`: a template takes no type argument |
+
+## Components
+
+Every part takes the props of its React page (for example [Root](/docs/api/primitives/root#props),
+[Node](/docs/api/primitives/node#props), [Handle](/docs/api/primitives/handle#props)) except
+`render`, `className`, `style`, `ref` and `children` (see the table above). Each one is a
+`FlowComponent<Props, Slots, Emits>`, and its props extend `PrimitiveProps`.
+
+| prop or event | of | description |
+| --- | --- | --- |
+| `as` | every part (`PrimitiveProps`) | the tag or component rendered instead of the part's element (`AsProp`); never `asChild` |
+| `v-model:nodes` | `Flow.Root` | `nodes` and `update:nodes`: the model's nodes after every command that changes them (a drag step too) |
+| `v-model:edges` | `Flow.Root` | `edges` and `update:edges`: the model's edges after every command that changes them |
+| `v-model:viewport` | `Flow.Root` | `viewport` and `update:viewport`: every viewport change, `(viewport, gesture)`, `gesture` true for a pan, a zoom or a pinch |
+
+| slot | of | receives |
+| --- | --- | --- |
+| `default` | `Flow.Nodes`, `Flow.Edges`, `Flow.ConnectionLine`, `MiniMap` | one entity each time: `{ node }` (`FlowNode<T>`), `{ edge }` (`FlowEdge<T>`), `{ connection }` (`Connection`), `{ view }` (`MinimapView`) |
+| `default` | every other part with content | `{ state }`: the part's state, as on its page (`RootState`, `NodeState<T>`, `EdgeState<T>`, `HandleState`, `ControlButtonState`, …) |
+| `render` | every part (`RenderSlot`) | `RenderSlotProps`: `props`, `state` and `children`; it replaces the element |
+
+| field | of | description |
+| --- | --- | --- |
+| `props` | `RenderSlotProps` | what goes on your element (`v-bind="props"`): the part's `data-*`, listeners, its structural style merged over your `class` and `style`, and its template ref (`ElementRef`) |
+| `state` | `RenderSlotProps` | the part's state |
+| `children` | `RenderSlotProps` | the part's content, as one stable component: `<component :is="children" />` |
+
+A slot is a `SlotFunction<Scope>`. Each node's and each edge's slot is its own component, whose
+only prop is the entity: a drag step re-renders the moved nodes only, a pan none, and what else
+the slot shows follows Vue's reactivity (a ref, a prop it reads). React's advice to keep a children
+function stable has no Vue counterpart.
+
+What differs from React, part by part:
+
+- **`Flow.Root`** creates the engine in its `onMounted` (its children mount first) and destroys it
+  in `onUnmounted`; a server render has no engine. Another `model` remounts the flow, where React
+  swaps the engine in place.
+- **`Flow.EdgeLabel`** renders nothing where it is written: it hands its content to `Flow.Edges`,
+  whose HTML layer renders it with its edge (a `Teleport` out of an SVG would keep creating SVG
+  elements). **`Flow.NodeToolbar`** is a `Teleport` to the root. For both, a template `ref` reaches
+  no element: use the `render` slot.
+- **`MiniMap`** and **`NodeResizer`** come from `@fragiola/flow-vue/minimap` and
+  `@fragiola/flow-vue/resize`, with `MiniMapNode`, `MiniMapMask`, `ResizeHandle` and
+  `RESIZE_POSITIONS`.
+
+The props, slots and state of each part are typed by its exports: `RootProps`, `RootEngineProps`,
+`RootSlots`, `RootEmits`, `RootState`; `ViewportProps`, `ViewportSlots`, `ViewportState`;
+`BackgroundProps`, `BackgroundSlots`, `BackgroundState`; `NodesProps`, `NodesSlots`, `NodesState`;
+`NodeProps`, `NodeSlots`; `HandleProps`, `HandleSlots`; `EdgesProps`, `EdgesSlots`, `EdgesState`;
+`EdgeProps`, `EdgeSlots`; `EdgePathProps`, `EdgePathSlots`, `EdgePathState`; `EdgeLabelProps`,
+`EdgeLabelSlots`, `EdgeLabelState`; `ReconnectAnchorProps`, `ReconnectAnchorSlots`,
+`ReconnectAnchorState`; `ConnectionLineProps`, `ConnectionLineSlots`, `ConnectionLineState`;
+`SelectionBoxProps`, `SelectionBoxSlots`, `SelectionBoxState`; `NodeToolbarProps`,
+`NodeToolbarSlots`, `NodeToolbarState`; `ControlsProps`, `ControlsSlots`, `ControlsState`;
+`ZoomInProps`, `ZoomInSlots`; `ZoomOutProps`, `ZoomOutSlots`; `FitViewProps`, `FitViewSlots`;
+`ToggleInteractiveProps`, `ToggleInteractiveSlots`, `ToggleInteractiveState`. On the feature
+entries: `MiniMapProps`, `MiniMapSlots`, `MiniMapState`, `MiniMapNodeProps`, `MiniMapNodeSlots`,
+`MiniMapNodeState`, `MiniMapMaskProps`, `MiniMapMaskSlots`, `MiniMapMaskState`;
+`NodeResizerProps`, `NodeResizerSlots`, `NodeResizerState`, `ResizeHandleProps`,
+`ResizeHandleSlots`, `ResizeHandleState`, `ResizePosition`.
+
+## Composables
+
+The hooks have the same names and arguments. A composable is called in `setup`; what changes is a
+`ComputedRef` (a template unwraps it), and a part's options are a value, a ref or a getter. Pass a
+prop as a getter (`() => props.node`): read in `setup`, its value would stay the first one.
+
+| React | Vue |
+| --- | --- |
+| `useFlow<T, F>()` | `UseFlowResult<T, F>`, the plain `model` and `engine`: they never change for a mounted root (another model remounts it); the engine is there from `setup` |
+| `useViewport()` | `ComputedRef<Viewport>` |
+| `useConnection()` | `ComputedRef<Connection \| null>` |
+| `useSelection<T>()` | `ComputedRef<FlowSelection<T>>`: a `FlowSelection<T>`, the selected `nodes` and `edges` |
+| `useNodes<T>()`, `useEdges<T>()` | `ComputedRef<readonly FlowNode<T>[]>`, `ComputedRef<readonly FlowEdge<T>[]>` (the model's frozen lists) |
+| `useNode(node)` | `useNode(nodeOrGetter)`: `UseNodeResult<T>`, `state` (`NodeState<T>`) and `props` (`NodeElementProps`) as computed refs |
+| `useEdge(edge)` | `useEdge(edgeOrGetter)`: `UseEdgeResult<T>`, `state` (`EdgeState<T>`) and `props` (`EdgeElementProps`, with `tabindex`) as computed refs |
+| `useHandle(options)` | `useHandle(optionsOrGetter)`: `UseHandleResult`, `state` (`HandleState`) and `props` (`HandleElementProps`) as computed refs; `UseHandleOptions` as React's |
+| `useFlowRef()`, `createFlowRef()` | the same names: a `FlowRef<T, F>` whose `value` is reactive |
+| `ControlButtonState` | the same: the state of `Flow.ZoomIn`, `Flow.ZoomOut` and `Flow.FitView` |
+
+```vue title="selected-count.vue"
+<script setup lang="ts">
+import { type FlowNode, useNode, useSelection } from "@fragiola/flow-vue";
+
+const props = defineProps<{ node: FlowNode<Types> }>();
+const selection = useSelection<Types>();
+// a node rendered by hand: bind its props on your element
+const { state, props: element } = useNode(() => props.node);
+</script>
+
+<template>
+    <div v-bind="element" :class="{ 'ring-2': state.selected }">
+        {{ node.data.label }} ({{ selection.nodes.length }} selected)
+    </div>
+</template>
+```
+
+`v-bind` puts the props on the element, their template ref included (the `ElementRef` that
+registers it with the engine, which measures it).
+
+## Flow ref
+
+`useFlowRef<T, F>()` (in `setup`) and `createFlowRef<T, F>()` (anywhere) make a `FlowRef<T, F>`:
+pass it as the root's `:flow-ref`, and `flow.value` is a `FlowRefValue<T, F>` (`model`, `engine`)
+while the root is mounted, `null` otherwise.
+
+| field | type | description |
+| --- | --- | --- |
+| `value` | `FlowRefValue<T, F> \| null` | the root's model and engine while it is mounted; reactive, so a template that reads it re-renders when the root mounts or unmounts |
+
+A flow ref is not a Vue ref: a template does not unwrap it, so `:flow-ref="flow"` passes the flow
+ref itself and a template reads `flow.value`, as a script does. It is marked raw, so it stays the
+same object in `ref()` or `reactive()` state.
+
+```vue title="toolbar.vue"
+<script setup lang="ts">
+import { typedFlow, useFlowRef } from "@fragiola/flow-vue";
+
+const Flow = typedFlow<Types, typeof features>();
+const flow = useFlowRef<Types, typeof features>();
+</script>
+
+<template>
+    <button type="button" :disabled="!flow.value" @click="flow.value?.engine.run('fit-view')">Fit</button>
+    <Flow.Root :flow-ref="flow" :features="features" :default-nodes="nodes">…</Flow.Root>
+</template>
+```
+
+## Typed components
+
+A template cannot pass a type argument, so `typedFlow<T, F>()` returns the same components typed
+by your registry and features (`TypedFlow<T, F>`): `Root` (its model, lists, features and events),
+`Nodes`, `Node`, `Edges` and `Edge`; the others are `Flow`'s. A slot's `node.data` is then the
+registry's, checked in a template by vue-tsc. The untyped `Flow.Root` takes any registry and any
+features.
+
+```ts
+import { type FlowTypes, typedFlow } from "@fragiola/flow-vue";
+import { drag } from "@fragiola/flow-vue/drag";
+
+interface Types extends FlowTypes {
+    readonly nodes: { task: { title: string; done: boolean } };
+}
+
+const features = [drag()] as const;
+export const Flow = typedFlow<Types, typeof features>();
+```
+
+## Reactivity
+
+The model's state never becomes reactive: the root counts the model's commits and the engine's
+notifications in one `shallowRef`, and each part reads what it shows in a `computed` that keeps
+its last value while it is equal, so Vue re-renders only what changed. The lists you give
+(`:default-nodes`, `v-model:nodes`) are read through `toRaw`, so no proxy reaches the model, and
+the frozen lists it gives back are never proxied.

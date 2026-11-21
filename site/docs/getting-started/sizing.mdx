@@ -11,14 +11,30 @@ a height is a flow of zero pixels. Its size is yours to give, the same way you s
 
 A fixed height:
 
+<Framework name="react">
+
 ```tsx
 <Flow.Root defaultNodes={nodes} className="h-[600px] w-full">
     …
 </Flow.Root>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Root :default-nodes="nodes" class="h-[600px] w-full">
+    …
+</Flow.Root>
+```
+
+</Framework>
+
 Or the room a parent leaves, in a flex or grid layout (the `min-h-0` lets a flex child shrink
 below its content):
+
+<Framework name="react">
 
 ```tsx title="editor-page.tsx"
 export function EditorPage() {
@@ -32,6 +48,23 @@ export function EditorPage() {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="editor-page.vue"
+<template>
+    <div class="flex h-dvh flex-col">
+        <header class="h-12 border-b">Workflow</header>
+        <Flow.Root :default-nodes="nodes" class="min-h-0 flex-1">
+            …
+        </Flow.Root>
+    </div>
+</template>
+```
+
+</Framework>
 
 The engine reads the root's box when it needs it: `engine.get("root-size")` gives it, and
 `fit-view`, `center-on`, the zoom buttons (they zoom around the root's centre), the minimap and
@@ -62,11 +95,27 @@ counts as unmeasured.
 `true`, or the `fit-view` payload: `padding` (a share of the root's size, default 0.1),
 `nodeIds`, `minZoom` and `maxZoom`.
 
+<Framework name="react">
+
 ```tsx
 <Flow.Root defaultNodes={nodes} fitView={{ padding: 0.2, maxZoom: 1 }} className="h-96">
     …
 </Flow.Root>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Root :default-nodes="nodes" :fit-view="{ padding: 0.2, maxZoom: 1 }" class="h-96">
+    …
+</Flow.Root>
+```
+
+A bare `fit-view` attribute is `fitView={true}`.
+
+</Framework>
 
 Later, fit again from code with `engine.run("fit-view")`, or with a `Flow.FitView` button
 ([The viewport](/docs/concepts/viewport)).
@@ -78,6 +127,8 @@ with your style (`absolute` in a corner): the root's `position: relative` is the
 block. A panel of your own marks itself `data-flow-no-gesture` (presses on it start no pan) and
 `data-flow-no-wheel` (its wheel scrolls it instead of zooming the flow).
 
+<Framework name="react">
+
 ```tsx
 <Flow.Root defaultNodes={nodes} className="relative h-96">
     <Flow.Viewport>…</Flow.Viewport>
@@ -86,6 +137,21 @@ block. A panel of your own marks itself `data-flow-no-gesture` (presses on it st
     </aside>
 </Flow.Root>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Root :default-nodes="nodes" class="relative h-96">
+    <Flow.Viewport>…</Flow.Viewport>
+    <aside data-flow-no-gesture data-flow-no-wheel class="absolute top-2 right-2 w-56 overflow-auto">
+        …
+    </aside>
+</Flow.Root>
+```
+
+</Framework>
 
 `Flow.Controls` and `Flow.NodeToolbar` need neither: presses and the wheel over them are already
 left to them.

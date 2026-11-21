@@ -8,6 +8,8 @@ buttons: `Flow.ZoomIn`, `Flow.ZoomOut`, `Flow.FitView`, `Flow.ToggleInteractive`
 calling the engine. Presses and the wheel over it are left to it. It has no role and no name:
 give it a group role and a label, and place it with your style.
 
+<Framework name="react">
+
 ```tsx
 import { MaximizeIcon, MinusIcon, PlusIcon } from "lucide-react";
 
@@ -23,6 +25,26 @@ import { MaximizeIcon, MinusIcon, PlusIcon } from "lucide-react";
     </Flow.FitView>
 </Flow.Controls>;
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import { MaximizeIcon, MinusIcon, PlusIcon } from "@lucide/vue";
+</script>
+
+<template>
+    <Flow.Controls role="group" aria-label="Zoom" class="absolute bottom-3 left-3 flex flex-col">
+        <Flow.ZoomIn aria-label="Zoom in" class="p-1 data-disabled:opacity-40"><PlusIcon /></Flow.ZoomIn>
+        <Flow.ZoomOut aria-label="Zoom out" class="p-1 data-disabled:opacity-40"><MinusIcon /></Flow.ZoomOut>
+        <Flow.FitView aria-label="Fit view" class="p-1"><MaximizeIcon /></Flow.FitView>
+    </Flow.Controls>
+</template>
+```
+
+</Framework>
 
 <Example id="minimap-and-controls" />
 

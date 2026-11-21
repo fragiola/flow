@@ -9,6 +9,8 @@ when it moves). With the root's `onlyRenderVisible`, only the nodes in view (and
 yet) are rendered (`visible-nodes`). You render each node: usually a `Flow.Node` with its content
 and handles, switching on `node.type` when the flow has several.
 
+<Framework name="react">
+
 ```tsx
 function renderNode(node: FlowNode<Types>) {
     return (
@@ -23,8 +25,29 @@ function renderNode(node: FlowNode<Types>) {
 <Flow.Nodes<Types>>{renderNode}</Flow.Nodes>;
 ```
 
-Each node's render is memoized on the node and the children function: a drag step re-renders the
-moved nodes only. A new children function re-renders every node, so keep it stable (a module
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Nodes v-slot="{ node }">
+    <Flow.Node :node="node" class="rounded border bg-white p-2">
+        {{ node.data.label }}
+        <Flow.Handle type="target" side="left" />
+        <Flow.Handle type="source" side="right" />
+    </Flow.Node>
+</Flow.Nodes>
+```
+
+In Vue, the children function is the default scoped slot, `v-slot="{ node }"`, and each node's
+slot is its own component whose only prop is the node: a drag step re-renders the moved nodes
+only, and nothing needs to be kept stable. What else the slot shows follows Vue's reactivity (a
+ref, a prop it reads).
+
+</Framework>
+
+In React, each node's render is memoized on the node and the children function: a drag step
+re-renders the moved nodes only. A new children function re-renders every node, so keep it stable (a module
 function as above, or `useCallback`) when the app re-renders on each change (controlled `nodes`).
 
 ## Props

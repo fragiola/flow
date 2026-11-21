@@ -15,6 +15,8 @@ attributes, and events for everything a screen reader user should hear about. Th
 Every primitive passes its props through to its element, so ARIA goes where you would put it on
 any element:
 
+<Framework name="react">
+
 ```tsx title="named-flow.tsx"
 <Flow.Root<Types, typeof features>
     features={features}
@@ -49,6 +51,46 @@ any element:
 </Flow.Root>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="named-flow.vue"
+<template>
+    <Flow.Root
+        :features="features"
+        :default-nodes="nodes"
+        role="group"
+        aria-label="Delivery workflow"
+        class="h-96"
+    >
+        <Flow.Viewport>
+            <Flow.Edges v-slot="{ edge }">
+                <Flow.Edge
+                    :edge="edge"
+                    role="group"
+                    aria-roledescription="edge"
+                    :aria-label="`${edge.source} to ${edge.target}`"
+                >
+                    <Flow.EdgePath />
+                </Flow.Edge>
+            </Flow.Edges>
+            <Flow.Nodes v-slot="{ node }">
+                <Flow.Node :node="node" role="group" aria-roledescription="node" :aria-label="node.data.label">
+                    {{ node.data.label }}
+                    <Flow.Handle type="target" side="top" title="Input" />
+                    <Flow.Handle type="source" side="bottom" title="Output" />
+                </Flow.Node>
+            </Flow.Nodes>
+        </Flow.Viewport>
+    </Flow.Root>
+</template>
+```
+
+In Vue, every attribute a primitive does not take as a prop falls through to its element.
+
+</Framework>
+
 Write the roles and names your app's language and your users need: the nodes' and edges' roles
 are the `announcements` example's choice, the root's name is this page's suggestion, and neither
 is a rule.
@@ -57,6 +99,8 @@ is a rule.
 
 `Flow.ZoomIn`, `Flow.ZoomOut`, `Flow.FitView` and `Flow.ToggleInteractive` render only their
 children, often an icon: give each one an `aria-label`, and the group a name.
+
+<Framework name="react">
 
 ```tsx
 <Flow.Controls role="group" aria-label="Zoom and lock" className="absolute bottom-3 left-3 flex flex-col">
@@ -75,6 +119,27 @@ children, often an icon: give each one an `aria-label`, and the group a name.
 </Flow.Controls>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import { LockIcon, MaximizeIcon, MinusIcon, PlusIcon } from "@lucide/vue";
+</script>
+
+<template>
+    <Flow.Controls role="group" aria-label="Zoom and lock" class="absolute bottom-3 left-3 flex flex-col">
+        <Flow.ZoomIn aria-label="Zoom in"><PlusIcon /></Flow.ZoomIn>
+        <Flow.ZoomOut aria-label="Zoom out"><MinusIcon /></Flow.ZoomOut>
+        <Flow.FitView aria-label="Fit view"><MaximizeIcon /></Flow.FitView>
+        <Flow.ToggleInteractive aria-label="Lock the flow"><LockIcon /></Flow.ToggleInteractive>
+    </Flow.Controls>
+</template>
+```
+
+</Framework>
+
 `Flow.ToggleInteractive` sets `aria-pressed` while the flow is locked; the buttons set `disabled`
 while their action is refused (a zoom at its limit). The minimap is an SVG: give `MiniMap` a
 `role="img"` and an `aria-label` when it should be announced.
@@ -86,6 +151,8 @@ text: `nodes-move` (with `source: "pointer"` or `"keyboard"`), `drag-cancel`, `c
 `connect-cancel` (with `refused`), `reconnect`, `resize`, `box-select`, `remove`, and more
 ([Engine](/docs/api/engine)). Turn the ones your users need into words, and write them into a live
 region of your own:
+
+<Framework name="react">
 
 ```tsx title="live-region.tsx"
 import { type FlowEngineEvent, type FlowModel, useFlow } from "@fragiola/flow-react";
@@ -129,7 +196,54 @@ export function LiveRegion() {
 }
 ```
 
-Render `LiveRegion` inside `Flow.Root` (it reads the root's engine with `useFlow`). The events
+</Framework>
+
+<Framework name="vue">
+
+```vue title="live-region.vue"
+<script setup lang="ts">
+import { type FlowEngineEvent, type FlowModel, useFlow } from "@fragiola/flow-vue";
+import { onUnmounted, ref } from "vue";
+
+type Model = FlowModel<Types, typeof features>;
+
+/** The app's words for an engine event, or nothing for one it keeps quiet about. */
+function describe(event: FlowEngineEvent, model: Model): string | undefined {
+    const name = (id: string) => model.get("node-by", { id })?.data.label ?? id;
+    switch (event.type) {
+        case "nodes-move":
+            return `Moved ${event.nodeIds.map(name).join(", ")}.`;
+        case "connect":
+            return `Connected ${name(event.source)} to ${name(event.target)}.`;
+        case "connect-cancel":
+            return event.refused ? "That connection is not allowed." : undefined;
+        case "remove":
+            return `Removed ${event.nodeIds.length} node(s) and ${event.edgeIds.length} edge(s).`;
+        default:
+            return undefined;
+    }
+}
+
+const { model, engine } = useFlow<Types, typeof features>();
+const message = ref("");
+// the engine of useFlow is there from setup: it forwards to the root's once it mounts
+onUnmounted(
+    engine.subscribe((event) => {
+        const text = describe(event, model);
+        if (text) message.value = text;
+    }),
+);
+</script>
+
+<template>
+    <p role="status" class="sr-only">{{ message }}</p>
+</template>
+```
+
+</Framework>
+
+Render `LiveRegion` (`live-region.vue`) inside `Flow.Root`: it reads the root's engine with
+`useFlow`. The events
 carry ids, so the words can name the nodes the way your app names them, in its language.
 
 ## Keyboard users

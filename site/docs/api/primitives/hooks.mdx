@@ -14,7 +14,14 @@ Every hook reads the enclosing `Flow.Root` (outside one it throws). Two kinds:
 
 From outside the root (a toolbar beside it, a test), use a [flow ref](/docs/api/primitives/flow-ref).
 
+In Vue they are composables of the same names, from `@fragiola/flow-vue`: the values are computed
+refs (`useViewport().value.zoom`, unwrapped in a template), and a part's `state` and `props` are
+computed refs too. Call them in `setup`. [Vue components](/docs/api/primitives/vue) lists their
+types.
+
 ## `useFlow`
+
+<Framework name="react">
 
 ```tsx
 import { useFlow } from "@fragiola/flow-react";
@@ -29,6 +36,26 @@ function DeleteSelected() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="delete-selected.vue"
+<script setup lang="ts">
+import { useFlow } from "@fragiola/flow-vue";
+
+const { model } = useFlow<Types, typeof features>();
+</script>
+
+<template>
+    <button type="button" @click="model.run('selection.remove')">Delete</button>
+</template>
+```
+
+Call `useFlow` in `setup`: another model remounts the root, so the values never change for a component.
+
+</Framework>
+
 `useFlow<T, F>()` returns `UseFlowResult<T, F>`, the model and the engine of the root. Pass the
 registry and the features as type arguments: a child cannot infer them through context.
 
@@ -42,12 +69,32 @@ registry and the features as type arguments: a child cannot infer them through c
 `useViewport()` returns the root's `Viewport` (`{ x, y, zoom }`), re-rendering on every change: a
 zoom readout, a control's state. Change it with `engine.run("set-viewport", …)`.
 
+<Framework name="react">
+
 ```tsx
 function ZoomLevel() {
     const { zoom } = useViewport();
     return <output>{Math.round(zoom * 100)}%</output>;
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="zoom-level.vue"
+<script setup lang="ts">
+import { useViewport } from "@fragiola/flow-vue";
+
+const viewport = useViewport();
+</script>
+
+<template>
+    <output>{{ Math.round(viewport.zoom * 100) }}%</output>
+</template>
+```
+
+</Framework>
 
 ## `useConnection`
 
@@ -76,6 +123,8 @@ A drag re-renders them at every step; read `model.get("node-by", { id })` for on
 `useNode<T>(node)` returns `UseNodeResult<T>` for a node rendered by hand: spread `props` on its
 element (the engine resolves presses from its attributes).
 
+<Framework name="react">
+
 ```tsx
 function PlainNode({ node }: { node: FlowNode<Types> }) {
     const { state, props } = useNode(node);
@@ -86,6 +135,31 @@ function PlainNode({ node }: { node: FlowNode<Types> }) {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="plain-node.vue"
+<script setup lang="ts">
+import { type FlowNode, useNode } from "@fragiola/flow-vue";
+
+const props = defineProps<{ node: FlowNode<Types> }>();
+const { state, props: element } = useNode(() => props.node);
+</script>
+
+<template>
+    <section v-bind="element" :aria-label="node.data.label" :class="{ 'ring-2': state.selected }">
+        {{ node.data.label }}
+    </section>
+</template>
+```
+
+In Vue, `useNode`, `useEdge` and `useHandle` take a getter or a ref (`() => props.node`) and
+return `state` and `props` as computed refs: `v-bind` the props in a template, which unwraps
+them. Vue's attribute names are the DOM's: `tabindex` where React writes `tabIndex`.
+
+</Framework>
 
 `state` is `NodeState<T>` (see [`Flow.Node`](/docs/api/primitives/node)):
 

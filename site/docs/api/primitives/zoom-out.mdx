@@ -8,6 +8,8 @@ it zooms out by the root's `zoomStep` (1.2) around the root's centre. At the lea
 re-renders when the view changes. It sets no text and no name: give it an icon and an
 `aria-label`. Put it in `Flow.Controls`, or anywhere inside `Flow.Root`.
 
+<Framework name="react">
+
 ```tsx
 import { MinusIcon } from "lucide-react";
 
@@ -15,6 +17,26 @@ import { MinusIcon } from "lucide-react";
     <MinusIcon />
 </Flow.ZoomOut>;
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import { MinusIcon } from "@lucide/vue";
+</script>
+
+<template>
+    <Flow.ZoomOut aria-label="Zoom out" class="p-1 data-disabled:opacity-40">
+        <MinusIcon />
+    </Flow.ZoomOut>
+</template>
+```
+
+In Vue, its default slot gets `{ state }` (`ControlButtonState`).
+
+</Framework>
 
 The same action from code: `engine.run("zoom-out")` ([engine](/docs/api/engine)).
 

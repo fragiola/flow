@@ -1,11 +1,11 @@
 ---
-title: Flow — headless node-based editors and diagrams for React
+title: Flow — headless node-based editors and diagrams
 description: Nodes, edges and handles on a pannable, zoomable canvas, with typed commands, middleware rules and accessible gestures. Every pixel is yours.
 layout: landing
 ---
 
 <Hero
-    eyebrow="@fragiola/flow · React"
+    eyebrow="@fragiola/flow · React · Vue"
     title="Node-based editors, without a single line of CSS from us."
     description="Workflow builders, pipelines, state machines and mind maps: nodes you drag, edges you draw from handles, a canvas you pan and zoom. It ships the behaviour and the accessibility, on a typed model of commands. Every pixel is yours."
     actions={[
@@ -41,8 +41,8 @@ Focusable nodes and edges, arrow moves, Delete and Escape, and engine events you
 turns into words.
 </Feature>
 <Feature title="Your markup">
-You render every node and edge with a children function, and swap any element with `render`: a
-`switch` on the node's type is your registry.
+You render every node and edge with a children function (a scoped slot in Vue), and swap any
+element with `render`: a `switch` on the node's type is your registry.
 </Feature>
 </Features>
 </Section>
@@ -56,6 +56,8 @@ persistence) as code you copy.
 </Section>
 
 <Section eyebrow="Start" title="A flow in one component">
+
+<Framework name="react">
 
 ```tsx title="pipeline.tsx"
 import { Flow, type FlowNodeInput, type FlowTypes } from "@fragiola/flow-react";
@@ -103,6 +105,57 @@ export function Pipeline() {
 }
 ```
 
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="pipeline.vue"
+<script setup lang="ts">
+import { type FlowNodeInput, type FlowTypes, typedFlow } from "@fragiola/flow-vue";
+import { connection } from "@fragiola/flow-vue/connection";
+import { drag } from "@fragiola/flow-vue/drag";
+import { selection } from "@fragiola/flow-vue/selection";
+
+interface Types extends FlowTypes {
+    readonly nodes: { step: { label: string } };
+}
+
+const features = [selection(), drag(), connection()] as const;
+const Flow = typedFlow<Types, typeof features>();
+
+const nodes: FlowNodeInput<Types>[] = [
+    { id: "fetch", type: "step", position: { x: 0, y: 0 }, data: { label: "Fetch" } },
+    { id: "save", type: "step", position: { x: 0, y: 140 }, data: { label: "Save" } },
+];
+</script>
+
+<template>
+    <Flow.Root
+        :features="features"
+        :default-nodes="nodes"
+        :default-edges="[{ id: 'fetch-save', source: 'fetch', target: 'save' }]"
+        fit-view
+        class="h-96"
+    >
+        <Flow.Viewport>
+            <Flow.Edges v-slot="{ edge }">
+                <Flow.Edge :edge="edge" class="stroke-gray-400" />
+            </Flow.Edges>
+            <Flow.Nodes v-slot="{ node }">
+                <Flow.Node :node="node" class="rounded border bg-white px-3 py-2">
+                    {{ node.data.label }}
+                    <Flow.Handle type="target" side="top" class="size-2 rounded-full bg-gray-500" />
+                    <Flow.Handle type="source" side="bottom" class="size-2 rounded-full bg-gray-500" />
+                </Flow.Node>
+            </Flow.Nodes>
+            <Flow.ConnectionLine class="stroke-gray-400" />
+        </Flow.Viewport>
+    </Flow.Root>
+</template>
+```
+
+</Framework>
 <Cards>
 <Card title="Your first flow" href="/docs/getting-started/first-flow" description="From a document to a canvas you pan, zoom, drag and connect." />
 <Card title="Connection rules" href="/docs/guides/connection-rules" description="Typed ports and no cycles, as one middleware." />
