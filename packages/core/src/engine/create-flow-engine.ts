@@ -209,6 +209,8 @@ interface Press {
     readonly pan: boolean;
     /** the mouse button pressed (0 for a touch or a pen) */
     readonly button: number;
+    /** started by the pan activation key: it pans and never taps */
+    readonly keyPan: boolean;
     travel: number;
     /** its pointer's last move: a press whose release was missed ends there */
     last: PointerEvent | undefined;
@@ -1276,7 +1278,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         }
         let gesture: FeatureGesture | undefined;
         let pan = false;
-        if (button === 0 && this.panKeyHeld(event)) {
+        const keyPan = button === 0 && this.panKeyHeld(event);
+        if (keyPan) {
             // the pan activation key: a pan from anywhere, and no other gesture
             gesture = this.panGesture(client);
             pan = true;
@@ -1298,6 +1301,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             gesture,
             pan,
             button,
+            keyPan,
             travel: 0,
             last: undefined,
         };
@@ -1353,13 +1357,14 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         }
     }
 
-    /** A middle or right button pan that moved keeps its context menu out. */
+    /**
+     * A middle or right button pan keeps the context menu out while it is pressed (macOS and Linux
+     * open it on press, before any move), and a right-button pan that moved after its release
+     * (Windows opens it on release).
+     */
     private contextMenu(event: MouseEvent): void {
         const press = this.press;
-        const panning =
-            press?.pan === true &&
-            press.button !== 0 &&
-            press.travel > TAP_TOLERANCE;
+        const panning = press?.pan === true && press.button !== 0;
         if (panning || this.blockContextMenu) event.preventDefault();
         this.blockContextMenu = false;
     }
@@ -1490,10 +1495,16 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         press.gesture?.end(event);
         if (press.button !== 0) {
             // the context menu a moved right-button pan's release opens stays out
-            this.blockContextMenu = press.pan && press.travel > TAP_TOLERANCE;
+            this.blockContextMenu =
+                press.pan && press.button === 2 && press.travel > TAP_TOLERANCE;
             return;
         }
-        if (!active && press.travel <= TAP_TOLERANCE && this.interactive) {
+        if (
+            !press.keyPan &&
+            !active &&
+            press.travel <= TAP_TOLERANCE &&
+            this.interactive
+        ) {
             this.features.tap(event, press.target);
         }
     }
@@ -1619,8 +1630,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         if (panOnScroll) {
             event.preventDefault();
             // Shift turns a wheel without a sideways delta sideways; the mode keeps one axis
-            const sideways = event.shiftKey && dx === 0;
             const mode = this.options.panOnScrollMode ?? "free";
+            const sideways = event.shiftKey && dx === 0 && mode !== "vertical";
             const speed = this.options.panOnScrollSpeed ?? 1;
             const byX = mode === "vertical" ? 0 : sideways ? dy : dx;
             const byY = mode === "horizontal" || sideways ? 0 : dy;
