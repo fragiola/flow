@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -264,7 +264,7 @@ describe("the adapters the package check covers", () => {
         expect(() => smokeVersion("vue", "left-pad")).toThrow(/no pin/);
     });
 
-    it("pin the Svelte smoke app at the package's pins until examples/svelte exists: svelte-check on TypeScript 6", () => {
+    it("pin the Svelte smoke app at examples/svelte's pins: svelte-check on TypeScript 6", () => {
         const read = (path: string) =>
             JSON.parse(
                 readFileSync(join(import.meta.dirname, "../..", path), "utf8"),
@@ -272,17 +272,8 @@ describe("the adapters the package check covers", () => {
                 dependencies?: Record<string, string>;
                 devDependencies?: Record<string, string>;
             };
-        const pkg = read("packages/svelte/package.json");
-        const examples = existsSync(
-            join(import.meta.dirname, "../../examples/svelte/package.json"),
-        )
-            ? read("examples/svelte/package.json")
-            : undefined;
-        const pins = {
-            ...pkg.devDependencies,
-            ...examples?.dependencies,
-            ...examples?.devDependencies,
-        };
+        const examples = read("examples/svelte/package.json");
+        const pins = { ...examples.dependencies, ...examples.devDependencies };
         for (const name of [
             "svelte",
             "vite",
@@ -290,11 +281,14 @@ describe("the adapters the package check covers", () => {
             "svelte-check",
             "typescript",
         ]) {
+            expect(pins[name], name).toBeDefined();
             expect(smokeVersion("svelte", name), name).toBe(pins[name]);
         }
-        // svelte-check and svelte-package do not run on TypeScript 7: the package pins 6 too
-        expect(pkg.devDependencies?.typescript).toMatch(/^6\./);
+        // svelte-check does not run on TypeScript 7: the app and the package pin 6
         expect(smokeVersion("svelte", "typescript")).toMatch(/^6\./);
+        expect(
+            read("packages/svelte/package.json").devDependencies?.typescript,
+        ).toBe(pins.typescript);
         expect(() => smokeVersion("svelte", "left-pad")).toThrow(/no pin/);
     });
 

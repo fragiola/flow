@@ -301,8 +301,9 @@ export interface AdapterCheck {
 /**
  * The version of `name` a framework's smoke app installs, so that it installs nothing new: its
  * examples app's pin (examples/<framework>: React's Vite plugin and types, Vue's vue-tsc, its
- * Vite plugin and the TypeScript 6 vue-tsc runs on), else its package's own (packages/<framework>:
- * Svelte's, until examples/svelte exists: svelte, its Vite plugin, svelte-check and TypeScript 6).
+ * Vite plugin and the TypeScript 6 vue-tsc runs on, Svelte's svelte, its Vite plugin,
+ * svelte-check and TypeScript 6), else its package's own (packages/<framework>: an adapter whose
+ * examples app does not exist yet, as Svelte's in #12 and Angular's next).
  */
 export function smokeVersion(framework: Framework, name: string): string {
     const manifests = [
