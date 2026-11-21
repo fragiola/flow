@@ -317,7 +317,10 @@ export class Editor {
 
 In Angular, the snapshot goes into a signal from `history.subscribe` (what
 `useSyncExternalStore` does in React), the history is made after the first render
-(`afterNextRender`, browser only) and disposed with the component (`DestroyRef`).
+(`afterNextRender`, browser only) and disposed with the component (`DestroyRef`). The
+`undo-redo` example makes it in a field and listens on `DOCUMENT`'s window instead: the adapter
+renders in a browser only, so both work; `afterNextRender` keeps a server render of the page out of
+it.
 
 </Framework>
 

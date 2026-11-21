@@ -121,7 +121,10 @@ const features = [minimap()] as const;
 
 In Angular, the children function is the elements you write inside `flowMiniMap`, reading
 `#map="flowMiniMap"`'s `map.state().view`; with no element written, it draws a node per node and
-the mask. A minimap node leaves the document while it is not shown, so wrap each one in a group
+the mask. `map.state()` changes on every pan and drag step, and a template that reads it is
+checked again with all of its views: in the template that renders the nodes, every node. Read it
+in a component of its own on the minimap's element (`<svg flowMiniMap appMinimap>`, whose
+component injects `FlowMiniMapDirective` and holds the `@for`), as the examples do. A minimap node leaves the document while it is not shown, so wrap each one in a group
 when it would be the first element of an `@for`'s view.
 
 </Framework>
