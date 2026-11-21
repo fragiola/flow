@@ -1,0 +1,154 @@
+{
+    "name": "@fragiola/flow",
+    "version": "0.0.0",
+    "description": "Headless node-based editors and diagrams core: the flow document and its JSON Schema, a typed model with commands, opt-in features (selection, sub-flows, drag, resize, connection, reconnection, keyboard, minimap), and the engine that binds a flow to the DOM.",
+    "keywords": [
+        "flow",
+        "node-editor",
+        "diagram",
+        "graph",
+        "headless"
+    ],
+    "license": "MIT",
+    "type": "module",
+    "author": {
+        "name": "Mauro de Souza",
+        "email": "maurodesouza.me@gmail.com",
+        "url": "https://github.com/maurodesouza"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/fragiola/flow.git",
+        "directory": "packages/core"
+    },
+    "homepage": "https://fragiola.com/flow",
+    "bugs": {
+        "url": "https://github.com/fragiola/flow/issues"
+    },
+    "sideEffects": false,
+    "exports": {
+        ".": {
+            "@fragiola/source": "./src/index.ts",
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js",
+            "default": "./dist/index.js"
+        },
+        "./selection": {
+            "@fragiola/source": "./src/selection/index.ts",
+            "types": "./dist/selection.d.ts",
+            "import": "./dist/selection.js",
+            "default": "./dist/selection.js"
+        },
+        "./subflows": {
+            "@fragiola/source": "./src/subflows/index.ts",
+            "types": "./dist/subflows.d.ts",
+            "import": "./dist/subflows.js",
+            "default": "./dist/subflows.js"
+        },
+        "./drag": {
+            "@fragiola/source": "./src/drag/index.ts",
+            "types": "./dist/drag.d.ts",
+            "import": "./dist/drag.js",
+            "default": "./dist/drag.js"
+        },
+        "./resize": {
+            "@fragiola/source": "./src/resize/index.ts",
+            "types": "./dist/resize.d.ts",
+            "import": "./dist/resize.js",
+            "default": "./dist/resize.js"
+        },
+        "./connection": {
+            "@fragiola/source": "./src/connection/index.ts",
+            "types": "./dist/connection.d.ts",
+            "import": "./dist/connection.js",
+            "default": "./dist/connection.js"
+        },
+        "./reconnection": {
+            "@fragiola/source": "./src/reconnection/index.ts",
+            "types": "./dist/reconnection.d.ts",
+            "import": "./dist/reconnection.js",
+            "default": "./dist/reconnection.js"
+        },
+        "./keyboard": {
+            "@fragiola/source": "./src/keyboard/index.ts",
+            "types": "./dist/keyboard.d.ts",
+            "import": "./dist/keyboard.js",
+            "default": "./dist/keyboard.js"
+        },
+        "./minimap": {
+            "@fragiola/source": "./src/minimap/index.ts",
+            "types": "./dist/minimap.d.ts",
+            "import": "./dist/minimap.js",
+            "default": "./dist/minimap.js"
+        },
+        "./package.json": "./package.json"
+    },
+    "files": [
+        "dist",
+        "README.md",
+        "LICENSE"
+    ],
+    "publishConfig": {
+        "exports": {
+            ".": {
+                "types": "./dist/index.d.ts",
+                "import": "./dist/index.js",
+                "default": "./dist/index.js"
+            },
+            "./selection": {
+                "types": "./dist/selection.d.ts",
+                "import": "./dist/selection.js",
+                "default": "./dist/selection.js"
+            },
+            "./subflows": {
+                "types": "./dist/subflows.d.ts",
+                "import": "./dist/subflows.js",
+                "default": "./dist/subflows.js"
+            },
+            "./drag": {
+                "types": "./dist/drag.d.ts",
+                "import": "./dist/drag.js",
+                "default": "./dist/drag.js"
+            },
+            "./resize": {
+                "types": "./dist/resize.d.ts",
+                "import": "./dist/resize.js",
+                "default": "./dist/resize.js"
+            },
+            "./connection": {
+                "types": "./dist/connection.d.ts",
+                "import": "./dist/connection.js",
+                "default": "./dist/connection.js"
+            },
+            "./reconnection": {
+                "types": "./dist/reconnection.d.ts",
+                "import": "./dist/reconnection.js",
+                "default": "./dist/reconnection.js"
+            },
+            "./keyboard": {
+                "types": "./dist/keyboard.d.ts",
+                "import": "./dist/keyboard.js",
+                "default": "./dist/keyboard.js"
+            },
+            "./minimap": {
+                "types": "./dist/minimap.d.ts",
+                "import": "./dist/minimap.js",
+                "default": "./dist/minimap.js"
+            },
+            "./package.json": "./package.json"
+        }
+    },
+    "scripts": {
+        "build": "tsdown",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run",
+        "generate:commands": "tsdown && node scripts/generate-command-docs.ts"
+    },
+    "devDependencies": {
+        "@types/node": "24.13.6",
+        "jsdom": "30.1.1",
+        "tsdown": "0.23.0",
+        "typescript": "7.0.2",
+        "vitest": "5.0.2"
+    }
+}

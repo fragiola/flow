@@ -1,0 +1,104 @@
+# CI: the Fragiola project jobs (guidelines repository.md#ci). It runs on every pull request and on
+# a manual run; a push to main runs no tests (main is what its pull request tested).
+#
+#   Checks            Biome and the source layout check, TypeScript, the unit tests and the build
+#                     (with the .d.ts check).
+#   Package           `pnpm check:package`: builds and packs every package with pnpm, lints the
+#                     tarballs (dist-only exports, publint, attw). Each adapter (none yet; one per
+#                     adapter Epic) also gets its exact core pin checked and its own smoke app. A
+#                     packaging check only: nothing is published (AGENTS.md, D15).
+#   Changes           the E2E suites the change can affect (scripts/e2e-suites.ts, a `git diff`
+#                     against the base, the merge commit's first parent): none for docs only
+#                     (site/docs, *.md, AGENTS.md); packages/react or examples/react: the
+#                     playground and examples react; packages/<framework> or
+#                     examples/<framework> (vue, svelte, angular): examples <framework>; anything
+#                     else (the core, examples/shared, the playground, the lockfile, root configs,
+#                     .github, scripts, site) and a manual run: every suite. It also lists the
+#                     frameworks with an examples app (every `examples/<framework>` with a
+#                     playwright.config.ts). No job reads its outputs yet: there is no suite.
+#
+# Arriving with the apps in the React Epic: the E2E jobs (the playground and a matrix over the
+# examples apps, in Playwright's image mcr.microsoft.com/playwright:v<version>-noble, its tag the
+# pinned @playwright/test, with no browser install: site/tests/ci-workflow.test.ts checks
+# both), the Site export job, and the Trigger www build job, the only one a push to main runs.
+# No release workflow and no Changesets job (AGENTS.md, D15).
+
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the pnpm version from `packageManager` in package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm check
+
+      - run: pnpm typecheck
+
+      - run: pnpm test
+
+      - run: pnpm build
+
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # builds the packages first, then packs and lints the tarballs
+      - run: pnpm check:package
+
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    outputs:
+      playground: ${{ steps.suites.outputs.playground }}
+      examples: ${{ steps.suites.outputs.examples }}
+    steps:
+      # a pull request checks out its merge commit: its first parent is the base it merges into
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - id: suites
+        run: |
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            node scripts/e2e-suites.ts --diff HEAD^1
+          else
+            node scripts/e2e-suites.ts --all
+          fi
