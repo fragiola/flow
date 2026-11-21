@@ -43,7 +43,10 @@ export interface BackgroundPatternPayload {
     variant?: BackgroundVariant | undefined;
     /** the distance between two marks, in flow units; default 20 (`[x, y]` for two) */
     gap?: number | readonly [number, number] | undefined;
-    /** a dot's diameter, or a cross's arm length, in flow units; default 1 (dots), 6 (cross) */
+    /**
+     * dots: a dot's diameter, in flow units (default 1); lines: the stroke width, in screen pixels
+     * (default 1); cross: the length of each bar, in flow units (default 6)
+     */
     size?: number | undefined;
     /** the pattern's shift from the flow's origin, in flow units; default 0 */
     offset?: number | readonly [number, number] | undefined;

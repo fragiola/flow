@@ -1,0 +1,196 @@
+---
+title: Features
+description: The eight opt-in features, from selection to the minimap - each factory, its options and defaults, what it adds to the model and the engine.
+---
+
+The core holds the document, nodes, edges, handles, the viewport, measurement, edge paths and
+`fit-view`. Everything else is an opt-in feature: a factory on its own entry, installed on the
+model once, when it is created. A flow that never imports a feature ships none of its code (the
+build's bundle guard checks the main entry imports none), and a command, key or document field of
+a feature that is not installed is a type error; at run time its command returns `not_found` and
+a document field is a validation issue, both naming the feature, while its `get` and `is` keys
+answer `undefined` and `false`. The
+concept is on [Features](/docs/concepts/features).
+
+```tsx
+import { Flow } from "@fragiola/flow-react";
+import { connection } from "@fragiola/flow-react/connection";
+import { drag } from "@fragiola/flow-react/drag";
+import { keyboard } from "@fragiola/flow-react/keyboard";
+import { selection } from "@fragiola/flow-react/selection";
+
+// once, outside the component: the features are fixed when the model is created
+const features = [selection({ boxMode: "partial" }), drag({ snapGrid: [20, 20] }), connection(), keyboard()] as const;
+
+export function Editor() {
+    return (
+        <Flow.Root<Types, typeof features> features={features} defaultNodes={nodes} className="size-full">
+            …
+        </Flow.Root>
+    );
+}
+```
+
+Each React entry re-exports the core's (`@fragiola/flow-react/drag` is `@fragiola/flow/drag`),
+so a React app imports everything from the one package it installs; `/minimap` and `/resize` add
+their primitives. Pass `typeof features` as the type argument so the verbs know the keys. Each
+factory returns a frozen object with its resolved `options`.
+
+<Example id="read-only" />
+
+## `selection()`
+
+`selection(options?)` from `@fragiola/flow-react/selection` returns a `SelectionFeature`: clicking
+selects a node or an edge (replacing the selection), a modifier click toggles it in the selection,
+a plain click on the pane clears it, and Shift + drag on the pane draws a selection box. It owns the `selected` field of nodes and edges, the commands `selection.set`,
+`selection.clear` and `selection.remove`, the keys `"selected-nodes"`, `"selected-edges"`,
+`"node-selected"`, `"edge-selected"`, and on the engine `"selection-box"` and `"box-selecting"`.
+
+`SelectionOptions`:
+
+| option | type | default | description |
+| --- | --- | --- | --- |
+| `boxMode` | `BoxSelectionMode` | `"full"` | a box takes the nodes it holds whole (`"full"`) or those it touches (`"partial"`), with the edges between them |
+| `multiple` | `boolean` | `true` | a modifier click (Ctrl / Cmd, Shift) toggles the item in the selection (adds it, or removes a selected one) |
+| `boxOnDrag` | `boolean` | `false` | any drag on the pane draws a box (instead of panning); otherwise Shift + drag |
+
+## `drag()`
+
+`drag(options?)` from `@fragiola/flow-react/drag` returns a `DragFeature`: a press on a node drags
+it (or the selection it belongs to), with `transient` `node.move` steps and a final one; Escape
+cancels and puts them back. It adds no command (`node.move` is the core's), and on the engine
+`"dragging-node-ids"`, `"dragging"` and `"node-dragging"`.
+
+`DragOptions`:
+
+| option | type | default | description |
+| --- | --- | --- | --- |
+| `snapGrid` | `[number, number]` | none | the grid a dragged node snaps to, in flow units (the others move by the same offset) |
+| `threshold` | `number` | `1` | how far, in pixels, a press moves before it is a drag |
+
+## `connection()`
+
+`connection(options?)` from `@fragiola/flow-react/connection` returns a `ConnectionFeature`: a
+press on a handle draws a connection; the drop on another handle runs `edge.add`. While it is
+drawn, the engine asks `model.can("edge.add", …)`, so a middleware's veto marks the target
+`data-invalid` and refuses the drop (see [Connection rules](/docs/guides/connection-rules)). It
+adds `"connection"` and `"connecting"` to the engine.
+
+`ConnectionOptions`:
+
+| option | type | default | description |
+| --- | --- | --- | --- |
+| `radius` | `number` | `20` | how near, in screen pixels, a handle must be for the drop to snap to it |
+| `mode` | `ConnectionMode` | `"strict"` | `"strict"`: a source ends at a target (or the reverse); `"loose"`: at any other handle |
+
+## `reconnection()`
+
+`reconnection(options?)` from `@fragiola/flow-react/reconnection` returns a `ReconnectionFeature`;
+it requires `connection()` (installing it alone throws). A press on an edge's end (a
+`Flow.ReconnectAnchor`, or the stroke within `radius` of the end) moves that end to another handle
+with `edge.reconnect`, its command (refused for an edge whose `reconnectable` flag is false). It
+adds `"edge-reconnecting"` to the engine.
+
+`ReconnectionOptions`:
+
+| option | type | default | description |
+| --- | --- | --- | --- |
+| `radius` | `number` | `10` | how near, in pixels, to an edge's end a press grabs it (give touch apps more) |
+
+## `resize()`
+
+`resize(options?)` from `@fragiola/flow-react/resize` returns a `ResizeFeature`: a press on a
+`ResizeHandle` resizes its node from that corner or side, with `transient` `node.resize` steps
+(the core's command) and a final one. The entry adds `NodeResizer` and `ResizeHandle` (see
+[NodeResizer](/docs/api/primitives/node-resizer)), the engine `"resizing"` and `"node-resizing"`.
+A `NodeResizer`'s own limits override these for its node.
+
+`ResizeOptions`:
+
+| option | type | default | description |
+| --- | --- | --- | --- |
+| `minWidth` | `number` | `10` | the smallest width, in flow units |
+| `minHeight` | `number` | `10` | the smallest height |
+| `maxWidth` | `number` | none | the largest width |
+| `maxHeight` | `number` | none | the largest height |
+| `keepAspectRatio` | `boolean` | `false` | a resize keeps the node's width-to-height ratio |
+
+## `subflows()`
+
+`subflows()` from `@fragiola/flow-react/subflows` returns a `SubflowsFeature` (its
+`SubflowsOptions` are empty for now): a node may live in another (`parentId`), its position
+relative to its parent; with `extent: "parent"` it stays inside its parent's box, and with
+`expandParent` the parent grows to keep it. Removing a parent removes its children. It owns those
+fields, the command `node.set-parent` and the keys `"node-children-by"` and `"node-parent-by"`.
+See [Sub-flows](/docs/guides/sub-flows).
+
+## `keyboard()`
+
+`keyboard(options?)` from `@fragiola/flow-react/keyboard` returns a `KeyboardFeature`: nodes and
+edges take DOM focus (`tabindex="0"`, the engine's `"node-focusable"` and `"edge-focusable"`); the
+arrows move the selection (or the focused node), Delete and Backspace remove it
+(`selection.remove` with `selection()`), Enter and Space select, Escape clears the selection. See
+[Keyboard and accessibility](/docs/guides/keyboard).
+
+`KeyboardOptions`:
+
+| option | type | default | description |
+| --- | --- | --- | --- |
+| `step` | `number` | `5` | how far an arrow moves a node, in flow units |
+| `fastStep` | `number` | `20` | how far Shift with an arrow moves it |
+
+## `minimap()`
+
+`minimap(options?)` from `@fragiola/flow-react/minimap` returns a `MinimapFeature`: the engine's
+`"minimap-view"` (what a minimap of a size draws), and pan and zoom from the minimap. The entry adds
+`MiniMap`, `MiniMapNode` and `MiniMapMask` (see [MiniMap](/docs/api/primitives/mini-map)).
+
+`MinimapOptions`:
+
+| option | type | default | description |
+| --- | --- | --- | --- |
+| `pannable` | `boolean` | `true` | a press or a drag on the minimap pans the viewport |
+| `zoomable` | `boolean` | `true` | the wheel over the minimap zooms the viewport |
+| `padding` | `number` | `0.1` | the share of the minimap's size kept free around the nodes and the view, on every side |
+
+## Who owns what
+
+`FEATURE_KEYS` is the table the core reads: for each `FeatureName`, its `commands`, its model
+`get` and `is` keys, its engine keys (`engineRun`, `engineGet`, `engineIs`) and its node and edge
+fields. `FeatureKeyKind` is one of those kinds, `OwnedBy<K, N>` the names of a kind the features
+`N` own.
+
+```ts
+import { FEATURE_KEYS } from "@fragiola/flow-react";
+
+FEATURE_KEYS.subflows.commands; // ["node.set-parent"]
+FEATURE_KEYS.selection.nodeFields; // ["selected"]
+```
+
+## The feature contract
+
+A feature is a `FlowFeature<N, O>` (any one: `AnyFlowFeature`; a list: `FlowFeatures`, whose wide
+form as a type argument means "any features"). Its parts are all optional: `requires`, `options`,
+`commands` (each a `CommandDefinition`), model `get` and `is` keys reading a `FlowReader` (the
+document's nodes and edges, in order and by id), document rules (`documentIssues`, `checkNode`,
+`checkEdge`, `removing`, `constrainPosition`, `nodeChanged`, `flagsChanged`, `absolutePosition`)
+and `engine(host)`, its part of each engine.
+
+| type | is |
+| --- | --- |
+| `FeatureEngine` | what a feature adds to one engine: `run`, `get` and `is` keys, and the hooks `pointerdown`, `tap`, `wheel`, `keydown`, `focus`, `attributes`, `attached`, `detached`, `destroy`, walked in install order |
+| `FeatureEngineHost` | what the engine lends its features: the model (as a `FeatureModel`), a `shared` slot, the root, the viewport, measured rects and handles, edge paths, `keepInParent`, `interactive`, `partOptions`, `changed` and `emit` |
+| `FeatureGesture` | what a `pointerdown` that takes the press returns: `move`, `end`, `cancel` and `active`; the engine owns the capture, Escape, a cancel and a missed release |
+| `FeatureModel` | the model's verbs as a feature's engine side calls them, typed loosely |
+| `FlowReader` | `nodes()`, `edges()`, `node(id)`, `edge(id)` of a document |
+| `FeatureNamesOf<F>` | the names of a list's features |
+| `AllowedKeys<Kind, All, F>` | the names of a kind a model with the features `F` has: the core's and theirs |
+| `CommandNameOf<F>` | its commands |
+| `ModelGetKeyOf<F>` | its `model.get` keys |
+| `ModelIsKeyOf<F>` | its `model.is` keys |
+| `EngineActionKeyOf<F>` | its engine's actions |
+| `EngineGetKeyOf<F>` | its engine's reads |
+| `EngineIsKeyOf<F>` | its engine's questions |
+
+Features never import each other: they talk through keys and the host's `shared` slot (the
+connection under way is shared by `connection()` and `reconnection()` that way).

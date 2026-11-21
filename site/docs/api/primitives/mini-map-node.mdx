@@ -1,0 +1,44 @@
+---
+title: MiniMapNode
+description: MiniMapNode is one node in the MiniMap, a rectangle of the node's box in flow coordinates, marked while the node is selected.
+---
+
+`MiniMapNode` comes from `@fragiola/flow-react/minimap` and goes inside `MiniMap`. It renders an
+SVG `rect` of its node's box from the minimap's view, in flow coordinates, and nothing when the
+node is not shown. Give it its fill, through `data-selected` for the selected look.
+
+```tsx
+<MiniMap>
+    {(view) =>
+        view.nodes.map((node) => (
+            <MiniMapNode key={node.nodeId} nodeId={node.nodeId} className="fill-gray-300 data-selected:fill-blue-500" />
+        ))
+    }
+</MiniMap>
+```
+
+## Props
+
+`MiniMapNodeProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and
+every SVG attribute of a `rect`.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `nodeId` | `string` | required | the node it stands for |
+
+## State
+
+`MiniMapNodeState`, what `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `nodeId` | `string` | the node |
+| `selected` | `boolean` | the node is selected (`selection()`) |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"minimap-node"` |
+| `data-flow-id` | the node's id |
+| `data-selected` | present while the node is selected |

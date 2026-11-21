@@ -1,0 +1,185 @@
+---
+title: Undo and redo
+description: Build an undo history from the model's events in about a hundred lines of app code, with a drag as one step and the selection left out.
+---
+
+The package ships no undo: what counts as a step, how many are kept and which commands are left out
+are your app's decisions. It gives you what a history needs. `model.subscribe` tells every committed
+command with the document before and after it, and whether it was a step of a gesture
+(`transient`); `model.get("commands-to", …)` gives the commands that bring the model back to a saved
+document; and `model.run("batch", …)` runs them as one step. Documents are immutable, so keeping one
+costs nothing.
+
+<Example id="undo-redo" />
+
+## Copy the history
+
+The example's `_kit/undo.ts` is a complete history you can copy and change freely (open it in the
+example's code panel). It never imports the package: it describes the few members of the model it
+uses, so any model fits, typed by your registry or not. Its core is a listener and a restore:
+
+```ts title="undo.ts (its core)"
+/** The part of a document the history keeps (the model's documents fit). */
+interface DocumentLike {
+    readonly nodes: readonly object[];
+    readonly edges: readonly object[];
+}
+
+/** The members of a model the history uses: any `FlowModel`, typed or not, fits. */
+interface HistoryModel {
+    subscribe(
+        listener: (event: {
+            readonly command: string;
+            readonly before: DocumentLike;
+            readonly after: DocumentLike;
+            readonly transient: boolean;
+            readonly meta: Readonly<Record<string, unknown>> | undefined;
+        }) => void,
+    ): () => void;
+    get(
+        key: "commands-to",
+        payload: { nodes: readonly never[]; edges: readonly never[] },
+    ): readonly unknown[];
+    run(
+        command: "batch",
+        payload: { commands: never[] },
+        options: { meta: Readonly<Record<string, unknown>> },
+    ): { readonly ok: boolean };
+}
+
+/** What the history runs itself: it records none of it. */
+const UNDO_META = Object.freeze({ undo: true });
+/** Commands that make no step: a selection is not an edit. */
+const IGNORE = ["selection.set", "selection.clear"];
+
+export function createUndoHistory(model: HistoryModel) {
+    const undos: DocumentLike[] = [];
+    const redos: DocumentLike[] = [];
+    let last: DocumentLike | undefined; // the document before the step under way
+    let present: DocumentLike | undefined;
+    let inGesture = false;
+
+    const stop = model.subscribe((event) => {
+        present = event.after;
+        if (event.meta?.undo === true || event.before === event.after) return;
+        last ??= event.before;
+        if (IGNORE.includes(event.command)) {
+            if (!inGesture) last = event.after;
+            return;
+        }
+        if (event.transient) {
+            inGesture = true; // a drag's moves: the final one records the step
+            return;
+        }
+        undos.push(last);
+        redos.length = 0;
+        inGesture = false;
+        last = event.after;
+    });
+
+    /** Brings the model to `target` as one step; says whether it could. */
+    function restore(target: DocumentLike): boolean {
+        const commands = model.get("commands-to", {
+            nodes: target.nodes as never[],
+            edges: target.edges as never[],
+        });
+        if (commands.length === 0) return true;
+        return model.run("batch", { commands: commands as never[] }, { meta: UNDO_META }).ok;
+    }
+
+    function swap(from: DocumentLike[], to: DocumentLike[]): boolean {
+        const document = from.pop();
+        if (!document || !present) return false;
+        const now = present;
+        if (!restore(document)) {
+            from.push(document); // a middleware refused it: the step stays
+            return false;
+        }
+        to.push(now);
+        last = present;
+        inGesture = false;
+        return true;
+    }
+
+    return {
+        undo: () => swap(undos, redos),
+        redo: () => swap(redos, undos),
+        dispose: stop,
+    };
+}
+```
+
+The kit's version adds a step limit, the list of steps (for a history panel), a snapshot for
+`useSyncExternalStore` (`subscribe`, `getSnapshot`), the `UndoHistory` type and the keyboard
+shortcuts (`handleUndoKeys`): copy the whole file as `undo.ts` to use the editor below.
+
+## What one step is
+
+- **A drag** moves its nodes with transient `node.move` commands (a `batch` of them for several
+  nodes) and ends with a final one: the
+  history records the final one only, with the document from before the drag. A resize too.
+- **A connection** is one `edge.add`; **a reconnection** one `edge.reconnect`.
+- **Delete** runs `selection.remove`: the selected nodes, their edges and their children, in one
+  command, so one step.
+- **Selecting** is no step: undo never just changes the selection back. The selection is part of
+  the document, so an undo restores the selection the document had.
+- **Your own changes** are steps too: run several commands as one `batch` to make them one step.
+
+## Wire it to the model
+
+Make the model yourself, so the history sits beside the root, and create the history in an effect
+(StrictMode's second mount then gets one that listens again):
+
+```tsx title="editor.tsx"
+import { createFlowModel, Flow } from "@fragiola/flow-react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { createUndoHistory, handleUndoKeys, type UndoHistory } from "./undo";
+
+export function Editor() {
+    const [model] = useState(() =>
+        createFlowModel<Types, typeof features>({ version: 1, nodes, edges }, { features }),
+    );
+    const [history, setHistory] = useState<UndoHistory | null>(null);
+    useEffect(() => {
+        const created = createUndoHistory(model);
+        setHistory(created);
+        const onKeyDown = (event: KeyboardEvent) => handleUndoKeys(created, event);
+        window.addEventListener("keydown", onKeyDown);
+        return () => {
+            window.removeEventListener("keydown", onKeyDown);
+            created.dispose();
+        };
+    }, [model]);
+    return (
+        <Flow.Root<Types, typeof features> model={model} className="flow">
+            {/* the viewport, edges and nodes */}
+            {history && <HistoryButtons history={history} />}
+        </Flow.Root>
+    );
+}
+
+function HistoryButtons({ history }: { history: UndoHistory }) {
+    const { canUndo, canRedo } = useSyncExternalStore(history.subscribe, history.getSnapshot);
+    return (
+        <div role="toolbar" aria-label="History">
+            <button type="button" disabled={!canUndo} onClick={() => history.undo()}>Undo</button>
+            <button type="button" disabled={!canRedo} onClick={() => history.redo()}>Redo</button>
+        </div>
+    );
+}
+```
+
+`handleUndoKeys` maps Ctrl/⌘ + Z to undo and Ctrl/⌘ + Shift + Z or Ctrl/⌘ + Y to redo, and leaves
+a text field its own undo.
+
+## Undo and middleware
+
+An undo is a `batch` of ordinary commands, so the middleware sees it: a connection rule that
+refuses an edge refuses to bring it back too, and the step stays in the history. Recognise the
+history's own commands by their `meta` (`ctx.meta?.undo === true`) if a rule should let them
+through.
+
+## The viewport is not undone
+
+Pan and zoom are view state, not the document: the history never records them. An app that wants
+"undo the zoom" keeps its own list from the engine's `viewport-change` events.

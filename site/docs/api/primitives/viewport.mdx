@@ -1,0 +1,59 @@
+---
+title: Viewport
+description: Flow.Viewport is the pannable, zoomable layer holding the edges, the nodes and the connection line, its transform written by the engine itself.
+---
+
+`Flow.Viewport` is the layer in flow coordinates, inside `Flow.Root`. Put in it what pans and
+zooms with the flow: `Flow.Edges` first, then `Flow.Nodes` (drawn on top), then
+`Flow.ConnectionLine`. Leave outside it, in the root, what stays in screen pixels:
+`Flow.Background`, `Flow.SelectionBox`, `Flow.Controls`, the minimap.
+
+The engine writes its `transform` and `transform-origin` directly (`engine.adapter.attachViewport`):
+React never renders a transform on it, so a pan or a zoom re-renders nothing inside it.
+
+```tsx
+<Flow.Root<Types, typeof features> features={features} defaultNodes={nodes} className="size-full">
+    <Flow.Background variant="dots" />
+    <Flow.Viewport>
+        <Flow.Edges<Types>>{renderEdge}</Flow.Edges>
+        <Flow.Nodes<Types>>{renderNode}</Flow.Nodes>
+        <Flow.ConnectionLine />
+    </Flow.Viewport>
+    <Flow.SelectionBox />
+</Flow.Root>
+```
+
+Read the viewport with [`useViewport`](/docs/api/primitives/hooks) and change it with the engine
+(`engine.run("set-viewport", { x, y, zoom })`, `"fit-view"`): see
+[The viewport](/docs/concepts/viewport).
+
+## Props
+
+`ViewportProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and
+every `div` attribute.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `children` | `ReactNode` | none | what is in flow coordinates |
+
+## State
+
+`ViewportState`, what `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `viewport` | `Viewport` | the pan (`x`, `y`, pixels) and the zoom |
+
+The viewport element itself re-renders on every viewport change (it reads `useViewport` for its
+state), while its children do not: the engine writes the transform, so nodes and edges stay put.
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"viewport"` |
+
+## Structural style
+
+`position: absolute`, at the root's top-left corner, `100%` wide and high; `transform` and
+`transform-origin` are the engine's.

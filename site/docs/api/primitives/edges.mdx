@@ -1,0 +1,55 @@
+---
+title: Edges
+description: Flow.Edges is the SVG layer of the edges, calling your children function for each edge once both its nodes have a size, plus the labels' layer.
+---
+
+`Flow.Edges` goes inside `Flow.Viewport`, before `Flow.Nodes` so the nodes are drawn on top. It
+renders a `div` holding an SVG where its children function draws each edge (usually a
+`Flow.Edge`), and is the HTML layer `Flow.EdgeLabel`s are portalled into. An edge is drawn once
+both its nodes have a size (`edge-path-by` is defined): on the first paint, edges wait for their
+nodes' measurements. Hidden edges, and edges of hidden nodes, are left out; with
+`onlyRenderVisible`, only those in view (`visible-edges`).
+
+```tsx
+function renderEdge(edge: FlowEdge<Types>) {
+    return (
+        <Flow.Edge<Types> edge={edge}>
+            <Flow.EdgePath className="stroke-gray-400 data-selected:stroke-blue-500" />
+        </Flow.Edge>
+    );
+}
+
+<Flow.Edges<Types>>{renderEdge}</Flow.Edges>;
+```
+
+The layer lets presses through to the pane; the edges' own parts take them. Each edge's render is
+memoized on the edge and the children function (its path re-renders by itself): keep the function
+stable, as for [`Flow.Nodes`](/docs/api/primitives/nodes).
+
+## Props
+
+`EdgesProps<T>` extends the [common primitive props](/docs/api/primitives/root#common-props) and
+every `div` attribute but `children`.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `children` | `(edge: FlowEdge<T>) => ReactNode` | required | draws one edge, as SVG |
+
+## State
+
+`EdgesState`, what `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `count` | `number` | how many edges are drawn |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"edges"`, on the `div` and on its `svg` |
+
+## Structural style
+
+The `div` and the `svg` are absolute, `100%` of the viewport, `overflow: visible` and
+`pointer-events: none`.

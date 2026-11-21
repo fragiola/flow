@@ -1,0 +1,63 @@
+---
+title: MiniMap
+description: MiniMap draws a small map of every node and of what the root shows; with minimap(), a drag on it pans the flow and its wheel zooms.
+---
+
+`MiniMap` comes from `@fragiola/flow-react/minimap`, with the `minimap()` feature it needs. It
+renders an SVG of `width` × `height` pixels inside `Flow.Root`, outside `Flow.Viewport`, whose
+view box is the engine's `minimap-view`: every node, and the view the root shows. By default it
+draws a `MiniMapNode` per node, then the `MiniMapMask`; a children function receives the view
+(`MinimapView`) to draw your own. With `minimap({ pannable, zoomable })` (both true by default) a
+press or a drag on it pans the flow and its wheel zooms it. Place it and name it yourself.
+
+<Example id="minimap-and-controls" />
+
+```tsx
+import { Flow } from "@fragiola/flow-react";
+import { MiniMap, MiniMapMask, MiniMapNode, minimap } from "@fragiola/flow-react/minimap";
+
+const features = [minimap()] as const;
+
+<Flow.Root<Types, typeof features> features={features} defaultNodes={nodes} className="relative size-full">
+    <Flow.Viewport>…</Flow.Viewport>
+    <MiniMap width={180} height={130} role="img" aria-label="Minimap" className="absolute right-3 bottom-3">
+        {(view) => (
+            <>
+                {view.nodes.map((node) => (
+                    <MiniMapNode key={node.nodeId} nodeId={node.nodeId} className="fill-gray-300" />
+                ))}
+                <MiniMapMask className="fill-black/10" />
+            </>
+        )}
+    </MiniMap>
+</Flow.Root>;
+```
+
+## Props
+
+`MiniMapProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and
+every SVG attribute of an `svg` but `children`.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `width` | `number` | `200` | its width, in pixels |
+| `height` | `number` | `150` | its height, in pixels |
+| `children` | `ReactNode \| ((view: MinimapView) => ReactNode)` | a `MiniMapNode` per node, then the `MiniMapMask` | what it draws, in flow coordinates |
+
+## State
+
+`MiniMapState`, what `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `view` | `MinimapView` | the nodes, the view and the mask, in flow coordinates ([engine reads](/docs/api/engine)) |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"minimap"` |
+
+## Structural style
+
+`width` and `height` (attributes and style), `viewBox` from `minimap-view`.

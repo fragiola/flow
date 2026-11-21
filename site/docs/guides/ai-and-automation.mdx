@@ -1,0 +1,156 @@
+---
+title: AI and automation
+description: Hand the flow's commands to an AI assistant as tools, run its calls as untrusted JSON, and keep a middleware as the permission boundary.
+---
+
+Every change to a flow is a named command with a description and a JSON Schema. That is what a
+tool-calling assistant needs to build or edit a flow, and what a script, an importer, a macro
+recorder or a test needs too. The model provides the four pieces; the package has no SDK, makes no
+network call and knows no provider:
+
+1. **describe**: `model.get("commands")` lists every installed command with its description and
+   schemas, ready to become tool definitions;
+2. **run**: `model.dispatch(input, { meta })` takes a command as untrusted JSON, validates it, and
+   answers with a result or a structured error, never an exception;
+3. **guard**: a middleware (`model.use`) decides what an assistant may do, and `model.can` /
+   `model.check` ask before acting;
+4. **report**: the result goes back to the assistant, and `model.subscribe` tells it what changed
+   in the meantime.
+
+To have your own coding agent build with this library, see the site's [agent docs](/ai): the
+Fragiola MCP server and the agent skills.
+
+## Commands as tool definitions
+
+`model.get("commands")` returns a `CommandInfo` per command the model's features install:
+
+| field | holds |
+| --- | --- |
+| `name` | the command's name (`"node.add"`) |
+| `description` | what it does, written for an assistant choosing a tool |
+| `payloadSchema` | the JSON Schema of its payload, self-contained |
+| `resultSchema` | the JSON Schema of its result value |
+| `transient` | whether it may run as a step of a continuous gesture (a drag) |
+| `feature` | the feature it comes with (`"selection"`), none for the core's |
+
+Most tool-calling APIs take a name, a description and an input schema, so a command maps onto a
+tool one to one. Tool names are usually restricted to letters, digits, `_` and `-`, so the dots go:
+
+```ts title="tools.ts"
+import type { CommandInfo, CommandName, JsonSchema } from "@fragiola/flow-react";
+
+/** What the tools read of a model: any `FlowModel`, typed by your registry or not, fits. */
+interface CommandsModel {
+    get(key: "commands"): readonly CommandInfo[];
+}
+
+/** The provider-neutral shape: rename the fields to what your API expects. */
+interface ToolDefinition {
+    name: string;
+    description: string;
+    input_schema: JsonSchema;
+}
+
+const toolName = (command: CommandName) => command.replaceAll(".", "_");
+
+export function toolsOf(model: CommandsModel): ToolDefinition[] {
+    return model.get("commands").map((info) => ({
+        name: toolName(info.name),
+        description: info.description,
+        input_schema: info.payloadSchema,
+    }));
+}
+
+/** The command a tool call names, back from its tool name. */
+export function commandOf(model: CommandsModel, tool: string): CommandName | undefined {
+    return model.get("commands").find((info) => toolName(info.name) === tool)?.name;
+}
+```
+
+Leave the gesture commands out if the assistant has no use for them, or keep a smaller list: the
+tools are yours to pick. The full reference of every command is [Commands](/docs/api/commands).
+
+## Run a call as untrusted JSON
+
+`model.run` is typed for your code. An assistant's call is just JSON, so give it to
+`model.dispatch`, which validates the input's shape and the payload against the command's schema
+before anything runs:
+
+```ts
+const result = model.dispatch(
+    { command: commandOf(model, call.name), payload: call.input },
+    { meta: { source: "assistant" } },
+);
+
+if (result.ok) {
+    reply(call.id, JSON.stringify(result.value)); // { nodeId: "node-4" }
+} else {
+    reply(call.id, JSON.stringify(result.error), { isError: true });
+}
+```
+
+An error is data the assistant can act on: a `code` (`invalid_payload`, `not_found`, `refused`,
+`vetoed`, …), a `message`, and for a bad payload the JSON `path` and every `issues` entry. `meta`
+is the app's (never read from the input): every middleware and listener sees it.
+
+Building a whole flow is one `batch`: all or nothing, one step for an undo history.
+
+```json
+{
+    "command": "batch",
+    "payload": {
+        "commands": [
+            { "command": "node.add", "payload": { "id": "fetch", "type": "task", "position": { "x": 0, "y": 0 }, "data": { "label": "Fetch" } } },
+            { "command": "node.add", "payload": { "id": "save", "type": "task", "position": { "x": 0, "y": 140 }, "data": { "label": "Save" } } },
+            { "command": "edge.add", "payload": { "source": "fetch", "target": "save" } }
+        ]
+    }
+}
+```
+
+## A middleware is the permission boundary
+
+The rules that hold for users hold for an assistant too (a connection rule refuses its `edge.add`
+the same way). Add the rules that only an assistant has, keyed on the `meta` you dispatched with:
+
+```ts
+import { veto } from "@fragiola/flow-react";
+
+model.use((ctx, next) => {
+    if (ctx.meta?.source !== "assistant") return next();
+    if (ctx.command === "node.remove" || ctx.command === "selection.remove") {
+        return veto("the assistant may not remove nodes");
+    }
+    return next();
+});
+```
+
+Before acting, an assistant (or your UI asking for confirmation) can ask the model in a dry run:
+`model.can(command, payload)` says whether it would succeed, `model.check` returns the result it
+would get. Neither commits or emits anything.
+
+## Tell the assistant what changed
+
+The user keeps working while the assistant thinks. `model.subscribe` tells every commit; send the
+assistant a short summary, or the whole document, with its next turn:
+
+```ts
+const changes: string[] = [];
+model.subscribe((event) => {
+    if (event.transient || event.meta?.source === "assistant") return;
+    changes.push(event.command);
+});
+
+// with the next request
+const context = { document: model.get("flow-json"), userChanges: changes.splice(0) };
+```
+
+`model.get("flow-json")` is the whole flow as JSON, and `validateFlow` checks a document an
+assistant writes from scratch before you load it with `createFlowModel`.
+
+## Automation without an assistant
+
+The same pieces drive anything that is not a person: an importer turns a file into one `batch`, an
+auto-layout runs `node.move` for each node (no feature needed: `node.move` is the core's), a
+recorder replays the events `model.subscribe` heard. The engine is separate: screen actions such
+as `engine.run("fit-view")` after an import are the view's, not the document's.

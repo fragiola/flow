@@ -1,0 +1,158 @@
+---
+title: Model
+description: createFlowModel and the members of a flow model, every key of its get and is verbs, and the validation of a document before it loads.
+---
+
+The model holds the flow's document (its nodes and edges) as plain, frozen, JSON-shaped data that
+only commands change. It needs no DOM: it runs in Node, on a server and in tests. `Flow.Root`
+creates one from its props unless you give it yours with `model`, which is what you do when you
+want its middleware, its events or its document outside the root.
+
+```ts
+import { createFlowModel, type FlowJson, type FlowTypes } from "@fragiola/flow-react";
+import { selection } from "@fragiola/flow-react/selection";
+import { subflows } from "@fragiola/flow-react/subflows";
+
+interface Types extends FlowTypes {
+    readonly nodes: { task: { title: string }; group: { label: string } };
+}
+
+const features = [selection(), subflows()] as const;
+
+declare const saved: FlowJson<Types>;
+
+const model = createFlowModel<Types, typeof features>(saved, {
+    features,
+    createId: (kind) => `${kind}-${crypto.randomUUID()}`,
+});
+model.get("node-by", { id: "review" });
+model.get("node-children-by", { nodeId: "group-1" });
+model.is("node-selected", { nodeId: "review" });
+```
+
+## `createFlowModel`
+
+`createFlowModel<T, F>(json?, options?)` returns a `FlowModel<T, F>`, typed by your registry `T`
+(see [Typed data](/docs/concepts/typed-data)) and by the features `F` it installs: a command or a
+key of a feature that is not installed is a type error, and at run time a `not_found` result (a
+command) or `undefined` / `false` (a key). Pass both type arguments (`typeof features`) when you
+give `T`. Without `json` the flow is empty. `json` is a version 1 document (see
+[The JSON document](/docs/api/json-document)); an invalid one throws a `FlowValidationError`, and a
+feature installed twice, or missing one it requires (`reconnection()` without `connection()`),
+throws a `TypeError` naming both.
+
+`FlowModelOptions`:
+
+| option | type | description |
+| --- | --- | --- |
+| `features` | `F` | the opt-in features, each from its own entry (`[selection(), drag()]`), fixed for the model's life (see [Features](/docs/api/features)) |
+| `createId` | `CreateId` | generates the id of a node or edge given without one: `(kind: IdKind) => string`, `IdKind` being `"node"` or `"edge"`; default `` `${kind}-${n}` `` (no global `crypto`). An id in use is skipped and asked again |
+| `freeze` | `boolean` | freeze the document and every node and edge in it (default `true`) |
+
+## `validateFlow` and `FlowValidationError`
+
+`validateFlow(json, options?)` returns every problem of a document as `ValidationIssue`s
+(`{ path, message }`, the path a JSON pointer), or none: what `createFlowModel` would throw with.
+It never throws for a document. Give it the same `features` as the model (`ValidateFlowOptions`):
+a field of a feature that is not installed (`selected` without `selection()`) is an issue.
+
+```ts
+import { createFlowModel, FlowValidationError, validateFlow } from "@fragiola/flow-react";
+
+declare const json: unknown;
+
+const issues = validateFlow(json, { features });
+if (issues.length > 0) console.warn(issues); // [{ path: "/nodes/0/position", message: "…" }]
+
+try {
+    createFlowModel(json as never, { features });
+} catch (error) {
+    if (error instanceof FlowValidationError) console.warn(error.issues);
+}
+```
+
+`FlowValidationError` is an `Error` whose `issues` lists every problem; its message names the
+first one.
+
+## The members
+
+Every member is one verb, and every method is bound (`const { run } = model` works):
+
+| member | does |
+| --- | --- |
+| `run(command, payload?, options?)` | changes the flow through the middleware chain; never throws on bad input |
+| `dispatch(input, options?)` | `run` for untrusted JSON `{ command, payload, transient? }`, validated first |
+| `can(command, payload?, options?)` | whether `run` would succeed now (a dry run: nothing committed, nothing emitted) |
+| `check(command, payload?, options?)` | what `run` would return, without committing or emitting |
+| `get(key, payload?)` | reads from the committed document |
+| `is(key, payload)` | asks a yes/no question about the committed document |
+| `use(middleware)` | adds a middleware around every command (the first added runs outermost); returns its remover |
+| `subscribe(listener)` | listens to every commit (one event per commit); returns its remover |
+
+`run`, `dispatch`, `can`, `check`, `use` and `subscribe` are on
+[The command bus](/docs/api/command-bus); the commands are on [Commands](/docs/api/commands).
+`CommandArgs<P>` types what follows a command's name: its payload, optional when it has no
+required field (`model.run("selection.clear")`), then the `RunOptions`. `QueryArgs<P>` does the
+same for a key (`NoPayload`, `{}`, for a key that takes none).
+
+## `get` keys
+
+A key that takes an id ends in `-by`. The lists are the document's own frozen arrays, in drawing
+order: compare them by identity.
+
+| key | payload | returns |
+| --- | --- | --- |
+| `"node-by"` | `{ id }` | a node, or undefined |
+| `"edge-by"` | `{ id }` | an edge, or undefined |
+| `"all-nodes"` | none | every node, in drawing order |
+| `"all-edges"` | none | every edge, in drawing order |
+| `"node-edges-by"` | `{ nodeId, handleType?, handleId? }` | the edges that start or end at a node; with `handleType` (`HandleType`: `"source"` or `"target"`) only those that start or end there; with `handleId` only those at that handle |
+| `"connected-edges-by"` | `{ nodeIds }` | the edges that touch any of the nodes (an edge between two of them once) |
+| `"absolute-position-by"` | `{ nodeId }` | a node's position in flow coordinates (with sub-flows, its parents' positions added) |
+| `"flow-json"` | none | the document as JSON: a writable copy, every id present (`FlowDocumentJson<T>`): what `createFlowModel` takes back |
+| `"commands"` | none | every installed command with its description and JSON Schemas (`CommandInfo[]`) |
+| `"commands-to"` | `{ nodes?, edges? }` | the commands that bring the document to these nodes and edges, for one `batch`: what an adapter runs for controlled `nodes` / `edges`, and what undo uses to go back to a saved document |
+| `"selected-nodes"` | none | the selected nodes, in drawing order (`selection()`) |
+| `"selected-edges"` | none | the selected edges, in drawing order (`selection()`) |
+| `"node-children-by"` | `{ nodeId }` | a node's children, in drawing order (`subflows()`) |
+| `"node-parent-by"` | `{ nodeId }` | a node's parent, or undefined (`subflows()`) |
+
+`"commands-to"` gives the commands a user would have run (`node.move`, `edge.add`,
+`selection.set`, …), a flag that would stop one (`draggable`, `deletable`, `connectable`) unlocked
+for its step only; what no command expresses (a node's type, a removed data key, a size given
+back) removes and adds the entity again with its id. The drawing order is not synced.
+
+```ts
+const back = model.get("commands-to", { nodes: saved.nodes, edges: saved.edges });
+model.run("batch", { commands: [...back] }, { meta: { undo: true } });
+```
+
+## `is` keys
+
+| key | payload | answers |
+| --- | --- | --- |
+| `"node-draggable"` | `{ nodeId }` | it may be moved (`draggable`, default true) |
+| `"node-selectable"` | `{ nodeId }` | it may be selected (`selectable`, default true) |
+| `"node-connectable"` | `{ nodeId }` | edges may start or end at it (`connectable`, default true) |
+| `"node-deletable"` | `{ nodeId }` | it may be removed (`deletable`, default true) |
+| `"node-hidden"` | `{ nodeId }` | it is hidden (`hidden`, default false) |
+| `"edge-selectable"` | `{ edgeId }` | it may be selected |
+| `"edge-deletable"` | `{ edgeId }` | it may be removed |
+| `"edge-hidden"` | `{ edgeId }` | it is hidden |
+| `"edge-reconnectable"` | `{ edgeId }` | its ends may be moved (`reconnectable`, default true) |
+| `"node-selected"` | `{ nodeId }` | it is selected (`selection()`) |
+| `"edge-selected"` | `{ edgeId }` | it is selected (`selection()`) |
+
+## The key types
+
+`ModelGetMap<T>` maps each `get` key to its payload and result, `ModelIsMap` each `is` key to its
+payload; `ModelGetKey`, `ModelIsKey`, `ModelGetPayload<T, K>`, `ModelGetResult<T, K>` and
+`ModelIsPayload<K>` read them. The installed features narrow them: `ModelGetKeyOf<F>` and
+`ModelIsKeyOf<F>` are the keys a model with the features `F` has (see
+[Features](/docs/api/features#the-feature-contract)).
+
+## Where to go next
+
+The commands and their payloads: [Commands](/docs/api/commands). Middleware, events and errors:
+[The command bus](/docs/api/command-bus). What only the screen knows (the viewport, sizes, edge
+paths): [Engine](/docs/api/engine).

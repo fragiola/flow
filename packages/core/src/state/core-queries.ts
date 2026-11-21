@@ -11,6 +11,7 @@ import type {
 import type { ComposedFeatures } from "../features/registry";
 import type { FlowReader } from "../features/types";
 import { cloneJson } from "./clone-json";
+import { type CommandsToPayload, commandsTo } from "./commands-to";
 
 /** What a key reads: the document, and the model's features and commands. */
 export interface QueryContext {
@@ -82,6 +83,19 @@ export const CORE_GET: Readonly<
             edges: [...reader.edges()],
         }),
     commands: ({ commands }) => commands,
+    "commands-to": ({ reader, commands }, payload) => {
+        const target = (
+            typeof payload === "object" && payload !== null ? payload : {}
+        ) as CommandsToPayload;
+        return commandsTo(
+            reader,
+            {
+                nodes: Array.isArray(target.nodes) ? target.nodes : undefined,
+                edges: Array.isArray(target.edges) ? target.edges : undefined,
+            },
+            new Set(commands.map((command) => command.name)),
+        );
+    },
 };
 
 function nodeAsks(flag: keyof NodeFlags) {

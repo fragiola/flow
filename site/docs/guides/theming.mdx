@@ -1,0 +1,131 @@
+---
+title: Theming with Fragiola palettes
+description: Take colour from palette roles and shape from a few custom properties, scoped to any element, the way the five example themes restyle every example.
+---
+
+Because the package paints nothing, a theme is just your CSS. This site's examples show one way to
+do it that scales: **colour** comes from [Fragiola UI](https://fragiola.com/ui) palettes, **shape**
+from a handful of `--fl-*` custom properties, and both are scoped to an element, so several themes
+can live on one page. Switch the theme above any example: the markup is the same in all five.
+
+<Example id="workflow-builder" theme="terminal" />
+
+## Colour: palette roles
+
+A Fragiola palette is a class (`palette-surface`, `palette-raised`, `palette-blue`, …) that sets six
+**roles** as custom properties: `--palette-base`, `--palette-soft`, `--palette-line`,
+`--palette-contrast`, `--palette-accent` and `--palette-ring`. Utilities read the roles, not
+colours:
+
+```tsx
+<Flow.Root className="palette-surface bg-palette-soft text-palette-contrast" … />
+<Flow.Node<Types> node={node} className="palette-raised border border-palette-line bg-palette-base" />
+<Flow.Node<Types> node={node} className="palette-blue bg-palette-soft text-palette-accent" />
+```
+
+A node of another kind takes another palette class (`palette-green` for a trigger, `palette-orange`
+for a condition): its roles change, its markup does not.
+
+## Shape: a few custom properties
+
+The examples read their shape from tokens, so a theme changes the shapes too, not only the colours:
+
+| token | what it shapes |
+| --- | --- |
+| `--fl-font`, `--fl-font-size`, `--fl-title-weight` | the type |
+| `--fl-node-padding`, `--fl-node-radius`, `--fl-node-border`, `--fl-node-shadow` | a node's box |
+| `--fl-handle-size`, `--fl-handle-radius`, `--fl-handle-border` | a handle: `50%` is a dot, `0` a square |
+| `--fl-edge-width`, `--fl-edge-selected-width`, `--fl-edge-dash` | an edge's stroke (`--fl-edge-dash` is a `stroke-dasharray`) |
+| `--fl-grid-dots`, `--fl-grid-lines`, `--fl-grid-cross` | which background pattern shows (`block` or `none`) |
+| `--fl-control-radius`, `--fl-focus-width`, `--fl-motion` | the controls' corners, the focus ring, transitions |
+
+And per palette, the colours that depend on it: `--fl-canvas-bg`, `--fl-grid-color`, `--fl-node-bg`,
+`--fl-node-line`, `--fl-edge-color`, `--fl-edge-selected`, `--fl-handle-bg`, `--fl-handle-line`,
+`--fl-valid`, `--fl-invalid`, `--fl-selection-bg`, `--fl-selection-line`, `--fl-minimap-mask`,
+`--fl-focus-line`.
+
+```tsx
+<Flow.Node<Types>
+    node={node}
+    className="rounded-(--fl-node-radius) border-(length:--fl-node-border) border-(--fl-node-line) bg-(--fl-node-bg) p-(--fl-node-padding) shadow-(--fl-node-shadow)"
+/>
+<Flow.Handle
+    type="source"
+    side="bottom"
+    className="size-(--fl-handle-size) rounded-(--fl-handle-radius) border-(length:--fl-handle-border) border-(--fl-handle-line) bg-(--fl-handle-bg)"
+/>
+<Flow.EdgePath className="fill-none stroke-(--fl-edge-color) stroke-(length:--fl-edge-width) [stroke-dasharray:var(--fl-edge-dash)]" />
+```
+
+Geometry is never a token: positions and sizes are the flow's document.
+
+## A background pattern per theme
+
+`Flow.Background`'s `variant` is a prop, so a stylesheet cannot switch it. Render one layer per
+pattern, and let the theme's tokens show one:
+
+```tsx
+<Flow.Background variant="dots" size={2} className="text-(--fl-grid-color) [display:var(--fl-grid-dots)]" />
+<Flow.Background variant="lines" className="text-(--fl-grid-color) [display:var(--fl-grid-lines)]" />
+<Flow.Background variant="cross" className="text-(--fl-grid-color) [display:var(--fl-grid-cross)]" />
+```
+
+## A theme is one file of values
+
+A theme sets custom properties under a scope, and styles no markup:
+
+```css title="themes/terminal.css"
+[data-example-theme="terminal"] {
+    color-scheme: dark;
+    --fl-font: ui-monospace, monospace;
+    --fl-node-radius: 0px;
+    --fl-handle-radius: 0px;
+    --fl-edge-dash: 6 4;
+    --fl-grid-dots: none;
+    --fl-grid-lines: none;
+    --fl-grid-cross: block;
+    /* … the other shape tokens */
+}
+
+:root [data-example-theme="terminal"] .palette-raised,
+:root [data-example-theme="terminal"].palette-raised {
+    --palette-base: oklch(0.16 0.02 150);
+    --palette-soft: oklch(0.2 0.03 150);
+    --palette-line: oklch(0.42 0.12 150);
+    --palette-contrast: oklch(0.86 0.2 150);
+    --palette-accent: oklch(0.78 0.2 150);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="terminal"] [class*="palette-"],
+:root [data-example-theme="terminal"][class*="palette-"] {
+    --fl-node-bg: var(--palette-base);
+    --fl-node-line: var(--palette-line);
+    --fl-edge-color: var(--palette-line);
+    /* … the other colour tokens, read from the palette the element sits in */
+}
+```
+
+Put `data-example-theme="terminal"` on any element: everything inside it takes the theme. Declare
+all six roles in every palette a theme defines; one left out would come from the page and leak
+across the theme's boundary. The colour tokens are declared per palette, so `var(--palette-…)`
+resolves against the palette the element sits in.
+
+## The five example themes
+
+| theme | scheme | look |
+| --- | --- | --- |
+| `light` | light | rounded nodes, round handles, smooth edges on a dot grid: the reference |
+| `dark` | dark | the same shapes as Light, on dark palettes |
+| `ide` | dark | a dense code-editor canvas: square nodes, small square handles, hairline edges on a line grid |
+| `paper` | light | serif type, round nodes, big ringed handles and thick ink edges |
+| `terminal` | dark | monospace, square nodes and handles, dashed edges on a cross grid |
+
+Their files are in the repository's `examples/shared/src/themes/`, and every example's code panel
+shows the current theme's CSS: copy one as the start of your own.
+
+## Light and dark
+
+A theme sets `color-scheme` with its palettes, so native controls (a select, a scrollbar) follow
+it. For an app that follows the system, scope the palettes under a class or attribute your app
+toggles, the way Fragiola UI's own `:root[data-theme]` does.

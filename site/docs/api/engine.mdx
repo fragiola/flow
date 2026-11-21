@@ -1,0 +1,319 @@
+---
+title: Engine
+description: createFlowEngine binds a model to the DOM. Its options, its actions, reads and questions, its events, and the contract adapters implement.
+---
+
+The engine is one flow on screen. It owns the viewport and writes its transform to the viewport
+element itself, measures nodes and handles with the root window's `ResizeObserver`, draws the
+edges' paths, and runs every gesture (pan, pinch, drag, connect, reconnect, box select, resize,
+the minimap) on Pointer Events with capture, plus the wheel and the keys. It changes the flow only
+by running the model's commands, so every middleware sees what a gesture does. It never touches
+the global `document` or `window`: everything goes through the root element.
+
+`Flow.Root` creates and destroys it; in a React app you reach it with
+[`useFlow`](/docs/api/primitives/hooks) or a [flow ref](/docs/api/primitives/flow-ref), and its
+surface is the same five verbs as the model's:
+
+```tsx
+import { useFlow } from "@fragiola/flow-react";
+
+function ZoomReadout() {
+    const { engine } = useFlow<Types, typeof features>();
+    return (
+        <button type="button" onClick={() => engine.run("fit-view", { padding: 0.2 })}>
+            Fit
+        </button>
+    );
+}
+```
+
+## `createFlowEngine`
+
+`createFlowEngine<T, F>(model, options?)` returns a `FlowEngine<T, F>`. Give it the root element
+now (`root`) or attach it later (`engine.adapter.attachRoot`, what an adapter does); call
+`destroy()` when the flow leaves the screen. A model may have several engines (two views of one
+flow), each with its own viewport.
+
+`FlowEngineOptions` (on `Flow.Root`, every one but `root` is a prop of the same name):
+
+| option | type | default | description |
+| --- | --- | --- | --- |
+| `root` | `HTMLElement` | none | the root element; an adapter may attach it later |
+| `defaultViewport` | `Viewport` | `{ x: 0, y: 0, zoom: 1 }` | the viewport it starts at |
+| `minZoom` | `number` | `0.5` | the least zoom |
+| `maxZoom` | `number` | `2` | the greatest zoom |
+| `translateExtent` | `Rect` | none | the flow rectangle the view stays inside |
+| `panOnDrag` | `boolean` | `true` | a drag on the pane pans |
+| `panOnScroll` | `boolean` | `false` | the wheel pans (Ctrl + wheel zooms); otherwise the wheel zooms |
+| `zoomOnScroll` | `boolean` | `true` | the wheel zooms around the pointer |
+| `zoomOnPinch` | `boolean` | `true` | a two-finger pinch (and a trackpad's) zooms |
+| `zoomOnDoubleClick` | `boolean` | `true` | a double click on the pane zooms in |
+| `zoomStep` | `number` | `1.2` | the factor of `zoom-in` and `zoom-out` |
+| `fitView` | `boolean \| FitViewPayload` | `false` | fits the nodes once every visible node is measured |
+| `interactive` | `boolean` | `true` | whether gestures and keys may change the flow (pan and zoom stay) |
+| `onlyRenderVisible` | `boolean` | `false` | adapters render only the nodes and edges in view |
+| `pathOptions` | `PathOptions` | see [Path helpers](/docs/api/path-helpers) | the shape of the built-in edge paths |
+
+## The members
+
+| member | does |
+| --- | --- |
+| `run(action, payload?)` | runs a screen action; returns a `CommandResult` (refused, never thrown) |
+| `can(action, payload?)` | whether `run` would succeed now (a Controls button's disabled state is `!engine.can("zoom-in")`) |
+| `check(action, payload?)` | what `run` would return, without doing it |
+| `get(key, payload?)` | reads a fact of the flow on screen |
+| `is(key, payload?)` | asks a yes/no question about it |
+| `subscribe(listener)` | listens to the engine's events; returns its remover |
+| `destroy()` | releases every listener and element; nothing runs afterwards |
+| `adapter` | what only an adapter calls (below) |
+
+An action's key never has a dot (`fit-view`), a command's always does (`node.move`): commands
+change the document through the model, actions do what only the screen can. The installed
+features add keys: `EngineActionKeyOf<F>`, `EngineGetKeyOf<F>` and `EngineIsKeyOf<F>` are those of
+an engine whose model has the features `F`. `EngineActionMap`, `EngineGetMap<T>` and `EngineIsMap`
+map each key to its payload and result; `EngineActionKey`, `EngineActionPayload<K>`,
+`EngineActionResult<K>`, `EngineGetKey`, `EngineGetPayload<K>`, `EngineGetResult<T, K>`,
+`EngineIsKey` and `EngineIsPayload<K>` read them.
+
+## Actions
+
+`around` and the selection box are root-relative pixels; `screen-to-flow` and `flow-to-screen`
+take and give client points (a pointer's `clientX` / `clientY`, a drop's).
+
+| action | payload | does |
+| --- | --- | --- |
+| `"set-viewport"` | `{ x?, y?, zoom? }` | sets the viewport (what it leaves out stays), zoom limits and extent kept |
+| `"pan-by"` | `{ x, y }` | pans by a screen offset, in pixels |
+| `"zoom-in"` | `ZoomStepPayload` | zooms in by a step around a point; refused at the greatest zoom |
+| `"zoom-out"` | `ZoomStepPayload` | zooms out by a step; refused at the least zoom |
+| `"zoom-to"` | `{ zoom, around? }` | zooms to a level around a point (default the root's centre) |
+| `"fit-view"` | `FitViewPayload` | fits the nodes (or some) in the root; refused while none is measured or the root has no size |
+| `"center-on"` | `{ x, y, zoom? }` | centres a flow point in the root |
+| `"focus-node"` | `{ nodeId }` | gives DOM focus to a node's element, panning it into view |
+| `"set-interactive"` | `{ interactive }` | lets gestures and keys change the flow, or not (`Flow.ToggleInteractive`); pan and zoom stay |
+| `"cancel-gesture"` | none | cancels the gesture under way (what Escape does); refused when there is none |
+
+`FitViewPayload` (also the `fitView` option's object form):
+
+| field | type | description |
+| --- | --- | --- |
+| `padding` | `number` | the share of the root's size kept free on every side; default `0.1` |
+| `nodeIds` | `string[]` | only these nodes; default every node that is not hidden |
+| `minZoom` | `number` | the least zoom it may pick, within the engine's limits (it narrows them, never widens) |
+| `maxZoom` | `number` | the greatest zoom it may pick, within the engine's limits |
+
+`ZoomStepPayload`:
+
+| field | type | description |
+| --- | --- | --- |
+| `step` | `number` | the factor; default the engine's `zoomStep` |
+| `around` | `XY` | the root-relative point that stays put; default the root's centre |
+
+## Reads
+
+| key | payload | returns |
+| --- | --- | --- |
+| `"viewport"` | none | the `Viewport` |
+| `"root-size"` | none | the root's `{ width, height }`, in pixels |
+| `"edge-path-by"` | `{ edgeId }` | its `EdgePath` (path, label point, ends and sides), undefined until both nodes have a size; an app type gets the bezier |
+| `"node-rect-by"` | `{ nodeId }` | its absolute box (size 0 until measured or given) |
+| `"nodes-bounds"` | `{ nodeIds? }` | the box of the nodes (or some); none without a node |
+| `"screen-to-flow"` | `XY` | a client point as a flow point (a drop's position) |
+| `"flow-to-screen"` | `XY` | a flow point as a client point |
+| `"visible-nodes"` | none | the nodes in view, plus those not measured yet |
+| `"visible-edges"` | none | the edges whose ends' box is in view |
+| `"handles-by"` | `{ nodeId }` | a node's registered handles (`FlowHandle[]`), with their centres |
+| `"background-pattern"` | `BackgroundPatternPayload` | one tile of a background pattern at the current viewport |
+| `"node-toolbar-by"` | `NodeToolbarPayload` | where a node's toolbar goes, outside the zoom |
+| `"selection-box"` | none | the box being drawn (a root-relative `SelectionBox`), or null (`selection()`; `undefined` without it) |
+| `"dragging-node-ids"` | none | the nodes being dragged (`drag()`) |
+| `"connection"` | none | the `Connection` being drawn, or null (`connection()`; `undefined` without it) |
+| `"minimap-view"` | `{ width, height }` | what a minimap of that many pixels draws (`minimap()`) |
+
+`BackgroundPatternPayload`:
+
+| field | type | description |
+| --- | --- | --- |
+| `variant` | `BackgroundVariant` | `"dots"` (default), `"lines"` or `"cross"` |
+| `gap` | `number \| [number, number]` | the distance between two marks, in flow units; default 20 |
+| `size` | `number` | `dots`: a dot's diameter, in flow units, default 1; `lines`: the stroke width in screen pixels (not scaled by the zoom), default 1; `cross`: each bar's length (an arm is half of it), in flow units, default 6 |
+| `offset` | `number \| [number, number]` | the pattern's shift from the flow's origin, in flow units; default 0 |
+
+`BackgroundPattern`, one tile for an SVG `pattern` with `patternUnits="userSpaceOnUse"`:
+
+| field | type | description |
+| --- | --- | --- |
+| `variant` | `BackgroundVariant` | the marks |
+| `x` | `number` | the tile's left, on the screen |
+| `y` | `number` | the tile's top |
+| `width` | `number` | the tile's width, in pixels |
+| `height` | `number` | the tile's height |
+| `dot` | `{ cx, cy, r } \| undefined` | the dot, for `dots` |
+| `path` | `string \| undefined` | the lines' or the cross's path data |
+| `strokeWidth` | `number` | the stroke width of `path`, in pixels |
+
+`NodeToolbarPayload`:
+
+| field | type | description |
+| --- | --- | --- |
+| `nodeId` | `string` | the node |
+| `side` | `HandleSide` | the side it stands on; default `"top"` |
+| `align` | `"start" \| "center" \| "end"` | where along that side; default `"center"` |
+| `offset` | `number` | the gap to the node, in pixels; default 10 |
+
+`NodeToolbarPosition`, a root-relative anchor outside the zoom:
+
+| field | type | description |
+| --- | --- | --- |
+| `x` | `number` | the anchor's left, in pixels |
+| `y` | `number` | the anchor's top |
+| `anchorX` | `number` | which point of the toolbar goes there, as a share of its width (`0.5`: its centre) |
+| `anchorY` | `number` | the same along its height (`1`: its bottom) |
+
+`Connection`, the connection being drawn:
+
+| field | type | description |
+| --- | --- | --- |
+| `from` | `FlowHandle` | the handle it started from |
+| `fromPoint` | `XY` | where it starts, in flow coordinates (the handle's centre) |
+| `toPoint` | `XY` | the pointer, or the centre of the handle it snapped to |
+| `toSide` | `HandleSide` | the side it enters by |
+| `to` | `FlowHandle \| undefined` | the handle within the radius it would end at |
+| `status` | `"valid" \| "invalid" \| null` | `valid`: the drop adds an edge; `invalid`: `model.can` refuses it; null: no handle near |
+| `path` | `string` | the connection line's path (a bezier) |
+| `reconnecting` | `{ edgeId, end } \| undefined` | the edge whose end is moved (`reconnection()`) |
+
+`MinimapView`, in flow coordinates:
+
+| field | type | description |
+| --- | --- | --- |
+| `viewBox` | `Rect` | the SVG `viewBox`: the nodes and the view, fitted to the minimap's aspect |
+| `viewBoxAttribute` | `string` | `viewBox` as the attribute writes it |
+| `scale` | `number` | the flow units one minimap pixel stands for |
+| `nodes` | `{ nodeId, x, y, width, height }[]` | the box of every node shown (not hidden) and measured, in view or not |
+| `view` | `Rect` | what the root shows |
+| `maskPath` | `string` | the view box with the view cut out, for `fill-rule="evenodd"` |
+
+## Questions
+
+| key | payload | answers |
+| --- | --- | --- |
+| `"interactive"` | none | gestures and keys may change the flow |
+| `"panning"` | none | the viewport is being panned by a drag or a pinch |
+| `"node-measured"` | `{ nodeId }` | its size is known (measured, or given by the document) |
+| `"box-selecting"` | none | a box selection is being drawn (`selection()`) |
+| `"dragging"` | none | nodes are being dragged (`drag()`) |
+| `"node-dragging"` | `{ nodeId }` | this node is being dragged (`drag()`) |
+| `"resizing"` | none | a node is being resized (`resize()`) |
+| `"node-resizing"` | `{ nodeId }` | this node is being resized (`resize()`) |
+| `"connecting"` | none | a connection is being drawn (`connection()`) |
+| `"edge-reconnecting"` | `{ edgeId }` | one of its ends is being moved (`reconnection()`) |
+| `"node-focusable"` | `{ nodeId }` | it takes DOM focus, `tabindex="0"` (`keyboard()`) |
+| `"edge-focusable"` | `{ edgeId }` | it takes DOM focus (`keyboard()`) |
+
+## Events
+
+`engine.subscribe(listener)` hears what happens on screen, a `FlowEngineEvent` (its `type` is a
+`FlowEngineEventType`). No text is built in: turn an event into your own words for your own live
+region (see [Accessible names](/docs/getting-started/accessible-names)), or sync a controlled
+viewport from it.
+
+| event | fields | when |
+| --- | --- | --- |
+| `"viewport-change"` | `viewport`, `gesture` | the viewport changed; `gesture`: by a pan, a zoom or a pinch, not an action |
+| `"drag-start"` | `nodeIds` | a drag of these nodes started (`drag()`) |
+| `"nodes-move"` | `nodeIds`, `source` | nodes were dropped after a drag, or moved by the arrows; `source` is a `MoveSource`, `"pointer"` or `"keyboard"` |
+| `"drag-cancel"` | `nodeIds` | a drag was cancelled: its nodes went back |
+| `"connect-start"` | `nodeId`, `handleId`, `handleType` | a connection started from a handle (`connection()`) |
+| `"connect"` | `edgeId`, `source`, `target` | a connection was dropped on a handle: an edge was added |
+| `"connect-cancel"` | `refused` | a connection ended without an edge; `refused`: on a handle `model.can("edge.add")` refused |
+| `"reconnect-start"` | `edgeId`, `end` | an edge's end was grabbed (`reconnection()`) |
+| `"reconnect"` | `edgeId`, `source`, `target` | an edge was reconnected |
+| `"reconnect-cancel"` | `edgeId`, `refused` | a reconnection ended with the edge as it was |
+| `"resize"` | `nodeId`, `width`, `height` | a node was resized (`resize()`) |
+| `"box-select"` | `nodeIds`, `edgeIds` | a box selection ended with these selected (`selection()`) |
+| `"remove"` | `nodeIds`, `edgeIds` | Delete or Backspace removed these (`keyboard()`) |
+
+```ts
+const stop = engine.subscribe((event) => {
+    if (event.type === "connect") announce(`Connected ${event.source} to ${event.target}.`);
+    if (event.type === "connect-cancel" && event.refused) announce("That connection is not allowed.");
+});
+```
+
+## The adapter contract
+
+`engine.adapter` is a `FlowEngineAdapter`: what a framework adapter (`@fragiola/flow-react`, and
+the Vue, Svelte and Angular ones to come) calls. An app never needs it. The adapter renders and
+attaches; the engine listens to the root itself and resolves every press, key and wheel from the
+part attributes, so every adapter behaves the same.
+
+| member | does |
+| --- | --- |
+| `model` | the model this engine draws |
+| `settings` | the rendering settings from the options: `onlyRenderVisible` |
+| `setOptions(options)` | options changed (a root prop): they apply from now on, a gesture under way included; `root`, `defaultViewport` and `fitView` are creation options |
+| `attachRoot(element)` | attaches the root: the engine listens to its pointer, wheel, key and focus events and sets its `touch-action: none` |
+| `detachRoot()` | detaches it, cancelling a gesture under way |
+| `attachViewport(element)` | attaches (or, with `null`, detaches) the viewport element: the engine writes its `transform` and `transform-origin`, the framework never does |
+| `registerNode(nodeId, element)` | registers (or unregisters) a node's element: the engine measures it |
+| `registerHandle(handle, element)` | registers (or unregisters) a handle: the engine measures its centre relative to its node |
+| `setPartOptions(part, id, options)` | options a part's primitive takes (a resizer's `minWidth`, …); `null` drops them |
+| `attributes(part, payload?)` | the record to spread on a part: `data-flow-part`, `data-flow-id` and its state |
+| `subscribe(listener)` | the view changed (a `ViewChange`); returns its remover |
+| `getSnapshot()` | a number that changes whenever the view changes |
+
+`HandleRegistration`, what a handle registers:
+
+| field | type | description |
+| --- | --- | --- |
+| `nodeId` | `string` | the node it belongs to |
+| `handleId` | `string` | its id among the node's handles of its type; none: the default handle |
+| `type` | `HandleType` | `"source"` or `"target"` |
+| `side` | `HandleSide` | the side it sits on: the direction its edges leave or enter by |
+| `connectable` | `boolean` | a connection may start or end at it; default true |
+
+`FlowHandle`, a registered handle (`handles-by`, a connection's ends):
+
+| field | type | description |
+| --- | --- | --- |
+| `nodeId` | `string` | its node |
+| `handleId` | `string \| undefined` | its id |
+| `type` | `HandleType` | source or target |
+| `side` | `HandleSide` | its side |
+| `connectable` | `boolean` | its flag and its node's |
+| `center` | `XY \| undefined` | its centre in absolute flow coordinates, once measured |
+| `bounds` | `Rect \| undefined` | its box relative to its node, in flow units, once measured |
+
+`ViewChange`, what changed in the view, so an adapter re-renders only what depends on it:
+
+| field | type | description |
+| --- | --- | --- |
+| `viewport` | `boolean` | the viewport moved or zoomed (the background, the minimap, toolbars) |
+| `measured` | `boolean` | a node or handle was measured (edges, the minimap, toolbars) |
+| `gesture` | `boolean` | a gesture's state changed (the connection line, the selection box, state attributes) |
+
+`PartPayloadMap` types the payload of each part's `attributes` (`node` takes `{ nodeId }`,
+`handle` a `HandleRegistration`, `reconnect-anchor` `{ edgeId, end }`, …). `PressTarget` is what
+the engine resolved a press to (`kind`: `pane`, `node`, `edge`, `handle`, `resize-handle`,
+`minimap` or `other`, with the ids), handed to the features' hooks.
+
+## Part attributes
+
+The attribute names are constants, and the helpers give the static attributes without an engine
+(a server render, a part with no state):
+
+| export | value |
+| --- | --- |
+| `PART_ATTRIBUTE` | `"data-flow-part"`: every element's part name (`FlowPart`: `root`, `node`, `edge`, `handle`, …) |
+| `ID_ATTRIBUTE` | `"data-flow-id"`: the id of the node, edge or handle a part stands for |
+| `POSITION_ATTRIBUTE` | `"data-position"`: a resize handle's corner or side |
+| `END_ATTRIBUTE` | `"data-end"`: a reconnect anchor's end of its edge |
+| `NO_GESTURE_ATTRIBUTE` | `"data-flow-no-gesture"`: a subtree inside a node that starts no gesture (a slider, a field) |
+| `NO_WHEEL_ATTRIBUTE` | `"data-flow-no-wheel"`: a subtree where the wheel scrolls its content instead of zooming |
+| `partAttributes(part, id?)` | `{ "data-flow-part": part, "data-flow-id": id }` |
+| `flag(on)` | a boolean state attribute's value: `""` when on, `undefined` when off |
+
+`PartAttributes` is a read-only record of them, `MutablePartAttributes` the writable one the engine
+and its features fill. The state attributes each part carries: [State
+attributes](/docs/concepts/state-attributes).

@@ -1,0 +1,51 @@
+---
+title: EdgeLabel
+description: Flow.EdgeLabel is HTML centred on an edge's label point, in flow coordinates, so it pans and zooms with the edge it names.
+---
+
+`Flow.EdgeLabel` goes inside `Flow.Edge` and is portalled into the HTML layer of `Flow.Edges`
+(SVG holds no HTML), centred on the path's label point: halfway along the path, in flow
+coordinates. It renders only its children (text from the edge's data, a badge, a button). A press
+on it selects its edge; a button in it keeps its own clicks.
+
+<Example id="edge-labels" />
+
+```tsx
+<Flow.Edge<Types> edge={edge}>
+    <Flow.EdgePath />
+    <Flow.EdgeLabel className="rounded bg-white px-1 text-xs">{edge.data?.text}</Flow.EdgeLabel>
+</Flow.Edge>
+```
+
+## Props
+
+`EdgeLabelProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and
+every `div` attribute.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `edgeId` | `string` | the enclosing `Flow.Edge`'s | the edge |
+| `children` | `ReactNode` | none | the label |
+
+## State
+
+`EdgeLabelState`, what `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `edgeId` | `string` | the edge |
+| `path` | `EdgePath` | the path, its label point and its ends |
+| `selected` | `boolean` | the edge is selected |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"edge-label"` |
+| `data-flow-id` | the edge's id |
+| `data-selected` | present while the edge is selected |
+
+## Structural style
+
+`position: absolute; top: 0; left: 0; transform: translate(<x>px, <y>px) translate(-50%, -50%)` at the label point,
+and `pointer-events: all`.

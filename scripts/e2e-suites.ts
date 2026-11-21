@@ -2,8 +2,8 @@
 // the guidelines (repository.md#ci). The E2E suites a change can affect: CI's `changes` job runs it
 // and gives the E2E jobs its outputs. Only what is known to be safe skips a suite: the docs skip
 // every suite, an adapter's package (or its examples app) runs only that adapter's suites, and any
-// other path runs them all. There is no suite yet (no playground, no examples app): the E2E jobs
-// that read the outputs arrive with the React Epic.
+// other path runs them all. The E2E jobs (the playground, and a matrix over the examples apps)
+// read its outputs.
 //
 //   node scripts/e2e-suites.ts --diff <base>   the files changed between <base> and HEAD
 //   node scripts/e2e-suites.ts --all           every suite (a manual run)
@@ -92,7 +92,7 @@ export function e2eSuites(
 
 /**
  * The frameworks with an examples app: every examples/<framework> with a playwright.config.ts
- * (none yet, and no examples/ folder).
+ * (React's today; examples/shared has none: every app runs its specs).
  */
 export function examplesFrameworks(dir = join(root, "examples")): string[] {
     if (!existsSync(dir)) {

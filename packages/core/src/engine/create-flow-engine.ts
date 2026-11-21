@@ -272,7 +272,10 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         this.measurements = new Measurements(
             () => this.current.zoom,
             () => this.measured(),
+            (nodeId) => this.model.get("node-by", { id: nodeId }) !== undefined,
         );
+        // a node removed while it was not rendered (culled, hidden) has its kept sizes forgotten
+        this.stopPrune = this.model.subscribe(() => this.measurements.prune());
         this.features = featureEngine(featuresOf(model), this.host());
         this.actions = {
             "set-viewport": (payload, dryRun) =>
@@ -495,6 +498,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         this.features.destroy();
         if (this.viewportElement) clearViewportTransform(this.viewportElement);
         this.viewportElement = undefined;
+        this.stopPrune();
         this.measurements.destroy();
         this.listeners.clear();
         this.adapterListeners.clear();
@@ -915,6 +919,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     }
 
     private measureQueued = false;
+
+    private readonly stopPrune: () => void;
 
     private flushMeasured(): void {
         if (this.destroyed) return;

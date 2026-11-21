@@ -17,11 +17,14 @@ Each framework has an adapter, so **every piece of logic that isn't rendering li
 | package | name | contains | depends on | status |
 |---|---|---|---|---|
 | `packages/core` | `@fragiola/flow` | the document and its JSON Schemas, the typed model and its commands, the feature registry and the features, the engine that binds a flow to the DOM | DOM only, zero runtime deps | Epic #4: the model (#2) and the engine (#3) |
-| `packages/react` | `@fragiola/flow-react` | the `Flow.*` primitives and hooks over the core | peer `react`, `react-dom` | planned (React Epic) |
+| `packages/react` | `@fragiola/flow-react` | the `Flow.*` primitives and hooks over the core, the core re-exported, the features' subpaths mirrored | the core (`workspace:*`); peers `react`, `react-dom` `^19` | Epic #8: the adapter (#5) |
 | `packages/vue` | `@fragiola/flow-vue` | the same primitives as Vue components, the hooks as composables | peer `vue` | planned |
 | `packages/svelte` | `@fragiola/flow-svelte` | the same primitives as Svelte components | peer `svelte` | planned |
 | `packages/angular` | `@fragiola/flow-angular` | the same primitives as Angular directives, the hooks as injection functions | peer `@angular/core` | planned |
-| `site` | private | for now only the repository's guard tests (`site/tests/`); the docs and the site export arrive with the React Epic | | |
+| `apps/playground` | private | the dev app: the examples in place, scenarios, the unstyled fixture Playwright drives, the inspector | the React package | Epic #8 (#6) |
+| `examples/shared` | `examples-shared`, private | what every framework's examples share: metadata, the five themes, the embed protocol, the manifest, every Playwright spec | no framework | Epic #8 (#6) |
+| `examples/react` | `examples-react`, private | the React examples (the site's gallery and its embed app), vendored Fragiola UI | the React package | Epic #8 (#6) |
+| `site` | private | the fragiola.com/flow site export (`site:export`, `site:dev`, the docs, the landing) and the repository's guard tests (`site/tests/`) | the examples apps (`examples-<framework>`) | Epic #8 (#7) |
 
 Every package stays at `0.0.0`; nothing is published (D15).
 
@@ -136,18 +139,25 @@ examples show them as copyable code.
 | `pnpm check:fix` | Biome check with auto-fix |
 | `pnpm format`, `pnpm lint` | Biome format (writes), Biome lint |
 | `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit) |
-| `pnpm test` | Vitest: `core` (node; a test that needs a DOM opts into jsdom) and `site` (the repository's guard tests) |
-| `pnpm build` | `pnpm -r build` (tsdown for the packages: the core's main entry and one entry per feature), then the `.d.ts` check (`scripts/check-dts.ts`: no `any`) and the features' bundle guard (`scripts/check-features.ts`: no main entry, nor a chunk it imports, built from a feature's folder, read from the source maps; tested with a planted import by `site/tests/check-features.test.ts`) |
-| `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs; for each adapter of `ADAPTERS` (none yet) checks its exact core pin and runs its smoke app (`scripts/check-package.ts`) |
+| `pnpm test` | Vitest: `core` (node; a test that needs a DOM opts into jsdom), `react` (jsdom) and `site` (the repository's guard tests) |
+| `pnpm build` | `pnpm -r build` (tsdown for the packages: each one's main entry and one entry per feature), then the `.d.ts` check (`scripts/check-dts.ts`: no `any`) and the features' bundle guard (`scripts/check-features.ts`: no main entry, nor a chunk it imports, built from a feature's folder, read from the source maps; tested with a planted import by `site/tests/check-features.test.ts`) |
+| `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs; for each adapter of `ADAPTERS` (React) checks its exact core pin and runs its smoke app: a scratch Vite + React app outside the workspace that installs the React tarball only, typechecks (strict, no `skipLibCheck`), builds and loads its dev server, at the pins of `examples/react` (`scripts/check-package.ts`) |
+| `pnpm dev` | the playground (`apps/playground`, port 5197; `PLAYGROUND_PORT` moves it) |
+| `pnpm e2e` | Playwright: the playground's suite (Chromium and Firefox, its dev server, the sources), then each examples app's (`examples/*/playwright.config.ts`: the shared specs against a production build of its embed, built against the packages' `dist`: run `pnpm build` first) |
+| `pnpm --filter examples-react dev` | the React embed alone, port 5185 (`PORT` moves it; `?id=<id>&theme=<name>`) |
+| `pnpm --filter examples-react vendor` | vendors Fragiola UI (`scripts/vendor-fragiola.ts`; `FRAGIOLA_REGISTRY` points it elsewhere) |
+| `pnpm site:export --base /flow --out <dir>` | the site export (contract v1.7): builds the packages and each framework's embed, writes the pages, `examples.json`, `project.json` and the manifests, then validates the output and exits non-zero on any violation ([The site export](#the-site-export-issue-7)) |
+| `pnpm site:dev --base /flow --port 5185` | every framework's embed with hot reload behind one port (`site/dev-proxy.ts`), for `www`'s dev mode |
 
-`pnpm e2e`, `pnpm dev`, `pnpm site:export` and `pnpm site:dev` arrive with the apps in the React
-Epic. There is no `changeset` or `release:version` script (D15).
+There is no `changeset` or `release:version` script (D15).
 
 ## CI
 
-`.github/workflows/ci.yml` (its comment header describes every job) runs on pull requests and on a
-manual run (`workflow_dispatch`); **a push to `main` runs no tests**: main is what its pull request
-tested (guidelines `repository.md#ci`). Its jobs today:
+`.github/workflows/ci.yml` (its comment header describes every job) runs on pull requests, on a
+manual run (`workflow_dispatch`) and on a push to `main`; **a push to `main` runs no tests, only the
+www trigger**: main is what its pull request tested (guidelines `repository.md#ci`). Every other job
+is `if: github.event_name != 'push'` or needs one that is (`site/tests/ci-workflow.test.ts`). Its
+jobs:
 
 - **Checks**: `pnpm check`, `typecheck`, `test`, `build`.
 - **Package**: `pnpm check:package`.
@@ -157,18 +167,32 @@ tested (guidelines `repository.md#ci`). Its jobs today:
   `examples/react/**`: the playground and examples react; `packages/<framework>/**` or
   `examples/<framework>/**` (vue, svelte, angular): examples `<framework>`; any other path, and a
   manual run: every suite. **It is an allow-list of what may skip**: a new rule names what it
-  skips, never what it runs; an unknown path runs everything. No job reads its outputs yet.
+  skips, never what it runs; an unknown path runs everything.
+- **E2E (playground)**: when `Changes` says so, `pnpm --filter playground run e2e` (Chromium and
+  Firefox, the dev server: nothing built).
+- **E2E (examples \<framework\>)**: a matrix over `Changes`' `examples` output (every
+  `examples/<framework>` with a `playwright.config.ts`: React today): builds the packages, then
+  `pnpm --filter examples-<framework> run e2e`.
+- **Site export**: `pnpm site:export --base /flow --out "$RUNNER_TEMP/site-export"`, self-validated
+  the way www's deploy runs it.
+- **Trigger www build**: on a push to `main` only, a `repository_dispatch` of type
+  `project-updated` (`client_payload` `slug: flow`, `sha`) to `fragiola/www`, with the
+  `WWW_DISPATCH_TOKEN` secret (a fine-grained token with Contents: read & write on
+  `fragiola/www`); without the secret the step is skipped, not failed. The secret is the
+  maintainer's to add.
 
 No Changesets job and no release workflow (D15); `site/tests/ci-workflow.test.ts` checks the
-triggers and that neither exists.
+triggers, the push rule, the two site jobs and that neither exists.
 
-With the apps (React Epic) come the E2E jobs, the Site export job and the Trigger www build job
-(the only job a push to `main` will run). Every job that runs Playwright runs in
-`mcr.microsoft.com/playwright:v<version>-noble` (`container.options: --user 1001`), its tag the
-exact `@playwright/test` version the apps pin, and **never runs `playwright install`**;
-`site/tests/ci-workflow.test.ts` ties the tag to the version (it passes today with no Playwright
-job and no pin), so upgrading Playwright changes both in one PR. Shard a suite only when its test
-step alone passes about 3 minutes. `main` has no required checks: a skipped job blocks nothing.
+Every job that runs Playwright runs in `mcr.microsoft.com/playwright:v1.63.0-noble`
+(`container.options: --user 1001`), its tag the exact `@playwright/test` the apps pin (1.63.0 in
+the playground, `examples/shared` and `examples/react`), and **never runs `playwright install`**;
+`site/tests/ci-workflow.test.ts` ties the tag to the version, so upgrading Playwright changes both
+in one PR. `main` has no required checks: a skipped job blocks nothing.
+
+**Shards: none.** Shard a suite only when its test step alone passes about 3 minutes. Measured
+locally (4 workers; CI runs 2): the playground's 90 tests (45 per browser) in ~23 s, the React
+examples' 175 tests (95 smoke runs: 19 examples × 5 themes) in ~45 s, the embed build included.
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
@@ -216,6 +240,7 @@ Error codes: `unknown_command`, `invalid_payload` (schema, or a field of a featu
 `refused`, `vetoed`, `queued`, `middleware_error`.
 
 **Keys.** `get`: `node-by { id }`, `edge-by { id }`, `all-nodes`, `all-edges`,
+`commands-to { nodes?, edges? }` (the commands that bring the document to them: controlled props),
 `node-edges-by { nodeId, handleType?, handleId? }`, `connected-edges-by { nodeIds }`,
 `absolute-position-by { nodeId }`, `flow-json`, `commands`; `selected-nodes`, `selected-edges`
 (`selection()`); `node-children-by { nodeId }`, `node-parent-by { nodeId }` (`subflows()`). `is`:
@@ -323,26 +348,292 @@ offset? }` (a root-relative anchor outside the zoom); features: `selection-box` 
   task (the root window's microtask), so a mount re-renders once.
 - `settings.onlyRenderVisible`: render `visible-nodes` / `visible-edges` instead of every one.
 
+## The React adapter (Issue #5)
+
+`@fragiola/flow-react` renders and wires; every rule is the core's. `export *` of the core (a local
+name that shadows a core one fails `tests/index.test.ts`), the `Flow` namespace (`parts.ts`), the
+hooks, `createFlowRef` / `useFlowRef`, and one entry per feature mirrored from the core's subpaths
+(`/selection`, `/subflows`, `/drag`, `/resize`, `/connection`, `/reconnection`, `/keyboard`,
+`/minimap`: each re-exports the core's factory; `/minimap` adds `MiniMap`, `MiniMapNode`,
+`MiniMapMask`, `/resize` adds `NodeResizer`, `ResizeHandle`, `RESIZE_POSITIONS`). The main entry
+never imports a feature (the bundle guard reads its source maps: `src/<feature>/` is a feature's
+code in every package).
+
+| folder | holds |
+| --- | --- |
+| `src/components/` | one primitive per file |
+| `src/hooks/` | the public hooks, `create-flow-ref.ts`, `internal.ts` (`useFlowValue`: a value read from the model and the engine, kept while equal) |
+| `src/utils/` | `merge-props.ts`, `use-render.ts` (`render`, refs, `className` / `style` functions, structural style), `shallow-equal.ts`, `engine-facade.ts` |
+| `src/<feature>/` | a feature's entry, and its primitives (`minimap/`, `resize/`) |
+
+**Primitives** (`Flow.*`; every element carries `data-flow-part`, entities `data-flow-id`, the
+engine's state attributes from `engine.adapter.attributes(part, payload)`):
+
+| primitive | element | does |
+| --- | --- | --- |
+| `Root` | `div` `root` | owns the model (or takes `model`) and the engine, attaches the root; `position: relative; overflow: hidden` |
+| `Viewport` | `div` `viewport` | `attachViewport`: the engine writes its transform, React never does |
+| `Nodes` | `div` `nodes` | children function per node not hidden (`visible-nodes` with `onlyRenderVisible`), keyed by id |
+| `Node` | `div` `node` | `registerNode`; `transform: translate(x, y)` from `node-rect-by`, the document's `width`/`height`; `tabIndex` from `node-focusable` |
+| `Handle` | `div` `handle` | `registerHandle({ nodeId, handleId, type, side, connectable })`; centred on its side by default (a style may move it) |
+| `Edges` | `div` + `svg` `edges` | children function per edge whose `edge-path-by` is defined; the `div` is the HTML layer labels portal into |
+| `Edge` | `g` `edge` | default child `EdgePath`; `pointer-events: visibleStroke`; `tabIndex` from `edge-focusable` |
+| `EdgePath` | `path` `edge-path` | `d` from `edge-path-by` (a `d` of your own draws an app type), `fill="none"` |
+| `EdgeLabel` | `div` `edge-label` | portal into the edges' HTML layer, centred on the label point |
+| `ReconnectAnchor` | `circle` `reconnect-anchor` | an end's grab area (`end`), transparent, `r` 10 |
+| `ConnectionLine` | `svg` `connection-line` | while a connection is drawn; default child `path` `connection-path`, or a children function |
+| `SelectionBox` | `div` `selection-box` | while a box is drawn, root-relative |
+| `Background` | `svg` `background` | `background-pattern`: `pattern` `background-pattern`, `circle`/`path` `background-mark` in `currentColor`, `rect` `background-fill` |
+| `Controls` | `div` `controls` | a group for the buttons |
+| `ZoomIn`, `ZoomOut`, `FitView` | `button` `zoom-in`, `zoom-out`, `fit-view` | run their action; `disabled` / `data-disabled` while `!engine.can(...)` |
+| `ToggleInteractive` | `button` `toggle-interactive` | `set-interactive`; `aria-pressed` while locked, `data-interactive` |
+| `NodeToolbar` | `div` `toolbar` | portal into the root at `node-toolbar-by` (outside the zoom); `open`, default while its node is selected |
+| `MiniMap` (`/minimap`) | `svg` `minimap` | `width` × `height` (200 × 150), `minimap-view`; children default: a `MiniMapNode` per node and the `MiniMapMask` |
+| `MiniMapNode`, `MiniMapMask` | `rect` `minimap-node`, `path` `minimap-mask` | a node's box; the mask (`fill-rule="evenodd"`) |
+| `NodeResizer` (`/resize`) | `div` `resizer` | `setPartOptions("resizer", nodeId, { minWidth, … })`; default children: a `ResizeHandle` at each corner and side |
+| `ResizeHandle` | `div` `resize-handle` | `data-position`; placed on its corner or along its side |
+
+**Root props:** `model`, or `defaultNodes` / `defaultEdges` (read once) and the controlled `nodes` /
+`edges` with `onNodesChange` / `onEdgesChange`; `features` and `createId` (read once: a changed
+`features` warns); `viewport` (controlled: `set-viewport`) / `defaultViewport` and
+`onViewportChange(viewport, gesture)` (the `viewport-change` event); `fitView` (read once); the
+engine options `minZoom`, `maxZoom`, `translateExtent`, `panOnDrag`, `panOnScroll`, `zoomOnScroll`,
+`zoomOnPinch`, `zoomOnDoubleClick`, `zoomStep`, `interactive`, `onlyRenderVisible`, `pathOptions`
+(a change sends only the keys that changed, `adapter.setOptions`); `flowRef`.
+
+**Hooks:** `useFlow<T, F>()` → `{ model, engine }` (the engine a facade: there from the first
+render, an action refused before the mount); part hooks `useNode(node)`, `useEdge(edge)`,
+`useHandle({ type, side, handleId?, connectable?, nodeId? })` → `{ state, props }`; values
+`useViewport()`, `useConnection()`, `useSelection()` (`{ nodes, edges }`), `useNodes()`,
+`useEdges()`. `createFlowRef<T, F>()` / `useFlowRef<T, F>()`: `ref.current` is `{ model, engine }`
+while the root is mounted.
+
+Decisions of the adapter (#5):
+
+- **The engine is created in the root's layout effect** (the tree's), destroyed in its cleanup: a
+  StrictMode double mount creates two and keeps the second (starting at the first one's viewport);
+  the first render and a server render have no engine (nodes at their model position with their
+  static attributes, no edge).
+- **Re-rendering:** `useFlowValue` reads a value again on every model commit and every
+  `adapter.subscribe` notification, and keeps the last object while equal (records by their
+  entries, edge paths by value), so a pan re-renders only what shows the viewport (the
+  background, the minimap, toolbars, the zoom buttons). `Nodes` and `Edges` memo each entity's
+  render on the entity and the children function: a drag step re-renders the moved nodes and
+  their edges only. A new children function re-renders every node: in a controlled flow, keep it
+  stable (`useCallback`, a module function).
+- **Controlled `nodes` / `edges` map onto commands through a core key**, `model.get("commands-to",
+  { nodes?, edges? })` (`packages/core/src/state/commands-to.ts`): the commands a user would run,
+  one `batch` with `meta: { source: "controlled" }` (which `onNodesChange` does not echo). The
+  props are the app's document: a flag that stops a user (`draggable`, `deletable`,
+  `connectable`) is unlocked for its step and locked again in the same batch; what no command
+  expresses (a node's type, a removed data key, a size given back) removes and adds the entity
+  again with its id; the drawing order is not synced. A batch a middleware refuses runs step by
+  step; whenever the model then differs from the props (a veto, an extent clamp), the change
+  callbacks get the model's lists, so the app's state follows the model. Only a list whose
+  identity changed is diffed. Alternative: the diff in the adapter (tree's `sync`); refused: every
+  adapter would re-implement it.
+- **Labels and toolbars are portals**: SVG holds no HTML, so `EdgeLabel` goes to the HTML layer of
+  `Edges` (inside the viewport, in flow coordinates); `NodeToolbar` goes to the root (outside the
+  zoom).
+- **Inner elements carry part names of their own** (`connection-path`, `background-pattern`,
+  `background-mark`, `background-fill`; the control buttons' `zoom-in`, …): every element has a
+  part (D11), and the engine leaves parts it does not know alone.
+- **SVG presentation defaults** are structural: `fill="none"` on paths, `currentColor` for the
+  background's marks, a transparent reconnect anchor, so an unstyled flow draws correctly; any
+  attribute or style of the consumer overrides them.
+- **A handle's place on its side is a default the consumer's style overrides** (`baseStyle` in
+  `use-render.ts`), unlike the structural keys that always win (`position`), so an app may put
+  several handles on one side.
+- **No role and no name**: nodes and edges get `tabIndex` from the engine and no role
+  (`aria-roledescription` would be text); the app names them.
+- **Every feature subpath is mirrored**, even those with no adapter code (the tree's): a React
+  app imports the features from the one package it installs.
+- **Known limits:** jsdom lays nothing out, so the adapter tests stub the layout (`tests/flow.tsx`);
+  the gestures' real feel is the playground E2E's (#6, Chromium and Firefox, mouse and touch).
+- **A resize corner is above its sides** (`zIndex: 1` in its structural place, #6): the side
+  handles span their whole side.
+
+For the playground and examples (#6, see [The playground and the examples](#the-playground-and-the-examples-issue-6)): wrap the flow in a sized element (the root fills it); put
+`Edges` before `Nodes` inside `Viewport`, and `Background`, `SelectionBox`, `Controls`, `MiniMap`
+outside it; give nodes `user-select: none`; style through `[data-flow-part]` and the state
+attributes (`data-selected`, `data-dragging`, `data-connecting`, `data-valid` / `data-invalid`,
+`data-handle-type`, `data-side`, `data-position`, `data-end`, `data-disabled`).
+
+## The playground and the examples (Issue #6)
+
+Every rule of the guidelines' Examples section (`../guidelines/docs/site.md#examples`) holds; what
+Flow decided on top of it:
+
+**`examples/shared`** (`examples-shared`, private, imports no framework: `tests/framework-free.test.ts`):
+
+| path | holds |
+| --- | --- |
+| `src/meta/<id>.ts` | one file per example: title, description, `level`, order, features, docs link, layout, height |
+| `src/meta-types.ts` | `LEVELS` (`basics`, `interaction`, `building-blocks`, `apps`, titled Basics, Interaction, Building blocks, Apps: `examples.json`'s `levels`), `DEFAULT_HEIGHT` |
+| `src/framework.ts` | `FRAMEWORKS` (react, vue, svelte, angular), entry files, adapter and icon packages |
+| `src/themes/` | `light`, `dark`, `ide`, `paper`, `terminal` (one CSS file of values each, `themes.ts`: name, title, description, scheme, swatch) |
+| `src/embed/messages.ts` | `fragiola:example:ready` / `resize` / `theme` |
+| `scripts/` | the examples finder, the manifest builder (`buildManifest`), the loader generator (`generate.ts <framework>`) |
+| `e2e/` | `examplesE2eConfig(framework)` (port 4360 + framework index, base `/flow/embed/<framework>/`), the server with its host page, `smoke`, `iframe`, `themes` and `examples/<id>.spec.ts` |
+
+`COMPLETE_FRAMEWORKS` is `["react"]`: a spec for an example another framework lacks is skipped
+there, failed in React.
+
+**The examples** (`examples/react/src/examples/<id>/index.tsx` + `styles.ts`; the README there is
+the authoring guide): Basics `basic`, `custom-nodes`, `edge-types`, `edge-labels`, `backgrounds`,
+`read-only`; Interaction `selection-and-keyboard`, `connection-validation`, `edge-reconnect`,
+`snap-to-grid`, `minimap-and-controls`; Building blocks `sub-flows`, `node-resizer`,
+`node-toolbar`, `add-nodes`, `save-and-restore`, `undo-redo`, `announcements`; Apps
+`workflow-builder` (the landing's showcase). `_kit/persistence.ts` and `_kit/undo.ts` are the
+copyable app policy.
+
+**Theme tokens** (`--fl-*`; `tests/themes.test.ts` holds the list, `e2e/themes.spec.ts` checks the
+shapes differ on computed styles): shape `font`, `font-size`, `title-weight`, `node-padding`,
+`node-radius`, `node-border`, `node-shadow`, `handle-size`, `handle-radius`, `handle-border`,
+`edge-width`, `edge-selected-width`, `edge-dash`, `grid-dots`, `grid-lines`, `grid-cross`,
+`control-radius`, `focus-width`, `motion`; colour, per palette: `canvas-bg`, `grid-color`,
+`node-bg`, `node-line`, `edge-color`, `edge-selected`, `handle-bg`, `handle-line`, `valid`,
+`invalid`, `selection-bg`, `selection-line`, `minimap-mask`, `focus-line`. Light: rounded nodes,
+round handles, dots. Dark: Light's shapes. IDE: near-square nodes, small square handles, hairline
+edges, lines. Paper: serif, round nodes, big ringed handles, thick edges. Terminal: monospace,
+square everything, dashed edges, crosses.
+
+**The playground** (`apps/playground`, `pnpm dev`, port 5197): the examples in place (themes,
+source panel), scenarios (`src/scenarios/<area>/<id>.tsx`, default export only: `gestures/every-
+feature`, `performance/five-hundred-nodes`, `api/commands`), the inspector
+(`src/inspector/flow-inspector.tsx`: viewport, gestures under way, selection, engine events, the
+document) and `fixtures/basic`, the unstyled flow its specs drive (`src/fixture/flow-fixture.tsx`:
+every feature, an 800 × 500 root at the page's corner, the viewport at `{ x: 100, y: 100, zoom:
+1 }`, its document, viewport and events printed beside it). Its suite runs on Chromium and Firefox:
+pan, wheel, double-click and pinch zoom, drag (selection, cancel, extent, snap), connect,
+reconnect, box select, resize, keyboard and minimap, each with the mouse and with fingers
+(`e2e/helpers.ts` `touch`: Chromium's real touch input through the DevTools protocol, touch
+pointer events in Firefox), and the 500-node scenario's re-render count.
+
+Decisions of #6:
+
+- **One background layer per pattern.** `Flow.Background`'s `variant` is a prop, so a theme cannot
+  switch it: every example renders `dots`, `lines` and `cross`, and the theme's `--fl-grid-dots`,
+  `--fl-grid-lines`, `--fl-grid-cross` (`block` | `none`) show one. Alternative: reading a token in
+  JavaScript; refused: not copyable, and a theme change would need a listener.
+- **Levels are the gallery's groups** (`level` in the metadata, not Dockable's `category`): the
+  Epic named them, and the contract calls them levels.
+- **No `_themes/`.** The repository template lists it, but no Fragiola project has one: the
+  themes live once in `examples/shared/src/themes`, and the theme contract test is
+  `examples/shared/tests/themes.test.ts` (Splitter's place), not a per-app test.
+- **No modal example**, so no overlay promotion; the workflow builder's Select is a non-modal
+  popup in the frame.
+- **Panels beside a root read its model**: the workflow builder makes its model with
+  `createFlowModel`, hands it to `Flow.Root`, and the palette, header and inspector outside the
+  root read it with `useSyncExternalStore` over `model.subscribe` (`use-workflow.ts`). A panel over
+  the canvas, inside the root, marks itself `data-flow-no-gesture` (and `data-flow-no-wheel`).
+- **Connection rules are middleware in every example** (`connection-validation`,
+  `workflow-builder`): a vetoed handle shows `data-invalid` while dragging.
+- **Ports**: the playground takes 5197 (the other Fragiola playgrounds take 5173, and a local run
+  reuses a server on its port); the examples' e2e server 4360+.
+- **Fixed in the packages, found by the E2E:** a resize corner is above the full-length sides it
+  joins (`zIndex: 1`, structural), or a press on a corner resized one dimension; a node whose
+  element goes while it stays in the flow (culled by `onlyRenderVisible`, hidden) keeps its last
+  size and handle bounds (`measurements.ts`: before, a culled node became unmeasured, was rendered
+  again, measured, culled, forever); its kept handles position its edges but are never a
+  connection's target, a node rendered again drops the handles it no longer renders, and a node
+  removed while not rendered is forgotten on the model's next commit.
+- **Known limits:** a reconnect anchor is drawn under its node's handle (edges come before nodes),
+  so the mouse grabs it beside the handle; a finger beside a handle lands on the handle
+  (Chromium's touch adjustment), so on touch an edge's end is grabbed on its stroke near the end:
+  give touch apps a wider `reconnection({ radius })` (the fixture uses 30).
+
+## The site export (Issue #7)
+
+fragiola.com/flow is built by `www` from `pnpm site:export --base /flow --out <dir>`
+(`../www/CONTRACT.md` v1.7, the source of truth; guidelines `docs/site.md`). The scripts are
+Splitter's (`site/export.ts`, `contract.ts` with `CONTRACT_VERSION = "1.7"`, `dev.ts`,
+`dev-proxy.ts`, `sources.ts`), unchanged but for the names:
+
+| output | from |
+| --- | --- |
+| `project.json` | `site/project.json`: `contract: 1`, slug `flow`, title "Flow", `frameworks: ["react"]`, `defaultFramework: "react"`, `repository`, keywords |
+| `docs/` | `site/docs`, copied as written: `config.json` (the sidebar), `index.mdx` (the landing), every page |
+| `examples.json` | built by `sources.ts`: `levels` from `LEVELS` / `LEVEL_TITLES`, `themes` from `THEMES` with each theme's CSS (`examples/shared`) |
+| `embed/<framework>/` | `pnpm --filter examples-<framework> build` with `EMBED_BASE=<base>/embed/<framework>/` and `EMBED_OUT_DIR`, against the packages' `dist`, plus `manifest.json` (`buildManifest(examplesApp(framework))`) |
+
+`site:dev` starts each framework's embed dev server (`EMBED_BASE`, a free `PORT`) behind a Node
+proxy on `--port` (5185, Flow's dev port, `www`'s `devUrl`); each serves `<base>manifest.json`.
+
+**The pages.** The sidebar is Dockable's IA: Getting started; Concepts; Guides; API: primitives
+(`@fragiola/flow-react`: one page per primitive under `api/primitives/`, titled by its name
+alone, plus `hooks` and `flow-ref`; the common props on `api/primitives/root#common-props`); API:
+core (`model`, `command-bus`, `commands` (generated), `json-document`, `engine`, `features`,
+`path-helpers`); More (`limitations`, "Found a problem?" to the issues). Every `.mdx` but
+`index.mdx` is in the sidebar exactly once; only the vocabulary of `docs/site.md`; a title is at
+most 60 characters and never contains "Flow" (`www` appends it); a description is 50-160
+characters. Snippets are typed and copied from the real API; a page embeds its examples with
+`<Example id>`, and every example's `docs` link is a page. The landing: the Hero's actions go
+examples, `/ai`, docs (then GitHub), then the `workflow-builder` showcase (`www` puts its agent
+band after it), then Sections.
+
+**Kept honest by tests** (`site/tests/`): `contract.test.ts` (the sources pass the contract checks,
+and each check catches what it should), `docs-reference.test.ts` (every export of the React
+package and of its `/minimap` and `/resize` entries is on its page, every field of every exported
+props, state, options or result interface is a table row, every primitive has its page, and the
+tables under a primitive's `## Props` and `## State` hold exactly its props and its state's
+fields, both ways (a stale row fails too); every
+core and feature-entry export is mentioned on an API page, every model and engine key and engine
+event is listed, and the members, error codes, document fields, engine payloads, feature options
+and path helper options have rows; every registry command has its section on the generated
+page), `dev-proxy.test.ts`, `noindex.test.ts` (every HTML page of the repository is `noindex`),
+`command-docs.test.ts` (the generated page).
+
+Decisions of #7:
+
+- **`examples.json` is generated, not committed** (every sibling's choice): the levels and themes
+  live once in `examples/shared`, and a committed copy could drift.
+- **No `adapters` in `project.json`**: absent, the landing's adapters row is the `frameworks`
+  (React). Each adapter Epic adds its framework to `frameworks`; list `adapters` only when a
+  package ships before its embed app.
+- **No sidebar icons** (contract v1.4, optional), like Dockable and Splitter: an icon for every
+  section or none, so none until they are decided for every library.
+- **Known limit of the reference test:** the `## Data attributes` tables are hand-written and not
+  compared with `engine.adapter.attributes` (only `data-flow-part` is required on every primitive
+  page); a new state attribute needs its row by review.
+- **Primitive pages live under `api/primitives/`** (the examples' metadata already linked there),
+  the core's under `api/` (where `api/commands.mdx` is generated).
+
 ## Repository layout
 
 ```
+packages/react/     @fragiola/flow-react src/components/, src/hooks/, src/utils/, src/<feature>/ (each core
+                                         feature's entry; minimap/ and resize/ with their primitives);
+                                         entries index.ts, parts.ts, context.ts; tests/ by behaviour
 packages/core/      @fragiola/flow       src/<domain>/ (document, state, commands, model, features,
                                          one folder per feature, engine, geometry, attributes,
                                          connect-session);
                                          entry index.ts; tests/ mirroring src/, tests/types/,
                                          tests/guard.test.ts
                     scripts/             generate-command-docs.ts (site/docs/api/commands.mdx)
-site/               package.json         the repository's guard tests (tests/): the layout, .d.ts,
-                                         package, E2E selection, CI workflow, features' bundle guard
-                                         and command docs checks; docs/api/commands.mdx (generated)
+apps/playground/    playground           src/shell/ (catalog, view, stage, sidebar, toolbar, source panel),
+                                         src/scenarios/<area>/, src/inspector/, src/fixture/,
+                                         fixtures/basic/, e2e/ (Chromium + Firefox), tests/
+examples/shared/    examples-shared      src/meta/, src/themes/, src/embed/, scripts/, e2e/, tests/
+examples/react/     examples-react       src/examples/<id>/, src/examples/_kit/, src/embed/, vendored
+                                         Fragiola UI (src/components, src/lib, src/styles),
+                                         scripts/vendor-fragiola.ts, tests/
+site/               package.json         export.ts, contract.ts, dev.ts, dev-proxy.ts, sources.ts,
+                                         project.json; docs/ (config.json, index.mdx, the pages,
+                                         api/commands.mdx generated); tests/: the site checks
+                                         (contract, docs reference, dev proxy, noindex) and the
+                                         repository's guard tests (layout, .d.ts, package, E2E
+                                         selection, CI workflow, bundle guard, command docs)
 scripts/                                 check-layout.ts, check-dts.ts, source-condition.ts,
                                          check-package.ts, e2e-suites.ts, check-features.ts
-.github/workflows/  ci.yml               Checks, Package, Changes
+docs/                                    docs-examples-gaps.md: what the docs and examples work
+                                         around (F1, …), each with a proposed API
+.github/workflows/  ci.yml               Checks, Package, Changes, E2E (playground), E2E (examples),
+                                         Site export, Trigger www build
 ```
 
-Later Epics add `packages/{react,vue,svelte,angular}`, `apps/playground`, `examples/*` and the
-site's docs and export (`pnpm-workspace.yaml` already lists `apps/*`, `packages/*`, `examples/*`
-and `site`).
+Later Epics add `packages/{vue,svelte,angular}` and their examples apps (`pnpm-workspace.yaml`
+already lists `apps/*`, `packages/*`, `examples/*` and `site`).
 
 ## Provenance: xyflow
 
@@ -466,6 +757,8 @@ Decisions of the engine (#3):
   root, a browser's `click` targets the root.
 - **Sizes: the document's where it gives one, the measured one otherwise** (per dimension), so a
   resize is drawn at once and a node without a size is measured; a 0 × 0 measurement is no size.
+  A node whose element goes while it stays in the flow (culled, hidden) keeps its last size and
+  handle bounds, never offered to a connection; a removed node's are forgotten (#6).
 - **Extent with measured sizes (closes #2's L6).** `host.keepInParent` clamps a drag's and the
   arrows' positions with the measured sizes before each `node.move`. A resize keeps a child inside
   its parent (the bound wins over `minWidth`, the ratio kept by shrinking), never shrinks a parent

@@ -1,0 +1,129 @@
+---
+title: Path helpers
+description: The edge path functions the engine draws with, bezier, smooth step, step and straight, each with its label point, and the geometry types they share.
+---
+
+The engine draws the built-in edge types (`bezier`, `smoothstep`, `step`, `straight`) with four
+pure functions, exported so an app can draw its own edge types from the same geometry. Each takes
+the two ends (and, for the curved and orthogonal ones, the sides they leave and enter by) and
+returns a `PathResult`: the SVG path data and the point a label goes at, in the middle of the path (a bezier's at its
+parameter t = 0.5, the others halfway along their length).
+They are written from the geometry (no code is ported from another library) and tested on known
+points.
+
+```tsx
+import { Flow, type FlowEdge, smoothStepPath } from "@fragiola/flow-react";
+
+/** An app edge type drawn from the engine's ends: a smooth step with wider corners. */
+function RoundedEdge({ edge }: { edge: FlowEdge<Types> }) {
+    return (
+        <Flow.Edge<Types> edge={edge}>
+            <Flow.EdgePath
+                render={(props, state) => (
+                    <path {...props} d={smoothStepPath({ ...state.path, borderRadius: 16 }).path} />
+                )}
+            />
+        </Flow.Edge>
+    );
+}
+```
+
+`state.path` is the edge's `EdgePath` (`engine.get("edge-path-by", { edgeId })`): its own path and
+label, and its ends (`PathEnds`), so spreading it gives a helper everything it needs. More on app
+edge types: [Custom edges](/docs/guides/custom-edges).
+
+## `bezierPath`
+
+`bezierPath(options)`: one cubic curve whose control points stand out from each end in the
+direction of its side, so the edge leaves and enters its handles square. A control point stands out
+by a share (`curvature`) of how far the other end lies along that direction, and never less than
+20 flow units, so an end whose other end is behind it still bends out before turning back. The
+label is the curve's middle.
+
+`BezierPathOptions` (with the `PathEnds` below):
+
+| option | type | description |
+| --- | --- | --- |
+| `curvature` | `number` | the share of the distance along a side its control point stands out by; default `0.5` |
+
+## `smoothStepPath` and `stepPath`
+
+`smoothStepPath(options)`: an orthogonal route (horizontal and vertical segments only) that leaves
+and enters each handle along its side, each corner rounded. `stepPath(options)` is the same route
+with square corners. Each end first stands out from its node by `offset`; the route then turns
+once halfway between two ends facing each other, goes out, across and back in when the target is
+behind, and joins perpendicular sides with one or two corners. The label goes halfway along the
+route's length.
+
+`SmoothStepPathOptions` (with the `PathEnds`):
+
+| option | type | description |
+| --- | --- | --- |
+| `borderRadius` | `number` | the radius of each rounded corner, in flow units; default `5` |
+| `offset` | `number` | how far each end stands out from its node before the route turns; default `20` |
+
+`StepPathOptions` (with the `PathEnds`): `offset` only, as above.
+
+## `straightPath`
+
+`straightPath(options)`: one line from end to end, its label halfway. The sides do not change a
+straight line, so it takes the points only.
+
+`StraightPathOptions`:
+
+| option | type | description |
+| --- | --- | --- |
+| `source` | `XY` | where it starts |
+| `target` | `XY` | where it ends |
+
+## The shared types
+
+`PathEnds`, the ends every curved or orthogonal helper takes:
+
+| field | type | description |
+| --- | --- | --- |
+| `source` | `XY` | where the edge starts, in flow coordinates |
+| `sourceSide` | `HandleSide` | the side of the source node it leaves by |
+| `target` | `XY` | where it ends |
+| `targetSide` | `HandleSide` | the side of the target node it enters by |
+
+`PathResult`, what every helper returns:
+
+| field | type | description |
+| --- | --- | --- |
+| `path` | `string` | the SVG path data, for a `path` element's `d` |
+| `label` | `XY` | where a label goes, in flow coordinates: a bezier's point at t = 0.5, halfway along the length for the others |
+
+`EdgePath` is both: what `"edge-path-by"` returns for an edge. `HandleSide` is
+`"top" | "right" | "bottom" | "left"`: physical diagram directions (x to the right, y down) that
+right-to-left text does not flip. An edge whose node has no handle leaves its source by the bottom
+and enters its target by the top.
+
+`PathOptions`, the engine's `pathOptions` (a `Flow.Root` prop): the shape of the built-in paths for
+every edge of the flow:
+
+| option | type | description |
+| --- | --- | --- |
+| `curvature` | `number` | bezier: the share of the distance a control point stands out by; default `0.5` |
+| `borderRadius` | `number` | smooth step: the corners' radius; default `5` |
+| `offset` | `number` | smooth step and step: how far an end stands out before turning; default `20` |
+
+`Rect`, an axis-aligned rectangle (a node's box, the selection box, a minimap's view):
+
+| field | type | description |
+| --- | --- | --- |
+| `x` | `number` | its left |
+| `y` | `number` | its top |
+| `width` | `number` | its width |
+| `height` | `number` | its height |
+
+`Viewport`, what the flow shows (view state, the engine's): a flow point `p` is drawn at
+`p * zoom + (x, y)` in the root:
+
+| field | type | description |
+| --- | --- | --- |
+| `x` | `number` | the screen offset of the flow's origin from the root's left, in pixels |
+| `y` | `number` | from the root's top |
+| `zoom` | `number` | the scale |
+
+`XY` is a point, `{ x, y }`, in flow coordinates unless a page says otherwise.

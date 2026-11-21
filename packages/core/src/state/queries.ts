@@ -3,12 +3,14 @@
 // that takes an id ends in `-by` (`node-by { id }`, `node-edges-by { nodeId }`). An `is` key is
 // the question after "is" (`node-draggable { nodeId }`). A feature's keys are typed here too and
 // answered by the feature (`FEATURE_KEYS` says whose they are).
-import type { CommandInfo } from "../commands/types";
+import type { BatchEntry, CommandInfo } from "../commands/types";
 import type {
     AnyTypes,
     FlowDocumentJson,
     FlowEdge,
+    FlowEdgeInput,
     FlowNode,
+    FlowNodeInput,
     FlowTypes,
     XY,
 } from "../document/types";
@@ -75,6 +77,22 @@ export interface ModelGetMap<T extends FlowTypes = AnyTypes> {
     "flow-json": { payload: NoPayload; result: FlowDocumentJson<T> };
     /** every installed command with its description and JSON Schemas */
     commands: { payload: NoPayload; result: readonly CommandInfo[] };
+    /**
+     * the commands that turn the document into one with these nodes and edges (a list left out
+     * stays as it is), for `batch`: what an adapter runs for its controlled `nodes` / `edges`
+     * props. Each difference is the command a user would have run (`node.move`, `edge.add`,
+     * `selection.set`, …), a flag that stops a user (`draggable`, `deletable`, `connectable`)
+     * unlocked for its step only; what no command expresses (a node's type, a removed data key)
+     * removes and adds the entity again with its id. Entities without an id are added; the
+     * drawing order is not synced
+     */
+    "commands-to": {
+        payload: {
+            nodes?: readonly FlowNodeInput<T>[] | undefined;
+            edges?: readonly FlowEdgeInput<T>[] | undefined;
+        };
+        result: readonly BatchEntry<T>[];
+    };
 }
 
 /** A key of `model.get`. */

@@ -1,0 +1,59 @@
+---
+title: ConnectionLine
+description: Flow.ConnectionLine draws the connection under way from a handle, and says whether a drop here would be accepted or refused.
+---
+
+`Flow.ConnectionLine` goes inside `Flow.Viewport` (after `Flow.Nodes`) and renders an SVG only
+while a connection is drawn (`connection()`): from the handle it started at to the pointer, or to
+the handle it snaps to within `connection({ radius })`. By default it draws an unfilled `path` of
+the connection's path; a children function draws your own. Its `data-valid` / `data-invalid` say
+whether the drop would be accepted (`model.can("edge.add", …)`, or `model.can("edge.reconnect", …)`
+while an edge's end is moved: a middleware's veto makes it invalid).
+
+```tsx
+<Flow.Viewport>
+    <Flow.Edges<Types>>{renderEdge}</Flow.Edges>
+    <Flow.Nodes<Types>>{renderNode}</Flow.Nodes>
+    <Flow.ConnectionLine className="stroke-blue-500 data-invalid:stroke-red-500" />
+</Flow.Viewport>
+```
+
+```tsx
+<Flow.ConnectionLine>
+    {(connection) => <path d={connection.path} fill="none" strokeDasharray="4 4" stroke="currentColor" />}
+</Flow.ConnectionLine>
+```
+
+The same state is available anywhere in the root through
+[`useConnection`](/docs/api/primitives/hooks).
+
+## Props
+
+`ConnectionLineProps` extends the [common primitive props](/docs/api/primitives/root#common-props)
+and every SVG attribute of an `svg` but `children`.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `children` | `(connection: Connection) => ReactNode` | a `path` (`data-flow-part="connection-path"`) | draws the line, in flow coordinates |
+
+## State
+
+`ConnectionLineState`, what `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `connection` | `Connection` | the connection being drawn ([engine reads](/docs/api/engine)) |
+| `valid` | `boolean` | the drop would be accepted (the edge added, or reconnected) |
+| `invalid` | `boolean` | the drop would be refused |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"connection-line"`; its default `path` is `"connection-path"` |
+| `data-valid` | present while the drop would be accepted |
+| `data-invalid` | present while the drop would be refused |
+
+## Structural style
+
+Absolute, `100%` of the viewport, `overflow: visible` and `pointer-events: none`.

@@ -1,0 +1,163 @@
+---
+title: Testing your flow
+description: Test your rules on the model in plain Node, your components in jsdom with a stubbed layout, and the real gestures in a browser with Playwright.
+---
+
+A flow has three layers worth testing, and each one has its own tool. Your rules (middleware,
+commands your app runs, what a save restores) live in the model, which runs in plain Node with no
+DOM. Your components render in jsdom, which lays nothing out, so a test gives the flow the sizes
+a browser would. The gestures themselves (a drag, a pinch, a connection) are best tested in a real
+browser. The package's own tests do the same; how you split them is yours.
+
+## The model in plain Node
+
+The model is a pure function of its commands: create it, run commands, read the result. No DOM,
+no React, no mocks.
+
+```ts title="connection-rules.test.ts"
+import { createFlowModel } from "@fragiola/flow-react";
+import { describe, expect, it } from "vitest";
+import { connectionRules, features, type Types } from "./connection-rules";
+
+function model() {
+    const created = createFlowModel<Types, typeof features>(
+        {
+            version: 1,
+            nodes: [
+                { id: "a", type: "block", position: { x: 0, y: 0 }, data: { label: "A", inputs: [], outputs: ["number"] } },
+                { id: "b", type: "block", position: { x: 200, y: 0 }, data: { label: "B", inputs: ["text"], outputs: [] } },
+            ],
+            edges: [],
+        },
+        { features },
+    );
+    created.use(connectionRules);
+    return created;
+}
+
+describe("the connection rules", () => {
+    it("refuse a port of another type", () => {
+        const result = model().run("edge.add", {
+            source: "a",
+            target: "b",
+            sourceHandle: "number-0",
+            targetHandle: "text-0",
+        });
+        expect(result).toMatchObject({ ok: false, error: { code: "vetoed" } });
+    });
+
+    it("say so before the drop, without changing anything", () => {
+        const flow = model();
+        expect(flow.can("edge.add", { source: "a", target: "b", sourceHandle: "number-0", targetHandle: "text-0" })).toBe(false);
+        expect(flow.get("all-edges")).toHaveLength(0);
+    });
+});
+```
+
+`model.check` returns what `run` would return without committing; `model.subscribe` lets a test
+assert the events your app would hear. The core is also `@fragiola/flow` on its own, without React:
+a server, a worker or a script can use the same model.
+
+## Components in jsdom
+
+jsdom has no layout: every element measures 0 × 0, so the engine never learns a node's size and
+draws no edge. Give the flow the sizes a browser would before rendering. The package's own adapter
+tests stub `getBoundingClientRect` and `offsetWidth` / `offsetHeight` from the structural styles
+the primitives write (a node's `transform` and size, the viewport's `transform`), and give the root
+a fixed box:
+
+```ts title="test/layout.ts"
+import { vi } from "vitest";
+
+/** Each node is 120 × 40, the root 800 × 600 at the page's corner. */
+export function installLayout() {
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (this: HTMLElement) {
+        return this.getAttribute("data-flow-part") === "node" ? 120 : 0;
+    });
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+        return this.getAttribute("data-flow-part") === "node" ? 40 : 0;
+    });
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+        const root = this.getAttribute("data-flow-part") === "root";
+        return box(0, 0, root ? 800 : 0, root ? 600 : 0);
+    });
+}
+
+function box(left: number, top: number, width: number, height: number): DOMRect {
+    return {
+        left,
+        top,
+        width,
+        height,
+        x: left,
+        y: top,
+        right: left + width,
+        bottom: top + height,
+        toJSON: () => ({}),
+    };
+}
+```
+
+Then assert on what your components render, by the part attributes, roles and names:
+
+```tsx title="editor.test.tsx"
+import { render, screen } from "@testing-library/react";
+import { act } from "react";
+import { beforeEach, expect, it } from "vitest";
+import { Editor } from "./editor";
+import { installLayout } from "./test/layout";
+
+beforeEach(() => installLayout());
+
+it("draws an edge once its nodes are measured", async () => {
+    const { container } = render(<Editor />);
+    // the engine tells its measurements once per task: let them re-render
+    await act(async () => {
+        await Promise.resolve();
+    });
+    expect(container.querySelectorAll('[data-flow-part="edge"]')).toHaveLength(1);
+    expect(screen.getByRole("group", { name: "Fetch data" })).toBeInTheDocument();
+});
+```
+
+Handles need a box too (their centre is measured relative to their node) before a connection can
+end on one; stub them the same way, at their side of the node. A gesture in jsdom is a sequence of
+`PointerEvent`s on the parts (`pointerdown` on the handle, `pointermove` and `pointerup` on the
+root, which captures the pointer), so stub `setPointerCapture` as well. Keep these tests to wiring;
+leave the feel of a gesture to a browser.
+
+## Gestures in a browser
+
+Playwright drives the real thing: layout, pointer capture, the wheel, touch. Find the parts by
+their attributes and their names, never by a class name:
+
+```ts title="flow.spec.ts"
+import { expect, test } from "@playwright/test";
+
+test("a drag from a handle to another node adds an edge", async ({ page }) => {
+    await page.goto("/editor");
+    const from = page.locator('[data-flow-id="fetch"] [data-flow-part="handle"][data-handle-type="source"]');
+    const to = page.locator('[data-flow-id="save"] [data-flow-part="handle"][data-handle-type="target"]');
+    const a = await from.boundingBox();
+    const b = await to.boundingBox();
+    if (!a || !b) throw new Error("the handles are not on screen");
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await page.mouse.down();
+    // move in steps: the engine sees the moves between the press and the release
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 10 });
+    await expect(to).toHaveAttribute("data-valid", "");
+    await page.mouse.up();
+    await expect(page.locator('[data-flow-part="edge"]')).toHaveCount(2);
+});
+```
+
+The attributes are also the states to wait on: `data-measured` on a node once it has a size,
+`data-dragging` during a drag, `data-valid` / `data-invalid` on a handle while a connection hovers
+it. This site's examples are tested this way, on Chromium and Firefox, with the mouse and with
+touch.
+
+## Events, not timers
+
+Wait for what the engine tells instead of sleeping: in a component test subscribe with
+`engine.subscribe` (a `connect` event, a `nodes-move`), in a browser test wait for the attribute or
+the text your live region writes.

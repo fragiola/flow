@@ -1,0 +1,198 @@
+---
+title: Custom nodes
+description: Render each node type from its own typed data, give it handles where you want them, edit its data from inside, and add new nodes from a palette.
+---
+
+There is no node component to configure and no `nodeTypes` map. `Flow.Nodes` calls your children
+function once per node, and you render whatever that node should be: a card, a form, a shape, a
+preview. The package places the element at the node's position, measures it, and resolves presses
+on it. What the node looks like, what it shows and what its fields do are yours.
+
+<Example id="custom-nodes" />
+
+## One function for every node type
+
+Name your node types and their data in a `Types` registry: `node.type` then narrows `node.data`,
+so each branch of the function reads the fields of its own type.
+
+```tsx title="custom-nodes.tsx"
+import { Flow, type FlowNode, type FlowTypes } from "@fragiola/flow-react";
+
+interface Types extends FlowTypes {
+    readonly nodes: {
+        colour: { label: string; colour: string };
+        number: { label: string; value: number };
+        preview: { label: string };
+    };
+}
+
+type Node = FlowNode<Types>;
+
+/** One function for every node: stable, so a change re-renders only the node it touched. */
+function renderNode(node: Node) {
+    return (
+        <Flow.Node<Types> node={node} className="node">
+            {node.type === "colour" && <ColourNode node={node} />}
+            {node.type === "number" && <NumberNode node={node} />}
+            {node.type === "preview" && <PreviewNode node={node} />}
+        </Flow.Node>
+    );
+}
+
+// inside the root:
+// <Flow.Nodes<Types>>{renderNode}</Flow.Nodes>
+```
+
+Keep the function stable (a module function, or `useCallback`): `Flow.Nodes` memoizes each node's
+rendering on the node and the function, so a drag step re-renders only the nodes it moved. A new
+function on every render re-renders every node.
+
+## A component per type
+
+Each branch is an ordinary component. `Extract` gives it the node of its own type, and
+[`useFlow`](/docs/api/primitives/hooks) gives it the model to change its data with
+`node.set-data`, a shallow merge:
+
+```tsx
+import { Flow, type FlowNode, type FlowTypes, useFlow } from "@fragiola/flow-react";
+import { connection } from "@fragiola/flow-react/connection";
+import { drag } from "@fragiola/flow-react/drag";
+import { selection } from "@fragiola/flow-react/selection";
+
+const features = [selection(), drag(), connection()] as const;
+
+function ColourNode({ node }: { node: Extract<FlowNode<Types>, { type: "colour" }> }) {
+    const { model } = useFlow<Types, typeof features>();
+    return (
+        <>
+            <label>
+                <span>{node.data.label}</span>
+                <input
+                    type="color"
+                    value={node.data.colour}
+                    onChange={(event) =>
+                        model.run("node.set-data", {
+                            nodeId: node.id,
+                            data: { colour: event.target.value },
+                        })
+                    }
+                />
+            </label>
+            <Flow.Handle type="source" side="right" className="handle" />
+        </>
+    );
+}
+```
+
+A press on a field, a button or a link inside a node starts no gesture: typing in the input never
+drags the node. Mark anything else that must keep its presses with `data-flow-no-gesture`, and an
+element that scrolls with `data-flow-no-wheel` (the wheel then scrolls it instead of zooming).
+
+## Handles where you want them
+
+A `Flow.Handle` sits at the middle of its `side` by default. Give a node several handles of one
+type with a `handleId` each, and move them along the side with your style:
+
+```tsx
+<Flow.Handle type="target" side="left" handleId="colour" className="handle" style={{ top: "35%" }} />
+<Flow.Handle type="target" side="left" handleId="size" className="handle" style={{ top: "75%" }} />
+```
+
+An edge names the handle it ends at with `targetHandle: "colour"` (and `sourceHandle` at its
+start). See [Handles and connections](/docs/concepts/handles-and-connections).
+
+## Read what is wired into a node
+
+A node that shows its inputs reads the edges and the nodes with
+[`useEdges` and `useNodes`](/docs/api/primitives/hooks), which re-render it when they change:
+
+```tsx
+import { useEdges, useNodes } from "@fragiola/flow-react";
+
+/** The node wired into one of `nodeId`'s target handles, if any. */
+function useInput(nodeId: string, handleId: string) {
+    const edges = useEdges<Types>();
+    const nodes = useNodes<Types>();
+    const edge = edges.find((e) => e.target === nodeId && e.targetHandle === handleId);
+    return nodes.find((n) => n.id === edge?.source);
+}
+```
+
+For a large flow, read only what you need with `model.get("node-edges-by", { nodeId, handleType:
+"target" })` in a `model.subscribe` listener instead: `useNodes` re-renders on every change of any
+node.
+
+## Add nodes from a palette
+
+<Example id="add-nodes" />
+
+A palette outside the root reaches the flow through a [flow ref](/docs/api/primitives/flow-ref).
+The browser's own drag and drop carries the node type; on the drop,
+`engine.get("screen-to-flow", { x, y })` turns the drop's client point into flow coordinates, and
+`node.add` puts the node there:
+
+```tsx title="add-nodes.tsx"
+import { Flow, type FlowTypes, useFlowRef } from "@fragiola/flow-react";
+import type { DragEvent } from "react";
+
+type Shape = "circle" | "square" | "diamond";
+
+interface Types extends FlowTypes {
+    readonly nodes: { shape: { shape: Shape; label: string } };
+}
+
+const MIME = "application/x-flow-shape";
+
+export function Editor() {
+    const flow = useFlowRef<Types, typeof features>();
+
+    function onDrop(event: DragEvent<HTMLDivElement>) {
+        const shape = event.dataTransfer.getData(MIME) as Shape;
+        const current = flow.current;
+        if (!shape || !current) return;
+        event.preventDefault();
+        const point = current.engine.get("screen-to-flow", { x: event.clientX, y: event.clientY });
+        current.model.run("node.add", {
+            type: "shape",
+            // the node's top-left corner, so that its middle lands on the point
+            position: { x: point.x - 50, y: point.y - 20 },
+            data: { shape, label: shape },
+        });
+    }
+
+    return (
+        <div className="layout">
+            <button
+                type="button"
+                draggable
+                onDragStart={(event) => event.dataTransfer.setData(MIME, "square")}
+            >
+                Task
+            </button>
+            <Flow.Root<Types, typeof features>
+                features={features}
+                flowRef={flow}
+                onDragOver={(event) => {
+                    if (!event.dataTransfer.types.includes(MIME)) return;
+                    event.preventDefault();
+                }}
+                onDrop={onDrop}
+                className="flow"
+            >
+                {/* the viewport, edges and nodes */}
+            </Flow.Root>
+        </div>
+    );
+}
+```
+
+`node.add` generates the id when you leave it out (the model's `createId`). A node added without a
+`width` and `height` is measured once rendered, and its edges are drawn from then on.
+
+## What stays yours
+
+- The look of every node type, its content and its fields.
+- Where handles sit and what they look like (`data-valid`, `data-invalid` while a connection
+  hovers them).
+- The node's name for assistive technology: see
+  [Accessible names](/docs/getting-started/accessible-names).

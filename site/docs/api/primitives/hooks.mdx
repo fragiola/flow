@@ -1,0 +1,169 @@
+---
+title: Hooks
+description: The hooks read the enclosing root's model, engine, viewport, connection, selection, nodes and edges, and render nodes, edges and handles by hand.
+---
+
+Every hook reads the enclosing `Flow.Root` (outside one it throws). Two kinds:
+
+- **Values**: `useFlow`, `useViewport`, `useConnection`, `useSelection`, `useNodes`, `useEdges`.
+  Each re-renders its component when its value changes, and only then.
+- **Parts**: `useNode`, `useEdge`, `useHandle`, each returning `{ state, props }`: the part's
+  state, and the props to spread on your own element (its attributes, the ref that registers it
+  with the engine, its structural style). `Flow.Node`, `Flow.Edge` and `Flow.Handle` are built on
+  them.
+
+From outside the root (a toolbar beside it, a test), use a [flow ref](/docs/api/primitives/flow-ref).
+
+## `useFlow`
+
+```tsx
+import { useFlow } from "@fragiola/flow-react";
+
+function DeleteSelected() {
+    const { model } = useFlow<Types, typeof features>();
+    return (
+        <button type="button" onClick={() => model.run("selection.remove")}>
+            Delete
+        </button>
+    );
+}
+```
+
+`useFlow<T, F>()` returns `UseFlowResult<T, F>`, the model and the engine of the root. Pass the
+registry and the features as type arguments: a child cannot infer them through context.
+
+| field | type | description |
+| --- | --- | --- |
+| `model` | `FlowModel<T, F>` | the flow's document and its rules: `model.run`, `model.get`, `model.is` ([model](/docs/api/model)) |
+| `engine` | `FlowEngine<T, F>` | the flow on screen: `engine.run("fit-view")`, `engine.get("viewport")`, `engine.subscribe` ([engine](/docs/api/engine)). There from the first render: before the root is mounted (and on the server) an action is refused and a read is empty |
+
+## `useViewport`
+
+`useViewport()` returns the root's `Viewport` (`{ x, y, zoom }`), re-rendering on every change: a
+zoom readout, a control's state. Change it with `engine.run("set-viewport", …)`.
+
+```tsx
+function ZoomLevel() {
+    const { zoom } = useViewport();
+    return <output>{Math.round(zoom * 100)}%</output>;
+}
+```
+
+## `useConnection`
+
+`useConnection()` returns the `Connection` being drawn from a handle (`connection()`), or `null`:
+where it starts and ends, the handle it would end at (`to`) and whether the drop would be accepted
+(`status`). `Flow.ConnectionLine` uses it.
+
+## `useSelection`
+
+`useSelection<T>()` returns `FlowSelection<T>`, the selected nodes and edges in drawing order
+(`selection()`; empty without it), re-rendering when they change.
+
+| field | type | description |
+| --- | --- | --- |
+| `nodes` | `readonly FlowNode<T>[]` | the selected nodes |
+| `edges` | `readonly FlowEdge<T>[]` | the selected edges |
+
+## `useNodes` and `useEdges`
+
+`useNodes<T>()` and `useEdges<T>()` return every node, or every edge, in drawing order (the
+model's own frozen list), re-rendering on every change of one: a list beside the flow, a counter.
+A drag re-renders them at every step; read `model.get("node-by", { id })` for one entity.
+
+## `useNode`
+
+`useNode<T>(node)` returns `UseNodeResult<T>` for a node rendered by hand: spread `props` on its
+element (the engine resolves presses from its attributes).
+
+```tsx
+function PlainNode({ node }: { node: FlowNode<Types> }) {
+    const { state, props } = useNode(node);
+    return (
+        <section {...props} aria-label={node.data.label} className={state.selected ? "ring-2" : undefined}>
+            {node.data.label}
+        </section>
+    );
+}
+```
+
+`state` is `NodeState<T>` (see [`Flow.Node`](/docs/api/primitives/node)):
+
+| field | type | description |
+| --- | --- | --- |
+| `nodeId` | `string` | its id |
+| `node` | `FlowNode<T>` | the node, as the model holds it |
+| `x`, `y` | `number` | its top-left corner in absolute flow coordinates |
+| `selected` | `boolean` | `data-selected` (`selection()`) |
+| `dragging` | `boolean` | `data-dragging` (`drag()`) |
+| `resizing` | `boolean` | `data-resizing` (`resize()`) |
+| `measured` | `boolean` | its size is known: `data-measured` |
+| `focusable` | `boolean` | it takes DOM focus (`keyboard()`) |
+| `attributes` | `PartAttributes` | `data-flow-part`, `data-flow-id` and its state |
+
+`UseNodeResult<T>`:
+
+| field | type | description |
+| --- | --- | --- |
+| `state` | `NodeState<T>` | its state |
+| `props` | `{ ref, tabIndex, style } & DataAttributes` | its attributes, `tabIndex` (`0` with `keyboard()`), its structural style (absolute, at its position, with the document's size) and the ref that registers it |
+
+## `useEdge`
+
+`useEdge<T>(edge)` returns `UseEdgeResult<T>` for an edge drawn by hand: spread `props` on an SVG
+`g`.
+
+`state` is `EdgeState<T>` (see [`Flow.Edge`](/docs/api/primitives/edge)):
+
+| field | type | description |
+| --- | --- | --- |
+| `edgeId` | `string` | its id |
+| `edge` | `FlowEdge<T>` | the edge, as the model holds it |
+| `path` | `EdgePath \| undefined` | its path, label point and ends, once both nodes have a size |
+| `selected` | `boolean` | `data-selected` (`selection()`) |
+| `reconnecting` | `boolean` | one of its ends is being moved (`reconnection()`) |
+| `focusable` | `boolean` | it takes DOM focus (`keyboard()`) |
+| `attributes` | `PartAttributes` | its attributes |
+
+`UseEdgeResult<T>`:
+
+| field | type | description |
+| --- | --- | --- |
+| `state` | `EdgeState<T>` | its state |
+| `props` | `{ tabIndex } & DataAttributes` | its attributes and `tabIndex` |
+
+## `useHandle`
+
+`useHandle(options)` returns `UseHandleResult` for a handle rendered by hand: spread `props` on its
+element, inside a node.
+
+`UseHandleOptions`:
+
+| option | type | default | description |
+| --- | --- | --- | --- |
+| `type` | `HandleType` | required | edges start (`"source"`) or end (`"target"`) here |
+| `side` | `HandleSide` | required | the side of the node it sits on |
+| `handleId` | `string` | none | its id among the node's handles of its type |
+| `connectable` | `boolean` | `true` | a connection may start or end here |
+| `nodeId` | `string` | the enclosing `Flow.Node`'s | its node |
+
+`state` is `HandleState` (see [`Flow.Handle`](/docs/api/primitives/handle)):
+
+| field | type | description |
+| --- | --- | --- |
+| `nodeId` | `string` | its node |
+| `handleId` | `string \| undefined` | its id |
+| `type` | `HandleType` | its type |
+| `side` | `HandleSide` | its side |
+| `connectable` | `boolean` | a connection may start or end here: `data-connectable` |
+| `connecting` | `boolean` | the connection under way starts here: `data-connecting` |
+| `valid` | `boolean` | the connection under way would end here, accepted: `data-valid` |
+| `invalid` | `boolean` | the connection under way would end here, refused: `data-invalid` |
+| `attributes` | `PartAttributes` | its attributes |
+
+`UseHandleResult`:
+
+| field | type | description |
+| --- | --- | --- |
+| `state` | `HandleState` | its state |
+| `props` | `{ ref } & DataAttributes` | its attributes and the ref that registers it (its centre is measured) |

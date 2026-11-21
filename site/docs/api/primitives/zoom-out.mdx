@@ -1,0 +1,44 @@
+---
+title: ZoomOut
+description: Flow.ZoomOut zooms the flow out by one step around the centre of the root, and is disabled once the zoom reaches its least value.
+---
+
+`Flow.ZoomOut` renders a `button` (`type="button"`) that runs the engine's `"zoom-out"` action:
+it zooms out by the root's `zoomStep` (1.2) around the root's centre. At the least zoom (`minZoom`) the engine refuses it, so the button is `disabled` (and `data-disabled`) while `engine.can("zoom-out")` is false; it
+re-renders when the view changes. It sets no text and no name: give it an icon and an
+`aria-label`. Put it in `Flow.Controls`, or anywhere inside `Flow.Root`.
+
+```tsx
+import { MinusIcon } from "lucide-react";
+
+<Flow.ZoomOut aria-label="Zoom out" className="p-1 data-disabled:opacity-40">
+    <MinusIcon />
+</Flow.ZoomOut>;
+```
+
+The same action from code: `engine.run("zoom-out")` ([engine](/docs/api/engine)).
+
+## Props
+
+`ZoomOutProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and
+every `button` attribute; a `disabled` of yours disables it too.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `children` | `ReactNode` | none | its icon or label |
+
+## State
+
+`ControlButtonState` ([Controls](/docs/api/primitives/controls)), what `className`, `style` and
+`render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `disabled` | `boolean` | the engine refuses its action now, or its `disabled` prop is set |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"zoom-out"` |
+| `data-disabled` | present while disabled |

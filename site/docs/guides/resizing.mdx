@@ -1,0 +1,116 @@
+---
+title: Resizing nodes
+description: Give nodes resize handles on their corners and sides, set limits for the whole flow or for one node, and keep an aspect ratio.
+---
+
+`resize()` and `NodeResizer` let a user resize a node from its corners and sides: each drag step is
+a `node.resize`, which writes the node's `width` and `height` (and, from a top or left handle, its
+position) into the document. The handles' look, when they show, and which nodes have them are
+yours.
+
+<Example id="node-resizer" />
+
+## Turn it on
+
+`resize()` is a feature, and `NodeResizer` and `ResizeHandle` come with it, on the same entry:
+
+```tsx
+import { NodeResizer, resize } from "@fragiola/flow-react/resize";
+import { drag } from "@fragiola/flow-react/drag";
+import { selection } from "@fragiola/flow-react/selection";
+
+const features = [selection(), drag(), resize({ minWidth: 80, minHeight: 60 })] as const;
+
+function renderNode(node: FlowNode<Types>) {
+    return (
+        <Flow.Node<Types> node={node} className="node group">
+            {node.data.label}
+            <NodeResizer className="hidden group-data-selected:block" />
+        </Flow.Node>
+    );
+}
+```
+
+`NodeResizer` goes inside `Flow.Node`: a box over the node holding a `ResizeHandle` at each corner
+and side by default. Give the handles their size and look; they are placed on their corner or
+along their side, and carry `data-position` (`top-left`, `top`, …, `left`).
+
+## The limits
+
+`resize()`'s options hold for every node; a `NodeResizer`'s props override them for its node:
+
+| option | default | does |
+| --- | --- | --- |
+| `minWidth`, `minHeight` | `10` | the smallest size, in flow units |
+| `maxWidth`, `maxHeight` | none | the largest size |
+| `keepAspectRatio` | `false` | a resize keeps the node's width-to-height ratio |
+
+```tsx
+<NodeResizer minWidth={120} maxWidth={360} minHeight={80} maxHeight={240} />
+<NodeResizer keepAspectRatio />
+```
+
+A child with `extent: "parent"` (sub-flows) is kept inside its parent while it resizes, and a parent
+never shrinks past such a child.
+
+## Your own handles
+
+Pass the handles you want as children: the corners only, a single grip, your own look per position.
+`RESIZE_POSITIONS` lists every position, corners first:
+
+```tsx
+import { NodeResizer, RESIZE_POSITIONS, ResizeHandle } from "@fragiola/flow-react/resize";
+
+<NodeResizer keepAspectRatio className="resizer">
+    {RESIZE_POSITIONS.map((position) => (
+        <ResizeHandle
+            key={position}
+            position={position}
+            className="size-2.5 rounded-sm border border-palette-ring bg-palette-base data-[position=top]:h-1.5 data-[position=bottom]:h-1.5 data-[position=left]:w-1.5 data-[position=right]:w-1.5"
+        />
+    ))}
+</NodeResizer>;
+
+<NodeResizer>
+    <ResizeHandle position="bottom-right" aria-hidden className="size-3 cursor-nwse-resize" />
+</NodeResizer>;
+```
+
+A corner is drawn above the two sides it joins, so a press on it resizes both dimensions.
+
+## Show the handles while selected
+
+Render the resizer only when the node should be resizable, or hide it with a style on the node's
+`data-selected`. While a node is resized, the node and its resizer carry `data-resizing`.
+
+```css
+[data-flow-part="node"]:not([data-selected]) [data-flow-part="resizer"] {
+    display: none;
+}
+
+[data-flow-part="resize-handle"] {
+    width: 10px;
+    height: 10px;
+    background: var(--fl-handle-bg);
+    border: 1px solid var(--fl-handle-line);
+}
+```
+
+## React to a resize
+
+`node.resize` is transient during the drag and final on the release, like a drag's moves: an undo
+history makes one step of it, and the engine's `resize` event (`{ nodeId, width, height }`) tells
+the final size.
+
+```ts
+engine.subscribe((event) => {
+    if (event.type === "resize") save(event.nodeId, event.width, event.height);
+});
+```
+
+Code resizes a node with the same command. It needs no feature: `node.resize` is the core's, and
+`resize()` is its gesture.
+
+```ts
+model.run("node.resize", { nodeId: "note", width: 240, height: 160 });
+```

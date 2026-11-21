@@ -1,0 +1,59 @@
+---
+title: ReconnectAnchor
+description: Flow.ReconnectAnchor is the grab area at one end of an edge; with reconnection(), a press on it moves that end to another handle.
+---
+
+`Flow.ReconnectAnchor` renders an SVG `circle` at one end of its edge, inside `Flow.Edge`. With
+`reconnection()` (which needs `connection()`), a press on it moves that end: the connection line
+runs from the fixed end, and a drop on another handle runs `edge.reconnect` (the edge keeps its
+id); dropped nowhere or on a refused handle, it goes back. A press on the edge's stroke within
+`reconnection({ radius })` of an end grabs it too, without an anchor. An edge with
+`reconnectable: false` cannot be moved.
+
+<Example id="edge-reconnect" />
+
+```tsx
+<Flow.Edge<Types> edge={edge}>
+    <Flow.EdgePath />
+    <Flow.ReconnectAnchor end="source" r={8} className="fill-transparent hover:stroke-blue-500" />
+    <Flow.ReconnectAnchor end="target" r={8} className="fill-transparent hover:stroke-blue-500" />
+</Flow.Edge>
+```
+
+It is transparent by default: give it its radius and look. Edges are drawn before the nodes, so an
+anchor lies under its node's handle: the mouse grabs it beside the handle.
+
+## Props
+
+`ReconnectAnchorProps` extends the [common primitive props](/docs/api/primitives/root#common-props)
+and every SVG attribute of a `circle`.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `end` | `"source" \| "target"` | required | which end of the edge it moves |
+| `edgeId` | `string` | the enclosing `Flow.Edge`'s | the edge |
+
+## State
+
+`ReconnectAnchorState`, what `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `edgeId` | `string` | the edge |
+| `end` | `"source" \| "target"` | the end it moves |
+| `path` | `EdgePath` | the edge's path and ends |
+| `reconnecting` | `boolean` | this edge's end is being moved |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"reconnect-anchor"` |
+| `data-flow-id` | the edge's id |
+| `data-end` | `"source"` or `"target"` |
+| `data-reconnecting` | present while one of the edge's ends is moved |
+
+## Structural style
+
+`cx` / `cy` at the end, `r` 10 and `fill="transparent"` (attributes your props override), and
+`pointer-events: all`.

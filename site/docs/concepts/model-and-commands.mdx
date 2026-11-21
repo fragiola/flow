@@ -1,0 +1,163 @@
+---
+title: The model and commands
+description: Every change to a flow is a typed command through one bus, with a result instead of an exception, middleware that can veto it and listeners for every commit.
+---
+
+The model is the flow as data, `{ version: 1, nodes, edges }`, with the rules that keep it valid.
+It is immutable: nothing writes into it. A change is a **command**, a name and a JSON payload
+(`node.move { nodeId, position }`), run through the model's bus, where middleware sees it before
+it applies and listeners hear it after. A drag, a connection, the Delete key, your toolbar and an
+assistant all change the flow the same way, so one middleware rule or one undo history covers
+them all.
+
+## Running a command
+
+`model.run` takes a command's name and its payload, typed by your registry and your features, and
+returns a result. It never throws on bad input: the result says why a command did not apply.
+
+```tsx title="rename-button.tsx"
+import { useFlow } from "@fragiola/flow-react";
+
+export function RenameButton({ nodeId }: { nodeId: string }) {
+    const { model } = useFlow<Types, typeof features>();
+    return (
+        <button
+            type="button"
+            onClick={() => {
+                const result = model.run("node.set-data", { nodeId, data: { label: "Renamed" } });
+                if (!result.ok) console.warn(result.error.code, result.error.message);
+            }}
+        >
+            Rename
+        </button>
+    );
+}
+```
+
+A result is `{ ok: true, value }` or `{ ok: false, error }`, where `error.code` is one of
+`unknown_command`, `invalid_payload`, `not_found`, `refused`, `vetoed`, `queued` or
+`middleware_error` ([The command bus](/docs/api/command-bus)). The commands are `node.add`,
+`node.remove`, `node.move`, `node.resize`, `node.set-data`, `node.set-flags`, `edge.add`,
+`edge.remove`, `edge.set-data`, `edge.set-flags`, `batch`, and the features' own: `selection.set`,
+`selection.clear`, `selection.remove` (`selection()`), `node.set-parent` (`subflows()`) and
+`edge.reconnect` (`reconnection()`). [Commands](/docs/api/commands) lists each payload and result.
+
+## Asking before running
+
+The five verbs share one shape, `(key, payload, options?)`:
+
+| verb | answers | example |
+| --- | --- | --- |
+| `run` | do it | `model.run("node.remove", { nodeId: "fetch" })` |
+| `can` | would it succeed? | `model.can("node.remove", { nodeId: "fetch" })` |
+| `check` | what would it return? | `model.check("edge.add", { source: "a", target: "b" })` |
+| `get` | read something | `model.get("node-edges-by", { nodeId: "fetch" })` |
+| `is` | a yes or no question | `model.is("node-deletable", { nodeId: "fetch" })` |
+
+`can` and `check` are dry runs: they go through the middleware too (with `ctx.dryRun` true) and
+commit nothing. A Delete button disabled with `!model.can("node.remove", { nodeId })` stays right
+whatever rule refuses the removal. The keys of `get` and `is` are on [Model](/docs/api/model).
+
+## From outside the root
+
+Inside `Flow.Root`, `useFlow()` gives the model. Outside it, a flow ref does, or you make the model
+yourself and hand it to the root:
+
+```tsx title="workflow-editor.tsx"
+import { createFlowModel, Flow, type FlowModel } from "@fragiola/flow-react";
+import { useState } from "react";
+
+export function WorkflowEditor() {
+    const [model] = useState<FlowModel<Types, typeof features>>(() =>
+        createFlowModel<Types, typeof features>(json, { features }),
+    );
+    return (
+        <div className="flex h-dvh">
+            <button type="button" onClick={() => model.run("selection.clear")}>
+                Deselect
+            </button>
+            <Flow.Root<Types, typeof features> model={model} className="flex-1">
+                …
+            </Flow.Root>
+        </div>
+    );
+}
+```
+
+A model given to the root keeps its own features: the root's `features`, `defaultNodes` and
+`defaultEdges` are for the model it creates when you give none. See also
+[The flow ref](/docs/api/primitives/flow-ref).
+
+## Middleware: veto or rewrite
+
+`model.use` adds a middleware around every command, from a gesture or from code. It sees a
+context narrowed by `ctx.command`, and either returns a refusal without calling `next` (a veto),
+assigns a new `ctx.payload` and calls `next` (a rewrite), or calls `next` and looks at the result.
+
+```ts title="rules.ts"
+import { type Middleware, veto } from "@fragiola/flow-react";
+
+/** No edge from a node to itself, and every move lands on whole numbers. */
+export const rules: Middleware<Types, typeof features> = (ctx, next) => {
+    if (ctx.command === "edge.add" && ctx.payload.source === ctx.payload.target) {
+        return veto("an edge joins two different nodes");
+    }
+    if (ctx.command === "node.move") {
+        const { x, y } = ctx.payload.position;
+        ctx.payload = { ...ctx.payload, position: { x: Math.round(x), y: Math.round(y) } };
+    }
+    return next();
+};
+
+const stop = model.use(rules); // returns its remover
+```
+
+Connection rules are middleware too: while a connection is drawn, the engine asks
+`model.can("edge.add", …)`, so a vetoed handle shows `data-invalid` before the drop
+([Connection rules](/docs/guides/connection-rules)). A middleware never writes into the payload
+(it is frozen): it assigns a new object, which is validated again.
+
+## Listening: every commit
+
+`model.subscribe` hears one event per commit: the command, its payload and result, the document
+`before` and `after`, whether it was `transient`, and its `meta`.
+
+```ts
+const stop = model.subscribe((event) => {
+    if (event.transient) return; // a step of a drag: wait for its last one
+    save(model.get("flow-json"));
+});
+```
+
+Documents are immutable and share what did not change, so `event.before.nodes !== event.after.nodes`
+says the nodes changed, and keeping a document for undo costs nothing.
+
+## Transient steps and batches
+
+A drag moves its nodes with **transient** `node.move` commands (a `batch` of them when several
+nodes move), one per pointer move, and ends with a final one that is not: a listener that saves or records history skips the transient ones. Pass
+`{ transient: true }` yourself for the steps of a gesture of your own.
+
+`batch` runs several commands as one, all or nothing, with one event:
+
+```ts
+model.run("batch", {
+    commands: [
+        { command: "node.add", payload: { id: "log", type: "step", position: { x: 0, y: 400 }, data: { label: "Log" } } },
+        { command: "edge.add", payload: { source: "save", target: "log" } },
+    ],
+});
+```
+
+## Untrusted JSON
+
+`model.dispatch` is `run` for a command that arrives as JSON (from a server, a WebSocket, an
+assistant): it validates the input against the command's JSON Schema first, and options it
+receives (`meta`) are the app's, never the input's.
+
+```ts
+const result = model.dispatch({ command: "node.move", payload: { nodeId: "save", position: { x: 0, y: 320 } } });
+```
+
+`model.get("commands")` lists every installed command with its description and JSON Schemas, ready
+to become tool definitions ([AI and automation](/docs/guides/ai-and-automation)).

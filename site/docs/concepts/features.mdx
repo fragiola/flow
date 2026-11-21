@@ -1,0 +1,93 @@
+---
+title: Features
+description: A bare flow draws, pans and zooms; every gesture beyond that is a feature you install from its own entry, so its commands, keys and code ship only when used.
+---
+
+The core holds what every flow needs: the document, nodes, edges and handles, the viewport with
+pan and zoom, measurement, edge paths, `fit-view`, and what the background and the controls read.
+Everything a user does to the flow beyond looking at it is a **feature**: a factory you import from
+its own entry and install in the model's `features` list.
+
+<Example id="read-only" />
+
+The `read-only` example installs none: it draws a diagram you pan and zoom, and nothing in it can
+be selected, dragged, connected or deleted.
+
+## Installing features
+
+```tsx
+import { Flow } from "@fragiola/flow-react";
+import { connection } from "@fragiola/flow-react/connection";
+import { drag } from "@fragiola/flow-react/drag";
+import { keyboard } from "@fragiola/flow-react/keyboard";
+import { reconnection } from "@fragiola/flow-react/reconnection";
+import { selection } from "@fragiola/flow-react/selection";
+
+const features = [
+    selection({ boxOnDrag: false }),
+    drag({ snapGrid: [20, 20] }),
+    connection({ mode: "strict", radius: 20 }),
+    reconnection(),
+    keyboard({ step: 5, fastStep: 20 }),
+] as const;
+
+<Flow.Root<Types, typeof features> features={features} defaultNodes={nodes} className="h-96">
+    …
+</Flow.Root>;
+```
+
+Make the list once (a module constant, or `useState`): the features are fixed when the model is
+created, and the root warns if the `features` prop changes later. A model you create yourself takes
+them in `createFlowModel(json, { features })`. A feature installed twice, or one installed without
+a feature it requires (`reconnection()` needs `connection()`), throws when the model is created,
+naming both.
+
+## The features
+
+| feature | entry | gives | options (defaults) |
+| --- | --- | --- | --- |
+| `selection()` | `/selection` | click and modifier click, box selection, `selection.set`, `selection.clear`, `selection.remove`, the `selected` field | `boxMode: "full"`, `multiple: true`, `boxOnDrag: false` |
+| `drag()` | `/drag` | dragging nodes and the selection, snapping | `snapGrid` (none), `threshold: 1` |
+| `connection()` | `/connection` | drawing an edge from a handle, the connection line | `radius: 20`, `mode: "strict"` |
+| `reconnection()` | `/reconnection` | moving an edge's end, `edge.reconnect` (requires `connection()`) | `radius: 10` |
+| `resize()` | `/resize` | the `NodeResizer` gestures | `minWidth: 10`, `minHeight: 10`, `maxWidth`, `maxHeight`, `keepAspectRatio: false` |
+| `subflows()` | `/subflows` | `parentId`, `extent: "parent"`, `expandParent`, `node.set-parent` | none |
+| `keyboard()` | `/keyboard` | focus on nodes and edges, arrows, Delete, Enter, Escape | `step: 5`, `fastStep: 20` |
+| `minimap()` | `/minimap` | the `MiniMap` view, pan and zoom from it | `pannable: true`, `zoomable: true`, `padding: 0.1` |
+
+Each entry is `@fragiola/flow-react/<feature>`, which re-exports the core's
+`@fragiola/flow/<feature>`; `/minimap` and `/resize` add their primitives. Every option is on
+[Features](/docs/api/features).
+
+## What a feature owns
+
+A feature brings commands, `get` and `is` keys, document fields and engine keys, and the model
+knows whose each one is. Without the feature, each is a type error and a refusal at run time,
+naming the feature:
+
+```ts
+const model = createFlowModel<Types, readonly []>(json);
+
+// @ts-expect-error: the selection feature is not installed
+model.run("selection.clear");
+// at run time: { ok: false, error: { code: "not_found", message: "\"selection.clear\" requires the selection feature (`@fragiola/flow/selection`)" } }
+
+validateFlow({ version: 1, nodes: [{ id: "a", type: "step", position: { x: 0, y: 0 }, data: {}, selected: true }], edges: [] });
+// [{ path: "/nodes/0/selected", message: "requires the selection feature (`@fragiola/flow/selection`)" }]
+```
+
+So a document saved by a flow with `subflows()` (with `parentId` fields) is refused by a model
+without it, instead of losing its parents silently.
+
+## Code, not only commands
+
+`node.move`, `node.resize` and `edge.add` are the core's commands: a flow without `drag()`,
+`resize()` or `connection()` still lays out, sizes and connects nodes in code (an auto-layout, a
+template, an assistant). Those features are the gestures that run them. The flags work the same
+with or without a gesture: a node with `draggable: false` refuses `node.move` from code too.
+
+## Only what you import ships
+
+The main entry never imports a feature (a bundle guard in the build fails if it does). A flow
+that never imports `@fragiola/flow-react/minimap` does not ship the minimap's geometry or its
+primitives.

@@ -1,0 +1,135 @@
+---
+title: Minimap and controls
+description: Add zoom, fit and lock buttons that know when they are disabled, and a minimap that shows the whole flow and pans it when dragged.
+---
+
+`Flow.Controls` groups the viewport's buttons: `Flow.ZoomIn`, `Flow.ZoomOut`, `Flow.FitView` and
+`Flow.ToggleInteractive`. Each runs one engine action and is disabled while the engine would refuse
+it. `MiniMap` (from `minimap()`) draws every node small, with a mask over what the root does not
+show, and pans and zooms the flow from there. Both render no icon and no text: the icons, the
+names, where they sit and how they look are yours.
+
+<Example id="minimap-and-controls" />
+
+## The control buttons
+
+Put `Flow.Controls` inside `Flow.Root`, outside `Flow.Viewport` (it must not pan or zoom), and place
+it with your style. Presses and the wheel over it are left to it.
+
+```tsx
+import { Flow } from "@fragiola/flow-react";
+import { LockIcon, MaximizeIcon, MinusIcon, PlusIcon, UnlockIcon } from "lucide-react";
+
+<Flow.Controls role="group" aria-label="Zoom and lock" className="absolute bottom-3 start-3 flex flex-col">
+    <Flow.ZoomIn aria-label="Zoom in" className="control">
+        <PlusIcon />
+    </Flow.ZoomIn>
+    <Flow.ZoomOut aria-label="Zoom out" className="control">
+        <MinusIcon />
+    </Flow.ZoomOut>
+    <Flow.FitView aria-label="Fit view" className="control">
+        <MaximizeIcon />
+    </Flow.FitView>
+    <Flow.ToggleInteractive
+        aria-label="Lock the flow"
+        className="control"
+        render={(props, state) => (
+            <button {...props}>{state.interactive ? <UnlockIcon /> : <LockIcon />}</button>
+        )}
+    />
+</Flow.Controls>;
+```
+
+| button | runs | disabled while |
+| --- | --- | --- |
+| `Flow.ZoomIn` | `zoom-in` (a step of `zoomStep`, default 1.2, around the root's centre) | at `maxZoom` |
+| `Flow.ZoomOut` | `zoom-out` | at `minZoom` |
+| `Flow.FitView` | `fit-view` (every node in view) | before a node is measured |
+| `Flow.ToggleInteractive` | `set-interactive` | only before the root is mounted (no engine yet); `aria-pressed` while the flow is locked |
+
+A disabled button has `disabled` and `data-disabled`: style it with `disabled:opacity-40`. While
+locked, gestures and keys change nothing (no drag, no connection, no selection, no Delete), and
+panning and zooming stay; the root and the toggle lose `data-interactive`.
+
+## The zoom limits
+
+The root's `minZoom` (default 0.5) and `maxZoom` (default 2) bound every zoom, the buttons', the
+wheel's and a pinch's:
+
+```tsx
+<Flow.Root minZoom={0.25} maxZoom={2} zoomStep={1.5} fitView={{ padding: 0.1 }} … />
+```
+
+## Buttons of your own
+
+The buttons are thin over the engine: your own button does the same with `useFlow` (inside the
+root) or a [flow ref](/docs/api/primitives/flow-ref) (outside):
+
+```tsx
+import { useFlow, useViewport } from "@fragiola/flow-react";
+
+function ZoomReadout() {
+    const { engine } = useFlow();
+    const { zoom } = useViewport();
+    return (
+        <button type="button" onClick={() => engine.run("zoom-to", { zoom: 1 })}>
+            {Math.round(zoom * 100)}%
+        </button>
+    );
+}
+```
+
+Other actions: `center-on { x, y, zoom? }`, `pan-by { x, y }`, `set-viewport { x?, y?, zoom? }`,
+`fit-view { nodeIds, padding }` (fit only some nodes). See [The viewport](/docs/concepts/viewport).
+
+## The minimap
+
+`minimap()` is a feature; `MiniMap`, `MiniMapNode` and `MiniMapMask` come with it, on the same
+entry:
+
+```tsx
+import { MiniMap, MiniMapMask, MiniMapNode, minimap } from "@fragiola/flow-react/minimap";
+
+const features = [selection(), drag(), minimap()] as const;
+
+<MiniMap
+    width={180}
+    height={130}
+    role="img"
+    aria-label="Minimap of the route"
+    className="absolute end-3 bottom-3 rounded border bg-palette-base"
+>
+    {(view) => (
+        <>
+            {view.nodes.map((node) => (
+                <MiniMapNode
+                    key={node.nodeId}
+                    nodeId={node.nodeId}
+                    className="fill-palette-line data-selected:fill-(--fl-edge-selected)"
+                />
+            ))}
+            <MiniMapMask className="fill-(--fl-minimap-mask) stroke-(--fl-edge-selected)" />
+        </>
+    )}
+</MiniMap>;
+```
+
+Without children, `MiniMap` draws a `MiniMapNode` per node and the `MiniMapMask`, unstyled. It is
+an SVG of `width` × `height` pixels (200 × 150 by default) whose view box holds every node and the
+root's view. The mask covers the map but what the root shows (`fill-rule="evenodd"`): give it a
+translucent fill.
+
+## Pan and zoom from the minimap
+
+| option | default | does |
+| --- | --- | --- |
+| `pannable` | `true` | a press or a drag on the minimap moves the view there |
+| `zoomable` | `true` | the wheel over the minimap zooms the flow |
+| `padding` | `0.1` | the share of the minimap's size kept free around the nodes and the view |
+
+```ts
+const features = [minimap({ zoomable: false, padding: 0.05 })] as const;
+```
+
+A node can be drawn your own way: the function's `view.nodes` gives each node's box in flow
+coordinates (`x`, `y`, `width`, `height`), and `view.scale` the map's scale.

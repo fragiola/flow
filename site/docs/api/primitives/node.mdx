@@ -1,0 +1,82 @@
+---
+title: Node
+description: Flow.Node renders one node at its place in the flow, registers it with the engine to be measured, and holds its content, handles and toolbar.
+---
+
+`Flow.Node` renders the node `Flow.Nodes` gives its children function. It is absolutely positioned
+at the node's place (a structural `transform: translate(x, y)` from `node-rect-by`, absolute even
+in a sub-flow: a child is not nested in its parent's element), with the document's `width` and
+`height` when it gives them. It registers its element with the engine, which measures it
+(`ResizeObserver`) and resolves presses on it: a drag (`drag()`), a click selects
+(`selection()`), a press on one of its handles draws a connection (`connection()`). With
+`keyboard()` it takes `tabIndex={0}`.
+
+It renders only its children: the content, `Flow.Handle`s, a `NodeResizer`, a
+`Flow.NodeToolbar`. Fields, buttons and links inside it start no gesture, nor does an element
+marked `data-flow-no-gesture`; `data-flow-no-wheel` keeps the wheel (a scrolling list).
+
+```tsx
+<Flow.Nodes<Types>>
+    {(node) => (
+        <Flow.Node<Types>
+            node={node}
+            aria-label={node.data.label}
+            className={(state) => (state.selected ? "node node-selected" : "node")}
+        >
+            {node.data.label}
+            <Flow.Handle type="target" side="top" />
+            <Flow.Handle type="source" side="bottom" />
+        </Flow.Node>
+    )}
+</Flow.Nodes>
+```
+
+It has no role and no name: give it the ones your app means (see
+[Accessible names](/docs/getting-started/accessible-names)), and `user-select: none` so a drag does
+not select its text. For a node rendered by hand, [`useNode`](/docs/api/primitives/hooks) gives
+the same state and props.
+
+## Props
+
+`NodeProps<T>` extends the [common primitive props](/docs/api/primitives/root#common-props) and
+every `div` attribute.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `node` | `FlowNode<T>` | required | the node it renders: the one `Flow.Nodes` gives |
+| `children` | `ReactNode` | none | its content, handles, resizer, toolbar |
+
+## State
+
+`NodeState<T>`, what `className`, `style` and `render` receive (also
+[`useNode`](/docs/api/primitives/hooks)'s `state`):
+
+| field | type | description |
+| --- | --- | --- |
+| `nodeId` | `string` | its id |
+| `node` | `FlowNode<T>` | the node, as the model holds it |
+| `x`, `y` | `number` | its top-left corner in absolute flow coordinates |
+| `selected` | `boolean` | it is selected (`selection()`) |
+| `dragging` | `boolean` | it is being dragged (`drag()`) |
+| `resizing` | `boolean` | it is being resized (`resize()`) |
+| `measured` | `boolean` | its size is known (measured or given) |
+| `focusable` | `boolean` | it takes DOM focus (`keyboard()`) |
+| `attributes` | `PartAttributes` | the attributes its element carries |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"node"` |
+| `data-flow-id` | its id |
+| `data-selected` | present while selected |
+| `data-dragging` | present while dragged |
+| `data-resizing` | present while resized |
+| `data-measured` | present once its size is known |
+| `data-hidden` | present when hidden: only on a node you render by hand with `useNode`, since `Flow.Nodes` leaves hidden nodes out |
+| `tabindex` | `0` with `keyboard()` |
+
+## Structural style
+
+`position: absolute; top: 0; left: 0; transform: translate(<x>px, <y>px)`, and `width` / `height`
+when the document gives them. Its look is yours.

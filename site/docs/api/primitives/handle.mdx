@@ -1,0 +1,73 @@
+---
+title: Handle
+description: Flow.Handle is a connection point on a side of its node, registered with the engine, where edges start or end and connections are drawn.
+---
+
+`Flow.Handle` goes inside `Flow.Node`. It registers `{ nodeId, handleId, type, side, connectable }`
+with the engine, which measures its centre relative to its node: an edge naming this handle
+(`sourceHandle`, `targetHandle`) starts or ends at that centre, leaving or entering by its `side`.
+With `connection()`, a press on it draws a connection; while one is drawn it says whether the
+drop here would be accepted (`data-valid`, `data-invalid`, from `model.can("edge.add", …)`, or
+`model.can("edge.reconnect", …)` while an edge's end is moved).
+
+```tsx
+<Flow.Node<Types> node={node}>
+    {node.data.label}
+    <Flow.Handle type="target" side="left" title="Input" className="size-2 rounded-full bg-gray-500" />
+    <Flow.Handle type="source" side="right" handleId="ok" style={{ top: "30%" }} />
+    <Flow.Handle type="source" side="right" handleId="error" style={{ top: "70%" }} />
+</Flow.Node>
+```
+
+It sits at the middle of its side by default (a default your `style` overrides: several handles on
+one side are placed by you). A handle without `handleId` is the node's default handle of its type.
+Sides are physical (`top`, `right`, `bottom`, `left`): a diagram does not flip in right-to-left.
+See [Handles and connections](/docs/concepts/handles-and-connections). For a handle rendered by
+hand, [`useHandle`](/docs/api/primitives/hooks) gives the same state and props.
+
+## Props
+
+`HandleProps` extends the [common primitive props](/docs/api/primitives/root#common-props), every
+`div` attribute and `UseHandleOptions`.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `type` | `HandleType` | required | `"source"`: edges start here; `"target"`: edges end here |
+| `side` | `HandleSide` | required | the side of the node it sits on: the direction its edges leave or enter by |
+| `handleId` | `string` | none | its id among the node's handles of its type (none: the default handle) |
+| `connectable` | `boolean` | `true` | a connection may start or end here |
+| `nodeId` | `string` | the enclosing `Flow.Node`'s | its node |
+| `children` | `ReactNode` | none | its content |
+
+## State
+
+`HandleState`, what `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `nodeId` | `string` | its node |
+| `handleId` | `string \| undefined` | its id |
+| `type` | `HandleType` | `"source"` or `"target"` |
+| `side` | `HandleSide` | its side |
+| `connectable` | `boolean` | a connection may start or end here (its flag and its node's) |
+| `connecting` | `boolean` | the connection under way starts here |
+| `valid` | `boolean` | the connection under way would end here and be accepted |
+| `invalid` | `boolean` | the connection under way would end here and be refused |
+| `attributes` | `PartAttributes` | the attributes its element carries |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"handle"` |
+| `data-flow-id` | its `handleId` |
+| `data-handle-type` | `"source"` or `"target"` |
+| `data-side` | `"top"`, `"right"`, `"bottom"` or `"left"` |
+| `data-connectable` | present when a connection may start or end here |
+| `data-connecting` | present while the connection under way starts here |
+| `data-valid` / `data-invalid` | present while the connection under way would end here, accepted or refused |
+
+## Structural style
+
+`position: absolute`; by default centred on its side (`translate(-50%, -50%)`), a place your
+`style` overrides. Its size and look are yours.

@@ -1,0 +1,110 @@
+---
+title: Typed data
+description: Name your node and edge types and their data once, and every node, edge, command and hook is typed from it, so a node's type narrows its data.
+---
+
+The package does not know what your nodes hold: a task's title, a service's URL, a step's
+settings. You tell it once, in a `Types` registry, and every node, edge, command payload, key
+result and children function is typed from it. Nothing of it exists at run time: the registry is
+a type, and the document stays plain JSON.
+
+## The registry
+
+```ts title="types.ts"
+import type { FlowTypes } from "@fragiola/flow-react";
+
+export interface Types extends FlowTypes {
+    readonly nodes: {
+        task: { title: string; done: boolean };
+        note: { text: string };
+    };
+    readonly edges: {
+        dependency: { weight: number };
+    };
+}
+```
+
+`nodes` names each node type and the shape of its `data`; `edges` names your edge types and
+theirs. The built-in edge types (`bezier`, `smoothstep`, `step`, `straight`) are always allowed,
+with any JSON object as data; an edge with no `type` is a `bezier`. A node's `data` is required
+(a JSON object), an edge's is optional.
+
+## A node's type narrows its data
+
+`FlowNode<Types>` is a union over the node types, so checking `type` narrows `data`:
+
+```tsx
+function renderNode(node: FlowNode<Types>) {
+    if (node.type === "task") {
+        return <Flow.Node<Types> node={node}>{node.data.done ? "✓ " : ""}{node.data.title}</Flow.Node>;
+    }
+    return <Flow.Node<Types> node={node}>{node.data.text}</Flow.Node>;
+}
+```
+
+The same holds for `FlowEdge<Types>` and `edge.type`.
+
+## Where it applies
+
+Pass the registry, and the features, as type arguments where they enter:
+
+```tsx
+const features = [selection(), drag(), connection()] as const;
+
+// a model you create
+const model = createFlowModel<Types, typeof features>(json, { features });
+
+// a root, and each layer's children function
+<Flow.Root<Types, typeof features> features={features} defaultNodes={nodes}>
+    <Flow.Viewport>
+        <Flow.Edges<Types>>{(edge) => <Flow.Edge<Types> edge={edge} />}</Flow.Edges>
+        <Flow.Nodes<Types>>{renderNode}</Flow.Nodes>
+    </Flow.Viewport>
+</Flow.Root>;
+
+// a hook under the root: it cannot infer them through context
+const { model, engine } = useFlow<Types, typeof features>();
+const selected = useSelection<Types>();
+```
+
+Commands are checked against it:
+
+```ts
+model.run("node.add", { type: "task", position: { x: 0, y: 0 }, data: { title: "Ship it", done: false } });
+// @ts-expect-error: a note's data is { text }
+model.run("node.add", { type: "note", position: { x: 0, y: 0 }, data: { title: "Ship it" } });
+// @ts-expect-error: a dependency's weight is a number
+model.run("edge.add", { source: "a", target: "b", type: "dependency", data: { weight: "1" } });
+// a shallow patch of one type's data
+model.run("node.set-data", { nodeId: "a", data: { done: true } });
+```
+
+And so are reads: `model.get("node-by", { id })` returns a `FlowNode<Types> | undefined`,
+`model.get("all-edges")` a list of `FlowEdge<Types>`.
+
+## The features are types too
+
+The second type argument is the installed features. A command, a key or an engine read of a
+feature that is not in the list does not compile:
+
+```ts
+const bare = createFlowModel<Types, readonly []>(json);
+// @ts-expect-error: the selection feature is not installed
+bare.get("selected-nodes");
+```
+
+Without type arguments, `useFlow`, `useFlowRef`, `createFlowRef` and a `FlowEngine` know no
+feature (`readonly []`): only the core's commands and keys typecheck, so pass `typeof features`.
+A bare `FlowModel` is the exception: its default is "any features" (`FlowFeatures`), so a model
+with features is assignable to it, and a key of a feature that is not installed answers
+`undefined` or `false`, and its command `not_found`, at run time.
+
+## What the registry does not check
+
+- **Ids.** A node id, an edge's `source` and `target`, a handle id are strings: whether they exist
+  is the model's rule at run time (`not_found`), not a type.
+- **Untrusted JSON.** `model.dispatch` and `validateFlow` take `unknown` and check it against the
+  JSON Schemas of the commands and the document, which know the shape of a node but not your data:
+  validate your own `data` in a middleware if it comes from outside.
+- **Untyped hooks.** `useNodes()` without `Types` returns `FlowNode<AnyTypes>`, where `data` is a
+  record of unknown values.

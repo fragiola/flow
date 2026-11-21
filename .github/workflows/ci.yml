@@ -1,10 +1,11 @@
 # CI: the Fragiola project jobs (guidelines repository.md#ci). It runs on every pull request and on
-# a manual run; a push to main runs no tests (main is what its pull request tested).
+# a manual run; a push to main runs no tests (main is what its pull request tested), only the www
+# trigger: every other job is `if: github.event_name != 'push'`, or needs one that is.
 #
 #   Checks            Biome and the source layout check, TypeScript, the unit tests and the build
 #                     (with the .d.ts check).
 #   Package           `pnpm check:package`: builds and packs every package with pnpm, lints the
-#                     tarballs (dist-only exports, publint, attw). Each adapter (none yet; one per
+#                     tarballs (dist-only exports, publint, attw). Each adapter (React's today; one per
 #                     adapter Epic) also gets its exact core pin checked and its own smoke app. A
 #                     packaging check only: nothing is published (AGENTS.md, D15).
 #   Changes           the E2E suites the change can affect (scripts/e2e-suites.ts, a `git diff`
@@ -15,18 +16,35 @@
 #                     else (the core, examples/shared, the playground, the lockfile, root configs,
 #                     .github, scripts, site) and a manual run: every suite. It also lists the
 #                     frameworks with an examples app (every `examples/<framework>` with a
-#                     playwright.config.ts). No job reads its outputs yet: there is no suite.
+#                     playwright.config.ts).
+#   E2E (playground)  the playground's suite (apps/playground/e2e) on Chromium and Firefox: every
+#                     gesture on the unstyled fixture, with the mouse and with fingers, the
+#                     scenarios (500 nodes) and the shell, against its dev server (sources).
+#   E2E (examples)    a matrix over those frameworks, from the Changes outputs: the shared specs
+#                     (examples/shared/e2e) against a production build of that framework's embed,
+#                     served under /flow/embed/<framework>/ with a host page that frames it.
+#   Site export       fragiola.com builds /flow from `pnpm site:export` (contract v1.7,
+#                     fragiola/www CONTRACT.md), built and validated the way www's deploy runs it:
+#                     it fails on anything www would reject.
+#   Trigger www build on a push to main only, asks fragiola/www to rebuild fragiola.com (a
+#                     repository_dispatch of type "project-updated"). It needs the
+#                     WWW_DISPATCH_TOKEN secret: a fine-grained token with Contents: read & write
+#                     on fragiola/www. Without the secret the step is skipped, not failed.
 #
-# Arriving with the apps in the React Epic: the E2E jobs (the playground and a matrix over the
-# examples apps, in Playwright's image mcr.microsoft.com/playwright:v<version>-noble, its tag the
-# pinned @playwright/test, with no browser install: site/tests/ci-workflow.test.ts checks
-# both), the Site export job, and the Trigger www build job, the only one a push to main runs.
+# Every Playwright job runs in Playwright's image mcr.microsoft.com/playwright:v<version>-noble
+# (`--user 1001`), its tag the pinned @playwright/test, and installs no browser
+# (site/tests/ci-workflow.test.ts checks both). A suite is sharded only when its test step alone
+# passes about 3 minutes (AGENTS.md, CI).
+#
 # No release workflow and no Changesets job (AGENTS.md, D15).
 
 name: CI
 
 on:
   pull_request:
+  # only for the Trigger www build job: every other job skips a push
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -39,6 +57,7 @@ concurrency:
 jobs:
   checks:
     name: Checks
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -63,6 +82,7 @@ jobs:
 
   package:
     name: Package
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -81,6 +101,7 @@ jobs:
 
   changes:
     name: Changes
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     outputs:
       playground: ${{ steps.suites.outputs.playground }}
@@ -102,3 +123,115 @@ jobs:
           else
             node scripts/e2e-suites.ts --all
           fi
+
+  e2e-playground:
+    name: E2E (playground)
+    needs: changes
+    if: needs.changes.outputs.playground == 'true'
+    runs-on: ubuntu-latest
+    # Playwright's image: its browsers and their system packages, at the pinned @playwright/test
+    # (site/tests/ci-workflow.test.ts); no browser install
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --user 1001
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # the dev server serves the packages from their sources: nothing to build
+      - name: Run Playwright
+        run: pnpm --filter playground run e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-playground
+          path: apps/playground/playwright-report/
+          retention-days: 14
+
+  e2e-examples:
+    name: E2E (examples ${{ matrix.framework }})
+    needs: changes
+    if: needs.changes.outputs.examples != '[]' && needs.changes.outputs.examples != ''
+    runs-on: ubuntu-latest
+    # Playwright's image: its browsers and their system packages, at the pinned @playwright/test
+    # (site/tests/ci-workflow.test.ts); no browser install
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --user 1001
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: ${{ fromJson(needs.changes.outputs.examples) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The examples suite builds the embed against the packages' dist (examplesE2eConfig).
+      - name: Build the packages
+        run: pnpm --filter "./packages/*" build
+
+      - name: Run Playwright
+        run: pnpm --filter examples-${{ matrix.framework }} run e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-examples-${{ matrix.framework }}
+          path: examples/${{ matrix.framework }}/playwright-report/
+          retention-days: 14
+
+  site-export:
+    name: Site export
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # builds the packages and the embed, writes the export and validates it (exits non-zero on
+      # any contract violation)
+      - run: pnpm site:export --base /flow --out "$RUNNER_TEMP/site-export"
+
+  trigger-www-build:
+    name: Trigger www build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      WWW_DISPATCH_TOKEN: ${{ secrets.WWW_DISPATCH_TOKEN }}
+    steps:
+      - name: Dispatch project-updated to fragiola/www
+        if: env.WWW_DISPATCH_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ env.WWW_DISPATCH_TOKEN }}
+        run: |
+          gh api repos/fragiola/www/dispatches \
+            -f event_type=project-updated \
+            -f "client_payload[slug]=flow" \
+            -f "client_payload[sha]=$GITHUB_SHA"

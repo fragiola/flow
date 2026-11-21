@@ -14,10 +14,21 @@
 // - every adapter (`ADAPTERS`: each package under packages/ but the core) depends on the core at
 //   its exact version, and passes its smoke test: a scratch app outside the workspace installs
 //   that adapter's tarball (the core tarball comes as its dependency), typechecks, builds and
-//   loads its dev server. There is no adapter yet: each adapter Epic (React, Vue, Svelte,
-//   Angular) adds its entry and its smoke app, as Splitter's.
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+//   loads its dev server. React's is a Vite + React app at the pins of examples/react; each later adapter Epic (Vue, Svelte,
+//   Angular) adds its entry and its smoke app, as Splitter's. A consumer's dev server adds the
+//   `development` condition, which once pointed Dockable's published `exports` at sources that
+//   are not in the tarball.
+import { execFileSync, spawn } from "node:child_process";
+import {
+    existsSync,
+    mkdirSync,
+    mkdtempSync,
+    readdirSync,
+    readFileSync,
+    rmSync,
+    writeFileSync,
+} from "node:fs";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SOURCE_CONDITION } from "./source-condition.ts";
@@ -198,10 +209,289 @@ export interface AdapterCheck {
 }
 
 /**
- * Every adapter, one per package under packages/ but the core (`unlistedPackages` checks it).
- * Empty until the React Epic; React, Vue, Svelte and Angular are added in that order.
+ * The pins a smoke app installs that no package of the repo pins: none since the React examples
+ * app (examples/react) pins the Vite plugin; a later adapter's smoke app may need one before its
+ * examples app exists.
  */
-export const ADAPTERS: readonly AdapterCheck[] = [];
+const SMOKE_PINS: Readonly<Record<string, string>> = {};
+
+/**
+ * The version of `name` a framework's smoke app installs, so that it installs nothing new: its
+ * examples app's pin (examples/<framework>), else its package's own (packages/<framework>), else
+ * {@link SMOKE_PINS}.
+ */
+export function smokeVersion(framework: Framework, name: string): string {
+    for (const manifestPath of [
+        join(root, "examples", framework, "package.json"),
+        join(root, "packages", framework, "package.json"),
+    ]) {
+        if (!existsSync(manifestPath)) continue;
+        const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+            dependencies?: Record<string, string>;
+            devDependencies?: Record<string, string>;
+        };
+        const version =
+            manifest.dependencies?.[name] ?? manifest.devDependencies?.[name];
+        if (version !== undefined && !version.startsWith("workspace:"))
+            return version;
+    }
+    const pinned = SMOKE_PINS[name];
+    if (pinned === undefined) {
+        throw new Error(`no pin of ${name} for the ${framework} smoke app`);
+    }
+    return pinned;
+}
+
+// The React package only, the core's names included: a React app installs that one only. A
+// typed registry, a model with features from the package's subpaths, the primitives with a
+// children function per node and per edge, the minimap's own entry, and a core rule.
+const SMOKE_MAIN = `import {
+    createFlowModel,
+    Flow,
+    type FlowJson,
+    type FlowModel,
+    type FlowTypes,
+    useFlowRef,
+} from "@fragiola/flow-react";
+import { connection } from "@fragiola/flow-react/connection";
+import { drag } from "@fragiola/flow-react/drag";
+import { MiniMap, minimap } from "@fragiola/flow-react/minimap";
+import { NodeResizer, resize } from "@fragiola/flow-react/resize";
+import { selection } from "@fragiola/flow-react/selection";
+import { createRoot } from "react-dom/client";
+
+interface Types extends FlowTypes {
+    readonly nodes: { task: { title: string } };
+}
+
+const features = [selection(), drag(), connection(), resize(), minimap()] as const;
+
+const json: FlowJson<Types> = {
+    version: 1,
+    nodes: [
+        { id: "a", type: "task", position: { x: 0, y: 0 }, data: { title: "A" } },
+        { id: "b", type: "task", position: { x: 0, y: 200 }, data: { title: "B" } },
+    ],
+    edges: [{ id: "ab", source: "a", target: "b" }],
+};
+
+const model: FlowModel<Types, typeof features> = createFlowModel<Types, typeof features>(
+    json,
+    { features },
+);
+
+function App() {
+    const flow = useFlowRef<Types, typeof features>();
+    return (
+        <Flow.Root<Types, typeof features> model={model} flowRef={flow} style={{ height: "100vh" }}>
+            <Flow.Background variant="dots" />
+            <Flow.Viewport>
+                <Flow.Edges<Types>>
+                    {(edge) => (
+                        <Flow.Edge<Types> edge={edge}>
+                            <Flow.EdgePath />
+                        </Flow.Edge>
+                    )}
+                </Flow.Edges>
+                <Flow.Nodes<Types>>
+                    {(node) => (
+                        <Flow.Node<Types> node={node} className={(state) => (state.selected ? "selected" : "")}>
+                            {node.data.title}
+                            <Flow.Handle type="target" side="top" />
+                            <Flow.Handle type="source" side="bottom" />
+                            <NodeResizer minWidth={40} />
+                        </Flow.Node>
+                    )}
+                </Flow.Nodes>
+                <Flow.ConnectionLine />
+            </Flow.Viewport>
+            <Flow.Controls>
+                <Flow.ZoomIn aria-label="Zoom in">+</Flow.ZoomIn>
+                <Flow.FitView aria-label="Fit view" onClick={() => console.log(flow.current?.engine.get("viewport"))}>
+                    Fit
+                </Flow.FitView>
+            </Flow.Controls>
+            <MiniMap width={200} height={150} />
+        </Flow.Root>
+    );
+}
+
+const container = document.getElementById("root");
+if (container) createRoot(container).render(<App />);
+`;
+
+/**
+ * A scratch Vite + React app in `dir` that depends on the React tarball only: the core tarball is
+ * installed as its dependency, never declared by the app.
+ */
+function writeReactSmokeApp(dir: string, core: string, react: string): void {
+    const version = (name: string) => smokeVersion("react", name);
+    const manifest = {
+        name: "flow-smoke",
+        private: true,
+        type: "module",
+        dependencies: {
+            "@fragiola/flow-react": `file:${react}`,
+            react: version("react"),
+            "react-dom": version("react-dom"),
+        },
+        devDependencies: {
+            "@types/react": version("@types/react"),
+            "@types/react-dom": version("@types/react-dom"),
+            "@vitejs/plugin-react": version("@vitejs/plugin-react"),
+            typescript: version("typescript"),
+            vite: version("vite"),
+        },
+    };
+    writeFileSync(
+        join(dir, "package.json"),
+        `${JSON.stringify(manifest, null, 4)}\n`,
+    );
+    // The React tarball depends on the core at its own version, which the registry may not have:
+    // the packed core stands in for it. A file of its own also keeps the app out of any workspace.
+    writeFileSync(
+        join(dir, "pnpm-workspace.yaml"),
+        `overrides:\n  "@fragiola/flow": "file:${core}"\n`,
+    );
+    writeFileSync(
+        join(dir, "vite.config.js"),
+        `import react from "@vitejs/plugin-react";\nimport { defineConfig } from "vite";\n\nexport default defineConfig({ plugins: [react()] });\n`,
+    );
+    writeFileSync(
+        join(dir, "index.html"),
+        `<!doctype html>\n<html lang="en">\n<body>\n<div id="root"></div>\n<script type="module" src="/src/main.tsx"></script>\n</body>\n</html>\n`,
+    );
+    // strict, with the published declarations checked too (no skipLibCheck)
+    const tsconfig = {
+        compilerOptions: {
+            target: "ES2022",
+            lib: ["ES2022", "DOM", "DOM.Iterable"],
+            module: "ESNext",
+            moduleResolution: "bundler",
+            jsx: "react-jsx",
+            strict: true,
+            noUncheckedIndexedAccess: true,
+            verbatimModuleSyntax: true,
+            noEmit: true,
+            types: [],
+        },
+        include: ["src"],
+    };
+    writeFileSync(
+        join(dir, "tsconfig.json"),
+        `${JSON.stringify(tsconfig, null, 4)}\n`,
+    );
+    mkdirSync(join(dir, "src"));
+    writeFileSync(join(dir, "src/main.tsx"), SMOKE_MAIN);
+}
+
+function freePort(): Promise<number> {
+    return new Promise((resolve, reject) => {
+        const server = createServer();
+        server.once("error", reject);
+        server.listen(0, "127.0.0.1", () => {
+            const address = server.address();
+            const port =
+                typeof address === "object" && address ? address.port : 0;
+            server.close(() => resolve(port));
+        });
+    });
+}
+
+async function fetchOk(url: string): Promise<string> {
+    const response = await fetch(url);
+    const body = await response.text();
+    if (!response.ok) {
+        throw new Error(`${url}: ${response.status}\n${body.slice(0, 2000)}`);
+    }
+    return body;
+}
+
+/** The absolute imports of a module served by Vite (`/node_modules/.vite/deps/…`, `/@id/…`). */
+export function servedImports(code: string): string[] {
+    return [...code.matchAll(/(?:from|import)\s*["'](\/[^"']+)["']/g)].flatMap(
+        ([, path]) => (path === undefined ? [] : [path]),
+    );
+}
+
+/**
+ * Starts the app's dev server, loads its entry (`/src/main.tsx`) and every module it imports, then
+ * stops it.
+ */
+async function loadThroughDevServer(
+    dir: string,
+    entryPath: string,
+): Promise<void> {
+    const port = await freePort();
+    const base = `http://127.0.0.1:${port}`;
+    const server = spawn(
+        process.execPath,
+        [
+            join(dir, "node_modules/vite/bin/vite.js"),
+            "--host",
+            "127.0.0.1",
+            "--port",
+            String(port),
+            "--strictPort",
+        ],
+        { cwd: dir, stdio: "inherit" },
+    );
+    const exited = new Promise<void>((resolve) => {
+        server.once("exit", () => resolve());
+    });
+    try {
+        const deadline = Date.now() + 30_000;
+        for (;;) {
+            try {
+                await fetchOk(`${base}/`);
+                break;
+            } catch (error) {
+                if (Date.now() > deadline) throw error;
+                await new Promise((resolve) => setTimeout(resolve, 250));
+            }
+        }
+        const entry = await fetchOk(`${base}${entryPath}`);
+        const imports = servedImports(entry);
+        if (!imports.some((path) => path.includes("@fragiola"))) {
+            throw new Error(
+                `the dev server's entry imports no package:\n${entry}`,
+            );
+        }
+        for (const path of imports) {
+            await fetchOk(`${base}${path}`);
+        }
+        console.log(
+            `check-package: the dev server loads the entry (${imports.length} imports)`,
+        );
+    } finally {
+        // the app's directory is removed next: the server must be gone first
+        server.kill();
+        await exited;
+    }
+}
+
+/**
+ * The React smoke test: the scratch Vite + React app installs the React tarball, typechecks,
+ * builds and loads its dev server.
+ */
+async function reactSmoke(
+    app: string,
+    tarballs: { core: string; adapter: string },
+): Promise<void> {
+    writeReactSmokeApp(app, tarballs.core, tarballs.adapter);
+    run("pnpm", ["install", "--no-frozen-lockfile"], app);
+    run("pnpm", ["exec", "tsc", "--noEmit"], app);
+    run("pnpm", ["exec", "vite", "build"], app);
+    await loadThroughDevServer(app, "/src/main.tsx");
+}
+
+/**
+ * Every adapter, one per package under packages/ but the core (`unlistedPackages` checks it):
+ * React; Vue, Svelte and Angular are added in that order by their Epics.
+ */
+export const ADAPTERS: readonly AdapterCheck[] = [
+    { dir: "react", framework: "react", smoke: reactSmoke },
+];
 
 /** The packages/ directories that are neither the core nor an adapter of `adapters`. */
 export function unlistedPackages(

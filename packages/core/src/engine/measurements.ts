@@ -24,7 +24,8 @@ type ObserverConstructor = new (
 
 interface RegisteredHandle {
     readonly registration: HandleRegistration;
-    readonly element: Element;
+    /** its element; none once it went while its node stays in the flow (its last bounds kept) */
+    readonly element: Element | undefined;
     bounds: Rect | undefined;
 }
 
@@ -46,6 +47,8 @@ export class Measurements {
     private readonly handleOfElement = new Map<Element, string>();
     /** each node's handle keys, in registration order */
     private readonly handlesByNode = new Map<string, Set<string>>();
+    /** the nodes whose element went while they stayed in the flow: their last measurements kept */
+    private readonly retired = new Set<string>();
     private observer: Observer | undefined;
     private observerView: Window | undefined;
 
@@ -54,6 +57,12 @@ export class Measurements {
         private readonly zoom: () => number,
         /** something was measured: the nodes whose size or handles changed */
         private readonly measured: (nodeIds: readonly string[]) => void,
+        /**
+         * whether a node is still in the flow: a node whose element goes while it stays (culled by
+         * `onlyRenderVisible`, hidden) keeps its last size and handles, so that it is not taken
+         * for an unmeasured one (rendered again) and its edges keep their ends
+         */
+        private readonly inFlow: (nodeId: string) => boolean = () => false,
     ) {}
 
     /** A node's measured size, if it was measured. */
@@ -75,8 +84,21 @@ export class Measurements {
             this.nodes.delete(nodeId);
         }
         if (!element) {
-            if (this.sizes.delete(nodeId)) this.measured([nodeId]);
+            if (this.inFlow(nodeId)) {
+                this.retired.add(nodeId);
+                return;
+            }
+            this.forget(nodeId);
             return;
+        }
+        this.retired.delete(nodeId);
+        // React attaches a node's children before the node: a handle of it still without an
+        // element was not rendered again (a node of another type now, its handles changed)
+        for (const key of this.handlesByNode.get(nodeId) ?? []) {
+            if (this.handles.get(key)?.element === undefined) {
+                this.handles.delete(key);
+                this.handlesByNode.get(nodeId)?.delete(key);
+            }
         }
         this.nodes.set(nodeId, element);
         this.nodeOfElement.set(element, nodeId);
@@ -96,11 +118,24 @@ export class Measurements {
             registration.handleId,
         );
         const previous = this.handles.get(key);
-        if (previous) {
+        if (previous?.element) {
             if (previous.element !== element) {
                 this.observer?.unobserve(previous.element);
             }
             this.handleOfElement.delete(previous.element);
+        }
+        if (
+            !element &&
+            previous &&
+            !this.nodes.has(registration.nodeId) &&
+            this.inFlow(registration.nodeId)
+        ) {
+            // its node's element went before it (React detaches a parent's ref first) and the node
+            // stays in the flow: the handle keeps its last bounds, without an element
+            this.handles.set(key, { ...previous, element: undefined });
+            return;
+        }
+        if (previous) {
             this.handles.delete(key);
             this.handlesByNode.get(registration.nodeId)?.delete(key);
         }
@@ -144,9 +179,28 @@ export class Measurements {
         });
     }
 
-    /** Every registered handle (its centre left for the engine to place), in registration order. */
+    /**
+     * Every rendered handle (its centre left for the engine to place), in registration order: what
+     * a connection may reach. A culled or hidden node's kept handles are not in it.
+     */
     allHandles(): FlowHandle[] {
-        return [...this.handles.values()].map((entry) => this.view(entry));
+        return [...this.handles.values()]
+            .filter((entry) => entry.element !== undefined)
+            .map((entry) => this.view(entry));
+    }
+
+    /** Forgets the kept measurements of the nodes that left the flow while not rendered. */
+    prune(): void {
+        for (const nodeId of [...this.retired]) {
+            if (!this.inFlow(nodeId)) this.forget(nodeId);
+        }
+    }
+
+    /** Forgets a node's size and handles. */
+    private forget(nodeId: string): void {
+        this.retired.delete(nodeId);
+        this.forgetHandles(nodeId);
+        if (this.sizes.delete(nodeId)) this.measured([nodeId]);
     }
 
     private view(entry: RegisteredHandle): FlowHandle {
@@ -183,7 +237,7 @@ export class Measurements {
             const zoom = this.zoom() || 1;
             for (const key of this.handlesByNode.get(nodeId) ?? []) {
                 const entry = this.handles.get(key);
-                if (!entry) continue;
+                if (!entry?.element) continue;
                 const box = entry.element.getBoundingClientRect();
                 const bounds = {
                     x: (box.left - nodeBox.left) / zoom,
@@ -208,6 +262,19 @@ export class Measurements {
         if (changed.length > 0) this.measured(changed);
     }
 
+    /** Forgets a node's handles (the node left the flow). */
+    private forgetHandles(nodeId: string): void {
+        for (const key of this.handlesByNode.get(nodeId) ?? []) {
+            const entry = this.handles.get(key);
+            if (entry?.element) {
+                this.observer?.unobserve(entry.element);
+                this.handleOfElement.delete(entry.element);
+            }
+            this.handles.delete(key);
+        }
+        this.handlesByNode.delete(nodeId);
+    }
+
     /** Measures every registered node again (after a zoom, handles' client rects scale). */
     measureAll(): void {
         this.measure([...this.nodes.keys()]);
@@ -222,6 +289,7 @@ export class Measurements {
         this.handles.clear();
         this.handleOfElement.clear();
         this.handlesByNode.clear();
+        this.retired.clear();
     }
 
     /** The observer of an element's window, made once (an element of another window gets none). */

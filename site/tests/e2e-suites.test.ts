@@ -13,7 +13,7 @@ import {
 
 // From Splitter (fragiola/splitter, site/tests/e2e-suites.test.ts), same author and licence.
 // CI's `changes` job runs scripts/e2e-suites.ts against the pull request's base. The examples apps
-// are given (none exists yet): the four the adapter Epics add.
+// are given: React's today, and the three the adapter Epics add.
 const EXAMPLES = ["angular", "react", "svelte", "vue"];
 const ALL = { playground: true, examples: EXAMPLES };
 
@@ -143,11 +143,14 @@ describe("the examples apps", () => {
         }
     });
 
-    it("are none without an examples/ folder, as in this repository today", () => {
+    it("are none without an examples/ folder", () => {
         expect(examplesFrameworks(join(tmpdir(), "flow-no-such-dir"))).toEqual(
             [],
         );
-        expect(examplesFrameworks()).toEqual([]);
+    });
+
+    it("are React's in this repository today (examples/shared has no suite of its own)", () => {
+        expect(examplesFrameworks()).toEqual(["react"]);
     });
 });
 

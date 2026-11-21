@@ -1,0 +1,159 @@
+---
+title: Root
+description: Flow.Root holds the model and the engine of one flow, takes its nodes and edges controlled or uncontrolled. Give it a size, and the flow fills it.
+---
+
+`Flow.Root` is the flow. It owns the model (or takes yours with `model`), creates the engine once
+it is mounted, and attaches the engine to its element: the engine listens to the root itself
+(pointer, wheel, keys, focus), so no event is forwarded by React. It renders a `div` with only your
+children, no role and no name; no Provider is needed above it. Its only structural style is
+`position: relative; overflow: hidden`: give it a size, and the flow fills it (see
+[Sizing the root](/docs/getting-started/sizing)).
+
+```tsx
+import { Flow, type FlowEdgeInput, type FlowNodeInput, type FlowTypes } from "@fragiola/flow-react";
+import { connection } from "@fragiola/flow-react/connection";
+import { drag } from "@fragiola/flow-react/drag";
+import { selection } from "@fragiola/flow-react/selection";
+
+interface Types extends FlowTypes {
+    readonly nodes: { step: { label: string } };
+}
+
+const features = [selection(), drag(), connection()] as const;
+
+const nodes: FlowNodeInput<Types>[] = [
+    { id: "a", type: "step", position: { x: 0, y: 0 }, data: { label: "Start" } },
+    { id: "b", type: "step", position: { x: 0, y: 140 }, data: { label: "Save" } },
+];
+const edges: FlowEdgeInput<Types>[] = [{ id: "a-b", source: "a", target: "b" }];
+
+export function Editor() {
+    return (
+        <div style={{ height: 480 }}>
+            <Flow.Root<Types, typeof features>
+                features={features}
+                defaultNodes={nodes}
+                defaultEdges={edges}
+                fitView={{ padding: 0.2 }}
+                className="size-full"
+            >
+                <Flow.Viewport>
+                    <Flow.Edges<Types>>{(edge) => <Flow.Edge<Types> edge={edge} />}</Flow.Edges>
+                    <Flow.Nodes<Types>>
+                        {(node) => (
+                            <Flow.Node<Types> node={node}>
+                                {node.data.label}
+                                <Flow.Handle type="target" side="top" />
+                                <Flow.Handle type="source" side="bottom" />
+                            </Flow.Node>
+                        )}
+                    </Flow.Nodes>
+                </Flow.Viewport>
+            </Flow.Root>
+        </div>
+    );
+}
+```
+
+Pass the registry and the features as type arguments (`Flow.Root<Types, typeof features>`): the
+commands, keys and data are then typed. The features are fixed when the model is created: a
+changed `features` prop warns and is ignored.
+
+## Controlled or uncontrolled
+
+- **Uncontrolled**: `defaultNodes` and `defaultEdges` are read once, at mount. Read and change the
+  flow through the model ([`useFlow`](/docs/api/primitives/hooks), a
+  [flow ref](/docs/api/primitives/flow-ref)).
+- **Controlled**: `nodes` and `edges` are your state. Each render brings the model to them with the
+  commands a user would run (`model.get("commands-to")`, one `batch` marked
+  `meta: { source: "controlled" }`), and `onNodesChange` / `onEdgesChange` receive the model's
+  lists after every other change (a drag step too). When a middleware vetoes a change, or a rule
+  keeps a node in its parent, the callbacks receive what the model holds, so your state follows it.
+  Keep the `Flow.Nodes` and `Flow.Edges` children functions stable (a module function,
+  `useCallback`): a new one re-renders every node.
+- **Your own model**: `model` takes a model made with `createFlowModel`, with its features and its
+  middleware; `defaultNodes`, `features` and `createId` are then unused.
+
+The engine is created in the root's layout effect: the first render, and a server render, have no
+engine (nodes at their model position, no edges drawn).
+
+## Props
+
+`RootProps<T, F>` extends the [common primitive props](#common-props), every `div` attribute, and
+`RootEngineProps`, the engine's options a root takes as props (each change applies at once,
+through `engine.adapter.setOptions`).
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `model` | `FlowModel<T, F>` | created by the root | the flow model: its middleware sees every command, its listeners every change |
+| `defaultNodes` | `readonly FlowNodeInput<T>[]` | `[]` | the nodes of the model the root creates (read once) |
+| `defaultEdges` | `readonly FlowEdgeInput<T>[]` | `[]` | the edges of the model the root creates (read once) |
+| `nodes` | `readonly FlowNode<T>[]` | none | controlled nodes; give every node its id |
+| `onNodesChange` | `(nodes: readonly FlowNode<T>[]) => void` | none | the model's nodes, after every command that changes them |
+| `edges` | `readonly FlowEdge<T>[]` | none | controlled edges |
+| `onEdgesChange` | `(edges: readonly FlowEdge<T>[]) => void` | none | the model's edges, after every command that changes them |
+| `features` | `F` | `[]` | the opt-in features of the model the root creates (read once), each from its entry (`@fragiola/flow-react/drag`) |
+| `createId` | `CreateId` | `` `${kind}-${n}` `` | the id generator of the model the root creates (read once) |
+| `viewport` | `Viewport` | none | controlled viewport: a new value runs `set-viewport` |
+| `defaultViewport` | `Viewport` | `{ x: 0, y: 0, zoom: 1 }` | the viewport the flow starts at (read once) |
+| `onViewportChange` | `(viewport: Viewport, gesture: boolean) => void` | none | every viewport change; `gesture` is true for a pan, a zoom or a pinch |
+| `fitView` | `boolean \| FitViewPayload` | `false` | fits the nodes once every visible one is measured (read once) |
+| `flowRef` | `FlowRef<T, F>` | none | access to the model and the engine from outside the root ([flow ref](/docs/api/primitives/flow-ref)) |
+| `minZoom` | `number` | `0.5` | the least zoom |
+| `maxZoom` | `number` | `2` | the greatest zoom |
+| `translateExtent` | `Rect` | none | the flow rectangle the view stays inside |
+| `panOnDrag` | `boolean` | `true` | a drag on the pane pans |
+| `panOnScroll` | `boolean` | `false` | the wheel pans (Ctrl + wheel zooms) |
+| `zoomOnScroll` | `boolean` | `true` | the wheel zooms around the pointer |
+| `zoomOnPinch` | `boolean` | `true` | a two-finger pinch (and a trackpad's) zooms |
+| `zoomOnDoubleClick` | `boolean` | `true` | a double click on the pane zooms in |
+| `zoomStep` | `number` | `1.2` | the factor of `zoom-in` and `zoom-out` |
+| `interactive` | `boolean` | `true` | gestures and keys may change the flow (pan and zoom always work) |
+| `onlyRenderVisible` | `boolean` | `false` | render only the nodes and edges in view |
+| `pathOptions` | `PathOptions` | `{ curvature: 0.5, borderRadius: 5, offset: 20 }` | the shape of the built-in edge paths ([path helpers](/docs/api/path-helpers)) |
+| `children` | `ReactNode` | none | the flow's layers: `Flow.Background`, `Flow.Viewport`, `Flow.Controls`, … |
+
+## State
+
+`RootState`, what `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `interactive` | `boolean` | gestures and keys may change the flow |
+| `panning` | `boolean` | the viewport is being panned |
+| `dragging` | `boolean` | nodes are being dragged (`drag()`) |
+| `connecting` | `boolean` | a connection is being drawn (`connection()`) |
+| `selecting` | `boolean` | a selection box is being drawn (`selection()`) |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"root"` |
+| `data-interactive` | present while gestures may change the flow; absent before the engine exists (the first render, a server render), while `state.interactive` is already true |
+| `data-panning` | present while panning |
+| `data-dragging` | present while nodes are dragged (`drag()`) |
+| `data-connecting` | present while a connection is drawn (`connection()`) |
+| `data-selecting` | present while a box is drawn (`selection()`) |
+
+## Structural style
+
+`position: relative; overflow: hidden`, and the engine writes `touch-action: none` (without it a
+browser cancels touch gestures). Its size is yours.
+
+## Common props
+
+Every primitive takes these on top of its element's attributes (`PrimitiveProps<State, E>`; the
+`div` primitives' props are `DivPrimitiveProps<State>`, the buttons' `ButtonPrimitiveProps<State>`,
+the SVG ones' `SvgPrimitiveProps<State, E>`):
+
+| prop | type | description |
+| --- | --- | --- |
+| `render` | `RenderProp<State, E>` | replaces the element: an element whose props are merged (`render={<section />}`), or a function `(props, state) => element` whose `props` (`RenderedProps<E>`) you spread on what it returns. Never `asChild` |
+| `className` | `string \| ((state: State) => string \| undefined)` | a class, or a function of the primitive's state |
+| `style` | `CSSProperties \| ((state: State) => CSSProperties \| undefined)` | a style, or a function of the state; the structural keys a primitive sets always win |
+| `ref` | `Ref<E>` | the element, merged with the primitive's own ref |
+
+Your handlers run after the primitive's own. A primitive sets no text and no `aria-label`: names
+are yours ([Accessible names](/docs/getting-started/accessible-names)).
