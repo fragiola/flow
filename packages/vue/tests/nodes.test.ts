@@ -3,11 +3,12 @@ import { keyboard } from "@fragiola/flow/keyboard";
 import { selection } from "@fragiola/flow/selection";
 import { subflows } from "@fragiola/flow/subflows";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { defineComponent, h, onMounted, type PropType } from "vue";
+import { defineComponent, h, onMounted, type PropType, shallowRef } from "vue";
 import {
     type AnyTypes,
     createFlowRef,
     Flow,
+    type FlowEdge,
     type FlowNode,
     useNode,
 } from "../src/index";
@@ -15,6 +16,7 @@ import {
     drag,
     installLayout,
     key,
+    pair,
     part,
     pointer,
     render,
@@ -72,6 +74,49 @@ describe("nodes", () => {
         expect(after.style.transform).toBe("translate(60px, 40px)");
         expect(mounts).not.toHaveBeenCalled();
         expect(renders.mock.calls.every(([id]) => id === "a")).toBe(true);
+    });
+
+    it("render a new slot again: a render function's closure, a slot reading an outer scope", async () => {
+        const mark = shallowRef("off");
+        const { nodes, edges } = pair();
+        const { container } = await render(() => {
+            // read here, outside the slots: each render of the app gives Nodes and Edges new slots
+            const current = mark.value;
+            return h(
+                Flow.Root,
+                { defaultNodes: nodes, defaultEdges: edges },
+                () => [
+                    h(Flow.Viewport, null, () => [
+                        h(Flow.Edges, null, {
+                            default: ({ edge }: { edge: FlowEdge }) => [
+                                h(Flow.Edge, { edge, "data-mark": current }),
+                            ],
+                        }),
+                        h(Flow.Nodes, null, {
+                            default: ({ node }: { node: FlowNode }) => [
+                                h(Flow.Node, { node, "data-mark": current }),
+                            ],
+                        }),
+                    ]),
+                ],
+            );
+        });
+        expect(part(container, "node", "a")).toHaveAttribute(
+            "data-mark",
+            "off",
+        );
+        expect(part(container, "edge", "ab")).toHaveAttribute(
+            "data-mark",
+            "off",
+        );
+        mark.value = "on";
+        await settle();
+        expect(part(container, "node", "a")).toHaveAttribute("data-mark", "on");
+        expect(part(container, "node", "b")).toHaveAttribute("data-mark", "on");
+        expect(part(container, "edge", "ab")).toHaveAttribute(
+            "data-mark",
+            "on",
+        );
     });
 
     it("show the engine's state: selected on a tap, dragging during a drag", async () => {

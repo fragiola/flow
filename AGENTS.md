@@ -520,10 +520,12 @@ Decisions of the Vue adapter (#9):
 - **Another `model` remounts the flow** (the root is keyed by its model, Tree's `Root`), instead of
   React's in-place engine swap.
 - **Each node's and each edge's slot is its own component** (`NodeSlot`, `EdgeSlot`), whose props
-  are the entity alone: a drag step re-renders the moved nodes only, and a pan none (the viewport
-  reads its own state only when it is used). The slot is read when the entity renders, so what
-  else it shows follows Vue's reactivity (a ref, a prop the slot reads), where React re-renders
-  every node on a new children function.
+  are the entity and the slot function: a drag step re-renders the moved nodes only, and a pan
+  none (the viewport reads its own state only when it is used). What else it shows follows Vue's
+  reactivity (a ref, a prop the slot reads). A compiled template's slot keeps its identity; a new
+  one (a render function's closure, a slot reading an outer slot's scope: Vue's dynamic slots)
+  re-renders every entity, as React does on a new children function (#11's review: the slot read
+  through a getter kept such a closure stale).
 - **Edge labels render in the edges' HTML layer through a registry, not a `Teleport`**: a Vue
   `Teleport` out of an SVG keeps creating SVG elements (its namespace sticks), so `EdgeLabel`
   hands a render function to `Edges`, whose layer renders it (with the edge provided again);

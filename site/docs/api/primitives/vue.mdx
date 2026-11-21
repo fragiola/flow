@@ -84,7 +84,8 @@ const nodes = shallowRef<readonly FlowNode<Types>[]>([
 `v-model:nodes` gives you the model's nodes on every change, drag steps included, and a list you
 write to it is brought into the model with the commands a user would have run (one `batch` with
 `meta: { source: "controlled" }`), so middleware still sees every change. The model's lists are
-frozen and never become reactive: keep them in a `shallowRef`.
+frozen and never become reactive: keep them in a `shallowRef`, and give it a new list
+(`nodes.value = [...nodes.value, node]`): only a new list is synced, as in React.
 
 <Example id="basic" />
 
@@ -133,9 +134,10 @@ Every part takes the props of its React page (for example [Root](/docs/api/primi
 | `children` | `RenderSlotProps` | the part's content, as one stable component: `<component :is="children" />` |
 
 A slot is a `SlotFunction<Scope>`. Each node's and each edge's slot is its own component, whose
-only prop is the entity: a drag step re-renders the moved nodes only, a pan none, and what else
-the slot shows follows Vue's reactivity (a ref, a prop it reads). React's advice to keep a children
-function stable has no Vue counterpart.
+props are the entity and the slot: a drag step re-renders the moved nodes only, a pan none, and
+what else the slot shows follows Vue's reactivity (a ref, a prop it reads). A template's slot stays
+the same function; a new one (a render function's, or a slot that reads an outer slot's scope)
+re-renders every node, as a new children function does in React.
 
 What differs from React, part by part:
 

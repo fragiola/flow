@@ -35,20 +35,19 @@ const NODES_STYLE = { position: "absolute", top: "0", left: "0" };
 
 /**
  * One node's rendering, again only when its node changes (the model shares the nodes a command
- * did not change: a drag step renders the moved nodes only), or when a reactive value its slot
- * reads does.
+ * did not change: a drag step renders the moved nodes only), when a reactive value its slot reads
+ * does, or when the slot is a new one.
  */
 const NodeSlot = defineComponent({
     name: "FlowNodeSlot",
     props: {
         node: { type: Object as PropType<FlowNode>, required: true },
-        slot: {
-            type: Function as PropType<() => Slot | undefined>,
-            required: true,
-        },
+        // the slot itself: a new one (a render function's, or a slot that reads an outer slot's
+        // scope) renders every entity again, a compiled template's stays the same
+        slot: { type: Function as PropType<Slot>, required: false },
     },
     setup(props) {
-        return () => props.slot()?.({ node: props.node });
+        return () => props.slot?.({ node: props.node });
     },
 });
 
@@ -74,8 +73,6 @@ export const Nodes: FlowComponent<NodesProps, NodesSlots> = definePrimitive<
             ? engine.get("visible-nodes")
             : model.get("all-nodes").filter((node) => node.hidden !== true);
     });
-    // the slot as it is now: a node's slot reads it when it renders
-    const slot = () => slots.default as Slot | undefined;
     return () => {
         const nodes = list.value;
         return renderElement({
@@ -87,7 +84,13 @@ export const Nodes: FlowComponent<NodesProps, NodesSlots> = definePrimitive<
             props: { ...partAttributes("nodes") },
             style: NODES_STYLE,
             children: () =>
-                nodes.map((node) => h(NodeSlot, { key: node.id, node, slot })),
+                nodes.map((node) =>
+                    h(NodeSlot, {
+                        key: node.id,
+                        node,
+                        slot: slots.default as Slot | undefined,
+                    }),
+                ),
         });
     };
 });

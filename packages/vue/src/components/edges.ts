@@ -56,20 +56,19 @@ const LAYER_STYLE = {
 };
 
 /**
- * One edge's drawing, again only when its edge changes, or a reactive value its slot reads does;
- * its path renders again by itself (`Flow.EdgePath` follows `edge-path-by`).
+ * One edge's drawing, again only when its edge changes, a reactive value its slot reads does, or
+ * the slot is a new one; its path renders again by itself (`Flow.EdgePath` follows `edge-path-by`).
  */
 const EdgeSlot = defineComponent({
     name: "FlowEdgeSlot",
     props: {
         edge: { type: Object as PropType<FlowEdge>, required: true },
-        slot: {
-            type: Function as PropType<() => Slot | undefined>,
-            required: true,
-        },
+        // the slot itself: a new one (a render function's, or a slot that reads an outer slot's
+        // scope) renders every entity again, a compiled template's stays the same
+        slot: { type: Function as PropType<Slot>, required: false },
     },
     setup(props) {
-        return () => props.slot()?.({ edge: props.edge });
+        return () => props.slot?.({ edge: props.edge });
     },
 });
 
@@ -135,8 +134,6 @@ export const Edges: FlowComponent<EdgesProps, EdgesSlots> = definePrimitive<
         },
     };
     provide(EdgeLabelLayerKey, layer);
-    // the slot as it is now: an edge's slot reads it when it renders
-    const slot = () => slots.default as Slot | undefined;
     return () => {
         const edges = list.value;
         return renderElement({
@@ -152,7 +149,11 @@ export const Edges: FlowComponent<EdgesProps, EdgesSlots> = definePrimitive<
                     "svg",
                     { ...partAttributes("edges"), style: LAYER_STYLE },
                     edges.map((edge) =>
-                        h(EdgeSlot, { key: edge.id, edge, slot }),
+                        h(EdgeSlot, {
+                            key: edge.id,
+                            edge,
+                            slot: slots.default as Slot | undefined,
+                        }),
                     ),
                 ),
                 ...labels.value.map((entry) =>
