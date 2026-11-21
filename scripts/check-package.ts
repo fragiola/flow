@@ -16,15 +16,25 @@
 //   that adapter's tarball (the core tarball comes as its dependency), typechecks, builds and
 //   loads its dev server. React's is a Vite + React app at the pins of examples/react; Vue's a
 //   Vite + Vue app whose single-file component vue-tsc checks, on TypeScript 6 (vue-tsc does not
-//   run on TypeScript 7 yet); each later adapter Epic (Svelte, Angular) adds its entry and its
-//   smoke app, as Splitter's. A consumer's dev server adds the
+//   run on TypeScript 7 yet); Svelte's a Vite + Svelte 5 app whose component svelte-check checks,
+//   on TypeScript 6 too (svelte-check and svelte-package take TypeScript 5 or 6); the Angular Epic
+//   adds its entry and its smoke app, as Splitter's. A consumer's dev server adds the
 //   `development` condition, which once pointed Dockable's published `exports` at sources that
 //   are not in the tarball.
-import { execFileSync, spawn } from "node:child_process";
+//
+// A Svelte package publishes its components as `.svelte` files (`@sveltejs/package`), under the
+// `svelte` condition Svelte's tooling reads, beside `types` and `default`; its declarations import
+// them as `./x.svelte` (each typed by its `x.svelte.d.ts`), which TypeScript resolves under
+// `moduleResolution: bundler` (Vite, SvelteKit) but not under `node16`. attw reports those imports
+// as an internal resolution error: for a Svelte package that rule alone is ignored, and only for
+// `.svelte` imports (`svelteAttwProblems`), xyflow's Svelte package's choice.
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import {
+    closeSync,
     existsSync,
     mkdirSync,
     mkdtempSync,
+    openSync,
     readdirSync,
     readFileSync,
     rmSync,
@@ -37,8 +47,11 @@ import { SOURCE_CONDITION } from "./source-condition.ts";
 
 const root = join(import.meta.dirname, "..");
 
-/** The only conditions a published `exports` may use: ESM, with its types. */
-const PUBLISHED_CONDITIONS = ["types", "import", "default"];
+/**
+ * The only conditions a published `exports` may use: ESM, with its types, and `svelte` (the
+ * Svelte adapter's components, which Svelte's tooling resolves through it).
+ */
+const PUBLISHED_CONDITIONS = ["types", "import", "svelte", "default"];
 
 /** A published target is in `dist` (`./dist/…`). */
 const inDist = (target: string) => target.startsWith("./dist/");
@@ -147,6 +160,7 @@ function packedManifest(tarball: string): PackedManifest {
 /** `packages/<name>/package.json`: its `exports` (the source condition included), what it packs. */
 function repoManifest(name: string): {
     exports?: unknown;
+    svelte?: string;
     publishConfig?: { directory?: string };
 } {
     return JSON.parse(
@@ -161,6 +175,76 @@ function tarballFiles(tarball: string): Set<string> {
             .split("\n")
             .filter((line) => line.startsWith("package/"))
             .map((line) => `./${line.slice("package/".length)}`),
+    );
+}
+
+/** One problem attw reports (`attw -f json`'s `analysis.problems`). */
+export interface AttwProblem {
+    readonly kind: string;
+    /** the import a resolution problem is about (`./components/root.svelte`) */
+    readonly moduleSpecifier?: string;
+    /** the resolution of an internal import's problem (`node16`, `bundler`) */
+    readonly resolutionOption?: string;
+    /** the resolution of an entry point's problem (`node10`, `node16-cjs`, `node16-esm`, `bundler`) */
+    readonly resolutionKind?: string;
+}
+
+/** The resolutions attw's `esm-only` profile ignores: an ESM-only package does not serve them. */
+const ESM_ONLY_IGNORED = ["node10", "node16-cjs"];
+
+/**
+ * The problems of a Svelte package that attw's `esm-only` profile would fail it on, but the one
+ * the package check accepts: an internal resolution error, under `node16`, of a `.svelte` import in
+ * a declaration file, which `moduleResolution: bundler` resolves (to `x.svelte.d.ts`) and `node16`
+ * does not. Any problem under `bundler` or `node16-esm` is kept; the profile's ignored resolutions
+ * (`node10`, `node16-cjs`) stay ignored.
+ */
+export function svelteAttwProblems(
+    problems: readonly AttwProblem[],
+): AttwProblem[] {
+    return problems.filter(
+        (problem) =>
+            !(
+                problem.resolutionKind !== undefined &&
+                ESM_ONLY_IGNORED.includes(problem.resolutionKind)
+            ) &&
+            !(
+                problem.kind === "InternalResolutionError" &&
+                problem.resolutionOption === "node16" &&
+                problem.moduleSpecifier?.endsWith(".svelte") === true
+            ),
+    );
+}
+
+/** attw on a Svelte package's tarball: its one accepted exception (`svelteAttwProblems`). */
+function attwSvelte(tarball: string): void {
+    // into a file: attw exits as soon as it has written, and a pipe would lose all but its first
+    // 64 KiB; it exits non-zero on any problem, the accepted ones too
+    const dir = mkdtempSync(join(tmpdir(), "flow-attw-"));
+    const file = join(dir, "report.json");
+    const fd = openSync(file, "w");
+    try {
+        spawnSync(
+            "pnpm",
+            ["exec", "attw", tarball, "--profile", "esm-only", "-f", "json"],
+            { cwd: root, stdio: ["ignore", fd, "inherit"] },
+        );
+    } finally {
+        closeSync(fd);
+    }
+    const output = readFileSync(file, "utf8");
+    rmSync(dir, { recursive: true, force: true });
+    const report = JSON.parse(output) as {
+        analysis?: { problems?: AttwProblem[] };
+    };
+    const left = svelteAttwProblems(report.analysis?.problems ?? []);
+    if (left.length > 0) {
+        throw new Error(
+            `attw: ${tarball}:\n${left.map((problem) => JSON.stringify(problem)).join("\n")}`,
+        );
+    }
+    console.log(
+        "check-package: attw (esm-only) passes but for the .svelte imports node16 cannot resolve",
     );
 }
 
@@ -186,7 +270,11 @@ function lint(name: string, tarball: string): string[] {
               ]
     ).map((problem) => `${manifest.name}: ${problem}`);
     run("pnpm", ["exec", "publint", tarball, "--strict"], root);
-    run("pnpm", ["exec", "attw", tarball, "--profile", "esm-only"], root);
+    if (repo.svelte === undefined) {
+        run("pnpm", ["exec", "attw", tarball, "--profile", "esm-only"], root);
+    } else {
+        attwSvelte(tarball);
+    }
     return problems;
 }
 
@@ -213,7 +301,9 @@ export interface AdapterCheck {
 /**
  * The version of `name` a framework's smoke app installs, so that it installs nothing new: its
  * examples app's pin (examples/<framework>: React's Vite plugin and types, Vue's vue-tsc, its
- * Vite plugin and the TypeScript 6 vue-tsc runs on), else its package's own (packages/<framework>).
+ * Vite plugin and the TypeScript 6 vue-tsc runs on, Svelte's svelte, its Vite plugin,
+ * svelte-check and TypeScript 6), else its package's own (packages/<framework>: an adapter whose
+ * examples app does not exist yet, as Svelte's in #12 and Angular's next).
  */
 export function smokeVersion(framework: Framework, name: string): string {
     const manifests = [
@@ -539,6 +629,168 @@ function writeVueSmokeApp(dir: string, core: string, vue: string): void {
     writeFileSync(join(dir, "src/App.vue"), VUE_SMOKE_APP);
 }
 
+// The Svelte package only, the core's names included: a Svelte app installs that one only. Its
+// entry mounts the component with a model made from the package's subpaths; the component renders
+// the typed primitives (`typedFlow`) with a children snippet per node and per edge, the minimap's
+// and the resizer's own entries, `bind:nodes`, a `class` function of the state, a `render`
+// snippet and a flow ref, checked by svelte-check.
+const SVELTE_SMOKE_MAIN = `import { createFlowModel, type FlowJson } from "@fragiola/flow-svelte";
+import { mount } from "svelte";
+import App, { features, type Types } from "./app.svelte";
+
+const json: FlowJson<Types> = {
+    version: 1,
+    nodes: [
+        { id: "a", type: "task", position: { x: 0, y: 0 }, data: { title: "A" } },
+        { id: "b", type: "task", position: { x: 0, y: 200 }, data: { title: "B" } },
+    ],
+    edges: [{ id: "ab", source: "a", target: "b" }],
+};
+
+const target = document.getElementById("root");
+if (target) {
+    mount(App, {
+        target,
+        props: { model: createFlowModel<Types, typeof features>(json, { features }) },
+    });
+}
+`;
+
+const SVELTE_SMOKE_APP = `<script module lang="ts">
+    import type { FlowTypes } from "@fragiola/flow-svelte";
+    import { connection } from "@fragiola/flow-svelte/connection";
+    import { drag } from "@fragiola/flow-svelte/drag";
+    import { minimap } from "@fragiola/flow-svelte/minimap";
+    import { resize } from "@fragiola/flow-svelte/resize";
+    import { selection } from "@fragiola/flow-svelte/selection";
+
+    export interface Types extends FlowTypes {
+        readonly nodes: { task: { title: string } };
+    }
+
+    export const features = [selection(), drag(), connection(), resize(), minimap()] as const;
+</script>
+
+<script lang="ts">
+    import {
+        type FlowModel,
+        type FlowNode,
+        typedFlow,
+        useFlowRef,
+    } from "@fragiola/flow-svelte";
+    import { MiniMap } from "@fragiola/flow-svelte/minimap";
+    import { NodeResizer } from "@fragiola/flow-svelte/resize";
+
+    let { model }: { model: FlowModel<Types, typeof features> } = $props();
+
+    const Flow = typedFlow<Types, typeof features>();
+    const flow = useFlowRef<Types, typeof features>();
+    // svelte-ignore state_referenced_locally
+    let nodes: readonly FlowNode<Types>[] = $state.raw(model.get("all-nodes"));
+
+    function fit(): void {
+        console.log(flow.current?.engine.get("viewport"), nodes.length);
+    }
+</script>
+
+<Flow.Root bind:nodes {model} flowRef={flow} style="height: 100vh" panOnScroll>
+    <Flow.Background variant="dots" />
+    <Flow.Viewport>
+        <Flow.Edges>
+            {#snippet children(edge)}
+                <Flow.Edge {edge}>
+                    <Flow.EdgePath />
+                </Flow.Edge>
+            {/snippet}
+        </Flow.Edges>
+        <Flow.Nodes>
+            {#snippet children(node)}
+                <Flow.Node {node} class={(state) => (state.selected ? "selected" : "")}>
+                    {node.data.title}
+                    <Flow.Handle type="target" side="top" />
+                    <Flow.Handle type="source" side="bottom" />
+                    <NodeResizer minWidth={40} />
+                </Flow.Node>
+            {/snippet}
+        </Flow.Nodes>
+        <Flow.ConnectionLine />
+    </Flow.Viewport>
+    <Flow.Controls>
+        <Flow.ZoomIn aria-label="Zoom in">+</Flow.ZoomIn>
+        <Flow.FitView aria-label="Fit view" onclick={fit}>
+            {#snippet render({ props, state })}
+                <button {...props} title={state.disabled ? "Nothing to fit" : "Fit"}>Fit</button>
+            {/snippet}
+        </Flow.FitView>
+    </Flow.Controls>
+    <MiniMap width={200} height={150} />
+</Flow.Root>
+`;
+
+/**
+ * A scratch Vite + Svelte 5 app in `dir` that depends on the Svelte tarball only (the core tarball
+ * comes as its dependency). It typechecks with svelte-check on TypeScript 6 (svelte-check takes
+ * TypeScript 5 or 6, not 7 yet).
+ */
+function writeSvelteSmokeApp(dir: string, core: string, svelte: string): void {
+    const version = (name: string) => smokeVersion("svelte", name);
+    const manifest = {
+        name: "flow-smoke-svelte",
+        private: true,
+        type: "module",
+        dependencies: {
+            "@fragiola/flow-svelte": `file:${svelte}`,
+            svelte: version("svelte"),
+        },
+        devDependencies: {
+            "@sveltejs/vite-plugin-svelte": version(
+                "@sveltejs/vite-plugin-svelte",
+            ),
+            "svelte-check": version("svelte-check"),
+            typescript: version("typescript"),
+            vite: version("vite"),
+        },
+    };
+    writeFileSync(
+        join(dir, "package.json"),
+        `${JSON.stringify(manifest, null, 4)}\n`,
+    );
+    writeFileSync(
+        join(dir, "pnpm-workspace.yaml"),
+        `overrides:\n  "@fragiola/flow": "file:${core}"\n`,
+    );
+    writeFileSync(
+        join(dir, "vite.config.js"),
+        `import { svelte } from "@sveltejs/vite-plugin-svelte";\nimport { defineConfig } from "vite";\n\nexport default defineConfig({ plugins: [svelte()] });\n`,
+    );
+    writeFileSync(
+        join(dir, "index.html"),
+        `<!doctype html>\n<html lang="en">\n<body>\n<div id="root"></div>\n<script type="module" src="/src/main.ts"></script>\n</body>\n</html>\n`,
+    );
+    // strict, with the published declarations checked too (no skipLibCheck)
+    const tsconfig = {
+        compilerOptions: {
+            target: "ES2022",
+            lib: ["ES2022", "DOM", "DOM.Iterable"],
+            module: "ESNext",
+            moduleResolution: "bundler",
+            strict: true,
+            noUncheckedIndexedAccess: true,
+            verbatimModuleSyntax: true,
+            noEmit: true,
+            types: [],
+        },
+        include: ["src/**/*.ts", "src/**/*.svelte"],
+    };
+    writeFileSync(
+        join(dir, "tsconfig.json"),
+        `${JSON.stringify(tsconfig, null, 4)}\n`,
+    );
+    mkdirSync(join(dir, "src"));
+    writeFileSync(join(dir, "src/main.ts"), SVELTE_SMOKE_MAIN);
+    writeFileSync(join(dir, "src/app.svelte"), SVELTE_SMOKE_APP);
+}
+
 function freePort(): Promise<number> {
     return new Promise((resolve, reject) => {
         const server = createServer();
@@ -655,12 +907,38 @@ async function vueSmoke(
 }
 
 /**
+ * The Svelte smoke test: the scratch Vite + Svelte app installs the Svelte tarball, typechecks
+ * (svelte-check, warnings failing it), builds and loads its dev server.
+ */
+async function svelteSmoke(
+    app: string,
+    tarballs: { core: string; adapter: string },
+): Promise<void> {
+    writeSvelteSmokeApp(app, tarballs.core, tarballs.adapter);
+    run("pnpm", ["install", "--no-frozen-lockfile"], app);
+    run(
+        "pnpm",
+        [
+            "exec",
+            "svelte-check",
+            "--tsconfig",
+            "./tsconfig.json",
+            "--fail-on-warnings",
+        ],
+        app,
+    );
+    run("pnpm", ["exec", "vite", "build"], app);
+    await loadThroughDevServer(app, "/src/main.ts");
+}
+
+/**
  * Every adapter, one per package under packages/ but the core (`unlistedPackages` checks it):
- * React, Vue; Svelte and Angular are added in that order by their Epics.
+ * React, Vue, Svelte; Angular is added by its Epic.
  */
 export const ADAPTERS: readonly AdapterCheck[] = [
     { dir: "react", framework: "react", smoke: reactSmoke },
     { dir: "vue", framework: "vue", smoke: vueSmoke },
+    { dir: "svelte", framework: "svelte", smoke: svelteSmoke },
 ];
 
 /** The packages/ directories that are neither the core nor an adapter of `adapters`. */

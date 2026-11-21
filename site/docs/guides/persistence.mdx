@@ -167,6 +167,57 @@ function onRestore() {
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="toolbar.svelte"
+<script module lang="ts">
+    import type { FlowDocumentJson, Viewport } from "@fragiola/flow-svelte";
+
+    const KEY = "my-app:flow";
+
+    interface Saved {
+        flow: FlowDocumentJson<Types>;
+        viewport: Viewport;
+    }
+
+    function isViewport(value: unknown): value is Viewport {
+        const { x, y, zoom } = (value ?? {}) as Partial<Record<string, unknown>>;
+        return [x, y, zoom].every((n) => typeof n === "number" && Number.isFinite(n));
+    }
+</script>
+
+<script lang="ts">
+    import { useFlow, validateFlow } from "@fragiola/flow-svelte";
+    import { load, save } from "./persistence";
+
+    const flow = useFlow<Types, typeof features>();
+
+    function onSave() {
+        save(KEY, { flow: flow.model.get("flow-json"), viewport: flow.engine.get("viewport") } satisfies Saved);
+    }
+
+    function onRestore() {
+        const { model, engine } = flow;
+        const saved = load<Saved>(KEY);
+        if (!saved || !isViewport(saved.viewport)) return;
+        if (validateFlow(saved.flow, { features }).length > 0) return;
+        const commands = model.get("commands-to", {
+            nodes: saved.flow.nodes,
+            edges: saved.flow.edges,
+        });
+        if (commands.length > 0) model.run("batch", { commands: [...commands] });
+        engine.run("set-viewport", saved.viewport);
+    }
+</script>
+
+<div role="toolbar" aria-label="Flow file">
+    <button type="button" onclick={onSave}>Save</button>
+    <button type="button" onclick={onRestore}>Restore</button>
+</div>
+```
+
+</Framework>
+
 `validateFlow(json, { features })` returns every problem with its JSON path (an empty list for a
 valid document); pass the features the flow installs, since a field of one that is missing
 (`selected` without `selection()`) is a problem.
@@ -229,6 +280,32 @@ const model = restore();
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="editor.svelte"
+<script lang="ts">
+    import { createFlowModel, type FlowJson, typedFlow, validateFlow } from "@fragiola/flow-svelte";
+
+    const EMPTY: FlowJson<Types> = { version: 1, nodes: [], edges: [] };
+
+    function restore() {
+        const saved = load<Saved>(KEY)?.flow;
+        const valid = saved !== undefined && validateFlow(saved, { features }).length === 0;
+        return createFlowModel<Types, typeof features>(valid ? (saved as FlowJson<Types>) : EMPTY, {
+            features,
+        });
+    }
+
+    const Flow = typedFlow<Types, typeof features>();
+    // once, in the script: another model would get another engine
+    const model = restore();
+</script>
+
+<Flow.Root {model} class="flow"><!-- … --></Flow.Root>
+```
+
+</Framework>
+
 ## Save on every change
 
 `model.subscribe` tells every commit. Skip the transient steps of a gesture (a drag moves its nodes
@@ -257,6 +334,22 @@ useEffect(
 ```ts
 // in the editor's setup, after the model is created
 onUnmounted(
+    model.subscribe((event) => {
+        if (event.transient) return;
+        // the same record as the toolbar's: the flow changes, the saved viewport stays
+        const viewport = load<Saved>(KEY)?.viewport ?? { x: 0, y: 0, zoom: 1 };
+        save(KEY, { flow: model.get("flow-json"), viewport } satisfies Saved);
+    }),
+);
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```ts
+// in the editor's script, after the model is created: the effect's cleanup is the remover
+$effect(() =>
     model.subscribe((event) => {
         if (event.transient) return;
         // the same record as the toolbar's: the flow changes, the saved viewport stays

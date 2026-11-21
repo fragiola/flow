@@ -12,6 +12,10 @@ describe("the source layout check", () => {
             "layout-engine.ts",
             "tab-list.tsx",
             "layout-node.vue",
+            "node-resizer.svelte",
+            "use-flow.svelte.ts",
+            "use-flow.svelte.d.ts",
+            "contract.svelte.test.ts",
             "drag-drop-manager.test.ts",
             "tabset.directive.ts",
             "index.d.ts",
@@ -29,6 +33,9 @@ describe("the source layout check", () => {
             "LayoutEngine.ts",
             "dropZones.ts",
             "LayoutNode.vue",
+            "NodeResizer.svelte",
+            "useFlow.svelte.ts",
+            "Use-flow.svelte.ts",
             "test_two_tabs.json",
             "KeyMap.test.ts",
             "Tab-list.tsx",
@@ -52,6 +59,17 @@ describe("the source layout check", () => {
         expect(isLooseSourceFile("packages/core/src/paths.ts")).toBe(true);
         expect(isLooseSourceFile("packages/react/src/index.ts")).toBe(false);
         expect(isLooseSourceFile("packages/vue/src/typed.ts")).toBe(false);
+        expect(isLooseSourceFile("packages/svelte/src/typed.ts")).toBe(false);
+        expect(isLooseSourceFile("packages/svelte/src/root.svelte")).toBe(true);
+        expect(
+            isLooseSourceFile("packages/svelte/src/use-flow.svelte.ts"),
+        ).toBe(true);
+        expect(
+            isLooseSourceFile("packages/svelte/src/components/root.svelte"),
+        ).toBe(false);
+        expect(
+            isLooseSourceFile("packages/svelte/src/runes/use-flow.svelte.ts"),
+        ).toBe(false);
         expect(isLooseSourceFile("packages/angular/src/public-api.ts")).toBe(
             false,
         );
@@ -71,6 +89,8 @@ describe("the source layout check", () => {
                 ".github/workflows/CI.yml",
                 "packages/react/src/foo.ts",
                 "packages/react/src/components/tab-list.tsx",
+                "packages/svelte/src/components/NodeResizer.svelte",
+                "packages/svelte/src/runes/use-flow.svelte.ts",
             ]),
         ).toEqual([
             "packages/core/src/engine/LayoutEngine.ts: not kebab-case",
@@ -79,6 +99,7 @@ describe("the source layout check", () => {
             expect.stringMatching(
                 /^packages\/react\/src\/foo\.ts: a package's src\/ root/,
             ),
+            "packages/svelte/src/components/NodeResizer.svelte: not kebab-case",
         ]);
     });
 });

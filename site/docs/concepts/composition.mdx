@@ -56,6 +56,34 @@ and per edge.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="editor.svelte"
+<Flow.Root {features} defaultNodes={nodes} defaultEdges={edges} class="h-[600px]">
+    <!-- behind the viewport, in screen space, panned and zoomed by the pattern itself -->
+    <Flow.Background variant="dots" />
+    <!-- the pannable, zoomable layer: what is inside is in flow coordinates -->
+    <Flow.Viewport>
+        <Flow.Edges>
+            {#snippet children(edge)}<MyEdge {edge} />{/snippet}
+        </Flow.Edges>
+        <Flow.Nodes>
+            {#snippet children(node)}<MyNode {node} />{/snippet}
+        </Flow.Nodes>
+        <Flow.ConnectionLine />
+    </Flow.Viewport>
+    <!-- over the viewport, in screen space -->
+    <Flow.SelectionBox />
+    <Flow.Controls>…</Flow.Controls>
+    <MiniMap />
+</Flow.Root>
+```
+
+`MyNode` and `MyEdge` stand for your own components (below): the `children` snippet renders one
+per node and per edge.
+
+</Framework>
+
 - `Flow.Edges` comes before `Flow.Nodes`, so nodes are drawn above edges.
 - `Flow.ConnectionLine` is in the viewport (it is in flow coordinates); `Flow.SelectionBox`,
   `Flow.Controls` and `MiniMap` are outside it (they are in screen pixels, and do not zoom).
@@ -137,6 +165,43 @@ narrows `node.data` as React's `switch` does.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="my-node.svelte"
+<script lang="ts">
+    import { type FlowNode, type FlowTypes, typedFlow } from "@fragiola/flow-svelte";
+
+    interface Types extends FlowTypes {
+        readonly nodes: {
+            trigger: { label: string; event: string };
+            action: { label: string; service: string };
+        };
+    }
+
+    const Flow = typedFlow<Types>();
+    let { node }: { node: FlowNode<Types> } = $props();
+</script>
+
+{#if node.type === "trigger"}
+    <Flow.Node {node} class="node node-trigger">
+        {node.data.label} on {node.data.event}
+        <Flow.Handle type="source" side="right" />
+    </Flow.Node>
+{:else if node.type === "action"}
+    <Flow.Node {node} class="node">
+        <Flow.Handle type="target" side="left" />
+        {node.data.label} ({node.data.service})
+        <Flow.Handle type="source" side="right" />
+    </Flow.Node>
+{/if}
+```
+
+In Svelte the `children` snippet of `Flow.Nodes` is the function, rendered in a keyed `{#each}`:
+a drag step renders the moved nodes only. `{#if}` on `node.type` narrows `node.data` as React's
+`switch` does.
+
+</Framework>
+
 In React, keep the function stable (a module function, as here, or `useCallback`): a new function
 re-renders every node. `Flow.Nodes` re-renders a node only when its node object changes, so a drag step
 re-renders the moved nodes only.
@@ -192,6 +257,29 @@ defineProps<{ edge: FlowEdge<Types> }>();
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="my-edge.svelte"
+<script lang="ts">
+    import { type FlowEdge, typedFlow } from "@fragiola/flow-svelte";
+
+    const Flow = typedFlow<Types>();
+    let { edge }: { edge: FlowEdge<Types> } = $props();
+</script>
+
+<Flow.Edge {edge}>
+    <Flow.EdgePath class="stroke-transparent stroke-[12]" />
+    <Flow.EdgePath class="stroke-slate-400" />
+    {#if typeof edge.data?.label === "string"}
+        <Flow.EdgeLabel class="rounded bg-white px-1 text-xs">{edge.data.label}</Flow.EdgeLabel>
+    {/if}
+    <Flow.ReconnectAnchor end="source" />
+    <Flow.ReconnectAnchor end="target" />
+</Flow.Edge>
+```
+
+</Framework>
+
 `Flow.EdgeLabel` is HTML, centred on the path's label point: SVG holds no HTML, so it is portalled
 into the edges' HTML layer. `Flow.NodeToolbar`, likewise, portals into the root, outside the zoom.
 
@@ -241,6 +329,31 @@ render `<component :is="children" />` inside it when the part has content.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Node {node}>
+    {#snippet render({ props, children })}
+        <article {...props}>{@render children()}</article>
+    {/snippet}
+    {node.data.label}
+</Flow.Node>
+
+<Flow.ToggleInteractive aria-label="Lock the flow">
+    {#snippet render({ props, state })}
+        <button {...props}>
+            {#if state.interactive}<UnlockIcon />{:else}<LockIcon />{/if}
+        </button>
+    {/snippet}
+</Flow.ToggleInteractive>
+```
+
+In Svelte, both forms of React's `render` are the `render` snippet, `{ props, state, children }`:
+spread `{...props}` on your element (they carry the part's attachment, which registers it) and
+`{@render children()}` inside it when the part has content. There is no element shorthand.
+
+</Framework>
+
 Spread the props on what you return: they carry the ref that registers the element with the
 engine, the part attributes the engine resolves presses from, and the structural style.
 
@@ -285,6 +398,28 @@ const { state, props: element } = useNode(() => props.node);
 
 In Vue the composables take the node as a getter (or a ref) and return `state` and `props` as
 computed refs; `v-bind` puts the props, their template ref included, on your element.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="plain-node.svelte"
+<script lang="ts">
+    import { type FlowNode, useNode } from "@fragiola/flow-svelte";
+
+    let { node }: { node: FlowNode<Types> } = $props();
+    // getters: read own.state and own.props where they are used, never destructured
+    const own = useNode(() => node);
+</script>
+
+<div {...own.props} class={own.state.selected ? "node node-selected" : "node"}>
+    {node.data.label}
+</div>
+```
+
+In Svelte the runes take the node or a getter of it and return `state` and `props` as getters;
+`{...own.props}` puts the props, the attachment that registers the element included, on your
+element.
 
 </Framework>
 

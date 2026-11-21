@@ -79,6 +79,43 @@ handles) gets `{ state }`.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="resizable-node.svelte"
+<script module lang="ts">
+    import type { FlowTypes } from "@fragiola/flow-svelte";
+    import { drag } from "@fragiola/flow-svelte/drag";
+    import { resize } from "@fragiola/flow-svelte/resize";
+    import { selection } from "@fragiola/flow-svelte/selection";
+
+    export interface Types extends FlowTypes {
+        readonly nodes: { note: { label: string } };
+    }
+
+    export const features = [selection(), drag(), resize({ minWidth: 80, minHeight: 60 })] as const;
+</script>
+
+<script lang="ts">
+    import { type FlowNode, typedFlow } from "@fragiola/flow-svelte";
+    import { NodeResizer } from "@fragiola/flow-svelte/resize";
+
+    const Flow = typedFlow<Types, typeof features>();
+    let { node }: { node: FlowNode<Types> } = $props();
+</script>
+
+<Flow.Node {node} class="relative">
+    {node.data.label}
+    {#if node.selected}
+        <NodeResizer minWidth={120} maxWidth={360} keepAspectRatio={false} />
+    {/if}
+</Flow.Node>
+```
+
+In Svelte, `NodeResizer` comes from `@fragiola/flow-svelte/resize` with React's props
+(`minWidth`, `keepAspectRatio`), and its `children` snippet (its handles) gets `{ state }`.
+
+</Framework>
+
 ## Props
 
 `NodeResizerProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and

@@ -88,6 +88,44 @@ const nodes: FlowNodeInput<Types>[] = [
 
 </Framework>
 
+<Framework name="svelte">
+
+```ts
+import { selection } from "@fragiola/flow-svelte/selection";
+import { drag } from "@fragiola/flow-svelte/drag";
+import { subflows } from "@fragiola/flow-svelte/subflows";
+
+interface Types extends FlowTypes {
+    readonly nodes: {
+        group: { label: string };
+        item: { label: string };
+    };
+}
+
+const features = [selection(), drag(), subflows()] as const;
+
+const nodes: FlowNodeInput<Types>[] = [
+    {
+        id: "frontend",
+        type: "group",
+        position: { x: 0, y: 0 },
+        width: 260,
+        height: 220,
+        data: { label: "Frontend" },
+    },
+    {
+        id: "ui",
+        type: "item",
+        parentId: "frontend",
+        extent: "parent",
+        position: { x: 20, y: 50 }, // relative to the frontend group
+        data: { label: "UI" },
+    },
+];
+```
+
+</Framework>
+
 Without `subflows()`, `parentId` and `extent` are validation issues: the document is refused,
 naming the feature. A child may come before its parent in `nodes`.
 
@@ -133,6 +171,28 @@ function renderNode(node: FlowNode<Types>) {
         <Flow.Handle type="target" side="top" class="handle" />
         <Flow.Handle type="source" side="bottom" class="handle" />
     </Flow.Node>
+</Flow.Nodes>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Nodes>
+    {#snippet children(node)}
+        {#if node.type === "group"}
+            <Flow.Node {node} class="rounded-lg border border-dashed bg-palette-soft/40">
+                <span class="p-2 text-xs">{node.data.label}</span>
+            </Flow.Node>
+        {:else}
+            <Flow.Node {node} class="node">
+                {node.data.label}
+                <Flow.Handle type="target" side="top" class="handle" />
+                <Flow.Handle type="source" side="bottom" class="handle" />
+            </Flow.Node>
+        {/if}
+    {/snippet}
 </Flow.Nodes>
 ```
 
@@ -248,6 +308,52 @@ onUnmounted(
 <template>
     <!-- nothing to render -->
 </template>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="drop-into-groups.svelte"
+<script lang="ts">
+    import { useFlow } from "@fragiola/flow-svelte";
+
+    // inside the root: a component that renders nothing, only listens
+    const flow = useFlow<Types, typeof features>();
+
+    $effect(() =>
+        flow.engine.subscribe((event) => {
+            const { model, engine } = flow;
+            if (event.type !== "nodes-move") return;
+            for (const nodeId of event.nodeIds) {
+                const node = model.get("node-by", { id: nodeId });
+                const rect = engine.get("node-rect-by", { nodeId });
+                if (node?.type !== "item" || !rect) continue;
+                const centre = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+                const group = model.get("all-nodes").find((candidate) => {
+                    if (candidate.type !== "group") return false;
+                    const box = engine.get("node-rect-by", { nodeId: candidate.id });
+                    return (
+                        box !== undefined &&
+                        centre.x >= box.x &&
+                        centre.x <= box.x + box.width &&
+                        centre.y >= box.y &&
+                        centre.y <= box.y + box.height
+                    );
+                });
+                const parentId = group?.id ?? null;
+                if ((node.parentId ?? null) === parentId) continue;
+                model.run("node.set-parent", {
+                    nodeId,
+                    parentId,
+                    extent: parentId ? "parent" : null,
+                });
+            }
+        }),
+    );
+</script>
+
+<!-- nothing to render -->
 ```
 
 </Framework>

@@ -66,6 +66,35 @@ factories and the same options.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="editor.svelte"
+<script module lang="ts">
+    import { connection } from "@fragiola/flow-svelte/connection";
+    import { drag } from "@fragiola/flow-svelte/drag";
+    import { keyboard } from "@fragiola/flow-svelte/keyboard";
+    import { selection } from "@fragiola/flow-svelte/selection";
+
+    // once, at module level: the features are fixed when the model is created
+    const features = [selection({ boxMode: "partial" }), drag({ snapGrid: [20, 20] }), connection(), keyboard()] as const;
+</script>
+
+<script lang="ts">
+    import { typedFlow } from "@fragiola/flow-svelte";
+
+    const Flow = typedFlow<Types, typeof features>();
+</script>
+
+<Flow.Root {features} defaultNodes={nodes} class="size-full">
+    …
+</Flow.Root>
+```
+
+The Svelte package mirrors every feature entry (`@fragiola/flow-svelte/<feature>`), with the same
+factories and the same options.
+
+</Framework>
+
 Each React entry re-exports the core's (`@fragiola/flow-react/drag` is `@fragiola/flow/drag`),
 so a React app imports everything from the one package it installs; `/minimap` and `/resize` add
 their primitives. Pass `typeof features` as the type argument so the verbs know the keys. Each
@@ -210,6 +239,17 @@ FEATURE_KEYS.selection.nodeFields; // ["selected"]
 
 ```ts
 import { FEATURE_KEYS } from "@fragiola/flow-vue";
+
+FEATURE_KEYS.subflows.commands; // ["node.set-parent"]
+FEATURE_KEYS.selection.nodeFields; // ["selected"]
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```ts
+import { FEATURE_KEYS } from "@fragiola/flow-svelte";
 
 FEATURE_KEYS.subflows.commands; // ["node.set-parent"]
 FEATURE_KEYS.selection.nodeFields; // ["selected"]

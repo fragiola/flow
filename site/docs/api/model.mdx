@@ -60,6 +60,32 @@ model.is("node-selected", { nodeId: "review" });
 
 </Framework>
 
+<Framework name="svelte">
+
+```ts
+import { createFlowModel, type FlowJson, type FlowTypes } from "@fragiola/flow-svelte";
+import { selection } from "@fragiola/flow-svelte/selection";
+import { subflows } from "@fragiola/flow-svelte/subflows";
+
+interface Types extends FlowTypes {
+    readonly nodes: { task: { title: string }; group: { label: string } };
+}
+
+const features = [selection(), subflows()] as const;
+
+declare const saved: FlowJson<Types>;
+
+const model = createFlowModel<Types, typeof features>(saved, {
+    features,
+    createId: (kind) => `${kind}-${crypto.randomUUID()}`,
+});
+model.get("node-by", { id: "review" });
+model.get("node-children-by", { nodeId: "group-1" });
+model.is("node-selected", { nodeId: "review" });
+```
+
+</Framework>
+
 ## `createFlowModel`
 
 `createFlowModel<T, F>(json?, options?)` returns a `FlowModel<T, F>`, typed by your registry `T`
@@ -109,6 +135,25 @@ try {
 
 ```ts
 import { createFlowModel, FlowValidationError, validateFlow } from "@fragiola/flow-vue";
+
+declare const json: unknown;
+
+const issues = validateFlow(json, { features });
+if (issues.length > 0) console.warn(issues); // [{ path: "/nodes/0/position", message: "…" }]
+
+try {
+    createFlowModel(json as never, { features });
+} catch (error) {
+    if (error instanceof FlowValidationError) console.warn(error.issues);
+}
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```ts
+import { createFlowModel, FlowValidationError, validateFlow } from "@fragiola/flow-svelte";
 
 declare const json: unknown;
 

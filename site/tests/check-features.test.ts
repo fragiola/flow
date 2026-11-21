@@ -127,6 +127,62 @@ describe("the features' bundle guard", () => {
         expect(featureLeaks("index.js", read, readMap)).toEqual([]);
     });
 
+    it("follows an unbundled build (svelte-package) through its folders, each file its own source", () => {
+        const { read, readMap } = built({
+            "index.js": 'export * as Flow from "./parts.js";',
+            "parts.js":
+                'export { default as Node } from "./components/node.svelte";',
+            "components/node.svelte":
+                '<script>import { x } from "../utils/render.js";\nimport M from "../minimap/mini-map.svelte";</script>',
+            "utils/render.js": "export const x = 1;",
+            "minimap/mini-map.svelte": "<svg></svg>",
+        });
+        expect(featureLeaks("index.js", read, readMap, FEATURES, true)).toEqual(
+            [
+                "minimap/mini-map.svelte: minimap's ../src/minimap/mini-map.svelte",
+            ],
+        );
+        // the same build without the planted import passes
+        const clean = (file: string) =>
+            file === "components/node.svelte"
+                ? '<script>import { x } from "../utils/render.js";</script>'
+                : read(file);
+        expect(
+            featureLeaks("index.js", clean, readMap, FEATURES, true),
+        ).toEqual([]);
+    });
+
+    it("fails the real Svelte build when its main entry imports a feature (a planted import)", () => {
+        const dist = join(root, "packages/svelte/dist");
+        if (!existsSync(join(dist, "index.js"))) {
+            execFileSync(
+                "pnpm",
+                ["--filter", "@fragiola/flow-svelte", "build"],
+                {
+                    cwd: root,
+                    stdio: "ignore",
+                },
+            );
+        }
+        const read = (file: string) => {
+            const path = join(dist, file);
+            return existsSync(path) ? readFileSync(path, "utf8") : undefined;
+        };
+        const noMap = () => undefined;
+        expect(featureLeaks("index.js", read, noMap, FEATURES, true)).toEqual(
+            [],
+        );
+        const planted = (file: string) =>
+            file === "components/root.svelte"
+                ? `<script>import "../minimap/index.js";</script>\n${read(file) ?? ""}`
+                : read(file);
+        expect(
+            featureLeaks("index.js", planted, noMap, FEATURES, true).some(
+                (leak) => leak.startsWith("minimap/index.js: minimap's"),
+            ),
+        ).toBe(true);
+    });
+
     it("reads source maps and chunk imports", () => {
         expect(mapSources(undefined)).toEqual([]);
         expect(mapSources('{"sources":["a.ts",1]}')).toEqual(["a.ts"]);
@@ -135,6 +191,11 @@ describe("the features' bundle guard", () => {
                 'import { a } from "./a-1.js";\nimport("./b.js");\nimport "c";',
             ),
         ).toEqual(["a-1.js", "b.js"]);
+        expect(
+            chunksOf(
+                'import { x } from "../utils/x.js";\nimport N from "./components/node.svelte";',
+            ),
+        ).toEqual(["../utils/x.js", "components/node.svelte"]);
     });
 
     it("fails the real build when the main entry imports a feature (a planted import)", () => {

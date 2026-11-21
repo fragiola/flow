@@ -38,6 +38,23 @@ In Vue, its default slot gets `{ state }` (`ControlButtonState`); `@click` runs 
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<script lang="ts">
+    import { MaximizeIcon } from "@lucide/svelte";
+</script>
+
+<Flow.FitView aria-label="Fit view" class="p-1 data-disabled:opacity-40">
+    <MaximizeIcon />
+</Flow.FitView>
+```
+
+In Svelte, its `children` snippet gets `{ state }` (`ControlButtonState`); `onclick` runs after
+the action.
+
+</Framework>
+
 The same action from code: `engine.run("fit-view")` ([engine](/docs/api/engine)).
 
 ## Props

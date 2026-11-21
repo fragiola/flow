@@ -1,0 +1,43 @@
+<script lang="ts">
+    import { useFlow } from "@fragiola/flow-svelte";
+    import type { features, Types } from "./index.svelte";
+
+    // Puts a dropped item into the group under its centre (or takes it out of its group). It
+    // renders nothing: inside the root, it listens to the engine's `nodes-move` events.
+
+    const flow = useFlow<Types, typeof features>();
+
+    $effect(() =>
+        flow.engine.subscribe((event) => {
+            if (event.type !== "nodes-move") return;
+            for (const nodeId of event.nodeIds) {
+                const node = flow.model.get("node-by", { id: nodeId });
+                if (node?.type !== "item") continue;
+                const rect = flow.engine.get("node-rect-by", { nodeId });
+                if (!rect) continue;
+                const centre = {
+                    x: rect.x + rect.width / 2,
+                    y: rect.y + rect.height / 2,
+                };
+                const group = flow.model.get("all-nodes").find((candidate) => {
+                    if (candidate.type !== "group") return false;
+                    const box = flow.engine.get("node-rect-by", { nodeId: candidate.id });
+                    return (
+                        box !== undefined &&
+                        centre.x >= box.x &&
+                        centre.x <= box.x + box.width &&
+                        centre.y >= box.y &&
+                        centre.y <= box.y + box.height
+                    );
+                });
+                const parentId = group?.id ?? null;
+                if ((node.parentId ?? null) === parentId) continue;
+                flow.model.run("node.set-parent", {
+                    nodeId,
+                    parentId,
+                    extent: parentId ? "parent" : null,
+                });
+            }
+        }),
+    );
+</script>

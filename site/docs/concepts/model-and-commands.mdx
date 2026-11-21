@@ -60,6 +60,26 @@ function rename(): void {
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="rename-button.svelte"
+<script lang="ts">
+    import { useFlow } from "@fragiola/flow-svelte";
+
+    let { nodeId }: { nodeId: string } = $props();
+    const flow = useFlow<Types, typeof features>();
+
+    function rename(): void {
+        const result = flow.model.run("node.set-data", { nodeId, data: { label: "Renamed" } });
+        if (!result.ok) console.warn(result.error.code, result.error.message);
+    }
+</script>
+
+<button type="button" onclick={rename}>Rename</button>
+```
+
+</Framework>
+
 A result is `{ ok: true, value }` or `{ ok: false, error }`, where `error.code` is one of
 `unknown_command`, `invalid_payload`, `not_found`, `refused`, `vetoed`, `queued` or
 `middleware_error` ([The command bus](/docs/api/command-bus)). The commands are `node.add`,
@@ -137,6 +157,27 @@ Another `model` given to a Vue root remounts the flow.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="workflow-editor.svelte"
+<script lang="ts">
+    import { createFlowModel, typedFlow } from "@fragiola/flow-svelte";
+
+    const Flow = typedFlow<Types, typeof features>();
+    // made once per component: the model is plain data, never a $state proxy
+    const model = createFlowModel<Types, typeof features>(json, { features });
+</script>
+
+<div class="flex h-dvh">
+    <button type="button" onclick={() => model.run("selection.clear")}>Deselect</button>
+    <Flow.Root {model} class="flex-1">…</Flow.Root>
+</div>
+```
+
+Another `model` given to a Svelte root gets another engine, at the last viewport, as in React.
+
+</Framework>
+
 A model given to the root keeps its own features: the root's `features`, `defaultNodes` and
 `defaultEdges` are for the model it creates when you give none. See also
 [The flow ref](/docs/api/primitives/flow-ref).
@@ -173,6 +214,28 @@ const stop = model.use(rules); // returns its remover
 
 ```ts title="rules.ts"
 import { type Middleware, veto } from "@fragiola/flow-vue";
+
+/** No edge from a node to itself, and every move lands on whole numbers. */
+export const rules: Middleware<Types, typeof features> = (ctx, next) => {
+    if (ctx.command === "edge.add" && ctx.payload.source === ctx.payload.target) {
+        return veto("an edge joins two different nodes");
+    }
+    if (ctx.command === "node.move") {
+        const { x, y } = ctx.payload.position;
+        ctx.payload = { ...ctx.payload, position: { x: Math.round(x), y: Math.round(y) } };
+    }
+    return next();
+};
+
+const stop = model.use(rules); // returns its remover
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```ts title="rules.ts"
+import { type Middleware, veto } from "@fragiola/flow-svelte";
 
 /** No edge from a node to itself, and every move lands on whole numbers. */
 export const rules: Middleware<Types, typeof features> = (ctx, next) => {

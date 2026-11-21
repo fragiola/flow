@@ -2,6 +2,7 @@
 // author and licence, rewritten for Flow's packages.
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { compile } from "svelte/compiler";
 import { describe, expect, it } from "vitest";
 
 // The API reference is written by hand, and this test keeps it honest.
@@ -27,6 +28,7 @@ import { describe, expect, it } from "vitest";
 const ROOT = join(import.meta.dirname, "../..");
 const REACT_SRC = join(ROOT, "packages/react/src");
 const VUE_SRC = join(ROOT, "packages/vue/src");
+const SVELTE_SRC = join(ROOT, "packages/svelte/src");
 const CORE_SRC = join(ROOT, "packages/core/src");
 const API = join(import.meta.dirname, "../docs/api");
 
@@ -185,6 +187,30 @@ const REACT_FILES = sourceFiles(REACT_SRC).map(read);
 const CORE_FILES = sourceFiles(CORE_SRC).map(read);
 
 const VUE_FILES = sourceFiles(VUE_SRC).map(read);
+
+/**
+ * A Svelte component's `<script module lang="ts">`, where its props and state types are declared,
+ * dedented by its 4 spaces so the interface patterns above read it as a `.ts` file.
+ */
+function scriptModule(source: string): string {
+    const body =
+        /<script module lang="ts">\n([\s\S]*?)<\/script>/.exec(source)?.[1] ??
+        "";
+    return body.replace(/^ {4}/gm, "");
+}
+
+/** Every `.svelte` file under `dir`. */
+function svelteFiles(dir: string): string[] {
+    return readdirSync(dir, { recursive: true, encoding: "utf-8" })
+        .filter((file) => file.endsWith(".svelte"))
+        .map((file) => join(dir, file));
+}
+
+// the Svelte package's `.ts` and `.svelte.ts` files, and its components' module scripts
+const SVELTE_FILES = [
+    ...sourceFiles(SVELTE_SRC).map(read),
+    ...svelteFiles(SVELTE_SRC).map((file) => scriptModule(read(file))),
+];
 
 /**
  * Fields of an interface, following `extends` into the interfaces the packages declare (`files`:
@@ -527,10 +553,10 @@ describe("the React reference", () => {
 });
 
 /**
- * The pages with React code, which show it in Vue too (`<Framework name="vue">`). Every page whose
- * snippets use the React API belongs here.
+ * The pages with React code, which show it in Vue and in Svelte too (`<Framework name="vue">`,
+ * `<Framework name="svelte">`). Every page whose snippets use the React API belongs here.
  */
-const PAGES_IN_VUE = [
+const PAGES_IN_EVERY_FRAMEWORK = [
     "index",
     "getting-started/introduction",
     "getting-started/installation",
@@ -695,7 +721,7 @@ describe("the Vue reference", () => {
             '"path": "api/primitives/vue"',
         );
         for (const slug of [
-            ...PAGES_IN_VUE,
+            ...PAGES_IN_EVERY_FRAMEWORK,
             ...primitives.map((part) => `api/${part.slug}`),
         ]) {
             const mdx = read(join(API, "..", `${slug}.mdx`));
@@ -708,7 +734,7 @@ describe("the Vue reference", () => {
     });
 
     it("leaves no React code outside a React block: JSX, or an import of the React package", () => {
-        const listed = new Set(PAGES_IN_VUE);
+        const listed = new Set(PAGES_IN_EVERY_FRAMEWORK);
         for (const slug of allPages()) {
             const outside = outsideFrameworks(
                 read(join(API, "..", `${slug}.mdx`)),
@@ -732,8 +758,263 @@ describe("the Vue reference", () => {
             ) {
                 expect(
                     listed.has(slug),
-                    `${slug} has blocks: list it in PAGES_IN_VUE`,
+                    `${slug} has blocks: list it in PAGES_IN_EVERY_FRAMEWORK`,
                 ).toBe(true);
+            }
+        }
+    });
+});
+
+describe("the Svelte reference", () => {
+    const svelteIndex = read(join(SVELTE_SRC, "index.ts"));
+    const svelteParts = namedExports(read(join(SVELTE_SRC, "parts.ts")));
+    const sveltePage = page("primitives/svelte");
+    const SVELTE_FEATURE_ENTRIES = ["minimap", "resize"] as const;
+    /** A component's module script, from its module specifier (`./components/root.svelte`). */
+    const componentModule = (dir: string, module: string) =>
+        scriptModule(read(join(dir, module.replace(/^\.\//, ""))));
+    /** Every part of the Svelte package: its name, its module script and its React page. */
+    const sveltePrimitives = [
+        ...svelteParts.map(({ name, module }) => ({
+            name,
+            source: componentModule(SVELTE_SRC, module),
+        })),
+        ...SVELTE_FEATURE_ENTRIES.flatMap((entry) =>
+            namedExports(read(join(SVELTE_SRC, entry, "index.ts")))
+                .filter(({ name }) =>
+                    primitives.some(
+                        (part) => !part.namespaced && part.name === name,
+                    ),
+                )
+                .map(({ name, module }) => ({
+                    name,
+                    source: componentModule(join(SVELTE_SRC, entry), module),
+                })),
+        ),
+    ].map((part) => ({
+        ...part,
+        slug: primitives.find((react) => react.name === part.name)?.slug ?? "",
+    }));
+    const render = read(join(SVELTE_SRC, "utils/render.ts"));
+    /** What every part's props extend (`render`, `class`, `style`, `ref`). */
+    const primitiveFields = allFields(render, "PrimitiveProps", SVELTE_FILES);
+
+    /**
+     * The keys of `export type <name> = Pick<…, | "a" | "b">` in the Svelte files (the root's
+     * engine props), which the interface patterns do not read.
+     */
+    function pickedKeys(name: string): string[] {
+        for (const file of SVELTE_FILES) {
+            const picked = new RegExp(
+                `export type ${name} = Pick<[^,]+,([^>]*)>`,
+            ).exec(file);
+            if (picked) {
+                return [...(picked[1] ?? "").matchAll(/"(\w+)"/g)].map(
+                    (key) => key[1] ?? "",
+                );
+            }
+        }
+        return [];
+    }
+
+    /** Every prop of a part: its own, its interfaces', its picked engine options and the primitive's. */
+    function propsOf(name: string, source: string): string[] {
+        const declared = interfaceFields(source, `${name}Props`);
+        expect(declared, `${name}Props`).toBeDefined();
+        // its element's props (`DivPrimitiveProps`, `SvgPrimitiveProps`, …) are the primitive's
+        expect(source, `${name}Props extends a primitive's props`).toMatch(
+            new RegExp(
+                `export interface ${name}Props\\b[^{]*\\b(?:Div|Button|Svg)PrimitiveProps<`,
+            ),
+        );
+        return [
+            ...allFields(source, `${name}Props`, [
+                ...SVELTE_FILES,
+                ...CORE_FILES,
+            ]),
+            ...(declared?.extendsNames ?? []).flatMap(pickedKeys),
+            ...primitiveFields,
+        ];
+    }
+
+    it("re-exports the core and exports the same Flow namespace as React", () => {
+        expect(svelteIndex).toMatch(/^export \* from "@fragiola\/flow";$/m);
+        expect(svelteIndex).toMatch(/export \* as Flow from "\.\/parts\.js"/);
+        expect(svelteParts.map((entry) => entry.name)).toEqual(
+            partExports.map((entry) => entry.name),
+        );
+        // every React primitive, the features' included, is a Svelte one with the same page
+        expect(sveltePrimitives.map((part) => part.name).sort()).toEqual(
+            primitives.map((part) => part.name).sort(),
+        );
+    });
+
+    it("mentions every named export of the Svelte package and its /minimap and /resize entries on api/primitives/svelte.mdx", () => {
+        const exports = [
+            ...namedExports(svelteIndex),
+            ...SVELTE_FEATURE_ENTRIES.flatMap((entry) =>
+                namedExports(read(join(SVELTE_SRC, entry, "index.ts"))),
+            ),
+        ];
+        expect(exports.length).toBeGreaterThan(70);
+        for (const { name } of exports) {
+            expect(
+                mentions(sveltePage, name),
+                `${name} on api/primitives/svelte.mdx`,
+            ).toBe(true);
+        }
+    });
+
+    it("has a row for every prop of every part: on api/primitives/svelte.mdx, or on the part's React page", () => {
+        expect(primitiveFields).toEqual(["render", "class", "style", "ref"]);
+        // the engine options the root takes, read from its Pick
+        expect(pickedKeys("RootEngineProps")).toContain("panOnScroll");
+        const svelteRows = tableRowNames(sveltePage);
+        let checked = 0;
+        for (const { name, source, slug } of sveltePrimitives) {
+            const rows = new Set([...svelteRows, ...tableRowNames(page(slug))]);
+            for (const field of propsOf(name, source)) {
+                checked++;
+                expect(rows.has(field), `Svelte ${name}.${field}`).toBe(true);
+            }
+        }
+        expect(checked).toBeGreaterThan(150);
+    });
+
+    it("documents Svelte's own props on its page: the primitive's, the callbacks, the bindings and the render snippet's fields", () => {
+        const rows = tableRowNames(sveltePage);
+        for (const field of primitiveFields) {
+            expect(rows.has(field), field).toBe(true);
+        }
+        expect(rows.has("children")).toBe(true);
+        const renderFields = allFields(
+            render,
+            "RenderSnippetProps",
+            SVELTE_FILES,
+        );
+        expect(renderFields).toEqual(["props", "state", "children"]);
+        for (const field of renderFields) {
+            expect(rows.has(field), field).toBe(true);
+        }
+        // the root's callbacks are lowercase, not React's: they need their own rows
+        const root = sveltePrimitives.find((part) => part.name === "Root");
+        const callbacks = propsOf("Root", root?.source ?? "").filter((field) =>
+            /^on[a-z]+$/.test(field),
+        );
+        expect(callbacks).toEqual([
+            "onnodeschange",
+            "onedgeschange",
+            "onviewportchange",
+        ]);
+        for (const callback of callbacks) {
+            expect(rows.has(callback), callback).toBe(true);
+        }
+        // the bindable props, as `typedFlow` declares them (`Component<Props, Exports, Bindings>`)
+        const typed = read(join(SVELTE_SRC, "typed.ts"));
+        const bindings = new Set(
+            [...typed.matchAll(/Record<string, never>,\s*([^>]+?)\s*>/g)]
+                .flatMap((match) => [...(match[1] ?? "").matchAll(/"(\w+)"/g)])
+                .map((match) => match[1] ?? ""),
+        );
+        expect([...bindings].sort()).toEqual([
+            "edges",
+            "nodes",
+            "ref",
+            "viewport",
+        ]);
+        for (const binding of bindings) {
+            expect(rows.has(`bind:${binding}`), `bind:${binding}`).toBe(true);
+        }
+    });
+
+    it("is in the sidebar, and the pages with React code show it in Svelte too", () => {
+        expect(read(join(API, "../config.json"))).toContain(
+            '"path": "api/primitives/svelte"',
+        );
+        for (const slug of [
+            ...PAGES_IN_EVERY_FRAMEWORK,
+            ...primitives.map((part) => `api/${part.slug}`),
+        ]) {
+            const mdx = read(join(API, "..", `${slug}.mdx`));
+            expect(mdx, slug).toContain('<Framework name="svelte">');
+            // a Svelte block wherever there is a React one
+            expect(mdx.split('<Framework name="svelte">').length, slug).toBe(
+                mdx.split('<Framework name="react">').length,
+            );
+        }
+    });
+
+    it("writes every Svelte block in Svelte: its fences compile, with no warning", () => {
+        let compiled = 0;
+        for (const slug of allPages()) {
+            const mdx = read(join(API, "..", `${slug}.mdx`));
+            const blocks = [
+                ...mdx.matchAll(
+                    /<Framework name="svelte">([\s\S]*?)<\/Framework>/g,
+                ),
+            ].map((match) => match[1] ?? "");
+            for (const block of blocks) {
+                const fences = [
+                    ...block.matchAll(/^```(\w+)[^\n]*\n([\s\S]*?)^```/gm),
+                ];
+                expect(
+                    fences.length,
+                    `${slug}: a Svelte block with no code`,
+                ).toBeGreaterThan(0);
+                for (const [, lang = "", code = ""] of fences) {
+                    expect(
+                        ["svelte", "ts", "bash"],
+                        `${slug}: a ${lang} fence`,
+                    ).toContain(lang);
+                    expect(code, slug).not.toMatch(
+                        /@fragiola\/flow-(react|vue)\b/,
+                    );
+                    if (lang === "ts") {
+                        expect(
+                            code,
+                            `${slug}: plain TypeScript of another package`,
+                        ).not.toMatch(/from "(react|vue)"/);
+                    }
+                    if (lang !== "svelte") continue;
+                    const { warnings } = compile(code, {
+                        runes: true,
+                        filename: `${slug}.svelte`,
+                    });
+                    expect(
+                        warnings.map((warning) => warning.message),
+                        slug,
+                    ).toEqual([]);
+                    compiled += 1;
+                }
+            }
+        }
+        expect(compiled).toBeGreaterThan(100);
+    });
+
+    it("closes every block, and writes a framework's code in its block only (or on its own page)", () => {
+        for (const slug of allPages()) {
+            const mdx = read(join(API, "..", `${slug}.mdx`));
+            expect(
+                mdx.split("<Framework ").length,
+                `${slug}: a <Framework> left open`,
+            ).toBe(mdx.split("</Framework>").length);
+            const fences = [
+                ...outsideFrameworks(mdx).matchAll(
+                    /^```(\w+)[^\n]*\n([\s\S]*?)^```/gm,
+                ),
+            ];
+            for (const framework of ["vue", "svelte"]) {
+                if (slug === `api/primitives/${framework}`) continue;
+                for (const [, lang, code] of fences) {
+                    expect(
+                        lang,
+                        `${slug}: a ${framework} snippet outside a block`,
+                    ).not.toBe(framework);
+                    expect(
+                        code,
+                        `${slug}: the ${framework} package outside a block`,
+                    ).not.toContain(`@fragiola/flow-${framework}`);
+                }
             }
         }
     });

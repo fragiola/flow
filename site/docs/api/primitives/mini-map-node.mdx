@@ -36,6 +36,20 @@ node is not shown. Give it its fill, through `data-selected` for the selected lo
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<MiniMap>
+    {#snippet children(view)}
+        {#each view.nodes as node (node.nodeId)}
+            <MiniMapNode nodeId={node.nodeId} class="fill-gray-300 data-selected:fill-blue-500" />
+        {/each}
+    {/snippet}
+</MiniMap>
+```
+
+</Framework>
+
 ## Props
 
 `MiniMapNodeProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and

@@ -43,6 +43,26 @@ the framework never renders a transform on it, so a pan or a zoom re-renders not
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Root {features} defaultNodes={nodes} class="size-full">
+    <Flow.Background variant="dots" />
+    <Flow.Viewport>
+        <Flow.Edges>
+            {#snippet children(edge)}<MyEdge {edge} />{/snippet}
+        </Flow.Edges>
+        <Flow.Nodes>
+            {#snippet children(node)}<MyNode {node} />{/snippet}
+        </Flow.Nodes>
+        <Flow.ConnectionLine />
+    </Flow.Viewport>
+    <Flow.SelectionBox />
+</Flow.Root>
+```
+
+</Framework>
+
 Read the viewport with [`useViewport`](/docs/api/primitives/hooks) and change it with the engine
 (`engine.run("set-viewport", { x, y, zoom })`, `"fit-view"`): see
 [The viewport](/docs/concepts/viewport).

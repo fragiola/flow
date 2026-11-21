@@ -6,8 +6,8 @@ description: What the package does for a node-based editor (panning, zooming, dr
 A node-based editor shows **nodes** joined by **edges** on a canvas you pan and zoom: a workflow
 builder, a data pipeline, a mind map, a state machine. Each node has **handles**, the points an
 edge starts or ends at, and a user draws a **connection** from one handle to another to add an
-edge. `@fragiola/flow-react` (React 19) and `@fragiola/flow-vue` (Vue 3.5) give you that behaviour
-as headless primitives under one namespace, `Flow.*`, over a framework-free core, `@fragiola/flow`.
+edge. `@fragiola/flow-react` (React 19), `@fragiola/flow-vue` (Vue 3.5) and `@fragiola/flow-svelte`
+(Svelte 5) give you that behaviour as headless primitives under one namespace, `Flow.*`, over a framework-free core, `@fragiola/flow`.
 
 What the package gives you:
 
@@ -116,6 +116,52 @@ const nodes: FlowNodeInput[] = [
         </Flow.Viewport>
     </Flow.Root>
 </template>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="pipeline.svelte"
+<script lang="ts">
+    import { Flow, type FlowNodeInput } from "@fragiola/flow-svelte";
+    import { connection } from "@fragiola/flow-svelte/connection";
+    import { drag } from "@fragiola/flow-svelte/drag";
+
+    const features = [drag(), connection()] as const;
+
+    const nodes: FlowNodeInput[] = [
+        { id: "read", type: "step", position: { x: 0, y: 0 }, data: { label: "Read" } },
+        { id: "write", type: "step", position: { x: 0, y: 120 }, data: { label: "Write" } },
+    ];
+</script>
+
+<Flow.Root
+    {features}
+    defaultNodes={nodes}
+    defaultEdges={[{ id: "read-write", source: "read", target: "write" }]}
+    class="h-96 bg-gray-50"
+>
+    <Flow.Viewport>
+        <Flow.Edges>
+            {#snippet children(edge)}
+                <Flow.Edge {edge}>
+                    <Flow.EdgePath class="stroke-gray-400" />
+                </Flow.Edge>
+            {/snippet}
+        </Flow.Edges>
+        <Flow.Nodes>
+            {#snippet children(node)}
+                <Flow.Node {node} class="rounded border bg-white px-3 py-2 select-none">
+                    {String(node.data.label)}
+                    <Flow.Handle type="target" side="top" class="size-2 rounded-full bg-gray-500" />
+                    <Flow.Handle type="source" side="bottom" class="size-2 rounded-full bg-gray-500" />
+                </Flow.Node>
+            {/snippet}
+        </Flow.Nodes>
+        <Flow.ConnectionLine class="stroke-blue-500" />
+    </Flow.Viewport>
+</Flow.Root>
 ```
 
 </Framework>

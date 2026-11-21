@@ -76,6 +76,37 @@ swap the icon.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<script lang="ts">
+    import { Flow } from "@fragiola/flow-svelte";
+    import { LockIcon, MaximizeIcon, MinusIcon, PlusIcon, UnlockIcon } from "@lucide/svelte";
+</script>
+
+<Flow.Controls role="group" aria-label="Zoom and lock" class="absolute bottom-3 start-3 flex flex-col">
+    <Flow.ZoomIn aria-label="Zoom in" class="control">
+        <PlusIcon />
+    </Flow.ZoomIn>
+    <Flow.ZoomOut aria-label="Zoom out" class="control">
+        <MinusIcon />
+    </Flow.ZoomOut>
+    <Flow.FitView aria-label="Fit view" class="control">
+        <MaximizeIcon />
+    </Flow.FitView>
+    <Flow.ToggleInteractive aria-label="Lock the flow" class="control">
+        {#snippet children({ state })}
+            {#if state.interactive}<UnlockIcon />{:else}<LockIcon />{/if}
+        {/snippet}
+    </Flow.ToggleInteractive>
+</Flow.Controls>
+```
+
+In Svelte, a button's `children` snippet gets its state (`{#snippet children({ state })}`): no
+`render` needed to swap the icon.
+
+</Framework>
+
 | button | runs | disabled while |
 | --- | --- | --- |
 | `Flow.ZoomIn` | `zoom-in` (a step of `zoomStep`, default 1.2, around the root's centre) | at `maxZoom` |
@@ -104,6 +135,14 @@ wheel's and a pinch's:
 
 ```vue
 <Flow.Root :min-zoom="0.25" :max-zoom="2" :zoom-step="1.5" :fit-view="{ padding: 0.1 }" … />
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Root minZoom={0.25} maxZoom={2} zoomStep={1.5} fitView={{ padding: 0.1 }} … />
 ```
 
 </Framework>
@@ -150,6 +189,26 @@ const viewport = useViewport();
 
 `useViewport` is a computed ref in Vue: a template unwraps it (`viewport.zoom`), a script reads
 `viewport.value`.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="zoom-readout.svelte"
+<script lang="ts">
+    import { useFlow, useViewport } from "@fragiola/flow-svelte";
+
+    const flow = useFlow();
+    const viewport = useViewport();
+</script>
+
+<button type="button" onclick={() => flow.engine.run("zoom-to", { zoom: 1 })}>
+    {Math.round(viewport.current.zoom * 100)}%
+</button>
+```
+
+`useViewport` gives `{ current }` in Svelte: a template and a script both read
+`viewport.current`, which follows the view.
 
 </Framework>
 
@@ -228,6 +287,41 @@ const Flow = typedFlow<Types, typeof features>();
 ```
 
 In Vue, the children function is `MiniMap`'s default scoped slot, `v-slot="{ view }"`.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<script module lang="ts">
+    import { MiniMap, MiniMapMask, MiniMapNode, minimap } from "@fragiola/flow-svelte/minimap";
+
+    const features = [selection(), drag(), minimap()] as const;
+</script>
+
+<script lang="ts">
+    import { typedFlow } from "@fragiola/flow-svelte";
+
+    const Flow = typedFlow<Types, typeof features>();
+</script>
+
+<MiniMap
+    width={180}
+    height={130}
+    role="img"
+    aria-label="Minimap of the route"
+    class="absolute end-3 bottom-3 rounded border bg-palette-base"
+>
+    {#snippet children(view)}
+        {#each view.nodes as node (node.nodeId)}
+            <MiniMapNode nodeId={node.nodeId} class="fill-palette-line data-selected:fill-(--fl-edge-selected)" />
+        {/each}
+        <MiniMapMask class="fill-(--fl-minimap-mask) stroke-(--fl-edge-selected)" />
+    {/snippet}
+</MiniMap>
+```
+
+In Svelte, the children function is `MiniMap`'s `children` snippet, `{#snippet children(view)}`.
 
 </Framework>
 

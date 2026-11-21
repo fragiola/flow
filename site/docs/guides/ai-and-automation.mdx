@@ -106,6 +106,41 @@ export function commandOf(model: CommandsModel, tool: string): CommandName | und
 
 </Framework>
 
+<Framework name="svelte">
+
+```ts title="tools.ts"
+import type { CommandInfo, CommandName, JsonSchema } from "@fragiola/flow-svelte";
+
+/** What the tools read of a model: any `FlowModel`, typed by your registry or not, fits. */
+interface CommandsModel {
+    get(key: "commands"): readonly CommandInfo[];
+}
+
+/** The provider-neutral shape: rename the fields to what your API expects. */
+interface ToolDefinition {
+    name: string;
+    description: string;
+    input_schema: JsonSchema;
+}
+
+const toolName = (command: CommandName) => command.replaceAll(".", "_");
+
+export function toolsOf(model: CommandsModel): ToolDefinition[] {
+    return model.get("commands").map((info) => ({
+        name: toolName(info.name),
+        description: info.description,
+        input_schema: info.payloadSchema,
+    }));
+}
+
+/** The command a tool call names, back from its tool name. */
+export function commandOf(model: CommandsModel, tool: string): CommandName | undefined {
+    return model.get("commands").find((info) => toolName(info.name) === tool)?.name;
+}
+```
+
+</Framework>
+
 Leave the gesture commands out if the assistant has no use for them, or keep a smaller list: the
 tools are yours to pick. The full reference of every command is [Commands](/docs/api/commands).
 
@@ -172,6 +207,22 @@ model.use((ctx, next) => {
 
 ```ts
 import { veto } from "@fragiola/flow-vue";
+
+model.use((ctx, next) => {
+    if (ctx.meta?.source !== "assistant") return next();
+    if (ctx.command === "node.remove" || ctx.command === "selection.remove") {
+        return veto("the assistant may not remove nodes");
+    }
+    return next();
+});
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```ts
+import { veto } from "@fragiola/flow-svelte";
 
 model.use((ctx, next) => {
     if (ctx.meta?.source !== "assistant") return next();

@@ -70,6 +70,34 @@ In Vue, the children function is the default scoped slot, `v-slot="{ view }"`.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<script lang="ts">
+    import { typedFlow } from "@fragiola/flow-svelte";
+    import { MiniMap, MiniMapMask, MiniMapNode, minimap } from "@fragiola/flow-svelte/minimap";
+
+    const features = [minimap()] as const;
+    const Flow = typedFlow<Types, typeof features>();
+</script>
+
+<Flow.Root {features} defaultNodes={nodes} class="relative size-full">
+    <Flow.Viewport>…</Flow.Viewport>
+    <MiniMap width={180} height={130} role="img" aria-label="Minimap" class="absolute right-3 bottom-3">
+        {#snippet children(view)}
+            {#each view.nodes as node (node.nodeId)}
+                <MiniMapNode nodeId={node.nodeId} class="fill-gray-300" />
+            {/each}
+            <MiniMapMask class="fill-black/10" />
+        {/snippet}
+    </MiniMap>
+</Flow.Root>
+```
+
+In Svelte, the children function is the `children` snippet, `{#snippet children(view)}`.
+
+</Framework>
+
 ## Props
 
 `MiniMapProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and

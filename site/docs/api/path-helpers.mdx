@@ -60,6 +60,33 @@ bind `props` on your element and read the engine's ends from `state.path`.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="rounded-edge.svelte"
+<script lang="ts">
+    import { type FlowEdge, smoothStepPath, typedFlow } from "@fragiola/flow-svelte";
+
+    /** An app edge type drawn from the engine's ends: a smooth step with wider corners. */
+    let { edge }: { edge: FlowEdge<Types> } = $props();
+
+    const Flow = typedFlow<Types>();
+</script>
+
+<Flow.Edge {edge}>
+    <Flow.EdgePath>
+        {#snippet render({ props, state })}
+            <path {...props} d={smoothStepPath({ ...state.path, borderRadius: 16 }).path} />
+        {/snippet}
+    </Flow.EdgePath>
+</Flow.Edge>
+```
+
+In Svelte, `render={(props, state) => …}` is the `render` snippet,
+`{#snippet render({ props, state })}`: spread `props` on your element and read the engine's ends
+from `state.path`.
+
+</Framework>
+
 `state.path` is the edge's `EdgePath` (`engine.get("edge-path-by", { edgeId })`): its own path and
 label, and its ends (`PathEnds`), so spreading it gives a helper everything it needs. More on app
 edge types: [Custom edges](/docs/guides/custom-edges).

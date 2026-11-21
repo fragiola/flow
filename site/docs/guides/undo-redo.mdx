@@ -225,6 +225,51 @@ In Vue, the snapshot goes into a `shallowRef` from `history.subscribe` (what
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="editor.svelte"
+<script lang="ts">
+    import { createFlowModel, typedFlow } from "@fragiola/flow-svelte";
+    import { createUndoHistory, handleUndoKeys, type UndoHistory, type UndoSnapshot } from "./undo";
+
+    const Flow = typedFlow<Types, typeof features>();
+    const model = createFlowModel<Types, typeof features>({ version: 1, nodes, edges }, { features });
+
+    // one history per model, made once mounted (never during a server render), as React's effect
+    let history = $state.raw<UndoHistory | null>(null);
+    let snapshot = $state.raw<UndoSnapshot | null>(null);
+    $effect(() => {
+        const created = createUndoHistory(model);
+        history = created;
+        snapshot = created.getSnapshot();
+        const unsubscribe = created.subscribe(() => {
+            snapshot = created.getSnapshot();
+        });
+        const onKeyDown = (event: KeyboardEvent) => handleUndoKeys(created, event);
+        window.addEventListener("keydown", onKeyDown);
+        return () => {
+            window.removeEventListener("keydown", onKeyDown);
+            unsubscribe();
+            created.dispose();
+        };
+    });
+</script>
+
+<Flow.Root {model} class="flow">
+    <!-- the viewport, edges and nodes -->
+    <div role="toolbar" aria-label="History">
+        <button type="button" disabled={!snapshot?.canUndo} onclick={() => history?.undo()}>Undo</button>
+        <button type="button" disabled={!snapshot?.canRedo} onclick={() => history?.redo()}>Redo</button>
+    </div>
+</Flow.Root>
+```
+
+In Svelte, the snapshot goes into a `$state.raw` from `history.subscribe` (what
+`useSyncExternalStore` does in React), and the history is made in an `$effect` (client only)
+whose cleanup disposes it (React's effect).
+
+</Framework>
+
 `handleUndoKeys` maps Ctrl/⌘ + Z to undo and Ctrl/⌘ + Shift + Z or Ctrl/⌘ + Y to redo, and leaves
 a text field its own undo.
 

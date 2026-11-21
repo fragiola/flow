@@ -9,6 +9,7 @@ import {
     relativeTo,
     servedImports,
     smokeVersion,
+    svelteAttwProblems,
     unlistedPackages,
     withoutSource,
 } from "../../scripts/check-package.ts";
@@ -32,6 +33,57 @@ describe("the packed package check", () => {
 
     it("accepts dist-only exports with the types, import and default conditions", () => {
         expect(exportProblems(published)).toEqual([]);
+    });
+
+    it("accepts the svelte condition a Svelte package publishes its components under", () => {
+        expect(
+            exportProblems({
+                ".": {
+                    types: "./dist/index.d.ts",
+                    svelte: "./dist/index.js",
+                    default: "./dist/index.js",
+                },
+            }),
+        ).toEqual([]);
+    });
+
+    it("accepts, for a Svelte package, attw's internal resolution errors of .svelte imports only", () => {
+        expect(
+            svelteAttwProblems([
+                { kind: "NoResolution", resolutionKind: "node10" },
+                { kind: "CJSResolvesToESM", resolutionKind: "node16-cjs" },
+                {
+                    kind: "InternalResolutionError",
+                    moduleSpecifier: "./components/root.svelte",
+                    resolutionOption: "node16",
+                },
+            ]),
+        ).toEqual([]);
+        // a missing entry under the resolutions an ESM-only package serves, a .svelte import
+        // bundler cannot resolve, any other internal import: reported
+        expect(
+            svelteAttwProblems([
+                { kind: "NoResolution", resolutionKind: "node16-esm" },
+                { kind: "NoResolution", resolutionKind: "bundler" },
+                {
+                    kind: "InternalResolutionError",
+                    moduleSpecifier: "./components/root.svelte",
+                    resolutionOption: "bundler",
+                },
+                {
+                    kind: "InternalResolutionError",
+                    moduleSpecifier: "./utils/render.js",
+                    resolutionOption: "node16",
+                },
+                { kind: "FalseESM", resolutionKind: "node16-esm" },
+            ]).map((problem) => problem.kind),
+        ).toEqual([
+            "NoResolution",
+            "NoResolution",
+            "InternalResolutionError",
+            "InternalResolutionError",
+            "FalseESM",
+        ]);
     });
 
     it("rejects any other condition, and a target outside dist", () => {
@@ -148,6 +200,7 @@ describe("the adapters the package check covers", () => {
         expect(ADAPTERS.map(({ dir, framework }) => [dir, framework])).toEqual([
             ["react", "react"],
             ["vue", "vue"],
+            ["svelte", "svelte"],
         ]);
     });
 
@@ -211,13 +264,41 @@ describe("the adapters the package check covers", () => {
         expect(() => smokeVersion("vue", "left-pad")).toThrow(/no pin/);
     });
 
+    it("pin the Svelte smoke app at examples/svelte's pins: svelte-check on TypeScript 6", () => {
+        const read = (path: string) =>
+            JSON.parse(
+                readFileSync(join(import.meta.dirname, "../..", path), "utf8"),
+            ) as {
+                dependencies?: Record<string, string>;
+                devDependencies?: Record<string, string>;
+            };
+        const examples = read("examples/svelte/package.json");
+        const pins = { ...examples.dependencies, ...examples.devDependencies };
+        for (const name of [
+            "svelte",
+            "vite",
+            "@sveltejs/vite-plugin-svelte",
+            "svelte-check",
+            "typescript",
+        ]) {
+            expect(pins[name], name).toBeDefined();
+            expect(smokeVersion("svelte", name), name).toBe(pins[name]);
+        }
+        // svelte-check does not run on TypeScript 7: the app and the package pin 6
+        expect(smokeVersion("svelte", "typescript")).toMatch(/^6\./);
+        expect(
+            read("packages/svelte/package.json").devDependencies?.typescript,
+        ).toBe(pins.typescript);
+        expect(() => smokeVersion("svelte", "left-pad")).toThrow(/no pin/);
+    });
+
     it("finds a package that is neither the core nor a listed adapter", () => {
-        const dirs = ["core", "react", "vue", "svelte", "solid"];
-        expect(unlistedPackages(dirs)).toEqual(["svelte", "solid"]);
+        const dirs = ["core", "react", "vue", "svelte", "angular", "solid"];
+        expect(unlistedPackages(dirs)).toEqual(["angular", "solid"]);
         expect(
             unlistedPackages(dirs, [
                 ...ADAPTERS,
-                { dir: "svelte", framework: "svelte", smoke: async () => {} },
+                { dir: "angular", framework: "angular", smoke: async () => {} },
             ]),
         ).toEqual(["solid"]);
     });

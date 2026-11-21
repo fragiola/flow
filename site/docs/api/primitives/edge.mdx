@@ -39,6 +39,25 @@ In Vue, its default slot (its parts) gets `{ state }`, the `EdgeState` of the ta
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Edges>
+    {#snippet children(edge)}
+        <Flow.Edge {edge} aria-label="{edge.source} to {edge.target}">
+            <Flow.EdgePath class="stroke-gray-400 stroke-2" />
+            {#if edge.data?.label}
+                <Flow.EdgeLabel>{edge.data.label}</Flow.EdgeLabel>
+            {/if}
+        </Flow.Edge>
+    {/snippet}
+</Flow.Edges>
+```
+
+In Svelte, its `children` snippet (its parts) gets `{ state }`, the `EdgeState` of the table below.
+
+</Framework>
+
 The path follows the edge's `type`: `bezier` (none is `bezier`), `smoothstep`, `step`,
 `straight`. An app type gets the bezier path and its ends, to draw its own `d` on
 `Flow.EdgePath` (see [Custom edges](/docs/guides/custom-edges)). For an edge drawn by hand,

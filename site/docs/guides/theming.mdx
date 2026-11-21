@@ -37,6 +37,16 @@ colours:
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Root class="palette-surface bg-palette-soft text-palette-contrast" … />
+<Flow.Node {node} class="palette-raised border border-palette-line bg-palette-base" />
+<Flow.Node {node} class="palette-blue bg-palette-soft text-palette-accent" />
+```
+
+</Framework>
+
 A node of another kind takes another palette class (`palette-green` for a trigger, `palette-orange`
 for a condition): its roles change, its markup does not.
 
@@ -92,6 +102,23 @@ And per palette, the colours that depend on it: `--fl-canvas-bg`, `--fl-grid-col
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Node
+    {node}
+    class="rounded-(--fl-node-radius) border-(length:--fl-node-border) border-(--fl-node-line) bg-(--fl-node-bg) p-(--fl-node-padding) shadow-(--fl-node-shadow)"
+/>
+<Flow.Handle
+    type="source"
+    side="bottom"
+    class="size-(--fl-handle-size) rounded-(--fl-handle-radius) border-(length:--fl-handle-border) border-(--fl-handle-line) bg-(--fl-handle-bg)"
+/>
+<Flow.EdgePath class="fill-none stroke-(--fl-edge-color) stroke-(length:--fl-edge-width) [stroke-dasharray:var(--fl-edge-dash)]" />
+```
+
+</Framework>
+
 Geometry is never a token: positions and sizes are the flow's document.
 
 ## A background pattern per theme
@@ -113,6 +140,16 @@ pattern, and let the theme's tokens show one:
 
 ```vue
 <Flow.Background variant="dots" :size="2" class="text-(--fl-grid-color) [display:var(--fl-grid-dots)]" />
+<Flow.Background variant="lines" class="text-(--fl-grid-color) [display:var(--fl-grid-lines)]" />
+<Flow.Background variant="cross" class="text-(--fl-grid-color) [display:var(--fl-grid-cross)]" />
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Background variant="dots" size={2} class="text-(--fl-grid-color) [display:var(--fl-grid-dots)]" />
 <Flow.Background variant="lines" class="text-(--fl-grid-color) [display:var(--fl-grid-lines)]" />
 <Flow.Background variant="cross" class="text-(--fl-grid-color) [display:var(--fl-grid-cross)]" />
 ```

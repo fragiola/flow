@@ -42,6 +42,28 @@ content.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Node {node}>
+    {#snippet render({ props, children })}<li {...props}>{@render children()}</li>{/snippet}
+</Flow.Node>
+
+<Flow.Edge {edge}>
+    {#snippet render({ props, state, children })}
+        <g {...props} opacity={state.reconnecting ? 0.4 : 1}>
+            {@render children()}
+        </g>
+    {/snippet}
+</Flow.Edge>
+```
+
+In Svelte, both forms of `render` are the `render` snippet, `{ props, state, children }`:
+`{...props}` carries the attributes, the handlers, the structural style and the attachment that
+registers the element, and `children` is the part's content.
+
+</Framework>
+
 `props.ref` is a callback ref, so it fits any element: `render={(props) => <section {...props} />}`
 needs no cast. The props carry what the engine depends on: the ref that registers a node or a
 handle, `data-flow-part` and `data-flow-id`, the state attributes and the structural style.
@@ -78,6 +100,24 @@ slot.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Node {node} class={(state) => ["node data-selected:ring-2", state.dragging && "opacity-80"]}>
+    {#snippet children({ state })}
+        {node.data.label}
+        {#if state.selected}<span>(selected)</span>{/if}
+    {/snippet}
+</Flow.Node>
+```
+
+In Svelte, `class` (any of Svelte's forms: a string, an array, an object) and `style` (a CSS
+string or a record) take a value or a function of the state, as in React. A part's state also
+reaches the template through its `data-*` attributes, its `children` snippet (`{ state }`) and
+its `render` snippet.
+
+</Framework>
+
 Each part's state is listed on its API page (`NodeState`, `HandleState`, `EdgeState`, …). For a
 style that only follows state, prefer the `data-*` attributes from a stylesheet: the same CSS then
 works for every framework's adapter ([State attributes](/docs/concepts/state-attributes)).
@@ -108,6 +148,15 @@ Two placements are defaults your style may override: where a `Flow.Handle` sits 
 ```vue
 <Flow.Handle type="source" side="right" handle-id="yes" :style="{ top: '30%' }" />
 <Flow.Handle type="source" side="right" handle-id="no" :style="{ top: '70%' }" />
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Handle type="source" side="right" handleId="yes" style="top: 30%" />
+<Flow.Handle type="source" side="right" handleId="no" style={{ top: "70%" }} />
 ```
 
 </Framework>
@@ -146,10 +195,30 @@ element. `EdgeLabel` and `NodeToolbar` render their element elsewhere: reach it 
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<script lang="ts">
+    // the node's element once mounted, null after
+    let element = $state<HTMLDivElement | null>();
+</script>
+
+<Flow.Node bind:ref={element} {node} />
+<!-- or an attachment, which runs on the element (the render snippet's one too) -->
+<Flow.Node {node} {@attach (element) => console.log(element)} />
+```
+
+In Svelte, `bind:ref` is the element (`undefined` until mounted, `null` after), and an
+attachment on a part reaches its element. `EdgeLabel` and `NodeToolbar` mount their element
+elsewhere; both reach it there.
+
+</Framework>
+
 ## Props are forwarded, handlers composed
 
 Every prop a part does not know goes to its element: `aria-*`, `data-*`, `title`, `role`,
-`tabIndex`, event handlers (in Vue, every fallthrough attribute and listener). A handler you pass
+`tabIndex`, event handlers (in Vue, every fallthrough attribute and
+listener; in Svelte, every attribute and `on…` handler prop). A handler you pass
 runs after the part's own. Gestures are not the framework's handlers: the engine listens on the root and resolves every press from the part attributes, so a
 field, a button or a link inside a node starts no drag, and neither does an element marked
 `data-flow-no-gesture`.

@@ -42,6 +42,24 @@ slot reads does, whatever its neighbours do.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Edges>
+    {#snippet children(edge)}
+        <Flow.Edge {edge}>
+            <Flow.EdgePath class="stroke-gray-400 data-selected:stroke-blue-500" />
+        </Flow.Edge>
+    {/snippet}
+</Flow.Edges>
+```
+
+In Svelte, the children function is the `children` snippet, `{#snippet children(edge)}`,
+rendered in a keyed `{#each}`: an edge renders again when its edge object changes, or when
+something its snippet reads does, whatever its neighbours do.
+
+</Framework>
+
 The layer lets presses through to the pane; the edges' own parts take them. Each edge's render is
 memoized on the edge and the children function (its path re-renders by itself): keep the function
 stable, as for [`Flow.Nodes`](/docs/api/primitives/nodes).

@@ -4,9 +4,13 @@
 // import of a feature's entry point (`@fragiola/flow…/selection`). Run by `pnpm build`, after the
 // packages built. From Tree (fragiola/tree, scripts/check-features.ts), same author and licence:
 // it reads the source maps (not Data Grid's string markers), since the core names every feature's
-// keys in `FEATURE_KEYS` (to refuse them when the feature is not installed).
+// keys in `FEATURE_KEYS` (to refuse them when the feature is not installed). A package that is not
+// bundled (the Svelte adapter: `@sveltejs/package` writes `dist/` file for file from `src/`, its
+// `.svelte` components as they are) has no source maps: each built file is its own source
+// (`dist/minimap/mini-map.svelte` is `src/minimap/mini-map.svelte`), and its imports are followed
+// through the folders (`../utils/render.js`, `./edge-path.svelte`).
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 
 const root = join(import.meta.dirname, "..");
 
@@ -37,13 +41,16 @@ export const FEATURES: readonly FeatureSources[] = [
     ],
 }));
 
-/** The chunks a built file imports (`./name.js`), by file name. */
+/**
+ * The built files a built file imports (`./name.js`, `../utils/x.js`, `./part.svelte`), relative
+ * to its folder (`name.js`, `../utils/x.js`).
+ */
 export function chunksOf(source: string): string[] {
     return [
         ...source.matchAll(
-            /(?:from|import)\s*\(?\s*["']\.\/([^"']+\.m?js)["']/g,
+            /(?:from|import)\s*\(?\s*["'](\.{1,2}\/[^"']+\.(?:m?js|svelte))["']/g,
         ),
-    ].map(([, name]) => name ?? "");
+    ].map(([, path]) => (path ?? "").replace(/^\.\//, ""));
 }
 
 /** An import of a feature's entry point, from any package: `@fragiola/<package>/<subpath>`. */
@@ -66,14 +73,16 @@ export function mapSources(map: string | undefined): string[] {
 
 /**
  * The feature code a main entry holds, through the chunks it imports: one line per feature source
- * or feature import found, with the file it is in. `read` gives a built file's source by its name
- * relative to the entry's folder, and `readMap` its source map (`undefined` for none).
+ * or feature import found, with the file it is in. `read` gives a built file's source by its path
+ * relative to the entry's folder, and `readMap` its source map (`undefined` for none). With
+ * `unbundled` (a build that mirrors `src/`, without source maps), each file is its own source.
  */
 export function featureLeaks(
     main: string,
     read: (name: string) => string | undefined,
     readMap: (name: string) => string | undefined,
     features: readonly FeatureSources[] = FEATURES,
+    unbundled = false,
 ): string[] {
     const leaks: string[] = [];
     const seen = new Set<string>();
@@ -82,9 +91,9 @@ export function featureLeaks(
         seen.add(name);
         const source = read(name);
         if (source === undefined) return;
-        const sources = mapSources(readMap(name)).map((path) =>
-            path.replaceAll("\\", "/"),
-        );
+        const sources = (
+            unbundled ? [`../src/${name}`] : mapSources(readMap(name))
+        ).map((path) => path.replaceAll("\\", "/"));
         for (const { subpath, folders } of features) {
             if (importsSubpath(source, subpath)) {
                 leaks.push(`${name}: imports the ${subpath} entry`);
@@ -95,7 +104,9 @@ export function featureLeaks(
                 }
             }
         }
-        for (const chunk of chunksOf(source)) visit(chunk);
+        for (const chunk of chunksOf(source)) {
+            visit(posix.normalize(posix.join(posix.dirname(name), chunk)));
+        }
     };
     visit(main);
     return leaks;
@@ -114,10 +125,21 @@ function main() {
             return existsSync(path) ? readFileSync(path, "utf8") : undefined;
         };
         const readMap = (file: string) => read(`${file}.map`);
-        if (readMap("index.js") === undefined) {
+        // a Svelte package (`svelte` in its manifest) is built file for file, without maps
+        const manifest = JSON.parse(
+            readFileSync(join(root, "packages", pkg, "package.json"), "utf8"),
+        ) as { svelte?: string };
+        const unbundled = manifest.svelte !== undefined;
+        if (!unbundled && readMap("index.js") === undefined) {
             problems.push(`packages/${pkg}: no source map for the main entry`);
         }
-        for (const leak of featureLeaks("index.js", read, readMap)) {
+        for (const leak of featureLeaks(
+            "index.js",
+            read,
+            readMap,
+            FEATURES,
+            unbundled,
+        )) {
             problems.push(`packages/${pkg}/dist/${leak}`);
         }
     }

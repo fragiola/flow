@@ -137,6 +137,58 @@ export const connectionRules: Middleware<Types, typeof features> = (ctx, next) =
 
 </Framework>
 
+<Framework name="svelte">
+
+```ts title="connection-rules.ts"
+import { type FlowEdge, type FlowTypes, type Middleware, veto } from "@fragiola/flow-svelte";
+import { connection } from "@fragiola/flow-svelte/connection";
+import { drag } from "@fragiola/flow-svelte/drag";
+import { selection } from "@fragiola/flow-svelte/selection";
+
+type Port = "number" | "text";
+
+export interface Types extends FlowTypes {
+    readonly nodes: { block: { label: string; inputs: Port[]; outputs: Port[] } };
+}
+
+export const features = [selection(), drag(), connection()] as const;
+
+/** A handle id says its port's type: `number-0`, `text-1`. */
+const portType = (handleId: string | undefined) => handleId?.split("-")[0] as Port | undefined;
+
+/** Whether `to` already reaches `from`: an edge from `from` to `to` would close a cycle. */
+function reaches(edges: readonly FlowEdge<Types>[], to: string, from: string): boolean {
+    const seen = new Set<string>();
+    const queue = [to];
+    while (queue.length > 0) {
+        const id = queue.shift() as string;
+        if (id === from) return true;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        for (const edge of edges) if (edge.source === id) queue.push(edge.target);
+    }
+    return false;
+}
+
+export const connectionRules: Middleware<Types, typeof features> = (ctx, next) => {
+    if (ctx.command !== "edge.add") return next();
+    const { source, target, sourceHandle, targetHandle } = ctx.payload;
+    if (portType(sourceHandle) !== portType(targetHandle)) {
+        return veto("a port only joins a port of its own type");
+    }
+    if (source === target || reaches(ctx.state.edges, target, source)) {
+        return veto("that edge would close a cycle");
+    }
+    const taken = ctx.state.edges.some(
+        (edge) => edge.target === target && edge.targetHandle === targetHandle,
+    );
+    if (taken) return veto("that input already has an edge");
+    return next();
+};
+```
+
+</Framework>
+
 `ctx.state` is the committed document the command applies to; `ctx.dryRun` is true while the
 engine asks during a drag, so a middleware with side effects (a log, a request) skips them then.
 
@@ -191,6 +243,29 @@ model.use(connectionRules);
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="pipeline.svelte"
+<script lang="ts">
+    import { createFlowModel, type FlowJson, typedFlow } from "@fragiola/flow-svelte";
+    import { connectionRules, features, type Types } from "./connection-rules";
+
+    let { json }: { json: FlowJson<Types> } = $props();
+    const Flow = typedFlow<Types, typeof features>();
+
+    // created once, from the first json: another model would get another engine
+    // svelte-ignore state_referenced_locally
+    const model = createFlowModel<Types, typeof features>(json, { features });
+    model.use(connectionRules);
+</script>
+
+<Flow.Root {model} class="flow">
+    <!-- … -->
+</Flow.Root>
+```
+
+</Framework>
+
 The same rule now holds for code: `model.run("edge.add", …)` from a paste or an import returns
 `{ ok: false, error: { code: "vetoed", message } }`.
 
@@ -220,6 +295,20 @@ does `Flow.ConnectionLine`. Style both:
     type="target"
     side="left"
     handle-id="text-0"
+    class="handle data-valid:bg-(--fl-valid) data-invalid:bg-(--fl-invalid)"
+/>
+<Flow.ConnectionLine class="fill-none stroke-(--fl-edge-selected) data-invalid:stroke-(--fl-invalid)" />
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Handle
+    type="target"
+    side="left"
+    handleId="text-0"
     class="handle data-valid:bg-(--fl-valid) data-invalid:bg-(--fl-invalid)"
 />
 <Flow.ConnectionLine class="fill-none stroke-(--fl-edge-selected) data-invalid:stroke-(--fl-invalid)" />
@@ -280,6 +369,32 @@ The engine `useFlow` gives is there from `setup` on: subscribe there, and stop i
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="outcome.svelte"
+<script lang="ts">
+    import { useFlow } from "@fragiola/flow-svelte";
+
+    const flow = useFlow<Types, typeof features>();
+    let outcome = $state("Drag from an output to an input.");
+    $effect(() =>
+        flow.engine.subscribe((event) => {
+            if (event.type === "connect") outcome = "Connected.";
+            if (event.type === "connect-cancel") {
+                outcome = event.refused ? "Refused by the rules." : "Dropped nowhere.";
+            }
+        }),
+    );
+</script>
+
+<p role="status">{outcome}</p>
+```
+
+The engine `useFlow` gives is there from the first render: subscribe in an `$effect`, whose
+cleanup (the remover `subscribe` returns) stops the listener.
+
+</Framework>
+
 ## Move an edge's ends
 
 <Example id="edge-reconnect" />
@@ -327,6 +442,30 @@ const Flow = typedFlow<Types, typeof features>();
         <Flow.ReconnectAnchor end="target" :r="6" class="fill-transparent stroke-current" />
     </Flow.Edge>
 </template>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<script module lang="ts">
+    import { reconnection } from "@fragiola/flow-svelte/reconnection";
+
+    const features = [selection(), drag(), connection(), reconnection()] as const;
+</script>
+
+<script lang="ts">
+    import { typedFlow } from "@fragiola/flow-svelte";
+
+    const Flow = typedFlow<Types, typeof features>();
+</script>
+
+<Flow.Edge {edge}>
+    <Flow.EdgePath class="edge" />
+    <Flow.ReconnectAnchor end="source" r={6} class="fill-transparent stroke-current" />
+    <Flow.ReconnectAnchor end="target" r={6} class="fill-transparent stroke-current" />
+</Flow.Edge>
 ```
 
 </Framework>

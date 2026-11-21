@@ -46,6 +46,22 @@ import { MaximizeIcon, MinusIcon, PlusIcon } from "@lucide/vue";
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<script lang="ts">
+    import { MaximizeIcon, MinusIcon, PlusIcon } from "@lucide/svelte";
+</script>
+
+<Flow.Controls role="group" aria-label="Zoom" class="absolute bottom-3 left-3 flex flex-col">
+    <Flow.ZoomIn aria-label="Zoom in" class="p-1 data-disabled:opacity-40"><PlusIcon /></Flow.ZoomIn>
+    <Flow.ZoomOut aria-label="Zoom out" class="p-1 data-disabled:opacity-40"><MinusIcon /></Flow.ZoomOut>
+    <Flow.FitView aria-label="Fit view" class="p-1"><MaximizeIcon /></Flow.FitView>
+</Flow.Controls>
+```
+
+</Framework>
+
 <Example id="minimap-and-controls" />
 
 ## Props

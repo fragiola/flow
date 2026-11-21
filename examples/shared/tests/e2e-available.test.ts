@@ -48,8 +48,8 @@ describe("a spec's examples", () => {
 describe("a complete framework", () => {
     const available = ["basic"];
 
-    it("is React and Vue today: the other adapters ship their examples with their Epics", () => {
-        expect([...COMPLETE_FRAMEWORKS]).toEqual(["react", "vue"]);
+    it("is React, Vue and Svelte today: Angular ships its examples with its Epic", () => {
+        expect([...COMPLETE_FRAMEWORKS]).toEqual(["react", "vue", "svelte"]);
     });
 
     it("fails a spec whose example it lacks, instead of skipping it", () => {
@@ -62,11 +62,14 @@ describe("a complete framework", () => {
         expect(() =>
             skipOrFail("vue", available, ["workflow-builder"]),
         ).toThrow(/every vue example is required/);
+        expect(() =>
+            skipOrFail("svelte", available, ["workflow-builder"]),
+        ).toThrow(/every svelte example is required/);
     });
 
     it("skips a spec in a framework still being written", () => {
-        expect(skipOrFail("svelte", available, ["workflow-builder"])).toBe(
-            "svelte has no workflow-builder example",
+        expect(skipOrFail("angular", available, ["workflow-builder"])).toBe(
+            "angular has no workflow-builder example",
         );
     });
 });

@@ -54,6 +54,25 @@ the node's element.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Nodes>
+    {#snippet children(node)}
+        <Flow.Node {node} aria-label={node.data.label} class={(state) => ["node", state.selected && "node-selected"]}>
+            {node.data.label}
+            <Flow.Handle type="target" side="top" />
+            <Flow.Handle type="source" side="bottom" />
+        </Flow.Node>
+    {/snippet}
+</Flow.Nodes>
+```
+
+In Svelte, `class` and `style` take a value or a function of the state, as in React (`class`
+takes any of Svelte's forms: a string, an array, an object); `bind:ref` is the node's element.
+
+</Framework>
+
 It has no role and no name: give it the ones your app means (see
 [Accessible names](/docs/getting-started/accessible-names)), and `user-select: none` so a drag does
 not select its text. For a node rendered by hand, [`useNode`](/docs/api/primitives/hooks) gives
