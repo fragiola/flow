@@ -517,6 +517,11 @@ Decisions of the Vue adapter (#9):
   `shallowRef`s; lists given by the app go through `toRaw` (`plainList`), so no proxy reaches the
   model, and the model's frozen lists given back by `update:nodes` are never proxied (Vue skips
   frozen objects).
+- **A generic directive from the package is `any`-typed in a template** (ngc's type-check of a
+  directive declared as `FlowRootDirective<any, any>`, an app's case and `examples/angular`'s):
+  the core's `EdgeTypeOf<any>` is `string`, as `AnyTypes`'s, so an untyped `[defaultEdges]` or
+  `[(edges)]` with a custom edge type is taken (#17's review: only the built-in types were;
+  `examples/angular/tests/untyped-lists.ts` and the core's `tests/types/model.ts` keep it).
 - **Controlled lists reuse `commands-to`**, exactly React's algorithm (one `batch` with `meta:
   { source: "controlled" }`, step by step after a veto, the model's lists reported back when they
   differ from the props), in a `watch` of the two lists' identity; a model the app gives is brought
@@ -806,7 +811,8 @@ Decisions of the Angular adapter (#15):
   the page right after the event (the shared specs: `selection-and-keyboard` failed 4 runs of 5,
   `minimap-and-controls` always). After a model commit or an engine view change the root ticks the
   application in a microtask (`ApplicationRef.tick()`), once per root and task, as Vue and Svelte
-  flush theirs; Angular's own scheduled render follows and finds nothing to do. Alternative: each
+  flush theirs; Angular's own scheduled render follows and finds nothing to do. An error of that
+  render goes to the app's `ErrorHandler`, as one of Angular's scheduled renders does (#17's review). Alternative: each
   part writing its DOM from its own subscription (a control button's click wrote `disabled`
   directly, #16's first fix); refused: one place, and the direct write could leave a button
   disabled when the app's `(click)` undid the limit in the same task (#16's review).
@@ -819,9 +825,7 @@ Decisions of the Angular adapter (#15):
   render (cheap reads, one hook per element); `renderSoon` ticks the whole application, so with
   several roots or a large app around the flow each task with a flow change renders the app once
   more; a generic part (`[flowEdge]`) does not infer its type from an entity narrowed by an `@if`
-  around it (narrow inside the part, as `edge-types` does); with strict templates, an untyped
-  `[defaultEdges]` (`FlowEdgeInput[]` of the default `AnyTypes`) is refused by ngc's template check
-  though plain TypeScript accepts it (give a registry, or a model); the gestures' real feel is
+  around it (narrow inside the part, as `edge-types` does); the gestures' real feel is
   checked by the Angular examples' shared specs (#16: they needed the fix above).
 
 ## The playground and the examples (Issue #6)
