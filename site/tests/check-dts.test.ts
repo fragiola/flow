@@ -32,4 +32,18 @@ describe("the built declarations check", () => {
             ),
         ).toEqual(["readonly node: any;"]);
     });
+
+    it("ignores svelte2tsx's bindings member on a generic Svelte component, and only it", () => {
+        expect(
+            anyUses(
+                [
+                    "interface $$IsomorphicComponent {",
+                    "    <T extends FlowTypes = AnyTypes>(internal: unknown, props: Props<T>): {};",
+                    "    z_$$bindings?: ReturnType<__sveltets_Render<any, any>['bindings']>;",
+                    "    other?: ReturnType<__sveltets_Render<any>['bindings']>;",
+                    "}",
+                ].join("\n"),
+            ),
+        ).toEqual(['other?: ReturnType<__sveltets_Render<any>[""]>;']);
+    });
 });

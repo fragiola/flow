@@ -1,0 +1,10 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "types": ["@testing-library/jest-dom/vitest", "svelte"],
+        "allowJs": true,
+        "checkJs": true,
+        "allowImportingTsExtensions": true
+    },
+    "include": ["src", "tests", "*.config.ts", "*.config.js"]
+}

@@ -28,11 +28,20 @@ export function codeOnly(source: string): string {
  */
 const ANGULAR_METADATA = /^\s*static\s+ɵ(?:fac|dir|cmp|mod|inj|prov|pipe)\s*:/;
 
+/**
+ * svelte2tsx's own member on a generic Svelte component's declaration (`@sveltejs/package`): it
+ * reads the component's bindings at `any` type arguments (`z_$$bindings?:
+ * ReturnType<__sveltets_Render<any>['bindings']>`), only for Svelte's tooling to know what
+ * `bind:` takes; no consumer types anything with it.
+ */
+const SVELTE_BINDINGS = /^\s*z_\$\$bindings\?:/;
+
 /** The lines of a declaration file that use `any`. */
 export function anyUses(source: string): string[] {
     return codeOnly(source)
         .split("\n")
         .filter((line) => !ANGULAR_METADATA.test(line))
+        .filter((line) => !SVELTE_BINDINGS.test(line))
         .filter((line) => /(?<![\w$])any(?![\w$])/.test(line))
         .map((line) => line.trim());
 }

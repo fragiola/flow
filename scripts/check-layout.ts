@@ -31,9 +31,9 @@ const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /**
  * Whether one path segment follows the naming rule: kebab-case once its suffixes are removed
- * (`.test.ts`, `.d.ts`, `.directive.ts`, any extension). A leading `.` (`.github`) is a tool's
- * folder or file and is not checked; a leading `_` (`_kit`) marks a folder that is not an example,
- * and the rest of the name is checked.
+ * (`.test.ts`, `.d.ts`, `.directive.ts`, Svelte's `.svelte` and `.svelte.ts`, any extension). A
+ * leading `.` (`.github`) is a tool's folder or file and is not checked; a leading `_` (`_kit`)
+ * marks a folder that is not an example, and the rest of the name is checked.
  */
 export function isLayoutName(segment: string): boolean {
     if (FIXED_NAMES.has(segment) || segment.startsWith(".")) {
