@@ -151,6 +151,28 @@ describe("nodes", () => {
         expect(node.style.transform).toBe("translate(5px, 0px)");
     });
 
+    it("show a move before the next task: an arrow's step is on screen after a microtask (#16)", async () => {
+        const features = [selection(), keyboard()] as const;
+        const { container } = await render(TestFlow, {
+            features,
+            defaultNodes: [task("a")],
+        });
+        const node = part(container, "node", "a");
+        node.focus();
+        node.dispatchEvent(
+            new KeyboardEvent("keydown", {
+                key: "ArrowDown",
+                bubbles: true,
+                cancelable: true,
+            }),
+        );
+        // zoneless Angular renders in a later task; the root renders the flow's change sooner, so
+        // whatever reads the page right after the key (a test, an assistive technology) sees it
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(node.style.transform).toBe("translate(0px, 5px)");
+    });
+
     it("are not focusable without keyboard()", async () => {
         const { container } = await render(TestFlow, {
             defaultNodes: [task("a")],

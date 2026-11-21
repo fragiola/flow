@@ -1,4 +1,5 @@
 import {
+    ApplicationRef,
     afterNextRender,
     computed,
     Directive,
@@ -272,7 +273,28 @@ export class FlowRootDirective<
 
     private readonly current = signal<AnyFlowEngine | null>(null);
     private readonly revision = signal(0);
-    private readonly bump = () => this.revision.update((value) => value + 1);
+    private readonly bump = () => {
+        this.revision.update((value) => value + 1);
+        this.renderSoon();
+    };
+    private readonly application = inject(ApplicationRef);
+    private renderQueued = false;
+
+    /**
+     * Renders a change of the flow before the next task (a microtask), as Vue and Svelte flush
+     * theirs: zoneless Angular would render it in a later task (a timeout or a frame), so a key
+     * press or a click that moved a node or reached a zoom limit would still show the old view to
+     * whatever reads the page right after it (an assistive technology, a test). One render per
+     * task, however many commits and view changes it had.
+     */
+    private renderSoon(): void {
+        if (this.renderQueued) return;
+        this.renderQueued = true;
+        queueMicrotask(() => {
+            this.renderQueued = false;
+            if (!this.application.destroyed) this.application.tick();
+        });
+    }
 
     /** @internal what the parts inject */
     readonly context: FlowContext = {
