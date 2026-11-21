@@ -182,7 +182,7 @@ describe("the features' bundle guard", () => {
                 (leak) => leak.startsWith("minimap/index.js: minimap's"),
             ),
         ).toBe(true);
-    });
+    }, 120_000);
 
     it("reads source maps and chunk imports", () => {
         expect(mapSources(undefined)).toEqual([]);
@@ -223,7 +223,7 @@ describe("the features' bundle guard", () => {
                 leak.startsWith("selection.js: selection's ../src/selection/"),
             ),
         ).toBe(true);
-    });
+    }, 120_000);
 
     it("finds each package's main entry from its published exports (ng-packagr's FESM bundle)", () => {
         const manifest = (pkg: string) =>
@@ -244,9 +244,17 @@ describe("the features' bundle guard", () => {
         const dist = join(root, "packages/angular/dist");
         const main = "fesm2022/fragiola-flow-angular.mjs";
         if (!existsSync(join(dist, main))) {
+            // The core only when it is missing, and never with `...`: rebuilding it cleans
+            // packages/core/dist while other test files (command-docs) read it in parallel.
+            if (!existsSync(join(root, "packages/core/dist/index.js"))) {
+                execFileSync("pnpm", ["--filter", "@fragiola/flow", "build"], {
+                    cwd: root,
+                    stdio: "ignore",
+                });
+            }
             execFileSync(
                 "pnpm",
-                ["--filter", "@fragiola/flow-angular...", "build"],
+                ["--filter", "@fragiola/flow-angular", "build"],
                 { cwd: root, stdio: "ignore" },
             );
         }
@@ -277,5 +285,5 @@ describe("the features' bundle guard", () => {
         expect(featureLeaks(main, read, plantedMap)).toContain(
             `${main}: minimap's ../../src/minimap/mini-map.directive.ts`,
         );
-    });
+    }, 120_000);
 });
