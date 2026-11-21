@@ -142,7 +142,6 @@ examples show them as copyable code.
 | `pnpm test` | Vitest: `core` (node; a test that needs a DOM opts into jsdom), `react` (jsdom) and `site` (the repository's guard tests) |
 | `pnpm build` | `pnpm -r build` (tsdown for the packages: each one's main entry and one entry per feature), then the `.d.ts` check (`scripts/check-dts.ts`: no `any`) and the features' bundle guard (`scripts/check-features.ts`: no main entry, nor a chunk it imports, built from a feature's folder, read from the source maps; tested with a planted import by `site/tests/check-features.test.ts`) |
 | `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs; for each adapter of `ADAPTERS` (React) checks its exact core pin and runs its smoke app: a scratch Vite + React app outside the workspace that installs the React tarball only, typechecks (strict, no `skipLibCheck`), builds and loads its dev server, at the pins of `examples/react` (`scripts/check-package.ts`) |
-
 | `pnpm dev` | the playground (`apps/playground`, port 5197; `PLAYGROUND_PORT` moves it) |
 | `pnpm e2e` | Playwright: the playground's suite (Chromium and Firefox, its dev server, the sources), then each examples app's (`examples/*/playwright.config.ts`: the shared specs against a production build of its embed, built against the packages' `dist`: run `pnpm build` first) |
 | `pnpm --filter examples-react dev` | the React embed alone, port 5185 (`PORT` moves it; `?id=<id>&theme=<name>`) |
@@ -627,6 +626,8 @@ site/               package.json         export.ts, contract.ts, dev.ts, dev-pro
                                          selection, CI workflow, bundle guard, command docs)
 scripts/                                 check-layout.ts, check-dts.ts, source-condition.ts,
                                          check-package.ts, e2e-suites.ts, check-features.ts
+docs/                                    docs-examples-gaps.md: what the docs and examples work
+                                         around (F1, …), each with a proposed API
 .github/workflows/  ci.yml               Checks, Package, Changes, E2E (playground), E2E (examples),
                                          Site export, Trigger www build
 ```
