@@ -2,6 +2,7 @@
 // Measurement (D8, D9): nodes with the root window's ResizeObserver, their absolute boxes (with
 // sub-flows), and handles' centres relative to their nodes, whatever the zoom.
 import { afterEach, describe, expect, it } from "vitest";
+import { Measurements } from "../../src/engine/measurements";
 import { subflows } from "../../src/subflows/subflows";
 import { FakeResizeObserver, flowOf, mount, unmountAll } from "./harness";
 
@@ -83,6 +84,10 @@ describe("measurement", () => {
             height: 50,
         });
         expect(engine.get("handles-by", { nodeId: "a" })).toHaveLength(1);
+        // removed while not rendered: the engine forgets it on the model's commit
+        engine.adapter.model.run("node.remove", { nodeId: "a" });
+        expect(engine.is("node-measured", { nodeId: "a" })).toBe(false);
+        expect(engine.get("handles-by", { nodeId: "a" })).toEqual([]);
     });
 
     it("takes the document's size where it gives one", () => {
@@ -193,5 +198,64 @@ describe("measurement", () => {
             "far",
             "fresh",
         ]);
+    });
+});
+
+describe("measurements of nodes that are not rendered", () => {
+    // Measurements alone, with a flow of its own: `inFlow` says which nodes the model still has
+    const setup = () => {
+        const flow = new Set(["a"]);
+        const told: string[][] = [];
+        const measurements = new Measurements(
+            () => 1,
+            (ids) => told.push([...ids]),
+            (id) => flow.has(id),
+        );
+        const element = () => {
+            const div = document.createElement("div");
+            div.getBoundingClientRect = () => new DOMRect(0, 0, 10, 10);
+            return div;
+        };
+        const handle = (handleId: string) =>
+            ({ nodeId: "a", handleId, type: "source", side: "right" }) as const;
+        return { flow, told, measurements, element, handle };
+    };
+
+    it("keeps a culled node's handles for its edges, never as a connection's target", () => {
+        const { measurements, element, handle } = setup();
+        measurements.registerNode("a", element());
+        measurements.registerHandle(handle("out"), element());
+        expect(measurements.allHandles()).toHaveLength(1);
+        measurements.registerNode("a", null);
+        measurements.registerHandle(handle("out"), null);
+        expect(measurements.handlesOf("a")).toHaveLength(1);
+        expect(measurements.allHandles()).toEqual([]);
+    });
+
+    it("drops the handles a node no longer renders when it comes back", () => {
+        const { measurements, element, handle } = setup();
+        measurements.registerNode("a", element());
+        measurements.registerHandle(handle("yes"), element());
+        measurements.registerHandle(handle("no"), element());
+        measurements.registerNode("a", null);
+        measurements.registerHandle(handle("yes"), null);
+        measurements.registerHandle(handle("no"), null);
+        // rendered again with one handle: React attaches it before its node
+        measurements.registerHandle(handle("out"), element());
+        measurements.registerNode("a", element());
+        expect(measurements.handlesOf("a").map((h) => h.handleId)).toEqual([
+            "out",
+        ]);
+    });
+
+    it("forgets a node removed while it was not rendered", () => {
+        const { flow, measurements, element } = setup();
+        measurements.registerNode("a", element());
+        measurements.registerNode("a", null);
+        measurements.prune();
+        expect(measurements.size("a")).toBeDefined();
+        flow.delete("a");
+        measurements.prune();
+        expect(measurements.size("a")).toBeUndefined();
     });
 });

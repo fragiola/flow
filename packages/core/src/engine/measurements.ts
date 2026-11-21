@@ -47,6 +47,8 @@ export class Measurements {
     private readonly handleOfElement = new Map<Element, string>();
     /** each node's handle keys, in registration order */
     private readonly handlesByNode = new Map<string, Set<string>>();
+    /** the nodes whose element went while they stayed in the flow: their last measurements kept */
+    private readonly retired = new Set<string>();
     private observer: Observer | undefined;
     private observerView: Window | undefined;
 
@@ -82,10 +84,21 @@ export class Measurements {
             this.nodes.delete(nodeId);
         }
         if (!element) {
-            if (this.inFlow(nodeId)) return;
-            this.forgetHandles(nodeId);
-            if (this.sizes.delete(nodeId)) this.measured([nodeId]);
+            if (this.inFlow(nodeId)) {
+                this.retired.add(nodeId);
+                return;
+            }
+            this.forget(nodeId);
             return;
+        }
+        this.retired.delete(nodeId);
+        // React attaches a node's children before the node: a handle of it still without an
+        // element was not rendered again (a node of another type now, its handles changed)
+        for (const key of this.handlesByNode.get(nodeId) ?? []) {
+            if (this.handles.get(key)?.element === undefined) {
+                this.handles.delete(key);
+                this.handlesByNode.get(nodeId)?.delete(key);
+            }
         }
         this.nodes.set(nodeId, element);
         this.nodeOfElement.set(element, nodeId);
@@ -166,9 +179,28 @@ export class Measurements {
         });
     }
 
-    /** Every registered handle (its centre left for the engine to place), in registration order. */
+    /**
+     * Every rendered handle (its centre left for the engine to place), in registration order: what
+     * a connection may reach. A culled or hidden node's kept handles are not in it.
+     */
     allHandles(): FlowHandle[] {
-        return [...this.handles.values()].map((entry) => this.view(entry));
+        return [...this.handles.values()]
+            .filter((entry) => entry.element !== undefined)
+            .map((entry) => this.view(entry));
+    }
+
+    /** Forgets the kept measurements of the nodes that left the flow while not rendered. */
+    prune(): void {
+        for (const nodeId of [...this.retired]) {
+            if (!this.inFlow(nodeId)) this.forget(nodeId);
+        }
+    }
+
+    /** Forgets a node's size and handles. */
+    private forget(nodeId: string): void {
+        this.retired.delete(nodeId);
+        this.forgetHandles(nodeId);
+        if (this.sizes.delete(nodeId)) this.measured([nodeId]);
     }
 
     private view(entry: RegisteredHandle): FlowHandle {
@@ -257,6 +289,7 @@ export class Measurements {
         this.handles.clear();
         this.handleOfElement.clear();
         this.handlesByNode.clear();
+        this.retired.clear();
     }
 
     /** The observer of an element's window, made once (an element of another window gets none). */
