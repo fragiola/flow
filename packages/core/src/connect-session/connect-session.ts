@@ -139,6 +139,7 @@ export class ConnectSession {
             this.host.changed();
         };
         return {
+            autoPan: true,
             move: (event) => {
                 const point = { x: event.clientX, y: event.clientY };
                 if (!active) {

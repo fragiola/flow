@@ -59,7 +59,10 @@ export function dragEngine(
 
     const gestureFor = (nodeId: string, start: XY): FeatureGesture => {
         let active = false;
+        // the flow point pressed: an auto-pan moves the flow under a still pointer
+        const anchor = host.toFlow(start);
         return {
+            autoPan: true,
             move: (event) => {
                 const client = { x: event.clientX, y: event.clientY };
                 if (!active) {
@@ -75,10 +78,10 @@ export function dragEngine(
                 }
                 const current = drag;
                 if (!current) return;
-                const zoom = host.viewport().zoom;
+                const pointer = host.toFlow(client);
                 const delta = {
-                    x: (client.x - start.x) / zoom,
-                    y: (client.y - start.y) / zoom,
+                    x: pointer.x - anchor.x,
+                    y: pointer.y - anchor.y,
                 };
                 const lead =
                     current.starts.get(nodeId) ??

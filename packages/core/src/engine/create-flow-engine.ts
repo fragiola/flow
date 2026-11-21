@@ -62,8 +62,9 @@ import type {
     PressTarget,
     ViewChange,
 } from "./adapter";
+import { type AutoPanOptions, autoPanOffset } from "./auto-pan";
 import { backgroundPattern } from "./background-pattern";
-import { pressTargetOf, viewOf } from "./dom";
+import { asElement, pressTargetOf, viewOf } from "./dom";
 import { edgeEnds, type PathOptions, pathOf } from "./edge-geometry";
 import type { FlowEngineEvent } from "./events";
 import { Measurements } from "./measurements";
@@ -88,7 +89,11 @@ import type {
     NodeToolbarPayload,
     ZoomStepPayload,
 } from "./verbs";
+import { animateViewport, type ViewportEasing } from "./viewport-animation";
 import { WHEEL_PINCH_RATE, WHEEL_RATE } from "./wheel-rate";
+
+/** Which way the wheel pans with `panOnScroll`: both ways, or one axis only. */
+export type PanOnScrollMode = "free" | "horizontal" | "vertical";
 
 /** Options of {@link createFlowEngine}. */
 export interface FlowEngineOptions {
@@ -102,10 +107,28 @@ export interface FlowEngineOptions {
     maxZoom?: number | undefined;
     /** the flow rectangle the view stays inside; default none */
     translateExtent?: Rect | undefined;
-    /** a drag on the pane pans; default true */
-    panOnDrag?: boolean | undefined;
+    /**
+     * a drag on the pane pans: `true` with the primary button (and a touch or a pen), or the mouse
+     * buttons that pan (`[0]` primary, `[1]` middle, `[2]` right); default true
+     */
+    panOnDrag?: boolean | readonly number[] | undefined;
+    /**
+     * the key that, held, makes a primary drag pan from anywhere (nodes included) and start no
+     * other gesture (`KeyboardEvent.key`, or `.code`); null for none; default `" "` (Space)
+     */
+    panActivationKey?: string | null | undefined;
     /** the wheel pans (Ctrl + wheel zooms); default false: the wheel zooms */
     panOnScroll?: boolean | undefined;
+    /** which way the wheel pans with `panOnScroll`; default `"free"` */
+    panOnScrollMode?: PanOnScrollMode | undefined;
+    /** the factor of the wheel's pixels when it pans (`panOnScroll`); default 1 */
+    panOnScrollSpeed?: number | undefined;
+    /**
+     * the key that, held, makes the wheel zoom while `panOnScroll` is on (`KeyboardEvent.key`;
+     * `Meta`, `Control`, `Alt` and `Shift` read from the wheel event); null for none; default
+     * `Meta` on Apple platforms and `Control` elsewhere (the root window's `navigator`)
+     */
+    zoomActivationKey?: string | null | undefined;
     /** the wheel zooms around the pointer; default true */
     zoomOnScroll?: boolean | undefined;
     /** a two-finger pinch (and a trackpad's) zooms; default true */
@@ -122,6 +145,13 @@ export interface FlowEngineOptions {
     onlyRenderVisible?: boolean | undefined;
     /** the shape of the built-in edge paths */
     pathOptions?: PathOptions | undefined;
+    /**
+     * the viewport pans while a drag, a connection, a reconnection, a selection box or a resize
+     * has its pointer near the root's edge (`{ speed, margin }` tunes it); default true
+     */
+    autoPan?: boolean | AutoPanOptions | undefined;
+    /** how an animated viewport action (its `duration`) eases; default a smooth ease in and out */
+    easing?: ViewportEasing | undefined;
 }
 
 /**
@@ -177,6 +207,8 @@ interface Press {
     readonly target: PressTarget;
     readonly gesture: FeatureGesture | undefined;
     readonly pan: boolean;
+    /** the mouse button pressed (0 for a touch or a pen) */
+    readonly button: number;
     travel: number;
     /** its pointer's last move: a press whose release was missed ends there */
     last: PointerEvent | undefined;
@@ -220,6 +252,29 @@ function distance(a: XY, b: XY): number {
     return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
+/** What typing goes into: a key pressed there never activates a pan or a zoom. */
+const EDITABLE =
+    'input, textarea, select, [contenteditable]:not([contenteditable="false"])';
+
+/** The keys a pointer or wheel event tells itself whether they are held. */
+const MODIFIERS: Readonly<
+    Record<string, "metaKey" | "ctrlKey" | "altKey" | "shiftKey">
+> = { Meta: "metaKey", Control: "ctrlKey", Alt: "altKey", Shift: "shiftKey" };
+
+/** A viewport action's `duration`, in milliseconds (0 when it leaves it out), or its failure. */
+function durationOf(payload: unknown): number | CommandResult<unknown> {
+    const { duration } = payloadRecord(payload);
+    if (duration === undefined) return 0;
+    if (!finite(duration) || duration < 0) {
+        return fail(
+            "invalid_payload",
+            "duration must be a number of milliseconds, 0 or more",
+            "/duration",
+        );
+    }
+    return duration;
+}
+
 class Engine<T extends FlowTypes, F extends FlowFeatures> {
     readonly model: FlowModel;
     readonly adapter: FlowEngineAdapter;
@@ -248,6 +303,14 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     private pinch: Pinch | undefined;
     private readonly pointers = new Map<number, XY>();
     private pendingFit: FitViewPayload | undefined;
+    /** stops the viewport animation under way */
+    private stopAnimation: (() => void) | undefined;
+    /** the auto-pan's pending frame, and its window */
+    private autoPanFrame: { view: Window; id: number } | undefined;
+    /** the keys held now (`key` and `code`), from the root's document */
+    private readonly heldKeys = new Set<string>();
+    /** a non-primary pan moved: the context menu its release opens is kept out */
+    private blockContextMenu = false;
     private revision = 0;
     private destroyed = false;
 
@@ -304,6 +367,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                         "/zoom",
                     );
                 }
+                const duration = durationOf(payload);
+                if (typeof duration !== "number") return duration;
                 return this.apply(
                     zoomAround(
                         this.current,
@@ -311,6 +376,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                         pointOf(around) ?? this.center(),
                     ),
                     dryRun,
+                    duration,
                 );
             },
             "fit-view": (payload, dryRun) =>
@@ -327,6 +393,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                         "/zoom",
                     );
                 }
+                const duration = durationOf(payload);
+                if (typeof duration !== "number") return duration;
                 return this.apply(
                     centeredOn(
                         at,
@@ -338,6 +406,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                         this.rootSize(),
                     ),
                     dryRun,
+                    duration,
                 );
             },
             "focus-node": (payload, dryRun) => this.focusNode(payload, dryRun),
@@ -358,12 +427,16 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 return ok({ interactive });
             },
             "cancel-gesture": (_payload, dryRun) => {
-                if (!this.press && !this.pinch) {
-                    return fail("refused", "no gesture is under way");
+                if (!this.press && !this.pinch && !this.stopAnimation) {
+                    return fail(
+                        "refused",
+                        "no gesture nor viewport animation is under way",
+                    );
                 }
                 if (!dryRun) {
                     this.cancelPress();
                     this.endPinch();
+                    this.stopViewportAnimation();
                 }
                 return ok({});
             },
@@ -494,6 +567,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     destroy(): void {
         if (this.destroyed) return;
         this.detachRoot();
+        this.stopViewportAnimation();
         this.destroyed = true;
         this.features.destroy();
         if (this.viewportElement) clearViewportTransform(this.viewportElement);
@@ -523,6 +597,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     /** Sets the viewport: writes its transform, tells the adapters and the app. */
     private setViewport(viewport: Viewport, gesture: boolean): Viewport {
+        // a gesture (a pan, the wheel, a pinch, the minimap, auto-pan) takes the viewport over
+        if (gesture) this.stopViewportAnimation();
         const next = this.kept(viewport);
         if (sameViewport(next, this.current)) return this.current;
         this.current = Object.freeze(next);
@@ -534,7 +610,15 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         return this.current;
     }
 
-    private apply(viewport: Viewport, dryRun: boolean): CommandResult<unknown> {
+    /**
+     * A viewport action's change: at once, or (`duration`, with a root whose window has frames)
+     * animated to the viewport it returns; either way an animation under way stops.
+     */
+    private apply(
+        viewport: Viewport,
+        dryRun: boolean,
+        duration = 0,
+    ): CommandResult<unknown> {
         if (
             !finite(viewport.x) ||
             !finite(viewport.y) ||
@@ -546,9 +630,41 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 "the viewport must be finite numbers",
             );
         }
-        return ok(
-            dryRun ? this.kept(viewport) : this.setViewport(viewport, false),
-        );
+        if (dryRun) return ok(this.kept(viewport));
+        this.stopViewportAnimation();
+        const target = this.kept(viewport);
+        const view = viewOf(this.rootElement);
+        if (
+            duration > 0 &&
+            view &&
+            typeof view.requestAnimationFrame === "function" &&
+            !sameViewport(target, this.current)
+        ) {
+            const stop = animateViewport({
+                view,
+                from: this.current,
+                to: target,
+                duration,
+                easing: this.options.easing,
+                step: (next) => {
+                    this.setViewport(next, false);
+                },
+                done: () => {
+                    if (this.stopAnimation === stop)
+                        this.stopAnimation = undefined;
+                },
+            });
+            this.stopAnimation = stop;
+            return ok(Object.freeze(target));
+        }
+        return ok(this.setViewport(viewport, false));
+    }
+
+    /** Stops the viewport animation under way, where it is. */
+    private stopViewportAnimation(): void {
+        const stop = this.stopAnimation;
+        this.stopAnimation = undefined;
+        stop?.();
     }
 
     private setViewportAction(
@@ -565,6 +681,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 );
             }
         }
+        const duration = durationOf(payload);
+        if (typeof duration !== "number") return duration;
         return this.apply(
             {
                 x: (record.x as number | undefined) ?? this.current.x,
@@ -572,6 +690,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 zoom: (record.zoom as number | undefined) ?? this.current.zoom,
             },
             dryRun,
+            duration,
         );
     }
 
@@ -581,6 +700,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         direction: 1 | -1,
     ): CommandResult<unknown> {
         const { step, around } = payloadRecord(payload) as ZoomStepPayload;
+        const duration = durationOf(payload);
+        if (typeof duration !== "number") return duration;
         const factor = step ?? this.options.zoomStep ?? 1.2;
         if (!finite(factor) || factor <= 1) {
             return fail(
@@ -607,6 +728,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         return this.apply(
             zoomAround(this.current, zoom, pointOf(around) ?? this.center()),
             dryRun,
+            duration,
         );
     }
 
@@ -614,6 +736,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         payload: FitViewPayload,
         dryRun: boolean,
     ): CommandResult<unknown> {
+        const duration = durationOf(payload);
+        if (typeof duration !== "number") return duration;
         const size = this.rootSize();
         if (size.width <= 0 || size.height <= 0) {
             return fail("refused", "the root has no size yet");
@@ -627,7 +751,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             payload.minZoom ?? this.minZoom,
             payload.maxZoom ?? this.maxZoom,
         );
-        return this.apply(viewport, dryRun);
+        return this.apply(viewport, dryRun, duration);
     }
 
     private focusNode(
@@ -672,6 +796,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             rect.x + rect.width <= view.x + view.width &&
             rect.y + rect.height <= view.y + view.height;
         if (!inside) {
+            this.stopViewportAnimation();
             this.setViewport(
                 centeredOn(
                     { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 },
@@ -1017,13 +1142,37 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             ["dblclick", (event) => this.doubleClick(event as MouseEvent)],
             ["keydown", (event) => this.keyDown(event as KeyboardEvent)],
             ["focusin", (event) => this.focusIn(event as FocusEvent)],
+            ["contextmenu", (event) => this.contextMenu(event as MouseEvent)],
         ];
         for (const [type, listener, options] of listeners) {
             element.addEventListener(type, listener, options);
         }
+        // the activation keys are held anywhere in the page, not only with focus in the flow
+        const doc = element.ownerDocument;
+        const view = viewOf(element);
+        const keyListeners: [EventTarget | undefined, string, EventListener][] =
+            [
+                [
+                    doc,
+                    "keydown",
+                    (event) => this.keyHeld(event as KeyboardEvent, true),
+                ],
+                [
+                    doc,
+                    "keyup",
+                    (event) => this.keyHeld(event as KeyboardEvent, false),
+                ],
+                [view, "blur", () => this.heldKeys.clear()],
+            ];
+        for (const [target, type, listener] of keyListeners) {
+            target?.addEventListener(type, listener);
+        }
         this.removeRootListeners = () => {
             for (const [type, listener, options] of listeners) {
                 element.removeEventListener(type, listener, options);
+            }
+            for (const [target, type, listener] of keyListeners) {
+                target?.removeEventListener(type, listener);
             }
         };
         this.features.attached(element);
@@ -1035,6 +1184,11 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         if (!this.rootElement) return;
         this.cancelPress();
         this.endPinch();
+        // the frames are the root window's: another root may be in another window
+        this.stopViewportAnimation();
+        this.stopAutoPan();
+        this.heldKeys.clear();
+        this.blockContextMenu = false;
         this.pointers.clear();
         this.features.detached();
         this.removeRootListeners?.();
@@ -1088,6 +1242,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 event.pointerType !== "touch")
         ) {
             this.press = undefined;
+            this.stopAutoPan();
             this.release(press.pointerId);
             if (press.last) press.gesture?.end(press.last);
             else press.gesture?.cancel();
@@ -1109,21 +1264,32 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             return;
         }
         if (event.isPrimary === false) return;
-        if (event.pointerType === "mouse" && event.button !== 0) return;
+        this.blockContextMenu = false;
+        // a touch or a pen presses as the primary button
+        const button = event.pointerType === "mouse" ? event.button : 0;
+        // a mouse button that does not pan starts nothing (a feature's gestures are primary)
+        if (button !== 0 && !this.pansWith(button)) return;
         const target = this.target(event.target);
         if (target.kind === "other") {
             this.pointers.delete(event.pointerId);
             return;
         }
-        let gesture = this.features.pointerdown(event, target);
+        let gesture: FeatureGesture | undefined;
         let pan = false;
-        if (
-            !gesture &&
-            target.kind === "pane" &&
-            (this.options.panOnDrag ?? true)
-        ) {
+        if (button === 0 && this.panKeyHeld(event)) {
+            // the pan activation key: a pan from anywhere, and no other gesture
             gesture = this.panGesture(client);
             pan = true;
+        } else if (button !== 0) {
+            if (target.kind !== "pane") return;
+            gesture = this.panGesture(client);
+            pan = true;
+        } else {
+            gesture = this.features.pointerdown(event, target);
+            if (!gesture && target.kind === "pane" && this.pansWith(0)) {
+                gesture = this.panGesture(client);
+                pan = true;
+            }
         }
         this.press = {
             pointerId: event.pointerId,
@@ -1131,6 +1297,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             target,
             gesture,
             pan,
+            button,
             travel: 0,
             last: undefined,
         };
@@ -1140,7 +1307,66 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             event.preventDefault();
     }
 
+    /** Whether a press of a mouse button (0 for a touch or a pen) pans the pane (`panOnDrag`). */
+    private pansWith(button: number): boolean {
+        const option = this.options.panOnDrag ?? true;
+        return typeof option === "boolean"
+            ? option && button === 0
+            : option.includes(button);
+    }
+
+    /** Whether `key` is held now: a modifier as `event` tells it, any other from the document's keys. */
+    private held(key: string | null, event: MouseEvent): boolean {
+        if (key === null || key === "") return false;
+        const modifier = MODIFIERS[key];
+        return modifier !== undefined
+            ? event[modifier]
+            : this.heldKeys.has(key);
+    }
+
+    private panKeyHeld(event: MouseEvent): boolean {
+        const key = this.options.panActivationKey;
+        return this.held(key === undefined ? " " : key, event);
+    }
+
+    private zoomKeyHeld(event: MouseEvent): boolean {
+        const key = this.options.zoomActivationKey;
+        if (key !== undefined) return this.held(key, event);
+        const agent = viewOf(this.rootElement)?.navigator;
+        const platform = `${agent?.platform ?? ""} ${agent?.userAgent ?? ""}`;
+        return this.held(
+            /Mac|iPhone|iPad|iPod/.test(platform) ? "Meta" : "Control",
+            event,
+        );
+    }
+
+    /** A key went down or up in the root's document: the activation keys read it. */
+    private keyHeld(event: KeyboardEvent, down: boolean): void {
+        if (down) {
+            // typing in a field (a node's, the page's) holds no activation key
+            if (asElement(event.target)?.closest?.(EDITABLE)) return;
+            this.heldKeys.add(event.key);
+            this.heldKeys.add(event.code);
+        } else {
+            this.heldKeys.delete(event.key);
+            this.heldKeys.delete(event.code);
+        }
+    }
+
+    /** A middle or right button pan that moved keeps its context menu out. */
+    private contextMenu(event: MouseEvent): void {
+        const press = this.press;
+        const panning =
+            press?.pan === true &&
+            press.button !== 0 &&
+            press.travel > TAP_TOLERANCE;
+        if (panning || this.blockContextMenu) event.preventDefault();
+        this.blockContextMenu = false;
+    }
+
     private panGesture(start: XY): FeatureGesture {
+        // a pan takes the viewport over from an animation, where it is
+        this.stopViewportAnimation();
         const origin = this.current;
         let moved = false;
         return {
@@ -1183,6 +1409,69 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         press.travel = Math.max(press.travel, distance(press.start, client));
         press.last = event;
         press.gesture?.move(event);
+        this.autoPan();
+    }
+
+    /** The auto-pan offset of the press under way now (zero when it does not auto-pan). */
+    private autoPanNow(): XY {
+        const press = this.press;
+        const gesture = press?.gesture;
+        if (
+            !press?.last ||
+            press.pan ||
+            gesture?.autoPan !== true ||
+            gesture.active?.() !== true
+        ) {
+            return { x: 0, y: 0 };
+        }
+        return autoPanOffset(
+            this.toRoot({ x: press.last.clientX, y: press.last.clientY }),
+            this.rootSize(),
+            this.options.autoPan,
+        );
+    }
+
+    /** Starts the auto-pan loop when the press's pointer is near the edge (one loop per engine). */
+    private autoPan(): void {
+        if (this.autoPanFrame || this.destroyed) return;
+        const offset = this.autoPanNow();
+        if (offset.x === 0 && offset.y === 0) return;
+        const view = viewOf(this.rootElement);
+        if (!view || typeof view.requestAnimationFrame !== "function") return;
+        const id = view.requestAnimationFrame(() => {
+            this.autoPanFrame = undefined;
+            this.autoPanStep();
+        });
+        this.autoPanFrame = { view, id };
+    }
+
+    /**
+     * One auto-pan frame: the viewport pans, and the gesture moves again with its last pointer
+     * event (the flow point under the still pointer changed). It stops at the translate extent and
+     * when the pointer leaves the edge; the next move starts it again.
+     */
+    private autoPanStep(): void {
+        const offset = this.autoPanNow();
+        const last = this.press?.last;
+        if (!last || (offset.x === 0 && offset.y === 0)) return;
+        const before = this.current;
+        const after = this.setViewport(
+            {
+                x: before.x + offset.x,
+                y: before.y + offset.y,
+                zoom: before.zoom,
+            },
+            true,
+        );
+        if (sameViewport(before, after)) return;
+        this.press?.gesture?.move(last);
+        this.autoPan();
+    }
+
+    private stopAutoPan(): void {
+        const frame = this.autoPanFrame;
+        this.autoPanFrame = undefined;
+        if (frame) frame.view.cancelAnimationFrame(frame.id);
     }
 
     private pointerUp(event: PointerEvent): void {
@@ -1195,9 +1484,15 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         const press = this.press;
         if (!press || press.pointerId !== event.pointerId) return;
         this.press = undefined;
+        this.stopAutoPan();
         this.release(event.pointerId);
         const active = press.gesture?.active?.() ?? false;
         press.gesture?.end(event);
+        if (press.button !== 0) {
+            // the context menu a moved right-button pan's release opens stays out
+            this.blockContextMenu = press.pan && press.travel > TAP_TOLERANCE;
+            return;
+        }
         if (!active && press.travel <= TAP_TOLERANCE && this.interactive) {
             this.features.tap(event, press.target);
         }
@@ -1218,6 +1513,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         const press = this.press;
         if (!press) return;
         this.press = undefined;
+        this.stopAutoPan();
         this.release(press.pointerId);
         press.gesture?.cancel();
     }
@@ -1229,6 +1525,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         // the press's gesture (a pan) gives way: the pinch pans and zooms from here
         const press = this.press;
         this.press = undefined;
+        this.stopAutoPan();
+        this.stopViewportAnimation();
         if (press && !press.pan) press.gesture?.cancel();
         const middle = this.toRoot({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
         this.pinch = {
@@ -1293,13 +1591,16 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         const dx = event.deltaX * scale;
         const dy = event.deltaY * scale;
         const pinching = event.ctrlKey;
+        const panOnScroll = this.options.panOnScroll ?? false;
         const point = this.toRoot({ x: event.clientX, y: event.clientY });
+        // with panOnScroll, the zoom activation key held turns the wheel back into a zoom
+        const zoomKey = panOnScroll && this.zoomKeyHeld(event);
         if (
-            pinching
-                ? (this.options.zoomOnPinch ?? true)
-                : !(this.options.panOnScroll ?? false)
+            zoomKey ||
+            (pinching ? (this.options.zoomOnPinch ?? true) : !panOnScroll)
         ) {
-            if (!pinching && !(this.options.zoomOnScroll ?? true)) return;
+            if (!zoomKey && !pinching && !(this.options.zoomOnScroll ?? true))
+                return;
             event.preventDefault();
             // a trackpad's pinch sends small deltas: it zooms faster per pixel than a wheel
             const zoom =
@@ -1315,14 +1616,19 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             );
             return;
         }
-        if (this.options.panOnScroll ?? false) {
+        if (panOnScroll) {
             event.preventDefault();
-            const horizontal = event.shiftKey && dx === 0;
+            // Shift turns a wheel without a sideways delta sideways; the mode keeps one axis
+            const sideways = event.shiftKey && dx === 0;
+            const mode = this.options.panOnScrollMode ?? "free";
+            const speed = this.options.panOnScrollSpeed ?? 1;
+            const byX = mode === "vertical" ? 0 : sideways ? dy : dx;
+            const byY = mode === "horizontal" || sideways ? 0 : dy;
             this.setViewport(
                 {
                     ...this.current,
-                    x: this.current.x - (horizontal ? dy : dx),
-                    y: this.current.y - (horizontal ? 0 : dy),
+                    x: this.current.x - byX * speed,
+                    y: this.current.y - byY * speed,
                 },
                 true,
             );

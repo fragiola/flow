@@ -71,6 +71,14 @@ export interface FeatureGesture {
      * gesture is not active and that barely moved is a tap (`FeatureEngine.tap`)
      */
     active?(): boolean;
+    /**
+     * the gesture follows the pointer in the flow (a drag, a connection, a box, a resize): while it
+     * is active and its pointer nears the root's edge, the engine pans the viewport every frame
+     * (the `autoPan` option) and calls `move` again with the pointer's last event, so `move` must
+     * read the flow point from the client point each time (`host.toFlow`), never from a delta
+     * divided by the zoom
+     */
+    readonly autoPan?: boolean | undefined;
 }
 
 /**

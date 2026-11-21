@@ -105,6 +105,7 @@ export function selectionEngine(
                 active: false,
             };
             return {
+                autoPan: true,
                 move: (moved) => {
                     const current = box;
                     if (!current) return;

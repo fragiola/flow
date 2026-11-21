@@ -104,7 +104,8 @@ export interface FlowEngineAdapter {
     };
     /**
      * the engine's options changed (a root prop: `minZoom`, `panOnDrag`, `translateExtent`,
-     * `pathOptions`, `interactive`, …): they apply from now on, a gesture under way included;
+     * `pathOptions`, `interactive`, `autoPan`, `panActivationKey`, `zoomActivationKey`, `easing`,
+     * …): they apply from now on, a gesture under way included;
      * `root`, `defaultViewport` and `fitView` are creation options and are ignored here
      */
     setOptions(options: Partial<FlowEngineOptions>): void;

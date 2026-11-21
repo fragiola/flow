@@ -255,12 +255,18 @@ export function resizeEngine(
         let active = false;
         let last: { commands: BatchEntry[]; rect: Rect } | undefined;
         const limits = limitsOf(start.nodeId);
+        // the flow point pressed: an auto-pan moves the flow under a still pointer
+        const anchor = host.toFlow(client);
         return {
+            autoPan: true,
             move: (event) => {
-                const zoom = host.viewport().zoom;
+                const pointer = host.toFlow({
+                    x: event.clientX,
+                    y: event.clientY,
+                });
                 const delta = {
-                    x: (event.clientX - client.x) / zoom,
-                    y: (event.clientY - client.y) / zoom,
+                    x: pointer.x - anchor.x,
+                    y: pointer.y - anchor.y,
                 };
                 if (!active) {
                     if (delta.x === 0 && delta.y === 0) return;
