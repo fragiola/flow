@@ -2,8 +2,8 @@
 // The frameworks an examples app can be written in. Each one is an app of its own,
 // `examples/<framework>` (package `examples-<framework>`), built for `<base>/embed/<framework>/`;
 // what they share (the metadata, the themes, the embed protocol, the manifest, the e2e specs) is
-// this package. `site/project.json`'s `frameworks` says which ones the site export ships: React
-// today, Vue, Svelte and Angular with their adapter Epics.
+// this package. `site/project.json`'s `frameworks` says which ones the site export ships: all
+// four (Vue, Svelte and Angular came with their adapter Epics).
 
 export const FRAMEWORKS = ["react", "vue", "svelte", "angular"] as const;
 

@@ -7,6 +7,7 @@ import {
     skipOrFail,
     skipReason,
 } from "../e2e/available.ts";
+import type { Framework } from "../src/framework.ts";
 
 // The shared e2e suite runs against every framework's embed; a spec that opens an example the
 // framework does not have is skipped with this reason, unless the framework ships every example
@@ -48,8 +49,13 @@ describe("a spec's examples", () => {
 describe("a complete framework", () => {
     const available = ["basic"];
 
-    it("is React, Vue and Svelte today: Angular ships its examples with its Epic", () => {
-        expect([...COMPLETE_FRAMEWORKS]).toEqual(["react", "vue", "svelte"]);
+    it("is every framework today: React, Vue, Svelte and Angular", () => {
+        expect([...COMPLETE_FRAMEWORKS]).toEqual([
+            "react",
+            "vue",
+            "svelte",
+            "angular",
+        ]);
     });
 
     it("fails a spec whose example it lacks, instead of skipping it", () => {
@@ -65,11 +71,17 @@ describe("a complete framework", () => {
         expect(() =>
             skipOrFail("svelte", available, ["workflow-builder"]),
         ).toThrow(/every svelte example is required/);
+        expect(() =>
+            skipOrFail("angular", available, ["workflow-builder"]),
+        ).toThrow(/every angular example is required/);
     });
 
     it("skips a spec in a framework still being written", () => {
-        expect(skipOrFail("angular", available, ["workflow-builder"])).toBe(
-            "angular has no workflow-builder example",
+        // no framework is incomplete today: a framework of a later adapter Epic, before its app
+        // has every example
+        const writing = "solid" as Framework;
+        expect(skipOrFail(writing, available, ["workflow-builder"])).toBe(
+            "solid has no workflow-builder example",
         );
     });
 });
