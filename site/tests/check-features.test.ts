@@ -6,6 +6,7 @@ import {
     chunksOf,
     FEATURES,
     featureLeaks,
+    mainEntryOf,
     mapSources,
 } from "../../scripts/check-features.ts";
 
@@ -222,5 +223,59 @@ describe("the features' bundle guard", () => {
                 leak.startsWith("selection.js: selection's ../src/selection/"),
             ),
         ).toBe(true);
+    });
+
+    it("finds each package's main entry from its published exports (ng-packagr's FESM bundle)", () => {
+        const manifest = (pkg: string) =>
+            JSON.parse(
+                readFileSync(
+                    join(root, "packages", pkg, "package.json"),
+                    "utf8",
+                ),
+            ) as { publishConfig?: { exports?: unknown } };
+        expect(mainEntryOf(manifest("core"))).toBe("index.js");
+        expect(mainEntryOf(manifest("react"))).toBe("index.js");
+        expect(mainEntryOf(manifest("angular"))).toBe(
+            "fesm2022/fragiola-flow-angular.mjs",
+        );
+    });
+
+    it("fails the real Angular build when its main entry ships a feature (planted)", () => {
+        const dist = join(root, "packages/angular/dist");
+        const main = "fesm2022/fragiola-flow-angular.mjs";
+        if (!existsSync(join(dist, main))) {
+            execFileSync(
+                "pnpm",
+                ["--filter", "@fragiola/flow-angular...", "build"],
+                { cwd: root, stdio: "ignore" },
+            );
+        }
+        const read = (file: string) => {
+            const path = join(dist, file);
+            return existsSync(path) ? readFileSync(path, "utf8") : undefined;
+        };
+        const readMap = (file: string) => read(`${file}.map`);
+        expect(featureLeaks(main, read, readMap)).toEqual([]);
+        // the main bundle importing the minimap's entry, or built from its folder
+        const imports = (file: string) =>
+            file === main
+                ? `import "@fragiola/flow-angular/minimap";\n${read(file) ?? ""}`
+                : read(file);
+        expect(featureLeaks(main, imports, readMap)).toContain(
+            `${main}: imports the minimap entry`,
+        );
+        const plantedMap = (file: string) =>
+            file === main
+                ? JSON.stringify({
+                      version: 3,
+                      sources: [
+                          ...mapSources(readMap(main)),
+                          "../../src/minimap/mini-map.directive.ts",
+                      ],
+                  })
+                : readMap(file);
+        expect(featureLeaks(main, read, plantedMap)).toContain(
+            `${main}: minimap's ../../src/minimap/mini-map.directive.ts`,
+        );
     });
 });
