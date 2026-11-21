@@ -29,7 +29,7 @@ context; Flow also keeps `typed.ts`, as its Vue adapter does). Add after "A prim
 file name in every adapter":
 
 > … `tab-list.tsx` in React, `tab-list.ts` in Vue, `tab-list.svelte` in Svelte. A Svelte package
-> has no `src/lib/` (SvelteKit's convention): `svelte-package --input src`. Its relative imports
+> keeps its sources in `src/`, not in SvelteKit's `src/lib/`: `svelte-package --input src`. Its relative imports
 > carry their extension (`./context.js`, `./root.svelte`), since `svelte-package` does not rewrite
 > them.
 
