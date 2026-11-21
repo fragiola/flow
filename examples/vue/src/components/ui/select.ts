@@ -21,6 +21,7 @@ import { defineComponent, h } from "vue";
 import { field } from "#/components/families/field";
 import { menu } from "#/components/families/menu";
 import { popup } from "#/components/families/popup";
+import { useFieldControlId } from "#/components/ui/field";
 import { cn } from "#/lib/cn";
 
 const SelectRoot = defineComponent({
@@ -69,11 +70,14 @@ const SelectTrigger = defineComponent({
     name: "SelectTrigger",
     inheritAttrs: false,
     setup(_, { attrs, slots }) {
+        // inside `Field.Root`, the field's control: its label names the trigger
+        const id = useFieldControlId();
         return () =>
             h(
                 SelectTriggerPrimitive,
                 {
                     "data-slot": "select-trigger",
+                    id,
                     ...attrs,
                     // the trigger IS a field row; the layout is its own
                     class: cn(
@@ -108,12 +112,15 @@ const SelectContent = defineComponent({
                         sideOffset: 4,
                         "data-open": "",
                         ...attrs,
-                        style: {
-                            "--available-height":
-                                "var(--reka-select-content-available-height)",
-                            "--transform-origin":
-                                "var(--reka-select-content-transform-origin)",
-                        },
+                        style: [
+                            {
+                                "--available-height":
+                                    "var(--reka-select-content-available-height)",
+                                "--transform-origin":
+                                    "var(--reka-select-content-transform-origin)",
+                            },
+                            attrs.style,
+                        ],
                         class: cn(
                             popup.content("isolate z-50 outline-none"),
                             attrs.class as string,

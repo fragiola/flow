@@ -5,9 +5,9 @@
 #   Checks            Biome and the source layout check, TypeScript, the unit tests and the build
 #                     (with the .d.ts check).
 #   Package           `pnpm check:package`: builds and packs every package with pnpm, lints the
-#                     tarballs (dist-only exports, publint, attw). Each adapter (React's today; one per
-#                     adapter Epic) also gets its exact core pin checked and its own smoke app. A
-#                     packaging check only: nothing is published (AGENTS.md, D15).
+#                     tarballs (dist-only exports, publint, attw). Each adapter (React's and Vue's
+#                     today; one per adapter Epic) also gets its exact core pin checked and its own
+#                     smoke app. A packaging check only: nothing is published (AGENTS.md, D15).
 #   Changes           the E2E suites the change can affect (scripts/e2e-suites.ts, a `git diff`
 #                     against the base, the merge commit's first parent): none for docs only
 #                     (site/docs, *.md, AGENTS.md); packages/react or examples/react: the
@@ -16,7 +16,7 @@
 #                     else (the core, examples/shared, the playground, the lockfile, root configs,
 #                     .github, scripts, site) and a manual run: every suite. It also lists the
 #                     frameworks with an examples app (every `examples/<framework>` with a
-#                     playwright.config.ts).
+#                     playwright.config.ts: react and vue today).
 #   E2E (playground)  the playground's suite (apps/playground/e2e) on Chromium and Firefox: every
 #                     gesture on the unstyled fixture, with the mouse and with fingers, the
 #                     scenarios (500 nodes) and the shell, against its dev server (sources).
