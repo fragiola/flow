@@ -3,6 +3,7 @@ import {
     afterNextRender,
     computed,
     Directive,
+    ErrorHandler,
     effect,
     inject,
     input,
@@ -278,6 +279,7 @@ export class FlowRootDirective<
         this.renderSoon();
     };
     private readonly application = inject(ApplicationRef);
+    private readonly errorHandler = inject(ErrorHandler);
     private renderQueued = false;
 
     /**
@@ -286,14 +288,20 @@ export class FlowRootDirective<
      * press or a click that moved a node or reached a zoom limit would still show the old view to
      * whatever reads the page right after it (an assistive technology, a test). One render per
      * root and task, however many commits and view changes it had; none once the application is
-     * destroyed.
+     * destroyed. An error of that render goes to the app's `ErrorHandler`, as one of Angular's
+     * own scheduled renders does (thrown from a microtask, it would reach no handler).
      */
     private renderSoon(): void {
         if (this.renderQueued) return;
         this.renderQueued = true;
         queueMicrotask(() => {
             this.renderQueued = false;
-            if (!this.application.destroyed) this.application.tick();
+            if (this.application.destroyed) return;
+            try {
+                this.application.tick();
+            } catch (error) {
+                this.errorHandler.handleError(error);
+            }
         });
     }
 

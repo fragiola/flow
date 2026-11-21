@@ -1,4 +1,4 @@
-import { ApplicationRef } from "@angular/core";
+import { ApplicationRef, ErrorHandler } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { drag as dragFeature } from "@fragiola/flow/drag";
 import { keyboard } from "@fragiola/flow/keyboard";
@@ -199,6 +199,33 @@ describe("nodes", () => {
         ).not.toThrow();
         await Promise.resolve();
         tick.mockRestore();
+    });
+
+    it("give an error of the root's own render to the app's ErrorHandler, as Angular's renders do (#17)", async () => {
+        const flow = createFlowRef();
+        await render(TestFlow, {
+            flowRef: flow,
+            defaultNodes: [task("a")],
+        });
+        const failure = new Error("a template failed");
+        const tick = vi
+            .spyOn(TestBed.inject(ApplicationRef), "tick")
+            .mockImplementationOnce(() => {
+                throw failure;
+            });
+        const handled = vi
+            .spyOn(TestBed.inject(ErrorHandler), "handleError")
+            .mockImplementation(() => {});
+        flow.current?.model.run("node.move", {
+            nodeId: "a",
+            position: { x: 10, y: 0 },
+        });
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(tick).toHaveBeenCalledTimes(1);
+        expect(handled).toHaveBeenCalledWith(failure);
+        tick.mockRestore();
+        handled.mockRestore();
     });
 
     it("are not focusable without keyboard()", async () => {
