@@ -16,7 +16,7 @@ Each framework has an adapter, so **every piece of logic that isn't rendering li
 
 | package | name | contains | depends on | status |
 |---|---|---|---|---|
-| `packages/core` | `@fragiola/flow` | the document and its JSON Schemas, the typed model and its commands, the feature registry and the features, the engine that binds a flow to the DOM | DOM only, zero runtime deps | Epic #4 (a placeholder until #2) |
+| `packages/core` | `@fragiola/flow` | the document and its JSON Schemas, the typed model and its commands, the feature registry and the features, the engine that binds a flow to the DOM | DOM only, zero runtime deps | Epic #4: the model (#2); the engine with #3 |
 | `packages/react` | `@fragiola/flow-react` | the `Flow.*` primitives and hooks over the core | peer `react`, `react-dom` | planned (React Epic) |
 | `packages/vue` | `@fragiola/flow-vue` | the same primitives as Vue components, the hooks as composables | peer `vue` | planned |
 | `packages/svelte` | `@fragiola/flow-svelte` | the same primitives as Svelte components | peer `svelte` | planned |
@@ -130,13 +130,14 @@ examples show them as copyable code.
 | command | does |
 |---|---|
 | `pnpm install` | install dependencies |
-| `pnpm check` | Biome lint + format + assist (non-mutating), then `check:layout`. Issue #2 adds `check:commands` (the command docs drift check) |
+| `pnpm check` | Biome lint + format + assist (non-mutating), then `check:layout` and `check:commands` |
+| `pnpm check:commands` | builds the core, then `packages/core/scripts/generate-command-docs.ts --check`: fails when `site/docs/api/commands.mdx` drifts from the command registry (tested by `site/tests/command-docs.test.ts`). Regenerate with `pnpm --filter @fragiola/flow generate:commands` |
 | `pnpm check:layout` | the source layout check (`scripts/check-layout.ts`, from Dockable): every tracked name kebab-case, a package's `src/` root holds only its entries |
 | `pnpm check:fix` | Biome check with auto-fix |
 | `pnpm format`, `pnpm lint` | Biome format (writes), Biome lint |
 | `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit) |
 | `pnpm test` | Vitest: `core` (node; a test that needs a DOM opts into jsdom) and `site` (the repository's guard tests) |
-| `pnpm build` | `pnpm -r build` (tsdown for the packages), then the `.d.ts` check (`scripts/check-dts.ts`: no `any`) |
+| `pnpm build` | `pnpm -r build` (tsdown for the packages: the core's main entry and one entry per feature), then the `.d.ts` check (`scripts/check-dts.ts`: no `any`) and the features' bundle guard (`scripts/check-features.ts`: no main entry, nor a chunk it imports, built from a feature's folder, read from the source maps; tested with a planted import by `site/tests/check-features.test.ts`) |
 | `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs; for each adapter of `ADAPTERS` (none yet) checks its exact core pin and runs its smoke app (`scripts/check-package.ts`) |
 
 `pnpm e2e`, `pnpm dev`, `pnpm site:export` and `pnpm site:dev` arrive with the apps in the React
@@ -172,6 +173,74 @@ step alone passes about 3 minutes. `main` has no required checks: a skipped job 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
 
+## The model (Issue #2)
+
+`createFlowModel<Types, typeof features>(json, { features, createId, freeze })` loads a version 1
+document (validated: `FlowValidationError` with `issues`; `validateFlow(json, { features })` returns
+them), holds it frozen, and exposes exactly `run`, `can`, `check`, `get`, `is`, `use`, `subscribe`,
+`dispatch` (bound; `tests/model/create-flow-model.test.ts` and `tests/types/model.ts` keep the
+surface exact). The source layout of the core:
+
+| folder | holds |
+| --- | --- |
+| `src/schema/` | the JSON Schema subset, its validator and `FromSchema` (from Dockable) |
+| `src/document/` | the document's types, its JSON Schema, flags' defaults, `createId`, loading, `validateFlow`, `FlowValidationError` |
+| `src/state/` | the draft (copy on write, untouched nodes shared), the `get`/`is` key registry (`queries.ts`) and the core's keys |
+| `src/commands/` | `defineCommand`, the core catalogue, one file per entity (`node.ts`, `edge.ts`, `batch.ts`), the shared rules |
+| `src/model/` | `createFlowModel` and its bus |
+| `src/features/` | `FEATURE_KEYS` (what each feature owns, by name), the registry (`composeFeatures`, `featuresOf`, `featureEngine`), the feature contract |
+| `src/<feature>/` | one folder per feature: its factory, its commands, its entry `index.ts` |
+
+**Commands** (`model.get("commands")`, every description and schema; reference:
+`site/docs/api/commands.mdx`):
+
+| command | feature | does |
+| --- | --- | --- |
+| `node.add` | core | adds a node (id generated when missing); a taken id is refused |
+| `node.remove` | core | removes a node, its edges and (subflows) its children, in one step; refused when one is not deletable |
+| `node.move` | core | moves a node, kept to its extent; refused when not draggable; transient |
+| `node.resize` | core | sets a node's size (and position); transient |
+| `node.set-data`, `edge.set-data` | core | shallow-merge a data patch |
+| `node.set-flags`, `edge.set-flags` | core | set some flags |
+| `edge.add` | core | joins two connectable nodes; one edge per pair of handles and direction |
+| `edge.remove` | core | removes an edge; refused when not deletable |
+| `batch` | core | several commands, all or nothing, one event; transient when each may be |
+| `node.set-parent` | `subflows()` | puts a node into a parent (or back), keeping its place on screen; refuses cycles |
+| `edge.reconnect` | `reconnection()` | moves an edge's ends; refused when not reconnectable |
+| `selection.set` | `selection()` | `replace` (default), `add` or `toggle` nodes and edges; refused when not selectable; transient |
+| `selection.clear` | `selection()` | deselects everything |
+| `selection.remove` | `selection()` | removes what is selected and deletable (the Delete key) |
+
+Error codes: `unknown_command`, `invalid_payload` (schema, or a field of a feature not installed),
+`not_found` (a missing node or edge, or a command of a feature not installed, naming it),
+`refused`, `vetoed`, `queued`, `middleware_error`.
+
+**Keys.** `get`: `node-by { id }`, `edge-by { id }`, `all-nodes`, `all-edges`,
+`node-edges-by { nodeId, handleType?, handleId? }`, `connected-edges-by { nodeIds }`,
+`absolute-position-by { nodeId }`, `flow-json`, `commands`; `selected-nodes`, `selected-edges`
+(`selection()`); `node-children-by { nodeId }`, `node-parent-by { nodeId }` (`subflows()`). `is`:
+`node-draggable`, `node-selectable`, `node-connectable`, `node-deletable`, `node-hidden`
+`{ nodeId }`; `edge-selectable`, `edge-deletable`, `edge-hidden`, `edge-reconnectable`
+`{ edgeId }`; `node-selected`, `edge-selected` (`selection()`).
+
+**Features** (D2): each factory returns a frozen object with its resolved `options` (read by its
+engine side, #3). Model side today: `selection()` (commands, keys, the `selected` field of nodes
+and edges), `subflows()` (`node.set-parent`, keys, `parentId` / `extent` / `expandParent`, removal
+of children, extent clamping and parent growth with the document's sizes), `reconnection()`
+(`edge.reconnect`; requires `connection()`). `drag()`, `resize()`, `connection()`, `keyboard()`,
+`minimap()` run the core's commands (`node.move`, `node.resize`, `edge.add`, `selection.remove`)
+and have only options and their reserved engine names in `FEATURE_KEYS` until #3. A command, key
+or document field of a feature that is not installed is a type error and a runtime refusal
+(`not_found`, `invalid_payload`, a validation issue), naming the feature.
+
+**For the engine (#3).** `featuresOf(model)` gives the composed features; `featureEngine(composed,
+host)` composes their `engine(host)` sides once per engine (keys merged, a key two features add
+throws; `pointerdown`/`keydown` hooks walked in install order, the first `true` taking the event;
+`attached`/`detached`/`destroy`). `FeatureEngineHost` (`model`, `shared(key, create)`) and
+`FeatureEngine` are the contract to extend, and the `engineRun`/`engineGet`/`engineIs` lists of
+`FEATURE_KEYS` are where each feature's engine names go. `FlowReader`, `AllowedKeys` type the
+engine's own key maps by the installed features like the model's.
+
 ## Repository layout
 
 ```
@@ -179,10 +248,12 @@ packages/core/      @fragiola/flow       src/<domain>/ (document, state, command
                                          one folder per feature, engine, geometry, attributes);
                                          entry index.ts; tests/ mirroring src/, tests/types/,
                                          tests/guard.test.ts
+                    scripts/             generate-command-docs.ts (site/docs/api/commands.mdx)
 site/               package.json         the repository's guard tests (tests/): the layout, .d.ts,
-                                         package, E2E selection and CI workflow checks
+                                         package, E2E selection, CI workflow, features' bundle guard
+                                         and command docs checks; docs/api/commands.mdx (generated)
 scripts/                                 check-layout.ts, check-dts.ts, source-condition.ts,
-                                         check-package.ts, e2e-suites.ts (check-features.ts with #2)
+                                         check-package.ts, e2e-suites.ts, check-features.ts
 .github/workflows/  ci.yml               Checks, Package, Changes
 ```
 
@@ -236,3 +307,55 @@ Code reused from another Fragiola repository carries the light header
 Decisions the implementer takes where the Epic is silent (a command, key or feature name not
 listed: `model-api.md` naming; xyflow and the guidelines disagree: the guidelines win), each with
 its reason.
+
+- **Selection is a document field** (`selected: true` on a node or an edge, absent when not),
+  owned by `selection()`. Why: the document stays the single source of truth, `get("flow-json")`
+  round-trips the selection, and an undo or a sync sees it like any change. Alternative: a state
+  slice outside the document (data-grid's, tree's); refused because the flow's document is its
+  whole state. A selected entity that is not selectable is refused (a command) or an issue (a
+  document), and one made unselectable is deselected.
+- **Unknown command name → `unknown_command`** (Dockable's code); a command of a feature that is
+  not installed → `not_found`, naming the feature (the Issue). Both carry `/command` from
+  `dispatch` and from a batch step.
+- **Which commands are a feature's.** `selection.*` (`selection()`), `node.set-parent`
+  (`subflows()`), `edge.reconnect` (`reconnection()`). `node.move`, `node.resize` and `edge.add`
+  stay the core's: an app with no drag, resizer or connection gesture still lays out, sizes and
+  connects nodes in code (an auto-layout, a loaded template); `drag()`, `resize()` and
+  `connection()` are their gestures (engine side, #3).
+- **Flags are core document fields** for every feature (`draggable`, `selectable`, `connectable`,
+  `deletable`, `hidden`; an edge's `selectable`, `deletable`, `hidden`, `reconnectable`), enforced
+  by the commands; only `selected`, `parentId`, `extent` and `expandParent` are a feature's fields.
+  `node.move` refuses a node that is not draggable even from code (Dockable's rule: code cannot
+  bypass a flag). `node.resize` has no flag (none in D3).
+- **`selection.set` takes a `mode`** (`replace` | `add` | `toggle`) rather than three commands, and
+  refuses an unselectable or missing id; `selection.remove` is the Delete key's command and skips
+  what is not deletable (a parent holding an undeletable child stays), while `node.remove` refuses.
+  Removing a node always removes its edges, whatever their `deletable` (an edge never dangles).
+- **Edges.** A self loop is allowed (a middleware forbids it, D7); a second edge joining the same
+  handles in the same direction is refused (in a document too). `edge.reconnect` takes the whole
+  new connection (a handle left out is none). Edge `type` and `data` are optional (`type` none is
+  `"bezier"`); a node's `data` is required, a JSON object.
+- **Sub-flows.** `extent` is `"parent"` only (no coordinate extent in D2). `expandParent` is a
+  subflows field (D2's "expand parent"). The model clamps and grows with the sizes the document
+  gives (`width`, `height`): without them it clamps at the parent's origin only, so the engine
+  (#3) keeps the rules during a gesture with measured sizes; resizing a parent smaller does not
+  move its children (the resize gesture, #3, keeps them in). `node.set-parent` keeps a node's place
+  on screen. Children may come before their parent in `nodes` (no order rule).
+- **The bundle guard reads source maps** (the tree's guard, not data-grid's string markers): the
+  core names every feature's keys in `FEATURE_KEYS`, so string markers would always match.
+- **Dry runs** never call the app's `createId` (`check`'s id is indicative, from the default
+  counters), and a command a middleware issues during `can`/`check` is `refused` (a dry run causes
+  nothing). The chain sees a frozen copy of the payload: a middleware rewrites by assigning a new
+  object (validated again) and never by writing into it; a middleware may veto a success but never
+  turn a failed command into one (a batch stays all or nothing).
+- **Typing.** `FlowModel<T, F = FlowFeatures>`: the default "any features" allows every key, and a
+  model with features is assignable to it (data-grid's default; the middleware context is a
+  distributive conditional, not a mapped type, so the variance check passes). `createFlowModel`'s
+  `F` defaults to `[]`: pass `typeof features` with an explicit `Types`. Payload types keep every
+  feature's optional fields (a field of a feature not installed is refused at run time, not by the
+  type); a batch entry may name any command (`not_found` at run time).
+- **Feature options** (engine side, read by #3), with their defaults: `selection({ boxMode: "full",
+  multiple: true })`, `drag({ snapGrid, threshold: 1 })`, `resize({ minWidth: 10, minHeight: 10,
+  maxWidth, maxHeight, keepAspectRatio: false })`, `connection({ radius: 20, mode: "strict" })`,
+  `reconnection({ radius: 10 })`, `keyboard({ step: 5, fastStep: 20 })`, `minimap({ pannable: true,
+  zoomable: true })`. #3 may extend them.
