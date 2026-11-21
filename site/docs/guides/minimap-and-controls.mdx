@@ -16,6 +16,8 @@ names, where they sit and how they look are yours.
 Put `Flow.Controls` inside `Flow.Root`, outside `Flow.Viewport` (it must not pan or zoom), and place
 it with your style. Presses and the wheel over it are left to it.
 
+<Framework name="react">
+
 ```tsx
 import { Flow } from "@fragiola/flow-react";
 import { LockIcon, MaximizeIcon, MinusIcon, PlusIcon, UnlockIcon } from "lucide-react";
@@ -40,6 +42,40 @@ import { LockIcon, MaximizeIcon, MinusIcon, PlusIcon, UnlockIcon } from "lucide-
 </Flow.Controls>;
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import { Flow } from "@fragiola/flow-vue";
+import { LockIcon, MaximizeIcon, MinusIcon, PlusIcon, UnlockIcon } from "@lucide/vue";
+</script>
+
+<template>
+    <Flow.Controls role="group" aria-label="Zoom and lock" class="absolute bottom-3 start-3 flex flex-col">
+        <Flow.ZoomIn aria-label="Zoom in" class="control">
+            <PlusIcon />
+        </Flow.ZoomIn>
+        <Flow.ZoomOut aria-label="Zoom out" class="control">
+            <MinusIcon />
+        </Flow.ZoomOut>
+        <Flow.FitView aria-label="Fit view" class="control">
+            <MaximizeIcon />
+        </Flow.FitView>
+        <Flow.ToggleInteractive v-slot="{ state }" aria-label="Lock the flow" class="control">
+            <UnlockIcon v-if="state.interactive" />
+            <LockIcon v-else />
+        </Flow.ToggleInteractive>
+    </Flow.Controls>
+</template>
+```
+
+In Vue, a button's default slot gets its state (`v-slot="{ state }"`): no `render` needed to
+swap the icon.
+
+</Framework>
+
 | button | runs | disabled while |
 | --- | --- | --- |
 | `Flow.ZoomIn` | `zoom-in` (a step of `zoomStep`, default 1.2, around the root's centre) | at `maxZoom` |
@@ -56,14 +92,28 @@ panning and zooming stay; the root and the toggle lose `data-interactive`.
 The root's `minZoom` (default 0.5) and `maxZoom` (default 2) bound every zoom, the buttons', the
 wheel's and a pinch's:
 
+<Framework name="react">
+
 ```tsx
 <Flow.Root minZoom={0.25} maxZoom={2} zoomStep={1.5} fitView={{ padding: 0.1 }} … />
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Root :min-zoom="0.25" :max-zoom="2" :zoom-step="1.5" :fit-view="{ padding: 0.1 }" … />
+```
+
+</Framework>
 
 ## Buttons of your own
 
 The buttons are thin over the engine: your own button does the same with `useFlow` (inside the
 root) or a [flow ref](/docs/api/primitives/flow-ref) (outside):
+
+<Framework name="react">
 
 ```tsx
 import { useFlow, useViewport } from "@fragiola/flow-react";
@@ -79,6 +129,30 @@ function ZoomReadout() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="zoom-readout.vue"
+<script setup lang="ts">
+import { useFlow, useViewport } from "@fragiola/flow-vue";
+
+const { engine } = useFlow();
+const viewport = useViewport();
+</script>
+
+<template>
+    <button type="button" @click="engine.run('zoom-to', { zoom: 1 })">
+        {{ Math.round(viewport.zoom * 100) }}%
+    </button>
+</template>
+```
+
+`useViewport` is a computed ref in Vue: a template unwraps it (`viewport.zoom`), a script reads
+`viewport.value`.
+
+</Framework>
+
 Other actions: `center-on { x, y, zoom? }`, `pan-by { x, y }`, `set-viewport { x?, y?, zoom? }`,
 `fit-view { nodeIds, padding }` (fit only some nodes). See [The viewport](/docs/concepts/viewport).
 
@@ -86,6 +160,8 @@ Other actions: `center-on { x, y, zoom? }`, `pan-by { x, y }`, `set-viewport { x
 
 `minimap()` is a feature; `MiniMap`, `MiniMapNode` and `MiniMapMask` come with it, on the same
 entry:
+
+<Framework name="react">
 
 ```tsx
 import { MiniMap, MiniMapMask, MiniMapNode, minimap } from "@fragiola/flow-react/minimap";
@@ -113,6 +189,47 @@ const features = [selection(), drag(), minimap()] as const;
     )}
 </MiniMap>;
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script lang="ts">
+import { MiniMap, MiniMapMask, MiniMapNode, minimap } from "@fragiola/flow-vue/minimap";
+
+const features = [selection(), drag(), minimap()] as const;
+</script>
+
+<script setup lang="ts">
+import { typedFlow } from "@fragiola/flow-vue";
+
+const Flow = typedFlow<Types, typeof features>();
+</script>
+
+<template>
+    <MiniMap
+        v-slot="{ view }"
+        :width="180"
+        :height="130"
+        role="img"
+        aria-label="Minimap of the route"
+        class="absolute end-3 bottom-3 rounded border bg-palette-base"
+    >
+        <MiniMapNode
+            v-for="node in view.nodes"
+            :key="node.nodeId"
+            :node-id="node.nodeId"
+            class="fill-palette-line data-selected:fill-(--fl-edge-selected)"
+        />
+        <MiniMapMask class="fill-(--fl-minimap-mask) stroke-(--fl-edge-selected)" />
+    </MiniMap>
+</template>
+```
+
+In Vue, the children function is `MiniMap`'s default scoped slot, `v-slot="{ view }"`.
+
+</Framework>
 
 Without children, `MiniMap` draws a `MiniMapNode` per node and the `MiniMapMask`, unstyled. It is
 an SVG of `width` × `height` pixels (200 × 150 by default) whose view box holds every node and the

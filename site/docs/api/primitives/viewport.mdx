@@ -9,7 +9,9 @@ zooms with the flow: `Flow.Edges` first, then `Flow.Nodes` (drawn on top), then
 `Flow.Background`, `Flow.SelectionBox`, `Flow.Controls`, the minimap.
 
 The engine writes its `transform` and `transform-origin` directly (`engine.adapter.attachViewport`):
-React never renders a transform on it, so a pan or a zoom re-renders nothing inside it.
+the framework never renders a transform on it, so a pan or a zoom re-renders nothing inside it.
+
+<Framework name="react">
 
 ```tsx
 <Flow.Root<Types, typeof features> features={features} defaultNodes={nodes} className="size-full">
@@ -22,6 +24,24 @@ React never renders a transform on it, so a pan or a zoom re-renders nothing ins
     <Flow.SelectionBox />
 </Flow.Root>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Root :features="features" :default-nodes="nodes" class="size-full">
+    <Flow.Background variant="dots" />
+    <Flow.Viewport>
+        <Flow.Edges v-slot="{ edge }"><MyEdge :edge="edge" /></Flow.Edges>
+        <Flow.Nodes v-slot="{ node }"><MyNode :node="node" /></Flow.Nodes>
+        <Flow.ConnectionLine />
+    </Flow.Viewport>
+    <Flow.SelectionBox />
+</Flow.Root>
+```
+
+</Framework>
 
 Read the viewport with [`useViewport`](/docs/api/primitives/hooks) and change it with the engine
 (`engine.run("set-viewport", { x, y, zoom })`, `"fit-view"`): see

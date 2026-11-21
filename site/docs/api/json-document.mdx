@@ -36,6 +36,8 @@ every typed API (see [Typed data](/docs/concepts/typed-data)):
 | `nodes` | `object` | each node type and the shape of its `data`: `{ task: { title: string } }` |
 | `edges` | `object` | each app edge type and the shape of its `data` (the built-in types may be given too) |
 
+<Framework name="react">
+
 ```ts
 import type { FlowNode, FlowTypes } from "@fragiola/flow-react";
 
@@ -47,6 +49,24 @@ interface Types extends FlowTypes {
 declare const node: FlowNode<Types>;
 if (node.type === "task") node.data.title; // string: the type narrows the data
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+import type { FlowNode, FlowTypes } from "@fragiola/flow-vue";
+
+interface Types extends FlowTypes {
+    readonly nodes: { trigger: { event: string }; task: { title: string } };
+    readonly edges: { dependency: { weight: number } };
+}
+
+declare const node: FlowNode<Types>;
+if (node.type === "task") node.data.title; // string: the type narrows the data
+```
+
+</Framework>
 
 `AnyTypes` types nothing (any type, any JSON object as data): the default. `NodeTypeOf<T>`,
 `NodeDataOf<T, K>`, `EdgeTypeOf<T>` (the built-in types and the app's) and `EdgeDataOf<T, K>` read
@@ -159,6 +179,8 @@ types a schema names.
 none; it never throws for a document. `createFlowModel` throws a `FlowValidationError` with the
 same `issues`. Validate what comes back from storage or from a network before you load it:
 
+<Framework name="react">
+
 ```ts
 import { createFlowModel, type FlowJson, validateFlow } from "@fragiola/flow-react";
 
@@ -173,6 +195,27 @@ function restore(raw: string | null) {
     return createFlowModel<Types, typeof features>(valid ? (json as FlowJson<Types>) : undefined, { features });
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+import { createFlowModel, type FlowJson, validateFlow } from "@fragiola/flow-vue";
+
+function restore(raw: string | null) {
+    let json: unknown = null;
+    try {
+        json = JSON.parse(raw ?? "null");
+    } catch {
+        // not JSON: start empty
+    }
+    const valid = json !== null && validateFlow(json, { features }).length === 0;
+    return createFlowModel<Types, typeof features>(valid ? (json as FlowJson<Types>) : undefined, { features });
+}
+```
+
+</Framework>
 
 `ValidateFlowOptions`:
 

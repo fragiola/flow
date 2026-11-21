@@ -10,6 +10,8 @@ the connection's path; a children function draws your own. Its `data-valid` / `d
 whether the drop would be accepted (`model.can("edge.add", …)`, or `model.can("edge.reconnect", …)`
 while an edge's end is moved: a middleware's veto makes it invalid).
 
+<Framework name="react">
+
 ```tsx
 <Flow.Viewport>
     <Flow.Edges<Types>>{renderEdge}</Flow.Edges>
@@ -18,11 +20,41 @@ while an edge's end is moved: a middleware's veto makes it invalid).
 </Flow.Viewport>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Viewport>
+    <Flow.Edges v-slot="{ edge }"><MyEdge :edge="edge" /></Flow.Edges>
+    <Flow.Nodes v-slot="{ node }"><MyNode :node="node" /></Flow.Nodes>
+    <Flow.ConnectionLine class="stroke-blue-500 data-invalid:stroke-red-500" />
+</Flow.Viewport>
+```
+
+</Framework>
+
+<Framework name="react">
+
 ```tsx
 <Flow.ConnectionLine>
     {(connection) => <path d={connection.path} fill="none" strokeDasharray="4 4" stroke="currentColor" />}
 </Flow.ConnectionLine>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.ConnectionLine v-slot="{ connection }">
+    <path :d="connection.path" fill="none" stroke-dasharray="4 4" stroke="currentColor" />
+</Flow.ConnectionLine>
+```
+
+In Vue, the children function is the default scoped slot, `v-slot="{ connection }"`.
+
+</Framework>
 
 The same state is available anywhere in the root through
 [`useConnection`](/docs/api/primitives/hooks).

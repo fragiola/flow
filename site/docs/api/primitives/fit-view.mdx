@@ -8,6 +8,8 @@ it fits every node in the root, with a padding of 0.1, within the zoom limits. B
 re-renders when the view changes. It sets no text and no name: give it an icon and an
 `aria-label`. Put it in `Flow.Controls`, or anywhere inside `Flow.Root`.
 
+<Framework name="react">
+
 ```tsx
 import { MaximizeIcon } from "lucide-react";
 
@@ -15,6 +17,26 @@ import { MaximizeIcon } from "lucide-react";
     <MaximizeIcon />
 </Flow.FitView>;
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import { MaximizeIcon } from "@lucide/vue";
+</script>
+
+<template>
+    <Flow.FitView aria-label="Fit view" class="p-1 data-disabled:opacity-40">
+        <MaximizeIcon />
+    </Flow.FitView>
+</template>
+```
+
+In Vue, its default slot gets `{ state }` (`ControlButtonState`); `@click` runs after the action.
+
+</Framework>
 
 The same action from code: `engine.run("fit-view")` ([engine](/docs/api/engine)).
 

@@ -3,7 +3,7 @@ title: MiniMap
 description: MiniMap draws a small map of every node and of what the root shows; with minimap(), a drag on it pans the flow and its wheel zooms.
 ---
 
-`MiniMap` comes from `@fragiola/flow-react/minimap`, with the `minimap()` feature it needs. It
+`MiniMap` comes from `@fragiola/flow-react/minimap` (`@fragiola/flow-vue/minimap`), with the `minimap()` feature it needs. It
 renders an SVG of `width` × `height` pixels inside `Flow.Root`, outside `Flow.Viewport`, whose
 view box is the engine's `minimap-view`: every node, and the view the root shows. By default it
 draws a `MiniMapNode` per node, then the `MiniMapMask`; a children function receives the view
@@ -11,6 +11,8 @@ draws a `MiniMapNode` per node, then the `MiniMapMask`; a children function rece
 press or a drag on it pans the flow and its wheel zooms it. Place it and name it yourself.
 
 <Example id="minimap-and-controls" />
+
+<Framework name="react">
 
 ```tsx
 import { Flow } from "@fragiola/flow-react";
@@ -32,6 +34,41 @@ const features = [minimap()] as const;
     </MiniMap>
 </Flow.Root>;
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import { typedFlow } from "@fragiola/flow-vue";
+import { MiniMap, MiniMapMask, MiniMapNode, minimap } from "@fragiola/flow-vue/minimap";
+
+const features = [minimap()] as const;
+const Flow = typedFlow<Types, typeof features>();
+</script>
+
+<template>
+    <Flow.Root :features="features" :default-nodes="nodes" class="relative size-full">
+        <Flow.Viewport>…</Flow.Viewport>
+        <MiniMap
+            v-slot="{ view }"
+            :width="180"
+            :height="130"
+            role="img"
+            aria-label="Minimap"
+            class="absolute right-3 bottom-3"
+        >
+            <MiniMapNode v-for="node in view.nodes" :key="node.nodeId" :node-id="node.nodeId" class="fill-gray-300" />
+            <MiniMapMask class="fill-black/10" />
+        </MiniMap>
+    </Flow.Root>
+</template>
+```
+
+In Vue, the children function is the default scoped slot, `v-slot="{ view }"`.
+
+</Framework>
 
 ## Props
 

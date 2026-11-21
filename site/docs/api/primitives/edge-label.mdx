@@ -10,12 +10,32 @@ on it selects its edge; a button in it keeps its own clicks.
 
 <Example id="edge-labels" />
 
+<Framework name="react">
+
 ```tsx
 <Flow.Edge<Types> edge={edge}>
     <Flow.EdgePath />
     <Flow.EdgeLabel className="rounded bg-white px-1 text-xs">{edge.data?.text}</Flow.EdgeLabel>
 </Flow.Edge>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Edge :edge="edge">
+    <Flow.EdgePath />
+    <Flow.EdgeLabel class="rounded bg-white px-1 text-xs">{{ edge.data?.text }}</Flow.EdgeLabel>
+</Flow.Edge>
+```
+
+In Vue, `Flow.EdgeLabel` renders nothing where it is written: it hands its content to
+`Flow.Edges`, whose HTML layer renders it with its edge (a `Teleport` out of an SVG would keep
+creating SVG elements). Its default slot gets `{ state }`; a template `ref` on it reaches no element,
+so read the element through its `render` slot.
+
+</Framework>
 
 ## Props
 

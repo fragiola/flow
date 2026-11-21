@@ -130,6 +130,8 @@ shortcuts (`handleUndoKeys`): copy the whole file as `undo.ts` to use the editor
 Make the model yourself, so the history sits beside the root, and create the history in an effect
 (StrictMode's second mount then gets one that listens again):
 
+<Framework name="react">
+
 ```tsx title="editor.tsx"
 import { createFlowModel, Flow } from "@fragiola/flow-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -168,6 +170,60 @@ function HistoryButtons({ history }: { history: UndoHistory }) {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="editor.vue"
+<script setup lang="ts">
+import { createFlowModel, typedFlow } from "@fragiola/flow-vue";
+import { onMounted, onUnmounted, shallowRef } from "vue";
+import { createUndoHistory, handleUndoKeys, type UndoHistory, type UndoSnapshot } from "./undo";
+
+const Flow = typedFlow<Types, typeof features>();
+const model = createFlowModel<Types, typeof features>({ version: 1, nodes, edges }, { features });
+
+// one history per model, made once mounted (never during a server render), as React's effect
+const history = shallowRef<UndoHistory | null>(null);
+const snapshot = shallowRef<UndoSnapshot | null>(null);
+const onKeyDown = (event: KeyboardEvent) => {
+    if (history.value) handleUndoKeys(history.value, event);
+};
+let stop = () => {};
+onMounted(() => {
+    const created = createUndoHistory(model);
+    history.value = created;
+    snapshot.value = created.getSnapshot();
+    const unsubscribe = created.subscribe(() => {
+        snapshot.value = created.getSnapshot();
+    });
+    window.addEventListener("keydown", onKeyDown);
+    stop = () => {
+        window.removeEventListener("keydown", onKeyDown);
+        unsubscribe();
+        created.dispose();
+    };
+});
+onUnmounted(() => stop());
+</script>
+
+<template>
+    <Flow.Root :model="model" class="flow">
+        <!-- the viewport, edges and nodes -->
+        <div role="toolbar" aria-label="History">
+            <button type="button" :disabled="!snapshot?.canUndo" @click="history?.undo()">Undo</button>
+            <button type="button" :disabled="!snapshot?.canRedo" @click="history?.redo()">Redo</button>
+        </div>
+    </Flow.Root>
+</template>
+```
+
+In Vue, the snapshot goes into a `shallowRef` from `history.subscribe` (what
+`useSyncExternalStore` does in React), and the history is made in `onMounted` and disposed in
+`onUnmounted` (React's effect).
+
+</Framework>
 
 `handleUndoKeys` maps Ctrl/⌘ + Z to undo and Ctrl/⌘ + Shift + Z or Ctrl/⌘ + Y to redo, and leaves
 a text field its own undo.

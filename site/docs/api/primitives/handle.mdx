@@ -10,6 +10,8 @@ With `connection()`, a press on it draws a connection; while one is drawn it say
 drop here would be accepted (`data-valid`, `data-invalid`, from `model.can("edge.add", …)`, or
 `model.can("edge.reconnect", …)` while an edge's end is moved).
 
+<Framework name="react">
+
 ```tsx
 <Flow.Node<Types> node={node}>
     {node.data.label}
@@ -18,6 +20,24 @@ drop here would be accepted (`data-valid`, `data-invalid`, from `model.can("edge
     <Flow.Handle type="source" side="right" handleId="error" style={{ top: "70%" }} />
 </Flow.Node>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Node :node="node">
+    {{ node.data.label }}
+    <Flow.Handle type="target" side="left" title="Input" class="size-2 rounded-full bg-gray-500" />
+    <Flow.Handle type="source" side="right" handle-id="ok" :style="{ top: '30%' }" />
+    <Flow.Handle type="source" side="right" handle-id="error" :style="{ top: '70%' }" />
+</Flow.Node>
+```
+
+In Vue, the props are kebab-case in a template (`handle-id`, `node-id`); a bare `connectable`
+attribute is `true`; its default slot gets `{ state }`.
+
+</Framework>
 
 It sits at the middle of its side by default (a default your `style` overrides: several handles on
 one side are placed by you). A handle without `handleId` is the node's default handle of its type.

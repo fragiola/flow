@@ -10,6 +10,8 @@ both its nodes have a size (`edge-path-by` is defined): on the first paint, edge
 nodes' measurements. Hidden edges, and edges of hidden nodes, are left out; with
 `onlyRenderVisible`, only those in view (`visible-edges`).
 
+<Framework name="react">
+
 ```tsx
 function renderEdge(edge: FlowEdge<Types>) {
     return (
@@ -21,6 +23,24 @@ function renderEdge(edge: FlowEdge<Types>) {
 
 <Flow.Edges<Types>>{renderEdge}</Flow.Edges>;
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Edges v-slot="{ edge }">
+    <Flow.Edge :edge="edge">
+        <Flow.EdgePath class="stroke-gray-400 data-selected:stroke-blue-500" />
+    </Flow.Edge>
+</Flow.Edges>
+```
+
+In Vue, the children function is the default scoped slot, `v-slot="{ edge }"`, and each edge's
+slot is its own component: an edge re-renders when its edge object changes, or when something its
+slot reads does, whatever its neighbours do.
+
+</Framework>
 
 The layer lets presses through to the pane; the edges' own parts take them. Each edge's render is
 memoized on the edge and the children function (its path re-renders by itself): keep the function

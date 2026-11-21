@@ -14,6 +14,8 @@ browser. The package's own tests do the same; how you split them is yours.
 The model is a pure function of its commands: create it, run commands, read the result. No DOM,
 no React, no mocks.
 
+<Framework name="react">
+
 ```ts title="connection-rules.test.ts"
 import { createFlowModel } from "@fragiola/flow-react";
 import { describe, expect, it } from "vitest";
@@ -53,6 +55,52 @@ describe("the connection rules", () => {
     });
 });
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts title="connection-rules.test.ts"
+import { createFlowModel } from "@fragiola/flow-vue";
+import { describe, expect, it } from "vitest";
+import { connectionRules, features, type Types } from "./connection-rules";
+
+function model() {
+    const created = createFlowModel<Types, typeof features>(
+        {
+            version: 1,
+            nodes: [
+                { id: "a", type: "block", position: { x: 0, y: 0 }, data: { label: "A", inputs: [], outputs: ["number"] } },
+                { id: "b", type: "block", position: { x: 200, y: 0 }, data: { label: "B", inputs: ["text"], outputs: [] } },
+            ],
+            edges: [],
+        },
+        { features },
+    );
+    created.use(connectionRules);
+    return created;
+}
+
+describe("the connection rules", () => {
+    it("refuse a port of another type", () => {
+        const result = model().run("edge.add", {
+            source: "a",
+            target: "b",
+            sourceHandle: "number-0",
+            targetHandle: "text-0",
+        });
+        expect(result).toMatchObject({ ok: false, error: { code: "vetoed" } });
+    });
+
+    it("say so before the drop, without changing anything", () => {
+        const flow = model();
+        expect(flow.can("edge.add", { source: "a", target: "b", sourceHandle: "number-0", targetHandle: "text-0" })).toBe(false);
+        expect(flow.get("all-edges")).toHaveLength(0);
+    });
+});
+```
+
+</Framework>
 
 `model.check` returns what `run` would return without committing; `model.subscribe` lets a test
 assert the events your app would hear. The core is also `@fragiola/flow` on its own, without React:
@@ -100,6 +148,8 @@ function box(left: number, top: number, width: number, height: number): DOMRect 
 
 Then assert on what your components render, by the part attributes, roles and names:
 
+<Framework name="react">
+
 ```tsx title="editor.test.tsx"
 import { render, screen } from "@testing-library/react";
 import { act } from "react";
@@ -119,6 +169,35 @@ it("draws an edge once its nodes are measured", async () => {
     expect(screen.getByRole("group", { name: "Fetch data" })).toBeInTheDocument();
 });
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts title="editor.test.ts"
+import { flushPromises, mount } from "@vue/test-utils";
+import { beforeEach, expect, it } from "vitest";
+import Editor from "./editor.vue";
+import { installLayout } from "./test/layout";
+
+beforeEach(() => installLayout());
+
+it("draws an edge once its nodes are measured", async () => {
+    const wrapper = mount(Editor, { attachTo: document.body });
+    // the engine is created when the root mounts, and tells its measurements once per task:
+    // let Vue patch, then let them re-render
+    await flushPromises();
+    await flushPromises();
+    expect(wrapper.findAll('[data-flow-part="edge"]')).toHaveLength(1);
+    expect(wrapper.find('[role="group"][aria-label="Fetch data"]').exists()).toBe(true);
+    wrapper.unmount();
+});
+```
+
+In Vue, `@vue/test-utils` mounts the component; the same layout stub serves, and the engine
+needs its root mounted in the document (`attachTo`) to measure.
+
+</Framework>
 
 Handles need a box too (their centre is measured relative to their node) before a connection can
 end on one; stub them the same way, at their side of the node. A gesture in jsdom is a sequence of

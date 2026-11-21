@@ -15,6 +15,8 @@ be selected, dragged, connected or deleted.
 
 ## Installing features
 
+<Framework name="react">
+
 ```tsx
 import { Flow } from "@fragiola/flow-react";
 import { connection } from "@fragiola/flow-react/connection";
@@ -36,7 +38,38 @@ const features = [
 </Flow.Root>;
 ```
 
-Make the list once (a module constant, or `useState`): the features are fixed when the model is
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import { typedFlow } from "@fragiola/flow-vue";
+import { connection } from "@fragiola/flow-vue/connection";
+import { drag } from "@fragiola/flow-vue/drag";
+import { keyboard } from "@fragiola/flow-vue/keyboard";
+import { reconnection } from "@fragiola/flow-vue/reconnection";
+import { selection } from "@fragiola/flow-vue/selection";
+
+const features = [
+    selection({ boxOnDrag: false }),
+    drag({ snapGrid: [20, 20] }),
+    connection({ mode: "strict", radius: 20 }),
+    reconnection(),
+    keyboard({ step: 5, fastStep: 20 }),
+] as const;
+
+const Flow = typedFlow<Types, typeof features>();
+</script>
+
+<template>
+    <Flow.Root :features="features" :default-nodes="nodes" class="h-96">…</Flow.Root>
+</template>
+```
+
+</Framework>
+
+Make the list once (a module constant, React's `useState`, a Vue component's setup): the features are fixed when the model is
 created, and the root warns if the `features` prop changes later. A model you create yourself takes
 them in `createFlowModel(json, { features })`. A feature installed twice, or one installed without
 a feature it requires (`reconnection()` needs `connection()`), throws when the model is created,
@@ -55,7 +88,7 @@ naming both.
 | `keyboard()` | `/keyboard` | focus on nodes and edges, arrows, Delete, Enter, Escape | `step: 5`, `fastStep: 20` |
 | `minimap()` | `/minimap` | the `MiniMap` view, pan and zoom from it | `pannable: true`, `zoomable: true`, `padding: 0.1` |
 
-Each entry is `@fragiola/flow-react/<feature>`, which re-exports the core's
+Each entry is `@fragiola/flow-react/<feature>` (`@fragiola/flow-vue/<feature>` in Vue), which re-exports the core's
 `@fragiola/flow/<feature>`; `/minimap` and `/resize` add their primitives. Every option is on
 [Features](/docs/api/features).
 
@@ -89,5 +122,5 @@ with or without a gesture: a node with `draggable: false` refuses `node.move` fr
 ## Only what you import ships
 
 The main entry never imports a feature (a bundle guard in the build fails if it does). A flow
-that never imports `@fragiola/flow-react/minimap` does not ship the minimap's geometry or its
+that never imports `@fragiola/flow-react/minimap` (or `@fragiola/flow-vue/minimap`) does not ship the minimap's geometry or its
 primitives.

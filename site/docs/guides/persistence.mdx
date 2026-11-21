@@ -62,6 +62,8 @@ commands a user would have run to bring the model to the saved document, and one
 as a single step (so an undo history sees one step, and a middleware sees every command). Validate
 what comes back first: storage is outside your app.
 
+<Framework name="react">
+
 ```tsx title="toolbar.tsx"
 import {
     type FlowDocumentJson,
@@ -111,6 +113,60 @@ export function Toolbar() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="toolbar.vue"
+<script lang="ts">
+import type { FlowDocumentJson, Viewport } from "@fragiola/flow-vue";
+
+const KEY = "my-app:flow";
+
+interface Saved {
+    flow: FlowDocumentJson<Types>;
+    viewport: Viewport;
+}
+
+function isViewport(value: unknown): value is Viewport {
+    const { x, y, zoom } = (value ?? {}) as Partial<Record<string, unknown>>;
+    return [x, y, zoom].every((n) => typeof n === "number" && Number.isFinite(n));
+}
+</script>
+
+<script setup lang="ts">
+import { useFlow, validateFlow } from "@fragiola/flow-vue";
+import { load, save } from "./persistence";
+
+const { model, engine } = useFlow<Types, typeof features>();
+
+function onSave() {
+    save(KEY, { flow: model.get("flow-json"), viewport: engine.get("viewport") } satisfies Saved);
+}
+
+function onRestore() {
+    const saved = load<Saved>(KEY);
+    if (!saved || !isViewport(saved.viewport)) return;
+    if (validateFlow(saved.flow, { features }).length > 0) return;
+    const commands = model.get("commands-to", {
+        nodes: saved.flow.nodes,
+        edges: saved.flow.edges,
+    });
+    if (commands.length > 0) model.run("batch", { commands: [...commands] });
+    engine.run("set-viewport", saved.viewport);
+}
+</script>
+
+<template>
+    <div role="toolbar" aria-label="Flow file">
+        <button type="button" @click="onSave">Save</button>
+        <button type="button" @click="onRestore">Restore</button>
+    </div>
+</template>
+```
+
+</Framework>
+
 `validateFlow(json, { features })` returns every problem with its JSON path (an empty list for a
 valid document); pass the features the flow installs, since a field of one that is missing
 (`selected` without `selection()`) is a problem.
@@ -120,6 +176,8 @@ valid document); pass the features the flow installs, since a field of one that 
 To open a saved flow, build the model from it once, and hand it to the root. It reads the same
 `Saved` record under the same `KEY` as the toolbar. An invalid document makes `createFlowModel`
 throw a `FlowValidationError` with its `issues`; validate first and fall back to a default:
+
+<Framework name="react">
 
 ```tsx
 import { createFlowModel, Flow, type FlowJson, validateFlow } from "@fragiola/flow-react";
@@ -141,11 +199,43 @@ export function Editor() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="editor.vue"
+<script setup lang="ts">
+import { createFlowModel, type FlowJson, typedFlow, validateFlow } from "@fragiola/flow-vue";
+
+const EMPTY: FlowJson<Types> = { version: 1, nodes: [], edges: [] };
+
+function restore() {
+    const saved = load<Saved>(KEY)?.flow;
+    const valid = saved !== undefined && validateFlow(saved, { features }).length === 0;
+    return createFlowModel<Types, typeof features>(valid ? (saved as FlowJson<Types>) : EMPTY, {
+        features,
+    });
+}
+
+const Flow = typedFlow<Types, typeof features>();
+// once, in setup: another model would remount the flow
+const model = restore();
+</script>
+
+<template>
+    <Flow.Root :model="model" class="flow"><!-- … --></Flow.Root>
+</template>
+```
+
+</Framework>
+
 ## Save on every change
 
 `model.subscribe` tells every commit. Skip the transient steps of a gesture (a drag moves its nodes
 with transient `node.move` commands, or a `batch` of them for several nodes, and ends with a final
 one) to write once per drag:
+
+<Framework name="react">
 
 ```ts
 useEffect(
@@ -159,6 +249,24 @@ useEffect(
     [model],
 );
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+// in the editor's setup, after the model is created
+onUnmounted(
+    model.subscribe((event) => {
+        if (event.transient) return;
+        // the same record as the toolbar's: the flow changes, the saved viewport stays
+        const viewport = load<Saved>(KEY)?.viewport ?? { x: 0, y: 0, zoom: 1 };
+        save(KEY, { flow: model.get("flow-json"), viewport } satisfies Saved);
+    }),
+);
+```
+
+</Framework>
 
 The viewport changes without a commit: save it into the same record from the engine's
 `viewport-change` event, or from the root's `onViewportChange`, preferably debounced.

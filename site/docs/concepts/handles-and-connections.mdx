@@ -14,6 +14,8 @@ and for your code.
 Render a `Flow.Handle` inside `Flow.Node` for each connection point. It registers with the engine,
 which measures its centre relative to its node, and it sits at the middle of its `side` by default:
 
+<Framework name="react">
+
 ```tsx
 <Flow.Node<Types> node={node} className="node">
     {node.data.label}
@@ -22,6 +24,23 @@ which measures its centre relative to its node, and it sits at the middle of its
     <Flow.Handle type="source" side="right" handleId="error" style={{ top: "70%" }} className="handle" />
 </Flow.Node>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Node :node="node" class="node">
+    {{ node.data.label }}
+    <Flow.Handle type="target" side="left" handle-id="in" class="handle" />
+    <Flow.Handle type="source" side="right" handle-id="ok" :style="{ top: '30%' }" class="handle" />
+    <Flow.Handle type="source" side="right" handle-id="error" :style="{ top: '70%' }" class="handle" />
+</Flow.Node>
+```
+
+In a template the props are kebab-case (`handle-id`); a bare `connectable` attribute is `true`.
+
+</Framework>
 
 | prop | means |
 | --- | --- |
@@ -42,6 +61,8 @@ Sides are physical, not logical: a diagram's right stays right in a right-to-lef
 With `connection()` installed, dragging from a handle draws a connection. `Flow.ConnectionLine`,
 inside the viewport, draws it while it lasts; `useConnection()` reads it:
 
+<Framework name="react">
+
 ```tsx
 <Flow.Viewport>
     <Flow.Edges<Types>>{renderEdge}</Flow.Edges>
@@ -49,6 +70,20 @@ inside the viewport, draws it while it lasts; `useConnection()` reads it:
     <Flow.ConnectionLine className="stroke-blue-500 data-invalid:stroke-red-500" />
 </Flow.Viewport>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Viewport>
+    <Flow.Edges v-slot="{ edge }"><MyEdge :edge="edge" /></Flow.Edges>
+    <Flow.Nodes v-slot="{ node }"><MyNode :node="node" /></Flow.Nodes>
+    <Flow.ConnectionLine class="stroke-blue-500 data-invalid:stroke-red-500" />
+</Flow.Viewport>
+```
+
+</Framework>
 
 While it is drawn, the engine looks for the nearest handle within `radius` screen pixels of the
 pointer (`connection({ radius: 20 })`), and asks the model whether the edge would be accepted:

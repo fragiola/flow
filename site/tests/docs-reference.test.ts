@@ -26,6 +26,7 @@ import { describe, expect, it } from "vitest";
 
 const ROOT = join(import.meta.dirname, "../..");
 const REACT_SRC = join(ROOT, "packages/react/src");
+const VUE_SRC = join(ROOT, "packages/vue/src");
 const CORE_SRC = join(ROOT, "packages/core/src");
 const API = join(import.meta.dirname, "../docs/api");
 
@@ -148,9 +149,12 @@ function interfaceFields(
     source: string,
     name: string,
 ): { fields: string[]; extendsNames: string[] } | undefined {
-    const declared = new RegExp(
-        `export interface ${name}\\b([^{]*)\\{([\\s\\S]*?)\\n\\}`,
-    ).exec(source);
+    // an empty body (`… extends PrimitiveProps {}`) first: the other pattern would run on past it
+    const declared =
+        new RegExp(`export interface ${name}\\b([^{]*)\\{()\\}`).exec(source) ??
+        new RegExp(
+            `export interface ${name}\\b([^{]*)\\{([\\s\\S]*?)\\n\\}`,
+        ).exec(source);
     const aliased = new RegExp(
         `export type ${name}\\b(?:<[^>]*>)?\\s*= \\{([\\s\\S]*?)\\n\\}`,
     ).exec(source);
@@ -180,15 +184,22 @@ function sourceFiles(dir: string): string[] {
 const REACT_FILES = sourceFiles(REACT_SRC).map(read);
 const CORE_FILES = sourceFiles(CORE_SRC).map(read);
 
-/** Fields of an interface, following `extends` into the interfaces the packages declare. */
-function allFields(source: string, name: string): string[] {
+const VUE_FILES = sourceFiles(VUE_SRC).map(read);
+
+/**
+ * Fields of an interface, following `extends` into the interfaces the packages declare (`files`:
+ * React's and the core's by default).
+ */
+function allFields(
+    source: string,
+    name: string,
+    files: readonly string[] = [...REACT_FILES, ...CORE_FILES],
+): string[] {
     const found = interfaceFields(source, name);
     if (!found) return [];
     const inherited = found.extendsNames.flatMap((base) => {
-        const declaring = [...REACT_FILES, ...CORE_FILES].find((file) =>
-            interfaceFields(file, base),
-        );
-        return declaring ? allFields(declaring, base) : [];
+        const declaring = files.find((file) => interfaceFields(file, base));
+        return declaring ? allFields(declaring, base, files) : [];
     });
     return [...found.fields, ...inherited];
 }
@@ -511,6 +522,219 @@ describe("the React reference", () => {
     it("gives every primitive page its part attribute", () => {
         for (const { slug } of primitives) {
             expect(page(slug), `api/${slug}.mdx`).toContain("`data-flow-part`");
+        }
+    });
+});
+
+/**
+ * The pages with React code, which show it in Vue too (`<Framework name="vue">`). Every page whose
+ * snippets use the React API belongs here.
+ */
+const PAGES_IN_VUE = [
+    "index",
+    "getting-started/introduction",
+    "getting-started/installation",
+    "getting-started/first-flow",
+    "getting-started/sizing",
+    "getting-started/accessible-names",
+    "concepts/composition",
+    "concepts/features",
+    "concepts/handles-and-connections",
+    "concepts/model-and-commands",
+    "concepts/model-and-engine",
+    "concepts/nodes-and-edges",
+    "concepts/primitive-contract",
+    "concepts/state-attributes",
+    "concepts/typed-data",
+    "concepts/viewport",
+    "api/primitives/hooks",
+    "api/primitives/flow-ref",
+    "api/command-bus",
+    "api/engine",
+    "api/features",
+    "api/json-document",
+    "api/model",
+    "api/path-helpers",
+    "guides/ai-and-automation",
+    "guides/connection-rules",
+    "guides/custom-edges",
+    "guides/custom-nodes",
+    "guides/keyboard",
+    "guides/minimap-and-controls",
+    "guides/persistence",
+    "guides/resizing",
+    "guides/selection",
+    "guides/styling-css",
+    "guides/styling-tailwind",
+    "guides/sub-flows",
+    "guides/testing",
+    "guides/theming",
+    "guides/undo-redo",
+];
+
+/** Every page of the docs, as its slug (`guides/selection`). */
+function allPages(dir = join(API, ".."), prefix = ""): string[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+        entry.isDirectory()
+            ? allPages(join(dir, entry.name), `${prefix}${entry.name}/`)
+            : entry.name.endsWith(".mdx")
+              ? [`${prefix}${entry.name.slice(0, -".mdx".length)}`]
+              : [],
+    );
+}
+
+/** A page's text outside its `<Framework>` blocks. */
+const outsideFrameworks = (mdx: string) =>
+    mdx.replace(/<Framework name="[a-z]+">[\s\S]*?<\/Framework>/g, "");
+
+describe("the Vue reference", () => {
+    const vueIndex = read(join(VUE_SRC, "index.ts"));
+    const vueParts = namedExports(read(join(VUE_SRC, "parts.ts")));
+    const vuePage = page("primitives/vue");
+    const VUE_FEATURE_ENTRIES = ["minimap", "resize"] as const;
+    /** Every part of the Vue package: its name, its source and its React page. */
+    const vuePrimitives = [
+        ...vueParts.map(({ name, module }) => ({
+            name,
+            source: read(join(VUE_SRC, `${module.replace(/^\.\//, "")}.ts`)),
+        })),
+        ...VUE_FEATURE_ENTRIES.flatMap((entry) =>
+            namedExports(read(join(VUE_SRC, entry, "index.ts")))
+                .filter(({ name }) =>
+                    primitives.some(
+                        (part) => !part.namespaced && part.name === name,
+                    ),
+                )
+                .map(({ name, module }) => ({
+                    name,
+                    source: read(
+                        join(
+                            VUE_SRC,
+                            entry,
+                            `${module.replace(/^\.\//, "")}.ts`,
+                        ),
+                    ),
+                })),
+        ),
+    ].map((part) => ({
+        ...part,
+        slug: primitives.find((react) => react.name === part.name)?.slug ?? "",
+    }));
+
+    it("re-exports the core and exports the same Flow namespace as React", () => {
+        expect(vueIndex).toMatch(/^export \* from "@fragiola\/flow";$/m);
+        expect(vueIndex).toMatch(/export \* as Flow from "\.\/parts"/);
+        expect(vueParts.map((entry) => entry.name)).toEqual(
+            partExports.map((entry) => entry.name),
+        );
+        // every React primitive, the features' included, is a Vue one with the same page
+        expect(vuePrimitives.map((part) => part.name).sort()).toEqual(
+            primitives.map((part) => part.name).sort(),
+        );
+    });
+
+    it("mentions every named export of the Vue package and its /minimap and /resize entries on api/primitives/vue.mdx", () => {
+        const exports = [
+            ...namedExports(vueIndex),
+            ...VUE_FEATURE_ENTRIES.flatMap((entry) =>
+                namedExports(read(join(VUE_SRC, entry, "index.ts"))),
+            ),
+        ];
+        expect(exports.length).toBeGreaterThan(100);
+        for (const { name } of exports) {
+            expect(
+                mentions(vuePage, name),
+                `${name} on api/primitives/vue.mdx`,
+            ).toBe(true);
+        }
+    });
+
+    it("has a row for every prop of every part: on api/primitives/vue.mdx, or on the part's React page", () => {
+        const vueRows = tableRowNames(vuePage);
+        let checked = 0;
+        for (const { name, source, slug } of vuePrimitives) {
+            const fields = allFields(source, `${name}Props`, [
+                ...VUE_FILES,
+                ...CORE_FILES,
+            ]);
+            expect(fields, `${name}Props`).toContain("as");
+            const rows = new Set([...vueRows, ...tableRowNames(page(slug))]);
+            for (const field of fields) {
+                checked++;
+                expect(rows.has(field), `Vue ${name}.${field}`).toBe(true);
+            }
+        }
+        expect(checked).toBeGreaterThan(40);
+    });
+
+    it("documents every slot, the root's events and what the render slot receives", () => {
+        const rows = tableRowNames(vuePage);
+        const render = read(join(VUE_SRC, "utils/render.ts"));
+        const renderFields = [
+            ...allFields(render, "RenderSlot", VUE_FILES),
+            ...allFields(render, "RenderSlotProps", VUE_FILES),
+        ];
+        expect(renderFields).toEqual(["render", "props", "state", "children"]);
+        for (const field of renderFields)
+            expect(rows.has(field), field).toBe(true);
+        expect(rows.has("default")).toBe(true);
+        const root = read(join(VUE_SRC, "components/root.ts"));
+        const events = [
+            ...(
+                /export type RootEmits[\s\S]*?\n\};/.exec(root)?.[0] ?? ""
+            ).matchAll(/^ {4}"update:(\w+)":/gm),
+        ].map((match) => match[1] ?? "");
+        expect(events).toEqual(["nodes", "edges", "viewport"]);
+        for (const event of events) {
+            expect(rows.has(`v-model:${event}`), `v-model:${event}`).toBe(true);
+        }
+    });
+
+    it("is in the sidebar, and the pages with React code show it in Vue too", () => {
+        expect(read(join(API, "../config.json"))).toContain(
+            '"path": "api/primitives/vue"',
+        );
+        for (const slug of [
+            ...PAGES_IN_VUE,
+            ...primitives.map((part) => `api/${part.slug}`),
+        ]) {
+            const mdx = read(join(API, "..", `${slug}.mdx`));
+            expect(mdx, slug).toContain('<Framework name="vue">');
+            // a Vue block wherever there is a React one
+            expect(mdx.split('<Framework name="vue">').length, slug).toBe(
+                mdx.split('<Framework name="react">').length,
+            );
+        }
+    });
+
+    it("leaves no React code outside a React block: JSX, or an import of the React package", () => {
+        const listed = new Set(PAGES_IN_VUE);
+        for (const slug of allPages()) {
+            const outside = outsideFrameworks(
+                read(join(API, "..", `${slug}.mdx`)),
+            );
+            const fences = [
+                ...outside.matchAll(/^```(\w+)[^\n]*\n([\s\S]*?)^```/gm),
+            ];
+            for (const [, lang, code] of fences) {
+                expect(
+                    lang,
+                    `${slug}: a ${lang} snippet outside a block`,
+                ).not.toBe("tsx");
+                expect(
+                    code,
+                    `${slug}: React's package outside a block`,
+                ).not.toMatch(/@fragiola\/flow-react|from "react"/);
+            }
+            if (
+                outside !== read(join(API, "..", `${slug}.mdx`)) &&
+                !slug.startsWith("api/primitives/")
+            ) {
+                expect(
+                    listed.has(slug),
+                    `${slug} has blocks: list it in PAGES_IN_VUE`,
+                ).toBe(true);
+            }
         }
     });
 });

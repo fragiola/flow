@@ -54,7 +54,9 @@ describe("src/scenarios", () => {
             expect(Object.keys(module), `${area}/${file}`).toEqual(["default"]);
             expect(typeof module.default, `${area}/${file}`).toBe("function");
         }
-    });
+        // Imports every scenario cold (each pulls the adapter and the core through the transform):
+        // past Vitest's 5 s default on a loaded machine.
+    }, 30_000);
 
     it("lists every scenario in the catalog, grouped by area in AREAS order", async () => {
         const files = (await scenarioFiles())

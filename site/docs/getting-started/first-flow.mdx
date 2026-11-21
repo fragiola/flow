@@ -17,6 +17,8 @@ gallery, step by step.
 **Name your node types.** A `Types` registry says which node types exist and what data each one
 holds, so `node.data` is typed wherever you render a node ([Typed data](/docs/concepts/typed-data)).
 
+<Framework name="react">
+
 ```tsx
 import type { FlowEdgeInput, FlowNodeInput, FlowTypes } from "@fragiola/flow-react";
 
@@ -38,6 +40,35 @@ const edges: FlowEdgeInput<Types>[] = [
 ];
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import type { FlowEdgeInput, FlowNodeInput, FlowTypes } from "@fragiola/flow-vue";
+
+interface Types extends FlowTypes {
+    readonly nodes: { step: { label: string } };
+}
+
+const nodes: FlowNodeInput<Types>[] = [
+    { id: "start", type: "step", position: { x: 0, y: 0 }, data: { label: "Start" } },
+    { id: "fetch", type: "step", position: { x: -160, y: 140 }, data: { label: "Fetch data" } },
+    { id: "parse", type: "step", position: { x: 160, y: 140 }, data: { label: "Parse file" } },
+    { id: "save", type: "step", position: { x: 0, y: 280 }, data: { label: "Save" } },
+];
+
+const edges: FlowEdgeInput<Types>[] = [
+    { id: "start-fetch", source: "start", target: "fetch" },
+    { id: "start-parse", source: "start", target: "parse" },
+    { id: "fetch-save", source: "fetch", target: "save" },
+];
+</script>
+```
+
+</Framework>
+
 Positions are in flow coordinates: x grows to the right, y grows down, and a node's position is
 its top-left corner.
 
@@ -48,6 +79,8 @@ its top-left corner.
 gesture is a feature you opt into, from its own entry. Make the list once, outside the component:
 the root reads it once.
 
+<Framework name="react">
+
 ```tsx
 import { connection } from "@fragiola/flow-react/connection";
 import { drag } from "@fragiola/flow-react/drag";
@@ -56,13 +89,38 @@ import { selection } from "@fragiola/flow-react/selection";
 const features = [selection(), drag(), connection()] as const;
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import { typedFlow } from "@fragiola/flow-vue";
+import { connection } from "@fragiola/flow-vue/connection";
+import { drag } from "@fragiola/flow-vue/drag";
+import { selection } from "@fragiola/flow-vue/selection";
+
+const features = [selection(), drag(), connection()] as const;
+// the components typed by the registry and the features: a template takes no type argument
+const Flow = typedFlow<Types, typeof features>();
+</script>
+```
+
+A template cannot pass type arguments (`<Flow.Root<Types, typeof features>>`), so
+`typedFlow<Types, typeof features>()` gives you the same components, typed: `node.data` in a
+slot is the registry's.
+
+</Framework>
+
 </Step>
 <Step>
 
 **Render the root and give it a size.** `Flow.Root` creates the model from `defaultNodes` and
-`defaultEdges` (read once) and fills its own box, so it needs a size from your layout
+`defaultEdges` (`:default-nodes`, `:default-edges` in Vue; read once) and fills its own box, so it needs a size from your layout
 ([Sizing the root](/docs/getting-started/sizing)). `fitView` fits the nodes once they are
 measured.
+
+<Framework name="react">
 
 ```tsx
 <Flow.Root<Types, typeof features>
@@ -76,12 +134,37 @@ measured.
 </Flow.Root>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<template>
+    <Flow.Root
+        :features="features"
+        :default-nodes="nodes"
+        :default-edges="edges"
+        :fit-view="{ padding: 0.2, maxZoom: 1 }"
+        class="h-[480px] w-full bg-slate-50"
+    >
+        <!-- the layers below -->
+    </Flow.Root>
+</template>
+```
+
+In a template the props are kebab-case (`:default-nodes`, `:fit-view`); a bare `fit-view`
+attribute is `true`.
+
+</Framework>
+
 </Step>
 <Step>
 
 **Add the layers.** `Flow.Background` sits behind the viewport. Inside `Flow.Viewport`, the edges
 come before the nodes so the nodes are drawn on top, and the connection line comes last. You
-render each node and each edge from a children function.
+render each node and each edge from a children function (a scoped slot in Vue).
+
+<Framework name="react">
 
 ```tsx
 <Flow.Background variant="dots" gap={20} size={2} className="text-slate-300" />
@@ -109,6 +192,38 @@ render each node and each edge from a children function.
 </Flow.Viewport>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<!-- inside <Flow.Root> -->
+<Flow.Background variant="dots" :gap="20" :size="2" class="text-slate-300" />
+<Flow.Viewport>
+    <Flow.Edges v-slot="{ edge }">
+        <Flow.Edge :edge="edge">
+            <Flow.EdgePath class="stroke-slate-400 stroke-2 data-selected:stroke-blue-500" />
+        </Flow.Edge>
+    </Flow.Edges>
+    <Flow.Nodes v-slot="{ node }">
+        <Flow.Node
+            :node="node"
+            class="min-w-28 select-none rounded-lg border bg-white p-3 text-center data-selected:border-blue-500"
+        >
+            {{ node.data.label }}
+            <Flow.Handle type="target" side="top" class="size-2.5 rounded-full border bg-white" />
+            <Flow.Handle type="source" side="bottom" class="size-2.5 rounded-full border bg-white" />
+        </Flow.Node>
+    </Flow.Nodes>
+    <Flow.ConnectionLine class="stroke-blue-500 stroke-2" />
+</Flow.Viewport>
+```
+
+`Flow.Edges` and `Flow.Nodes` render their default scoped slot once per edge and per node
+(`v-slot="{ edge }"`, `v-slot="{ node }"`), where React takes a children function.
+
+</Framework>
+
 `Flow.Node` positions its element at the node's place in the viewport; `Flow.Handle` sits at the
 middle of its `side`. Give nodes `user-select: none` (`select-none`), or a drag selects their text.
 
@@ -124,6 +239,8 @@ them through Tailwind's `data-*` variants ([State attributes](/docs/concepts/sta
 </Steps>
 
 ## The whole file
+
+<Framework name="react">
 
 ```tsx title="basic-flow.tsx"
 import { Flow, type FlowEdgeInput, type FlowNodeInput, type FlowTypes } from "@fragiola/flow-react";
@@ -187,6 +304,71 @@ export default function BasicFlow() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="basic-flow.vue"
+<script setup lang="ts">
+import { type FlowEdgeInput, type FlowNodeInput, type FlowTypes, typedFlow } from "@fragiola/flow-vue";
+import { connection } from "@fragiola/flow-vue/connection";
+import { drag } from "@fragiola/flow-vue/drag";
+import { selection } from "@fragiola/flow-vue/selection";
+
+interface Types extends FlowTypes {
+    readonly nodes: { step: { label: string } };
+}
+
+const features = [selection(), drag(), connection()] as const;
+const Flow = typedFlow<Types, typeof features>();
+
+const nodes: FlowNodeInput<Types>[] = [
+    { id: "start", type: "step", position: { x: 0, y: 0 }, data: { label: "Start" } },
+    { id: "fetch", type: "step", position: { x: -160, y: 140 }, data: { label: "Fetch data" } },
+    { id: "parse", type: "step", position: { x: 160, y: 140 }, data: { label: "Parse file" } },
+    { id: "save", type: "step", position: { x: 0, y: 280 }, data: { label: "Save" } },
+];
+
+const edges: FlowEdgeInput<Types>[] = [
+    { id: "start-fetch", source: "start", target: "fetch" },
+    { id: "start-parse", source: "start", target: "parse" },
+    { id: "fetch-save", source: "fetch", target: "save" },
+];
+</script>
+
+<template>
+    <Flow.Root
+        :features="features"
+        :default-nodes="nodes"
+        :default-edges="edges"
+        :fit-view="{ padding: 0.2, maxZoom: 1 }"
+        class="h-[480px] w-full bg-slate-50"
+    >
+        <Flow.Background variant="dots" :gap="20" :size="2" class="text-slate-300" />
+        <Flow.Viewport>
+            <Flow.Edges v-slot="{ edge }">
+                <Flow.Edge :edge="edge">
+                    <Flow.EdgePath class="stroke-slate-400 stroke-2 data-selected:stroke-blue-500" />
+                </Flow.Edge>
+            </Flow.Edges>
+            <Flow.Nodes v-slot="{ node }">
+                <Flow.Node
+                    :node="node"
+                    class="min-w-28 select-none rounded-lg border bg-white p-3 text-center data-selected:border-blue-500"
+                >
+                    {{ node.data.label }}
+                    <Flow.Handle type="target" side="top" class="size-2.5 rounded-full border bg-white" />
+                    <Flow.Handle type="source" side="bottom" class="size-2.5 rounded-full border bg-white" />
+                </Flow.Node>
+            </Flow.Nodes>
+            <Flow.ConnectionLine class="stroke-blue-500 stroke-2" />
+        </Flow.Viewport>
+    </Flow.Root>
+</template>
+```
+
+</Framework>
+
 ## What you have
 
 - **Pan** by dragging the pane, **zoom** with the wheel, a pinch or a double click: the core's
@@ -197,8 +379,8 @@ export default function BasicFlow() {
 - **Connect** by dragging from a bottom handle to another node's top handle (`connection()`):
   the drop runs `edge.add`, and the new edge is drawn.
 
-Every one of those changes is a command on the model. Read it with `useFlow()` inside the root, or
-a flow ref outside it ([The model and commands](/docs/concepts/model-and-commands)).
+Every one of those changes is a command on the model. Read it with `useFlow()` inside the root
+(a hook in React, a composable in Vue), or a flow ref outside it ([The model and commands](/docs/concepts/model-and-commands)).
 
 ## Next steps
 

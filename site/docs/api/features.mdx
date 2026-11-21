@@ -12,6 +12,8 @@ a document field is a validation issue, both naming the feature, while its `get`
 answer `undefined` and `false`. The
 concept is on [Features](/docs/concepts/features).
 
+<Framework name="react">
+
 ```tsx
 import { Flow } from "@fragiola/flow-react";
 import { connection } from "@fragiola/flow-react/connection";
@@ -30,6 +32,39 @@ export function Editor() {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="editor.vue"
+<script lang="ts">
+import { connection } from "@fragiola/flow-vue/connection";
+import { drag } from "@fragiola/flow-vue/drag";
+import { keyboard } from "@fragiola/flow-vue/keyboard";
+import { selection } from "@fragiola/flow-vue/selection";
+
+// once, at module level: the features are fixed when the model is created
+const features = [selection({ boxMode: "partial" }), drag({ snapGrid: [20, 20] }), connection(), keyboard()] as const;
+</script>
+
+<script setup lang="ts">
+import { typedFlow } from "@fragiola/flow-vue";
+
+const Flow = typedFlow<Types, typeof features>();
+</script>
+
+<template>
+    <Flow.Root :features="features" :default-nodes="nodes" class="size-full">
+        …
+    </Flow.Root>
+</template>
+```
+
+The Vue package mirrors every feature entry (`@fragiola/flow-vue/<feature>`), with the same
+factories and the same options.
+
+</Framework>
 
 Each React entry re-exports the core's (`@fragiola/flow-react/drag` is `@fragiola/flow/drag`),
 so a React app imports everything from the one package it installs; `/minimap` and `/resize` add
@@ -160,12 +195,27 @@ arrows move the selection (or the focused node), Delete and Backspace remove it
 fields. `FeatureKeyKind` is one of those kinds, `OwnedBy<K, N>` the names of a kind the features
 `N` own.
 
+<Framework name="react">
+
 ```ts
 import { FEATURE_KEYS } from "@fragiola/flow-react";
 
 FEATURE_KEYS.subflows.commands; // ["node.set-parent"]
 FEATURE_KEYS.selection.nodeFields; // ["selected"]
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+import { FEATURE_KEYS } from "@fragiola/flow-vue";
+
+FEATURE_KEYS.subflows.commands; // ["node.set-parent"]
+FEATURE_KEYS.selection.nodeFields; // ["selected"]
+```
+
+</Framework>
 
 ## The feature contract
 

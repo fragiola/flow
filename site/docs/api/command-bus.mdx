@@ -78,6 +78,8 @@ is validated again, then call `next`) or **observe** (call `next` and look at it
 Returning `undefined` passes on `next`'s result when it was called. A middleware may veto a
 success but never turn a failed command into one.
 
+<Framework name="react">
+
 ```ts
 import { type Middleware, veto } from "@fragiola/flow-react";
 
@@ -94,6 +96,29 @@ const rules: Middleware<Types, typeof features> = (ctx, next) => {
 
 const stop = model.use(rules);
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+import { type Middleware, veto } from "@fragiola/flow-vue";
+
+/** Connection rules: no self loop, and a "trigger" node takes no incoming edge. */
+const rules: Middleware<Types, typeof features> = (ctx, next) => {
+    if (ctx.command !== "edge.add") return next();
+    const { source, target } = ctx.payload;
+    if (source === target) return veto("an edge joins two different nodes");
+    if (ctx.get("node-by", { id: target })?.type === "trigger") {
+        return veto("a trigger starts a workflow: nothing connects into it");
+    }
+    return next();
+};
+
+const stop = model.use(rules);
+```
+
+</Framework>
 
 The payload is a frozen copy: rewrite it by assigning a new object, never by writing into it.
 Because the engine asks `model.can("edge.add", …)` while a connection is drawn, a vetoed target is

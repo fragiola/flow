@@ -1,6 +1,6 @@
 ---
 title: Composition
-description: You assemble a flow from primitives under one namespace, render every node and edge yourself through children functions, and swap any element with render.
+description: You assemble a flow from primitives under one namespace, render every node and edge yourself through children functions or slots, and swap any element.
 ---
 
 A flow is markup you write. `Flow.Root` holds the model and the engine; inside it, layers in the
@@ -8,6 +8,8 @@ order they are drawn; inside the layers, your nodes and edges, rendered by child
 `nodeTypes` map, no registry of components: a node's type is a field your function reads.
 
 ## The layers
+
+<Framework name="react">
 
 ```tsx title="editor.tsx"
 <Flow.Root<Types, typeof features> features={features} defaultNodes={nodes} defaultEdges={edges} className="h-[600px]">
@@ -26,6 +28,34 @@ order they are drawn; inside the layers, your nodes and edges, rendered by child
 </Flow.Root>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="editor.vue"
+<template>
+    <Flow.Root :features="features" :default-nodes="nodes" :default-edges="edges" class="h-[600px]">
+        <!-- behind the viewport, in screen space, panned and zoomed by the pattern itself -->
+        <Flow.Background variant="dots" />
+        <!-- the pannable, zoomable layer: what is inside is in flow coordinates -->
+        <Flow.Viewport>
+            <Flow.Edges v-slot="{ edge }"><MyEdge :edge="edge" /></Flow.Edges>
+            <Flow.Nodes v-slot="{ node }"><MyNode :node="node" /></Flow.Nodes>
+            <Flow.ConnectionLine />
+        </Flow.Viewport>
+        <!-- over the viewport, in screen space -->
+        <Flow.SelectionBox />
+        <Flow.Controls>…</Flow.Controls>
+        <MiniMap />
+    </Flow.Root>
+</template>
+```
+
+`MyNode` and `MyEdge` stand for your own components (below): the slot renders one per node
+and per edge.
+
+</Framework>
+
 - `Flow.Edges` comes before `Flow.Nodes`, so nodes are drawn above edges.
 - `Flow.ConnectionLine` is in the viewport (it is in flow coordinates); `Flow.SelectionBox`,
   `Flow.Controls` and `MiniMap` are outside it (they are in screen pixels, and do not zoom).
@@ -35,6 +65,8 @@ order they are drawn; inside the layers, your nodes and edges, rendered by child
 
 `Flow.Nodes` calls its children function for each node that is not hidden, keyed by its id. Switch
 on the node's type to render a different component per type; the registry narrows `node.data`:
+
+<Framework name="react">
 
 ```tsx title="render-node.tsx"
 import { Flow, type FlowNode, type FlowTypes } from "@fragiola/flow-react";
@@ -67,8 +99,46 @@ function renderNode(node: FlowNode<Types>) {
 }
 ```
 
-Keep the function stable (a module function, as here, or `useCallback`): a new function re-renders
-every node. `Flow.Nodes` re-renders a node only when its node object changes, so a drag step
+</Framework>
+
+<Framework name="vue">
+
+```vue title="my-node.vue"
+<script setup lang="ts">
+import { type FlowNode, type FlowTypes, typedFlow } from "@fragiola/flow-vue";
+
+interface Types extends FlowTypes {
+    readonly nodes: {
+        trigger: { label: string; event: string };
+        action: { label: string; service: string };
+    };
+}
+
+const Flow = typedFlow<Types>();
+defineProps<{ node: FlowNode<Types> }>();
+</script>
+
+<template>
+    <Flow.Node v-if="node.type === 'trigger'" :node="node" class="node node-trigger">
+        {{ node.data.label }} on {{ node.data.event }}
+        <Flow.Handle type="source" side="right" />
+    </Flow.Node>
+    <Flow.Node v-else-if="node.type === 'action'" :node="node" class="node">
+        <Flow.Handle type="target" side="left" />
+        {{ node.data.label }} ({{ node.data.service }})
+        <Flow.Handle type="source" side="right" />
+    </Flow.Node>
+</template>
+```
+
+In Vue the slot of `Flow.Nodes` is the function: each node's slot is its own component, so a
+drag step re-renders the moved nodes only, whatever the slot renders. `v-if` on `node.type`
+narrows `node.data` as React's `switch` does.
+
+</Framework>
+
+In React, keep the function stable (a module function, as here, or `useCallback`): a new function
+re-renders every node. `Flow.Nodes` re-renders a node only when its node object changes, so a drag step
 re-renders the moved nodes only.
 
 ## Your function draws each edge
@@ -76,6 +146,8 @@ re-renders the moved nodes only.
 `Flow.Edges` calls its children function for each edge whose two nodes have a size. A `Flow.Edge`
 is an SVG group: its default child is a `Flow.EdgePath`, and you add a label, end anchors or a
 wider invisible path for presses.
+
+<Framework name="react">
 
 ```tsx title="render-edge.tsx"
 function renderEdge(edge: FlowEdge<Types>) {
@@ -93,6 +165,33 @@ function renderEdge(edge: FlowEdge<Types>) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="my-edge.vue"
+<script setup lang="ts">
+import { type FlowEdge, typedFlow } from "@fragiola/flow-vue";
+
+const Flow = typedFlow<Types>();
+defineProps<{ edge: FlowEdge<Types> }>();
+</script>
+
+<template>
+    <Flow.Edge :edge="edge">
+        <Flow.EdgePath class="stroke-transparent stroke-[12]" />
+        <Flow.EdgePath class="stroke-slate-400" />
+        <Flow.EdgeLabel v-if="typeof edge.data?.label === 'string'" class="rounded bg-white px-1 text-xs">
+            {{ edge.data.label }}
+        </Flow.EdgeLabel>
+        <Flow.ReconnectAnchor end="source" />
+        <Flow.ReconnectAnchor end="target" />
+    </Flow.Edge>
+</template>
+```
+
+</Framework>
+
 `Flow.EdgeLabel` is HTML, centred on the path's label point: SVG holds no HTML, so it is portalled
 into the edges' HTML layer. `Flow.NodeToolbar`, likewise, portals into the root, outside the zoom.
 
@@ -101,6 +200,8 @@ into the edges' HTML layer. `Flow.NodeToolbar`, likewise, portals into the root,
 Every primitive renders one element by default (a `div`, a `g`, a `path`, a `button`). `render`
 replaces it, never `asChild`: give an element, whose props are merged with the primitive's, or a
 function of the props and the state.
+
+<Framework name="react">
 
 ```tsx
 <Flow.Node<Types> node={node} render={<article />}>
@@ -113,6 +214,33 @@ function of the props and the state.
 />
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<template>
+    <Flow.Node :node="node" as="article">
+        {{ node.data.label }}
+    </Flow.Node>
+
+    <Flow.ToggleInteractive aria-label="Lock the flow">
+        <template #render="{ props, state }">
+            <button v-bind="props">
+                <UnlockIcon v-if="state.interactive" />
+                <LockIcon v-else />
+            </button>
+        </template>
+    </Flow.ToggleInteractive>
+</template>
+```
+
+In Vue, `render={<article />}` is the `as` prop (a tag or a component), and a render function is
+the `render` scoped slot, `{ props, state, children }`: bind `v-bind="props"` on your element and
+render `<component :is="children" />` inside it when the part has content.
+
+</Framework>
+
 Spread the props on what you return: they carry the ref that registers the element with the
 engine, the part attributes the engine resolves presses from, and the structural style.
 
@@ -121,6 +249,8 @@ engine, the part attributes the engine resolves presses from, and the structural
 Each part the engine needs is also a hook returning `{ state, props }`, for a node or a handle you
 render by hand: `useNode(node)`, `useEdge(edge)` and `useHandle({ type, side, handleId })`. Spread
 `props` on your element:
+
+<Framework name="react">
 
 ```tsx
 function PlainNode({ node }: { node: FlowNode<Types> }) {
@@ -132,6 +262,31 @@ function PlainNode({ node }: { node: FlowNode<Types> }) {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="plain-node.vue"
+<script setup lang="ts">
+import { type FlowNode, useNode } from "@fragiola/flow-vue";
+
+const props = defineProps<{ node: FlowNode<Types> }>();
+// computed refs: a template unwraps them
+const { state, props: element } = useNode(() => props.node);
+</script>
+
+<template>
+    <div v-bind="element" :class="state.selected ? 'node node-selected' : 'node'">
+        {{ node.data.label }}
+    </div>
+</template>
+```
+
+In Vue the composables take the node as a getter (or a ref) and return `state` and `props` as
+computed refs; `v-bind` puts the props, their template ref included, on your element.
+
+</Framework>
 
 A node rendered by hand this way needs `Flow.Node`'s context for its handles: render its handles
 with `useHandle({ …, nodeId: node.id })` or `Flow.Handle nodeId={node.id}`. The value hooks

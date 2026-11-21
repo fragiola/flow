@@ -10,6 +10,8 @@ pan and zoom keep working. It is `aria-pressed` while locked and carries `data-i
 unlocked; it is disabled until the root is mounted. A `disabled` of yours replaces that rule (your props win), unlike the zoom and fit buttons, which stay disabled while their action is refused whatever you pass. It sets no text: switch its icon on
 `state.interactive` and give it an `aria-label`.
 
+<Framework name="react">
+
 ```tsx
 import { LockIcon, UnlockIcon } from "lucide-react";
 
@@ -18,6 +20,28 @@ import { LockIcon, UnlockIcon } from "lucide-react";
     render={(props, state) => <button {...props}>{state.interactive ? <UnlockIcon /> : <LockIcon />}</button>}
 />;
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import { LockIcon, UnlockIcon } from "@lucide/vue";
+</script>
+
+<template>
+    <Flow.ToggleInteractive v-slot="{ state }" aria-label="Lock the flow">
+        <UnlockIcon v-if="state.interactive" />
+        <LockIcon v-else />
+    </Flow.ToggleInteractive>
+</template>
+```
+
+In Vue, its default slot gets `{ state }`, so the icon switches without replacing the button;
+the `render` slot (`#render="{ props, state }"`) replaces it as React's `render` does.
+
+</Framework>
 
 The root's `interactive` prop sets the same lock from your state; a root whose `interactive` does
 not change leaves the toggle's lock alone.

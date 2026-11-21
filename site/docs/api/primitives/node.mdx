@@ -15,6 +15,8 @@ It renders only its children: the content, `Flow.Handle`s, a `NodeResizer`, a
 `Flow.NodeToolbar`. Fields, buttons and links inside it start no gesture, nor does an element
 marked `data-flow-no-gesture`; `data-flow-no-wheel` keeps the wheel (a scrolling list).
 
+<Framework name="react">
+
 ```tsx
 <Flow.Nodes<Types>>
     {(node) => (
@@ -30,6 +32,27 @@ marked `data-flow-no-gesture`; `data-flow-no-wheel` keeps the wheel (a scrolling
     )}
 </Flow.Nodes>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Nodes v-slot="{ node }">
+    <Flow.Node :node="node" :aria-label="node.data.label" class="node data-selected:node-selected">
+        {{ node.data.label }}
+        <Flow.Handle type="target" side="top" />
+        <Flow.Handle type="source" side="bottom" />
+    </Flow.Node>
+</Flow.Nodes>
+```
+
+In Vue, `class` takes no function of the state: style the state through its `data-*` attributes
+(`data-selected:`), or read `{ state }` from its default slot
+(`<Flow.Node :node="node" v-slot="{ state }">`). A template `ref` on it is the component, its `$el`
+the node's element.
+
+</Framework>
 
 It has no role and no name: give it the ones your app means (see
 [Accessible names](/docs/getting-started/accessible-names)), and `user-select: none` so a drag does

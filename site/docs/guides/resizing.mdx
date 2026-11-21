@@ -14,6 +14,8 @@ yours.
 
 `resize()` is a feature, and `NodeResizer` and `ResizeHandle` come with it, on the same entry:
 
+<Framework name="react">
+
 ```tsx
 import { NodeResizer, resize } from "@fragiola/flow-react/resize";
 import { drag } from "@fragiola/flow-react/drag";
@@ -31,6 +33,37 @@ function renderNode(node: FlowNode<Types>) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script lang="ts">
+import { drag } from "@fragiola/flow-vue/drag";
+import { NodeResizer, resize } from "@fragiola/flow-vue/resize";
+import { selection } from "@fragiola/flow-vue/selection";
+
+const features = [selection(), drag(), resize({ minWidth: 80, minHeight: 60 })] as const;
+</script>
+
+<script setup lang="ts">
+import { typedFlow } from "@fragiola/flow-vue";
+
+const Flow = typedFlow<Types, typeof features>();
+</script>
+
+<template>
+    <Flow.Nodes v-slot="{ node }">
+        <Flow.Node :node="node" class="node group">
+            {{ node.data.label }}
+            <NodeResizer class="hidden group-data-selected:block" />
+        </Flow.Node>
+    </Flow.Nodes>
+</template>
+```
+
+</Framework>
+
 `NodeResizer` goes inside `Flow.Node`: a box over the node holding a `ResizeHandle` at each corner
 and side by default. Give the handles their size and look; they are placed on their corner or
 along their side, and carry `data-position` (`top-left`, `top`, …, `left`).
@@ -45,10 +78,23 @@ along their side, and carry `data-position` (`top-left`, `top`, …, `left`).
 | `maxWidth`, `maxHeight` | none | the largest size |
 | `keepAspectRatio` | `false` | a resize keeps the node's width-to-height ratio |
 
+<Framework name="react">
+
 ```tsx
 <NodeResizer minWidth={120} maxWidth={360} minHeight={80} maxHeight={240} />
 <NodeResizer keepAspectRatio />
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<NodeResizer :min-width="120" :max-width="360" :min-height="80" :max-height="240" />
+<NodeResizer keep-aspect-ratio />
+```
+
+</Framework>
 
 A child with `extent: "parent"` (sub-flows) is kept inside its parent while it resizes, and a parent
 never shrinks past such a child.
@@ -57,6 +103,8 @@ never shrinks past such a child.
 
 Pass the handles you want as children: the corners only, a single grip, your own look per position.
 `RESIZE_POSITIONS` lists every position, corners first:
+
+<Framework name="react">
 
 ```tsx
 import { NodeResizer, RESIZE_POSITIONS, ResizeHandle } from "@fragiola/flow-react/resize";
@@ -75,6 +123,33 @@ import { NodeResizer, RESIZE_POSITIONS, ResizeHandle } from "@fragiola/flow-reac
     <ResizeHandle position="bottom-right" aria-hidden className="size-3 cursor-nwse-resize" />
 </NodeResizer>;
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import { NodeResizer, RESIZE_POSITIONS, ResizeHandle } from "@fragiola/flow-vue/resize";
+</script>
+
+<template>
+    <NodeResizer keep-aspect-ratio class="resizer">
+        <ResizeHandle
+            v-for="position in RESIZE_POSITIONS"
+            :key="position"
+            :position="position"
+            class="size-2.5 rounded-sm border border-palette-ring bg-palette-base data-[position=top]:h-1.5 data-[position=bottom]:h-1.5 data-[position=left]:w-1.5 data-[position=right]:w-1.5"
+        />
+    </NodeResizer>
+
+    <NodeResizer>
+        <ResizeHandle position="bottom-right" aria-hidden="true" class="size-3 cursor-nwse-resize" />
+    </NodeResizer>
+</template>
+```
+
+</Framework>
 
 A corner is drawn above the two sides it joins, so a press on it resizes both dimensions.
 

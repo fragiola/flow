@@ -15,6 +15,8 @@ them all.
 `model.run` takes a command's name and its payload, typed by your registry and your features, and
 returns a result. It never throws on bad input: the result says why a command did not apply.
 
+<Framework name="react">
+
 ```tsx title="rename-button.tsx"
 import { useFlow } from "@fragiola/flow-react";
 
@@ -33,6 +35,30 @@ export function RenameButton({ nodeId }: { nodeId: string }) {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="rename-button.vue"
+<script setup lang="ts">
+import { useFlow } from "@fragiola/flow-vue";
+
+const props = defineProps<{ nodeId: string }>();
+const { model } = useFlow<Types, typeof features>();
+
+function rename(): void {
+    const result = model.run("node.set-data", { nodeId: props.nodeId, data: { label: "Renamed" } });
+    if (!result.ok) console.warn(result.error.code, result.error.message);
+}
+</script>
+
+<template>
+    <button type="button" @click="rename">Rename</button>
+</template>
+```
+
+</Framework>
 
 A result is `{ ok: true, value }` or `{ ok: false, error }`, where `error.code` is one of
 `unknown_command`, `invalid_payload`, `not_found`, `refused`, `vetoed`, `queued` or
@@ -63,6 +89,8 @@ whatever rule refuses the removal. The keys of `get` and `is` are on [Model](/do
 Inside `Flow.Root`, `useFlow()` gives the model. Outside it, a flow ref does, or you make the model
 yourself and hand it to the root:
 
+<Framework name="react">
+
 ```tsx title="workflow-editor.tsx"
 import { createFlowModel, Flow, type FlowModel } from "@fragiola/flow-react";
 import { useState } from "react";
@@ -84,6 +112,31 @@ export function WorkflowEditor() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="workflow-editor.vue"
+<script setup lang="ts">
+import { createFlowModel, typedFlow } from "@fragiola/flow-vue";
+
+const Flow = typedFlow<Types, typeof features>();
+// made once per component: the model is plain data, never a reactive object
+const model = createFlowModel<Types, typeof features>(json, { features });
+</script>
+
+<template>
+    <div class="flex h-dvh">
+        <button type="button" @click="model.run('selection.clear')">Deselect</button>
+        <Flow.Root :model="model" class="flex-1">…</Flow.Root>
+    </div>
+</template>
+```
+
+Another `model` given to a Vue root remounts the flow.
+
+</Framework>
+
 A model given to the root keeps its own features: the root's `features`, `defaultNodes` and
 `defaultEdges` are for the model it creates when you give none. See also
 [The flow ref](/docs/api/primitives/flow-ref).
@@ -93,6 +146,8 @@ A model given to the root keeps its own features: the root's `features`, `defaul
 `model.use` adds a middleware around every command, from a gesture or from code. It sees a
 context narrowed by `ctx.command`, and either returns a refusal without calling `next` (a veto),
 assigns a new `ctx.payload` and calls `next` (a rewrite), or calls `next` and looks at the result.
+
+<Framework name="react">
 
 ```ts title="rules.ts"
 import { type Middleware, veto } from "@fragiola/flow-react";
@@ -111,6 +166,30 @@ export const rules: Middleware<Types, typeof features> = (ctx, next) => {
 
 const stop = model.use(rules); // returns its remover
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts title="rules.ts"
+import { type Middleware, veto } from "@fragiola/flow-vue";
+
+/** No edge from a node to itself, and every move lands on whole numbers. */
+export const rules: Middleware<Types, typeof features> = (ctx, next) => {
+    if (ctx.command === "edge.add" && ctx.payload.source === ctx.payload.target) {
+        return veto("an edge joins two different nodes");
+    }
+    if (ctx.command === "node.move") {
+        const { x, y } = ctx.payload.position;
+        ctx.payload = { ...ctx.payload, position: { x: Math.round(x), y: Math.round(y) } };
+    }
+    return next();
+};
+
+const stop = model.use(rules); // returns its remover
+```
+
+</Framework>
 
 Connection rules are middleware too: while a connection is drawn, the engine asks
 `model.can("edge.add", …)`, so a vetoed handle shows `data-invalid` before the drop

@@ -33,6 +33,8 @@ may start from a target handle; the edge is then added the other way round.
 A middleware sees every command. Check `ctx.command`: TypeScript then narrows `ctx.payload` to the
 command's payload. Return `veto(reason)` to refuse, `next()` to let it run:
 
+<Framework name="react">
+
 ```ts title="connection-rules.ts"
 import { type FlowEdge, type FlowTypes, type Middleware, veto } from "@fragiola/flow-react";
 import { connection } from "@fragiola/flow-react/connection";
@@ -81,12 +83,68 @@ export const connectionRules: Middleware<Types, typeof features> = (ctx, next) =
 };
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```ts title="connection-rules.ts"
+import { type FlowEdge, type FlowTypes, type Middleware, veto } from "@fragiola/flow-vue";
+import { connection } from "@fragiola/flow-vue/connection";
+import { drag } from "@fragiola/flow-vue/drag";
+import { selection } from "@fragiola/flow-vue/selection";
+
+type Port = "number" | "text";
+
+export interface Types extends FlowTypes {
+    readonly nodes: { block: { label: string; inputs: Port[]; outputs: Port[] } };
+}
+
+export const features = [selection(), drag(), connection()] as const;
+
+/** A handle id says its port's type: `number-0`, `text-1`. */
+const portType = (handleId: string | undefined) => handleId?.split("-")[0] as Port | undefined;
+
+/** Whether `to` already reaches `from`: an edge from `from` to `to` would close a cycle. */
+function reaches(edges: readonly FlowEdge<Types>[], to: string, from: string): boolean {
+    const seen = new Set<string>();
+    const queue = [to];
+    while (queue.length > 0) {
+        const id = queue.shift() as string;
+        if (id === from) return true;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        for (const edge of edges) if (edge.source === id) queue.push(edge.target);
+    }
+    return false;
+}
+
+export const connectionRules: Middleware<Types, typeof features> = (ctx, next) => {
+    if (ctx.command !== "edge.add") return next();
+    const { source, target, sourceHandle, targetHandle } = ctx.payload;
+    if (portType(sourceHandle) !== portType(targetHandle)) {
+        return veto("a port only joins a port of its own type");
+    }
+    if (source === target || reaches(ctx.state.edges, target, source)) {
+        return veto("that edge would close a cycle");
+    }
+    const taken = ctx.state.edges.some(
+        (edge) => edge.target === target && edge.targetHandle === targetHandle,
+    );
+    if (taken) return veto("that input already has an edge");
+    return next();
+};
+```
+
+</Framework>
+
 `ctx.state` is the committed document the command applies to; `ctx.dryRun` is true while the
 engine asks during a drag, so a middleware with side effects (a log, a request) skips them then.
 
 ## Install it on the model
 
 Create the model yourself, once, add the middleware, and hand the model to the root:
+
+<Framework name="react">
 
 ```tsx
 import { createFlowModel, Flow, type FlowJson, type FlowModel } from "@fragiola/flow-react";
@@ -107,6 +165,32 @@ export function Pipeline({ json }: { json: FlowJson<Types> }) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="pipeline.vue"
+<script setup lang="ts">
+import { createFlowModel, type FlowJson, typedFlow } from "@fragiola/flow-vue";
+import { connectionRules, features, type Types } from "./connection-rules";
+
+const props = defineProps<{ json: FlowJson<Types> }>();
+const Flow = typedFlow<Types, typeof features>();
+
+// created once, in setup: another model would remount the flow
+const model = createFlowModel<Types, typeof features>(props.json, { features });
+model.use(connectionRules);
+</script>
+
+<template>
+    <Flow.Root :model="model" class="flow">
+        <!-- … -->
+    </Flow.Root>
+</template>
+```
+
+</Framework>
+
 The same rule now holds for code: `model.run("edge.add", …)` from a paste or an import returns
 `{ ok: false, error: { code: "vetoed", message } }`.
 
@@ -114,6 +198,8 @@ The same rule now holds for code: `model.run("edge.add", …)` from a paste or a
 
 While a connection hovers a handle, that handle carries `data-valid` or `data-invalid`, and so
 does `Flow.ConnectionLine`. Style both:
+
+<Framework name="react">
 
 ```tsx
 <Flow.Handle
@@ -125,8 +211,26 @@ does `Flow.ConnectionLine`. Style both:
 <Flow.ConnectionLine className="fill-none stroke-(--fl-edge-selected) data-invalid:stroke-(--fl-invalid)" />
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Handle
+    type="target"
+    side="left"
+    handle-id="text-0"
+    class="handle data-valid:bg-(--fl-valid) data-invalid:bg-(--fl-invalid)"
+/>
+<Flow.ConnectionLine class="fill-none stroke-(--fl-edge-selected) data-invalid:stroke-(--fl-invalid)" />
+```
+
+</Framework>
+
 Tell the user why a drop did nothing from the engine's events: `connect-cancel` carries
 `refused: true` when the drop was on a handle the model refused.
+
+<Framework name="react">
 
 ```tsx
 function Outcome() {
@@ -146,6 +250,36 @@ function Outcome() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="outcome.vue"
+<script setup lang="ts">
+import { useFlow } from "@fragiola/flow-vue";
+import { onUnmounted, ref } from "vue";
+
+const { engine } = useFlow<Types, typeof features>();
+const outcome = ref("Drag from an output to an input.");
+onUnmounted(
+    engine.subscribe((event) => {
+        if (event.type === "connect") outcome.value = "Connected.";
+        if (event.type === "connect-cancel") {
+            outcome.value = event.refused ? "Refused by the rules." : "Dropped nowhere.";
+        }
+    }),
+);
+</script>
+
+<template>
+    <p role="status">{{ outcome }}</p>
+</template>
+```
+
+The engine `useFlow` gives is there from `setup` on: subscribe there, and stop in `onUnmounted`.
+
+</Framework>
+
 ## Move an edge's ends
 
 <Example id="edge-reconnect" />
@@ -154,6 +288,8 @@ function Outcome() {
 press a `Flow.ReconnectAnchor` at the end, or the stroke within `radius` (default 10 pixels) of
 it, and drop it on a handle. The edge keeps its id (`edge.reconnect`); dropped nowhere or on a
 refused handle, it goes back. An edge with `reconnectable: false` stays where it is.
+
+<Framework name="react">
 
 ```tsx
 import { reconnection } from "@fragiola/flow-react/reconnection";
@@ -166,6 +302,34 @@ const features = [selection(), drag(), connection(), reconnection()] as const;
     <Flow.ReconnectAnchor end="target" r={6} className="fill-transparent stroke-current" />
 </Flow.Edge>;
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script lang="ts">
+import { reconnection } from "@fragiola/flow-vue/reconnection";
+
+const features = [selection(), drag(), connection(), reconnection()] as const;
+</script>
+
+<script setup lang="ts">
+import { typedFlow } from "@fragiola/flow-vue";
+
+const Flow = typedFlow<Types, typeof features>();
+</script>
+
+<template>
+    <Flow.Edge :edge="edge">
+        <Flow.EdgePath class="edge" />
+        <Flow.ReconnectAnchor end="source" :r="6" class="fill-transparent stroke-current" />
+        <Flow.ReconnectAnchor end="target" :r="6" class="fill-transparent stroke-current" />
+    </Flow.Edge>
+</template>
+```
+
+</Framework>
 
 `edge.reconnect` passes the same middleware chain: check `ctx.command === "edge.reconnect"` in the
 same middleware to apply the rules there too. On touch screens give a wider radius,

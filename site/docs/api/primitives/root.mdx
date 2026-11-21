@@ -5,10 +5,12 @@ description: Flow.Root holds the model and the engine of one flow, takes its nod
 
 `Flow.Root` is the flow. It owns the model (or takes yours with `model`), creates the engine once
 it is mounted, and attaches the engine to its element: the engine listens to the root itself
-(pointer, wheel, keys, focus), so no event is forwarded by React. It renders a `div` with only your
+(pointer, wheel, keys, focus), so no event is forwarded by the framework. It renders a `div` with only your
 children, no role and no name; no Provider is needed above it. Its only structural style is
 `position: relative; overflow: hidden`: give it a size, and the flow fills it (see
 [Sizing the root](/docs/getting-started/sizing)).
+
+<Framework name="react">
 
 ```tsx
 import { Flow, type FlowEdgeInput, type FlowNodeInput, type FlowTypes } from "@fragiola/flow-react";
@@ -56,6 +58,65 @@ export function Editor() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="editor.vue"
+<script setup lang="ts">
+import { type FlowEdgeInput, type FlowNodeInput, type FlowTypes, typedFlow } from "@fragiola/flow-vue";
+import { connection } from "@fragiola/flow-vue/connection";
+import { drag } from "@fragiola/flow-vue/drag";
+import { selection } from "@fragiola/flow-vue/selection";
+
+interface Types extends FlowTypes {
+    readonly nodes: { step: { label: string } };
+}
+
+const features = [selection(), drag(), connection()] as const;
+const Flow = typedFlow<Types, typeof features>();
+
+const nodes: FlowNodeInput<Types>[] = [
+    { id: "a", type: "step", position: { x: 0, y: 0 }, data: { label: "Start" } },
+    { id: "b", type: "step", position: { x: 0, y: 140 }, data: { label: "Save" } },
+];
+const edges: FlowEdgeInput<Types>[] = [{ id: "a-b", source: "a", target: "b" }];
+</script>
+
+<template>
+    <div :style="{ height: '480px' }">
+        <Flow.Root
+            :features="features"
+            :default-nodes="nodes"
+            :default-edges="edges"
+            :fit-view="{ padding: 0.2 }"
+            class="size-full"
+        >
+            <Flow.Viewport>
+                <Flow.Edges v-slot="{ edge }"><Flow.Edge :edge="edge" /></Flow.Edges>
+                <Flow.Nodes v-slot="{ node }">
+                    <Flow.Node :node="node">
+                        {{ node.data.label }}
+                        <Flow.Handle type="target" side="top" />
+                        <Flow.Handle type="source" side="bottom" />
+                    </Flow.Node>
+                </Flow.Nodes>
+            </Flow.Viewport>
+        </Flow.Root>
+    </div>
+</template>
+```
+
+In Vue, `typedFlow<Types, typeof features>()` types the root and the parts (a template takes no
+type argument). The props of the table below are the same, kebab-case in a template
+(`:default-nodes`, `:fit-view`, `:flow-ref`); a bare boolean attribute is `true` (`pan-on-scroll`,
+`fit-view`). The controlled lists and the viewport are `v-model:nodes`, `v-model:edges` and
+`v-model:viewport` (the events `update:nodes`, `update:edges`, `update:viewport`); the content is
+the default slot, given `{ state }`. Another `model` remounts the flow.
+[Vue components](/docs/api/primitives/vue) maps the rest.
+
+</Framework>
+
 Pass the registry and the features as type arguments (`Flow.Root<Types, typeof features>`): the
 commands, keys and data are then typed. The features are fixed when the model is created: a
 changed `features` prop warns and is ignored.
@@ -75,8 +136,8 @@ changed `features` prop warns and is ignored.
 - **Your own model**: `model` takes a model made with `createFlowModel`, with its features and its
   middleware; `defaultNodes`, `features` and `createId` are then unused.
 
-The engine is created in the root's layout effect: the first render, and a server render, have no
-engine (nodes at their model position, no edges drawn).
+The engine is created in the root's layout effect (Vue: its `onMounted`): the first render, and a
+server render, have no engine (nodes at their model position, no edges drawn).
 
 ## Props
 
@@ -154,6 +215,10 @@ the SVG ones' `SvgPrimitiveProps<State, E>`):
 | `className` | `string \| ((state: State) => string \| undefined)` | a class, or a function of the primitive's state |
 | `style` | `CSSProperties \| ((state: State) => CSSProperties \| undefined)` | a style, or a function of the state; the structural keys a primitive sets always win |
 | `ref` | `Ref<E>` | the element, merged with the primitive's own ref |
+
+In Vue, `render` is the `as` prop and the `render` scoped slot, `className` and `style` are `class`
+and `style` without the function form, and `ref` is a template ref on the component: see
+[Vue components](/docs/api/primitives/vue).
 
 Your handlers run after the primitive's own. A primitive sets no text and no `aria-label`: names
 are yours ([Accessible names](/docs/getting-started/accessible-names)).

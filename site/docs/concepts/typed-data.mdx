@@ -10,6 +10,8 @@ a type, and the document stays plain JSON.
 
 ## The registry
 
+<Framework name="react">
+
 ```ts title="types.ts"
 import type { FlowTypes } from "@fragiola/flow-react";
 
@@ -24,6 +26,26 @@ export interface Types extends FlowTypes {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```ts title="types.ts"
+import type { FlowTypes } from "@fragiola/flow-vue";
+
+export interface Types extends FlowTypes {
+    readonly nodes: {
+        task: { title: string; done: boolean };
+        note: { text: string };
+    };
+    readonly edges: {
+        dependency: { weight: number };
+    };
+}
+```
+
+</Framework>
+
 `nodes` names each node type and the shape of its `data`; `edges` names your edge types and
 theirs. The built-in edge types (`bezier`, `smoothstep`, `step`, `straight`) are always allowed,
 with any JSON object as data; an edge with no `type` is a `bezier`. A node's `data` is required
@@ -32,6 +54,8 @@ with any JSON object as data; an edge with no `type` is a `bezier`. A node's `da
 ## A node's type narrows its data
 
 `FlowNode<Types>` is a union over the node types, so checking `type` narrows `data`:
+
+<Framework name="react">
 
 ```tsx
 function renderNode(node: FlowNode<Types>) {
@@ -42,11 +66,30 @@ function renderNode(node: FlowNode<Types>) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Nodes v-slot="{ node }">
+    <Flow.Node v-if="node.type === 'task'" :node="node">
+        {{ node.data.done ? "✓ " : "" }}{{ node.data.title }}
+    </Flow.Node>
+    <Flow.Node v-else :node="node">{{ node.data.text }}</Flow.Node>
+</Flow.Nodes>
+```
+
+`Flow` here is `typedFlow<Types>()`, so the slot's `node` is a `FlowNode<Types>`.
+
+</Framework>
+
 The same holds for `FlowEdge<Types>` and `edge.type`.
 
 ## Where it applies
 
 Pass the registry, and the features, as type arguments where they enter:
+
+<Framework name="react">
 
 ```tsx
 const features = [selection(), drag(), connection()] as const;
@@ -67,8 +110,52 @@ const { model, engine } = useFlow<Types, typeof features>();
 const selected = useSelection<Types>();
 ```
 
-Commands are checked against it:
+</Framework>
 
+<Framework name="vue">
+
+```vue title="editor.vue"
+<script setup lang="ts">
+import { createFlowModel, typedFlow } from "@fragiola/flow-vue";
+import StepNode from "./step-node.vue";
+
+const features = [selection(), drag(), connection()] as const;
+
+// a model you create
+const model = createFlowModel<Types, typeof features>(json, { features });
+
+// the components: a template takes no type argument, so `typedFlow` types them once
+const Flow = typedFlow<Types, typeof features>();
+</script>
+
+<template>
+    <Flow.Root :model="model">
+        <Flow.Viewport>
+            <Flow.Edges v-slot="{ edge }"><Flow.Edge :edge="edge" /></Flow.Edges>
+            <Flow.Nodes v-slot="{ node }"><StepNode :node="node" /></Flow.Nodes>
+        </Flow.Viewport>
+    </Flow.Root>
+</template>
+```
+
+```vue title="selection-count.vue"
+<script setup lang="ts">
+import { useFlow, useSelection } from "@fragiola/flow-vue";
+
+// a composable in a component under the root: it cannot infer them through injection
+const { engine } = useFlow<Types, typeof features>();
+const selected = useSelection<Types>();
+</script>
+
+<template>
+    <button
+        type="button"
+        :disabled="selected.nodes.length === 0"
+        @click="engine.run('fit-view', { nodeIds: selected.nodes.map((node) => node.id) })"
+    >
+        Show the selection
+    </button>
+</template>
 ```ts
 model.run("node.add", { type: "task", position: { x: 0, y: 0 }, data: { title: "Ship it", done: false } });
 // @ts-expect-error: a note's data is { text }
@@ -93,8 +180,8 @@ const bare = createFlowModel<Types, readonly []>(json);
 bare.get("selected-nodes");
 ```
 
-Without type arguments, `useFlow`, `useFlowRef`, `createFlowRef` and a `FlowEngine` know no
-feature (`readonly []`): only the core's commands and keys typecheck, so pass `typeof features`.
+Without type arguments, `useFlow`, `useFlowRef`, `createFlowRef`, `typedFlow` and a `FlowEngine`
+know no feature (`readonly []`): only the core's commands and keys typecheck, so pass `typeof features`.
 A bare `FlowModel` is the exception: its default is "any features" (`FlowFeatures`), so a model
 with features is assignable to it, and a key of a feature that is not installed answers
 `undefined` or `false`, and its command `not_found`, at run time.
@@ -106,5 +193,5 @@ with features is assignable to it, and a key of a feature that is not installed 
 - **Untrusted JSON.** `model.dispatch` and `validateFlow` take `unknown` and check it against the
   JSON Schemas of the commands and the document, which know the shape of a node but not your data:
   validate your own `data` in a middleware if it comes from outside.
-- **Untyped hooks.** `useNodes()` without `Types` returns `FlowNode<AnyTypes>`, where `data` is a
+- **Untyped hooks.** `useNodes()` (a hook, or a composable in Vue) without `Types` returns `FlowNode<AnyTypes>`, where `data` is a
   record of unknown values.

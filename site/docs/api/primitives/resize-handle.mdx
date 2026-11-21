@@ -3,7 +3,7 @@ title: ResizeHandle
 description: ResizeHandle is a grab area on a corner or a side of a node; a press on it resizes the node from there, with resize() installed.
 ---
 
-`ResizeHandle` comes from `@fragiola/flow-react/resize` and goes inside `NodeResizer`, inside its
+`ResizeHandle` comes from `@fragiola/flow-react/resize` (`@fragiola/flow-vue/resize`) and goes inside `NodeResizer`, inside its
 node's element: the engine finds the node a press resizes from the DOM (the closest node part),
 and `nodeId` only names the node in the state. A press on it
 resizes its node from its `position`, a `ResizePosition`: a corner (`top-left`, `top-right`,
@@ -11,6 +11,8 @@ resizes its node from its `position`, a `ResizePosition`: a corner (`top-left`, 
 one. A corner is centred on its corner and sits above the two sides it joins; a side spans its
 whole side. Give it its size (a side's thickness) and look. `RESIZE_POSITIONS` lists every
 position, corners then sides.
+
+<Framework name="react">
 
 ```tsx
 import { NodeResizer, RESIZE_POSITIONS, ResizeHandle } from "@fragiola/flow-react/resize";
@@ -25,6 +27,29 @@ import { NodeResizer, RESIZE_POSITIONS, ResizeHandle } from "@fragiola/flow-reac
     ))}
 </NodeResizer>;
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import { NodeResizer, RESIZE_POSITIONS, ResizeHandle } from "@fragiola/flow-vue/resize";
+</script>
+
+<template>
+    <NodeResizer class="outline outline-blue-500">
+        <ResizeHandle
+            v-for="position in RESIZE_POSITIONS"
+            :key="position"
+            :position="position"
+            :class="position.includes('-') ? 'size-2 bg-blue-500' : 'data-[position=left]:w-1 data-[position=right]:w-1 data-[position=top]:h-1 data-[position=bottom]:h-1'"
+        />
+    </NodeResizer>
+</template>
+```
+
+</Framework>
 
 ## Props
 

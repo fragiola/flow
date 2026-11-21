@@ -11,6 +11,8 @@ decides instead. Presses and the wheel over it are left to it. It renders only y
 
 <Example id="node-toolbar" />
 
+<Framework name="react">
+
 ```tsx
 function Toolbar({ node }: { node: FlowNode<Types> }) {
     const { model } = useFlow<Types, typeof features>();
@@ -23,6 +25,33 @@ function Toolbar({ node }: { node: FlowNode<Types> }) {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="toolbar.vue"
+<script setup lang="ts">
+import { type FlowNode, useFlow } from "@fragiola/flow-vue";
+import { Trash2Icon } from "@lucide/vue";
+
+const props = defineProps<{ node: FlowNode<Types> }>();
+const { model } = useFlow<Types, typeof features>();
+</script>
+
+<template>
+    <Flow.NodeToolbar role="toolbar" :aria-label="`${node.data.text}: actions`" side="top" :offset="8">
+        <button type="button" aria-label="Delete" @click="model.run('node.remove', { nodeId: props.node.id })">
+            <Trash2Icon />
+        </button>
+    </Flow.NodeToolbar>
+</template>
+```
+
+In Vue, it is a `Teleport` to the root's element; a bare `open` attribute is `true`. Its element
+renders elsewhere, so a template `ref` on it reaches no element: use its `render` slot.
+
+</Framework>
 
 A toolbar has no role: give it `role="toolbar"` and a label when it holds several buttons.
 
