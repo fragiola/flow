@@ -18,7 +18,7 @@ Each framework has an adapter, so **every piece of logic that isn't rendering li
 |---|---|---|---|---|
 | `packages/core` | `@fragiola/flow` | the document and its JSON Schemas, the typed model and its commands, the feature registry and the features, the engine that binds a flow to the DOM | DOM only, zero runtime deps | Epic #4: the model (#2) and the engine (#3) |
 | `packages/react` | `@fragiola/flow-react` | the `Flow.*` primitives and hooks over the core, the core re-exported, the features' subpaths mirrored | the core (`workspace:*`); peers `react`, `react-dom` `^19` | Epic #8: the adapter (#5) |
-| `packages/vue` | `@fragiola/flow-vue` | the same primitives as Vue components, the hooks as composables | peer `vue` | planned |
+| `packages/vue` | `@fragiola/flow-vue` | the same primitives as Vue components, the hooks as composables, the core re-exported, the features' subpaths mirrored | the core (`workspace:*`); peer `vue` `^3.5` | Epic #11: the adapter (#9) |
 | `packages/svelte` | `@fragiola/flow-svelte` | the same primitives as Svelte components | peer `svelte` | planned |
 | `packages/angular` | `@fragiola/flow-angular` | the same primitives as Angular directives, the hooks as injection functions | peer `@angular/core` | planned |
 | `apps/playground` | private | the dev app: the examples in place, scenarios, the unstyled fixture Playwright drives, the inspector | the React package | Epic #8 (#6) |
@@ -139,9 +139,9 @@ examples show them as copyable code.
 | `pnpm check:fix` | Biome check with auto-fix |
 | `pnpm format`, `pnpm lint` | Biome format (writes), Biome lint |
 | `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit) |
-| `pnpm test` | Vitest: `core` (node; a test that needs a DOM opts into jsdom), `react` (jsdom) and `site` (the repository's guard tests) |
+| `pnpm test` | Vitest: `core` (node; a test that needs a DOM opts into jsdom), `react` and `vue` (jsdom; a server render opts into node) and `site` (the repository's guard tests) |
 | `pnpm build` | `pnpm -r build` (tsdown for the packages: each one's main entry and one entry per feature), then the `.d.ts` check (`scripts/check-dts.ts`: no `any`) and the features' bundle guard (`scripts/check-features.ts`: no main entry, nor a chunk it imports, built from a feature's folder, read from the source maps; tested with a planted import by `site/tests/check-features.test.ts`) |
-| `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs; for each adapter of `ADAPTERS` (React) checks its exact core pin and runs its smoke app: a scratch Vite + React app outside the workspace that installs the React tarball only, typechecks (strict, no `skipLibCheck`), builds and loads its dev server, at the pins of `examples/react` (`scripts/check-package.ts`) |
+| `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs; for each adapter of `ADAPTERS` (React, Vue) checks its exact core pin and runs its smoke app: a scratch app outside the workspace that installs the adapter's tarball only, typechecks (strict, no `skipLibCheck`), builds and loads its dev server: Vite + React at the pins of `examples/react`; Vite + a Vue single-file component checked by `vue-tsc` on TypeScript 6, at `packages/vue`'s pins and `SMOKE_PINS.vue` (`@vitejs/plugin-vue`, `typescript` 6, `vue-tsc`) until `examples/vue` pins them (`scripts/check-package.ts`) |
 | `pnpm dev` | the playground (`apps/playground`, port 5197; `PLAYGROUND_PORT` moves it) |
 | `pnpm e2e` | Playwright: the playground's suite (Chromium and Firefox, its dev server, the sources), then each examples app's (`examples/*/playwright.config.ts`: the shared specs against a production build of its embed, built against the packages' `dist`: run `pnpm build` first) |
 | `pnpm --filter examples-react dev` | the React embed alone, port 5185 (`PORT` moves it; `?id=<id>&theme=<name>`) |
@@ -459,6 +459,85 @@ outside it; give nodes `user-select: none`; style through `[data-flow-part]` and
 attributes (`data-selected`, `data-dragging`, `data-connecting`, `data-valid` / `data-invalid`,
 `data-handle-type`, `data-side`, `data-position`, `data-end`, `data-disabled`).
 
+## The Vue adapter (Issue #9)
+
+`@fragiola/flow-vue` is the React adapter in Vue 3.5: the same 24 primitives (the 19 of `Flow`,
+`MiniMap`, `MiniMapNode`, `MiniMapMask` on `/minimap`, `NodeResizer`, `ResizeHandle` on
+`/resize`), in files of the same names (`components/<name>.ts`, `minimap/`, `resize/`:
+`tests/index.test.ts` compares them with React's), the same elements, part names, state
+attributes, structural styles, props and state fields, over the same core keys. `export *` of the
+core, the `Flow` namespace (`parts.ts`), the composables, `createFlowRef` / `useFlowRef`,
+`typedFlow`, and the eight feature entries mirrored. Components are `defineComponent` + `h()` in
+`.ts` (Splitter's and Tree's way), built by tsdown and typechecked by `tsc` (TypeScript 7); only
+the smoke app's single-file component needs `vue-tsc` (TypeScript 6).
+
+| folder | holds |
+| --- | --- |
+| `src/components/` | one primitive per file |
+| `src/composables/` | the public composables, `create-flow-ref.ts`, `internal.ts` (`useFlowValue`, `sameValue`) |
+| `src/utils/` | `primitive.ts` (`definePrimitive`, `FlowComponent`), `render.ts` (`renderElement`: `as`, the `render` slot, attrs merged under the structural style, `elementRef`, `onClient`), `shallow-equal.ts`, `engine-facade.ts` (React's) |
+| `src/<feature>/` | a feature's entry, and its primitives (`minimap/`, `resize/`) |
+| `src/` root | `index.ts`, `parts.ts`, `context.ts` (the injection keys), `typed.ts` |
+
+**How React's API maps to Vue:**
+
+| React | Vue |
+| --- | --- |
+| `render={<section />}` | `as="section"` or `:as="MyComponent"` (the props merged into it) |
+| `render={(props, state) => …}` | the `render` scoped slot: `{ props, state, children }` (`v-bind="props"`) |
+| children functions (`Nodes`, `Edges`, `ConnectionLine`, `MiniMap`) | the default scoped slot: `v-slot="{ node }"`, `{ edge }`, `{ connection }`, `{ view }` |
+| `children` of a part | its default slot, given `{ state }` |
+| `className` / `style` functions of the state | `class` / `style` values only (see below); the state through the slots and the `data-*` |
+| `ref` | a template ref: the component, its `$el` the element (`EdgeLabel`, `NodeToolbar`: their element renders elsewhere, reach it through the `render` slot) |
+| `nodes` + `onNodesChange`, `edges` + `onEdgesChange` | `v-model:nodes`, `v-model:edges` (`update:nodes`, `update:edges`) |
+| `viewport` + `onViewportChange(viewport, gesture)` | `v-model:viewport` (`update:viewport`, `(viewport, gesture)`) |
+| `flowRef={ref}`, `ref.current` | `:flow-ref="flow"`, `flow.value` (reactive, `markRaw`, Tree's) |
+| `useNode(node)` → `{ state, props }` | `useNode(nodeOrGetter)` → `{ state, props }` as computed refs (`useEdge`, `useHandle` too) |
+| `useViewport()`, `useConnection()`, `useSelection()`, `useNodes()`, `useEdges()` | the same names, computed refs |
+| `<Flow.Nodes<Types>>`, `<Flow.Root<Types, typeof features>>` | `const Flow = typedFlow<Types, typeof features>()` (a template takes no type argument) |
+
+Decisions of the Vue adapter (#9):
+
+- **The model's state never becomes reactive.** The root bumps one `shallowRef` counter
+  (`revision`) on every model commit and every `adapter.subscribe` notification; each part reads
+  the model and the engine in a `computed` (`useFlowValue`) that keeps its last object while equal
+  (React's comparison), so Vue re-renders only what changed. The engine and the root element are
+  `shallowRef`s; lists given by the app go through `toRaw` (`plainList`), so no proxy reaches the
+  model, and the model's frozen lists given back by `update:nodes` are never proxied (Vue skips
+  frozen objects).
+- **Controlled lists reuse `commands-to`**, exactly React's algorithm (one `batch` with `meta:
+  { source: "controlled" }`, step by step after a veto, the model's lists reported back when they
+  differ from the props), in a `watch` of the two lists' identity; a model the app gives is brought
+  to the starting props before the mount (client only). No core key was added.
+- **The engine is created in the root's `onMounted`** (children mount first) and destroyed in
+  `onUnmounted`, after its parts have let their elements go. A part that attaches to the engine
+  (root, viewport, node, handle) reads `engine` in its render, so it patches and its function ref
+  (`elementRef`, called on every patch, acting on a change only) registers it. A server render has
+  no engine (the React adapter's first render); nothing subscribes on the server (`onClient`).
+- **Another `model` remounts the flow** (the root is keyed by its model, Tree's `Root`), instead of
+  React's in-place engine swap.
+- **Each node's and each edge's slot is its own component** (`NodeSlot`, `EdgeSlot`), whose props
+  are the entity alone: a drag step re-renders the moved nodes only, and a pan none (the viewport
+  reads its own state only when it is used). The slot is read when the entity renders, so what
+  else it shows follows Vue's reactivity (a ref, a prop the slot reads), where React re-renders
+  every node on a new children function.
+- **Edge labels render in the edges' HTML layer through a registry, not a `Teleport`**: a Vue
+  `Teleport` out of an SVG keeps creating SVG elements (its namespace sticks), so `EdgeLabel`
+  hands a render function to `Edges`, whose layer renders it (with the edge provided again);
+  `EdgeLabel` itself renders nothing where it is written. `NodeToolbar` (HTML in HTML) is a
+  `Teleport` to the root.
+- **`class` and `style` take Vue's forms (string, array, object), not functions of the state**:
+  Vue normalizes both when it creates a node (a template's `:class` too), so a function never
+  reaches the primitive. The state is the `render` slot's and the default slot's, and the `data-*`
+  attributes'. The contract tests check that instead of React's functions.
+- **Bare boolean attributes are `true`** (`pan-on-scroll`, `fit-view`, `open`, `connectable`,
+  `keep-aspect-ratio`, `disabled`), absent ones stay `undefined` so the core's defaults apply
+  (Tree's `primitiveProps`); `fitView` takes a boolean or a payload.
+- **`typedFlow<T, F>()`** types `Root` (model, lists, features, events), `Nodes`, `Node`, `Edges`,
+  `Edge` by the registry; the untyped `Flow.Root` takes any features.
+- **Known limits:** the gestures' real feel and the Vue examples are #10's (the shared Playwright
+  specs); jsdom lays nothing out, so the tests stub the layout (`tests/flow.ts`, React's).
+
 ## The playground and the examples (Issue #6)
 
 Every rule of the guidelines' Examples section (`../guidelines/docs/site.md#examples`) holds; what
@@ -605,6 +684,9 @@ Decisions of #7:
 packages/react/     @fragiola/flow-react src/components/, src/hooks/, src/utils/, src/<feature>/ (each core
                                          feature's entry; minimap/ and resize/ with their primitives);
                                          entries index.ts, parts.ts, context.ts; tests/ by behaviour
+packages/vue/       @fragiola/flow-vue   src/components/, src/composables/, src/utils/, src/<feature>/
+                                         (minimap/ and resize/ with their primitives); entries
+                                         index.ts, parts.ts, context.ts, typed.ts; tests/ by behaviour
 packages/core/      @fragiola/flow       src/<domain>/ (document, state, commands, model, features,
                                          one folder per feature, engine, geometry, attributes,
                                          connect-session);
@@ -632,7 +714,7 @@ docs/                                    docs-examples-gaps.md: what the docs an
                                          Site export, Trigger www build
 ```
 
-Later Epics add `packages/{vue,svelte,angular}` and their examples apps (`pnpm-workspace.yaml`
+Later Epics add `examples/vue`, `packages/{svelte,angular}` and their examples apps (`pnpm-workspace.yaml`
 already lists `apps/*`, `packages/*`, `examples/*` and `site`).
 
 ## Provenance: xyflow
