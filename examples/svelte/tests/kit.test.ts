@@ -43,6 +43,8 @@ describe("the Svelte UI pieces", () => {
         const label = /<label[^>]*for="([^"]+)"/.exec(out)?.[1];
         expect(label).toBeTruthy();
         expect(out).toMatch(new RegExp(`<select[^>]*id="${label}"`));
+        // the field's row draws the focus ring around its control (`field-control`)
+        expect(out).toMatch(/<select[^>]*class="[^"]*\bfield-control\b/);
         expect(out).toMatch(
             /data-slot="select-trigger"[^>]*class="[^"]*justify-between/,
         );

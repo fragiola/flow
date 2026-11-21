@@ -142,7 +142,7 @@
             {#snippet children(node)}
                 <Flow.Node {node} class={styles.node}>
                     <span class={styles.title}>{node.data.label}</span>
-                    {#each node.data.inputs as port, index (`in-${port}`)}
+                    {#each node.data.inputs as port, index (`${port}-${index}`)}
                         <Flow.Handle
                             type="target"
                             side="left"
@@ -152,7 +152,7 @@
                             style={{ top: portTop(index, node.data.inputs.length) }}
                         />
                     {/each}
-                    {#each node.data.outputs as port, index (`out-${port}`)}
+                    {#each node.data.outputs as port, index (`${port}-${index}`)}
                         <Flow.Handle
                             type="source"
                             side="right"

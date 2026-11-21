@@ -39,7 +39,7 @@
     import StepNode from "./step-node.svelte";
     import { styles } from "./styles";
     import type { Types } from "./types";
-    import { useWorkflow } from "./use-workflow.svelte.ts";
+    import { useWorkflow } from "./use-workflow.svelte";
 
     const Flow = typedFlow<Types, Features>();
 

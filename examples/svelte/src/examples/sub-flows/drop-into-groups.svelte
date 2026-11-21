@@ -5,23 +5,23 @@
     // Puts a dropped item into the group under its centre (or takes it out of its group). It
     // renders nothing: inside the root, it listens to the engine's `nodes-move` events.
 
-    const { model, engine } = useFlow<Types, typeof features>();
+    const flow = useFlow<Types, typeof features>();
 
     $effect(() =>
-        engine.subscribe((event) => {
+        flow.engine.subscribe((event) => {
             if (event.type !== "nodes-move") return;
             for (const nodeId of event.nodeIds) {
-                const node = model.get("node-by", { id: nodeId });
+                const node = flow.model.get("node-by", { id: nodeId });
                 if (node?.type !== "item") continue;
-                const rect = engine.get("node-rect-by", { nodeId });
+                const rect = flow.engine.get("node-rect-by", { nodeId });
                 if (!rect) continue;
                 const centre = {
                     x: rect.x + rect.width / 2,
                     y: rect.y + rect.height / 2,
                 };
-                const group = model.get("all-nodes").find((candidate) => {
+                const group = flow.model.get("all-nodes").find((candidate) => {
                     if (candidate.type !== "group") return false;
-                    const box = engine.get("node-rect-by", { nodeId: candidate.id });
+                    const box = flow.engine.get("node-rect-by", { nodeId: candidate.id });
                     return (
                         box !== undefined &&
                         centre.x >= box.x &&
@@ -32,7 +32,7 @@
                 });
                 const parentId = group?.id ?? null;
                 if ((node.parentId ?? null) === parentId) continue;
-                model.run("node.set-parent", {
+                flow.model.run("node.set-parent", {
                     nodeId,
                     parentId,
                     extent: parentId ? "parent" : null,

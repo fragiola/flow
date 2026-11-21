@@ -29,7 +29,7 @@
         {id}
         {...rest}
         bind:value
-        class="w-full cursor-pointer appearance-none bg-transparent px-3 py-2 pe-9 text-sm text-palette-accent/85 outline-none"
+        class="field-control w-full cursor-pointer appearance-none bg-transparent px-3 py-2 pe-9 text-sm text-palette-accent/85 outline-none"
     >
         {@render children?.()}
     </select>

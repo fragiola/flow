@@ -112,12 +112,14 @@
             <MaximizeIcon />
         </Flow.FitView>
         <Flow.ToggleInteractive aria-label="Lock the flow" class={styles.control}>
-            {#snippet children({ state })}
-                {#if state.interactive}
-                    <UnlockIcon />
-                {:else}
-                    <LockIcon />
-                {/if}
+            {#snippet render({ props, state })}
+                <button {...props}>
+                    {#if state.interactive}
+                        <UnlockIcon />
+                    {:else}
+                        <LockIcon />
+                    {/if}
+                </button>
             {/snippet}
         </Flow.ToggleInteractive>
     </Flow.Controls>

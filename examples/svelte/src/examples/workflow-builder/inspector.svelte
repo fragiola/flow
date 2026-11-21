@@ -8,7 +8,7 @@
     import { issuesOf } from "./rules";
     import { styles } from "./styles";
     import type { TriggerKind, Types } from "./types";
-    import { useWorkflow } from "./use-workflow.svelte.ts";
+    import { useWorkflow } from "./use-workflow.svelte";
 
     // The side panel: the selected step's settings (each field runs `node.set-data`), or, with
     // nothing selected, the workflow's summary and every issue left. It sits beside the root and
@@ -24,9 +24,7 @@
 <script lang="ts">
     let { model }: { model: FlowModel<Types> } = $props();
 
-    // the model is the page's, made once: reading it here once is reading it always
-    // svelte-ignore state_referenced_locally
-    const workflow = useWorkflow(model);
+    const workflow = useWorkflow(() => model);
     const step = $derived.by(() => {
         const selected = workflow.steps.filter((s) => s.selected === true);
         return selected.length === 1 ? selected[0] : undefined;
@@ -125,13 +123,15 @@
                                     type="number"
                                     min={1}
                                     value={step.data.minutes}
-                                    oninput={(event) =>
-                                        set({
-                                            minutes: Math.max(
-                                                1,
-                                                Number(event.currentTarget.value) || 1,
-                                            ),
-                                        })}
+                                    oninput={(event) => {
+                                        const minutes = Math.max(
+                                            1,
+                                            Number(event.currentTarget.value) || 1,
+                                        );
+                                        set({ minutes });
+                                        // the model may keep its value (1 stays 1): show it
+                                        event.currentTarget.value = String(minutes);
+                                    }}
                                 />
                             </Field.Body>
                         </Field.Row>
