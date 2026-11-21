@@ -194,7 +194,8 @@ in one PR. `main` has no required checks: a skipped job blocks nothing.
 
 **Shards: none.** Shard a suite only when its test step alone passes about 3 minutes. Measured
 locally (4 workers; CI runs 2): the playground's 90 tests (45 per browser) in ~23 s, the React
-examples' 175 tests (95 smoke runs: 19 examples × 5 themes) in ~45 s, the embed build included.
+examples' 175 tests (95 smoke runs: 19 examples × 5 themes) in ~45 s, the embed build included;
+the Vue examples' 175 tests in ~16 s (~17 s with its embed build).
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
@@ -642,7 +643,7 @@ validates `embed/vue/` with its manifest (`project.json` `frameworks: ["react", 
 | `src/examples/<id>/*.vue` | the components React writes in the same `.tsx` (an SFC holds one); they import `Types` / `features` from `./index.vue`'s plain script |
 | `src/examples/<id>/styles.ts`, plain `*.ts`, `_kit/` | copied from `examples/react` (the adapter's name swapped); `tests/vendored.test.ts` compares them, `workflow-builder/catalog.ts` (Vue icon components) and `use-workflow.ts` (a composable over `model.subscribe`) differ on purpose |
 | `src/styles`, `src/lib/cn.ts`, `src/components/families` | the vendored Fragiola UI theme, `cn` and the style families, copied with a "Copied from" first line (`tests/vendored.test.ts`) |
-| `src/components/atoms/{badge,fields}.ts`, `src/components/ui/{field,select}.ts` | Vue ports of the React pieces (`defineComponent` + `h`, the same classes; the Select over Reka UI 2.11, Splitter's choice), `tests/kit.test.ts` |
+| `src/components/atoms/{badge,fields}.ts`, `src/components/ui/{field,select}.ts` | Vue ports of the React pieces (`defineComponent` + `h`, the same classes; the Select over Reka UI 2.11, Splitter's choice; `Field.Root` gives its label's `for` to the Input's or the Select trigger's `id`), `tests/kit.test.ts` |
 | `src/embed/main.ts` | Splitter's Vue embed (the same protocol: `ready` two frames after the example mounts, `resize` for a `flow` layout) |
 
 `tests/examples.test.ts`: every React id, the manifest, copyable imports (`vue`,
