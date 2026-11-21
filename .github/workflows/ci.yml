@@ -1,5 +1,6 @@
 # CI: the Fragiola project jobs (guidelines repository.md#ci). It runs on every pull request and on
-# a manual run; a push to main runs no tests (main is what its pull request tested).
+# a manual run; a push to main runs no tests (main is what its pull request tested), only the www
+# trigger: every other job is `if: github.event_name != 'push'`, or needs one that is.
 #
 #   Checks            Biome and the source layout check, TypeScript, the unit tests and the build
 #                     (with the .d.ts check).
@@ -22,20 +23,28 @@
 #   E2E (examples)    a matrix over those frameworks, from the Changes outputs: the shared specs
 #                     (examples/shared/e2e) against a production build of that framework's embed,
 #                     served under /flow/embed/<framework>/ with a host page that frames it.
+#   Site export       fragiola.com builds /flow from `pnpm site:export` (contract v1.7,
+#                     fragiola/www CONTRACT.md), built and validated the way www's deploy runs it:
+#                     it fails on anything www would reject.
+#   Trigger www build on a push to main only, asks fragiola/www to rebuild fragiola.com (a
+#                     repository_dispatch of type "project-updated"). It needs the
+#                     WWW_DISPATCH_TOKEN secret: a fine-grained token with Contents: read & write
+#                     on fragiola/www. Without the secret the step is skipped, not failed.
 #
 # Every Playwright job runs in Playwright's image mcr.microsoft.com/playwright:v<version>-noble
 # (`--user 1001`), its tag the pinned @playwright/test, and installs no browser
 # (site/tests/ci-workflow.test.ts checks both). A suite is sharded only when its test step alone
 # passes about 3 minutes (AGENTS.md, CI).
 #
-# Arriving with the site export (#7): the Site export job, and the Trigger www build job, the only
-# one a push to main runs.
 # No release workflow and no Changesets job (AGENTS.md, D15).
 
 name: CI
 
 on:
   pull_request:
+  # only for the Trigger www build job: every other job skips a push
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -48,6 +57,7 @@ concurrency:
 jobs:
   checks:
     name: Checks
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,6 +82,7 @@ jobs:
 
   package:
     name: Package
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -90,6 +101,7 @@ jobs:
 
   changes:
     name: Changes
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     outputs:
       playground: ${{ steps.suites.outputs.playground }}
@@ -186,3 +198,40 @@ jobs:
           name: playwright-report-examples-${{ matrix.framework }}
           path: examples/${{ matrix.framework }}/playwright-report/
           retention-days: 14
+
+  site-export:
+    name: Site export
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # builds the packages and the embed, writes the export and validates it (exits non-zero on
+      # any contract violation)
+      - run: pnpm site:export --base /flow --out "$RUNNER_TEMP/site-export"
+
+  trigger-www-build:
+    name: Trigger www build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      WWW_DISPATCH_TOKEN: ${{ secrets.WWW_DISPATCH_TOKEN }}
+    steps:
+      - name: Dispatch project-updated to fragiola/www
+        if: env.WWW_DISPATCH_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ env.WWW_DISPATCH_TOKEN }}
+        run: |
+          gh api repos/fragiola/www/dispatches \
+            -f event_type=project-updated \
+            -f "client_payload[slug]=flow" \
+            -f "client_payload[sha]=$GITHUB_SHA"
