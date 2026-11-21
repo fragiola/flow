@@ -33,8 +33,8 @@ the framework never renders a transform on it, so a pan or a zoom re-renders not
 <Flow.Root :features="features" :default-nodes="nodes" class="size-full">
     <Flow.Background variant="dots" />
     <Flow.Viewport>
-        <Flow.Edges v-slot="{ edge }"><FlowEdge :edge="edge" /></Flow.Edges>
-        <Flow.Nodes v-slot="{ node }"><FlowNode :node="node" /></Flow.Nodes>
+        <Flow.Edges v-slot="{ edge }"><MyEdge :edge="edge" /></Flow.Edges>
+        <Flow.Nodes v-slot="{ node }"><MyNode :node="node" /></Flow.Nodes>
         <Flow.ConnectionLine />
     </Flow.Viewport>
     <Flow.SelectionBox />

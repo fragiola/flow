@@ -76,7 +76,7 @@ A node is as big as what you render in it, unless the document gives it a `width
 The engine measures each node's element (`offsetWidth`, `offsetHeight`) and uses the document's
 size where there is one, the measured one otherwise, dimension by dimension.
 
-```tsx
+```ts
 const nodes: FlowNodeInput<Types>[] = [
     // sized by its content
     { id: "note", type: "note", position: { x: 0, y: 0 }, data: { text: "Hello" } },

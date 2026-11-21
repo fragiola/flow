@@ -123,7 +123,7 @@ Every part takes the props of its React page (for example [Root](/docs/api/primi
 | slot | of | receives |
 | --- | --- | --- |
 | `default` | `Flow.Nodes`, `Flow.Edges`, `Flow.ConnectionLine`, `MiniMap` | one entity each time: `{ node }` (`FlowNode<T>`), `{ edge }` (`FlowEdge<T>`), `{ connection }` (`Connection`), `{ view }` (`MinimapView`) |
-| `default` | every other part with content | `{ state }`: the part's state, as on its page (`RootState`, `NodeState<T>`, `EdgeState<T>`, `HandleState`, `ControlButtonState`, …) |
+| `default` | every other part with content but `Flow.Controls` (none) | `{ state }`: the part's state, as on its page (`RootState`, `NodeState<T>`, `EdgeState<T>`, `HandleState`, `ControlButtonState`, …) |
 | `render` | every part (`RenderSlot`) | `RenderSlotProps`: `props`, `state` and `children`; it replaces the element |
 
 | field | of | description |

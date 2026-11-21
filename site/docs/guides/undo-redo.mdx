@@ -179,40 +179,49 @@ function HistoryButtons({ history }: { history: UndoHistory }) {
 <script setup lang="ts">
 import { createFlowModel, typedFlow } from "@fragiola/flow-vue";
 import { onMounted, onUnmounted, shallowRef } from "vue";
-import { createUndoHistory, handleUndoKeys } from "./undo";
+import { createUndoHistory, handleUndoKeys, type UndoHistory, type UndoSnapshot } from "./undo";
 
 const Flow = typedFlow<Types, typeof features>();
 const model = createFlowModel<Types, typeof features>({ version: 1, nodes, edges }, { features });
 
-// one history per model, made in setup (Vue mounts a component once)
-const history = createUndoHistory(model);
-const snapshot = shallowRef(history.getSnapshot());
-const stop = history.subscribe(() => {
-    snapshot.value = history.getSnapshot();
+// one history per model, made once mounted (never during a server render), as React's effect
+const history = shallowRef<UndoHistory | null>(null);
+const snapshot = shallowRef<UndoSnapshot | null>(null);
+const onKeyDown = (event: KeyboardEvent) => {
+    if (history.value) handleUndoKeys(history.value, event);
+};
+let stop = () => {};
+onMounted(() => {
+    const created = createUndoHistory(model);
+    history.value = created;
+    snapshot.value = created.getSnapshot();
+    const unsubscribe = created.subscribe(() => {
+        snapshot.value = created.getSnapshot();
+    });
+    window.addEventListener("keydown", onKeyDown);
+    stop = () => {
+        window.removeEventListener("keydown", onKeyDown);
+        unsubscribe();
+        created.dispose();
+    };
 });
-const onKeyDown = (event: KeyboardEvent) => handleUndoKeys(history, event);
-onMounted(() => window.addEventListener("keydown", onKeyDown));
-onUnmounted(() => {
-    window.removeEventListener("keydown", onKeyDown);
-    stop();
-    history.dispose();
-});
+onUnmounted(() => stop());
 </script>
 
 <template>
     <Flow.Root :model="model" class="flow">
         <!-- the viewport, edges and nodes -->
         <div role="toolbar" aria-label="History">
-            <button type="button" :disabled="!snapshot.canUndo" @click="history.undo()">Undo</button>
-            <button type="button" :disabled="!snapshot.canRedo" @click="history.redo()">Redo</button>
+            <button type="button" :disabled="!snapshot?.canUndo" @click="history?.undo()">Undo</button>
+            <button type="button" :disabled="!snapshot?.canRedo" @click="history?.redo()">Redo</button>
         </div>
     </Flow.Root>
 </template>
 ```
 
 In Vue, the snapshot goes into a `shallowRef` from `history.subscribe` (what
-`useSyncExternalStore` does in React), and the history is made in `setup`: a component's setup
-runs once.
+`useSyncExternalStore` does in React), and the history is made in `onMounted` and disposed in
+`onUnmounted` (React's effect).
 
 </Framework>
 

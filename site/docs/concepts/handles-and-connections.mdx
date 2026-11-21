@@ -77,8 +77,8 @@ inside the viewport, draws it while it lasts; `useConnection()` reads it:
 
 ```vue
 <Flow.Viewport>
-    <Flow.Edges v-slot="{ edge }"><FlowEdge :edge="edge" /></Flow.Edges>
-    <Flow.Nodes v-slot="{ node }"><FlowNode :node="node" /></Flow.Nodes>
+    <Flow.Edges v-slot="{ edge }"><MyEdge :edge="edge" /></Flow.Edges>
+    <Flow.Nodes v-slot="{ node }"><MyNode :node="node" /></Flow.Nodes>
     <Flow.ConnectionLine class="stroke-blue-500 data-invalid:stroke-red-500" />
 </Flow.Viewport>
 ```

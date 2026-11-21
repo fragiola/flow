@@ -549,7 +549,43 @@ const PAGES_IN_VUE = [
     "concepts/viewport",
     "api/primitives/hooks",
     "api/primitives/flow-ref",
+    "api/command-bus",
+    "api/engine",
+    "api/features",
+    "api/json-document",
+    "api/model",
+    "api/path-helpers",
+    "guides/ai-and-automation",
+    "guides/connection-rules",
+    "guides/custom-edges",
+    "guides/custom-nodes",
+    "guides/keyboard",
+    "guides/minimap-and-controls",
+    "guides/persistence",
+    "guides/resizing",
+    "guides/selection",
+    "guides/styling-css",
+    "guides/styling-tailwind",
+    "guides/sub-flows",
+    "guides/testing",
+    "guides/theming",
+    "guides/undo-redo",
 ];
+
+/** Every page of the docs, as its slug (`guides/selection`). */
+function allPages(dir = join(API, ".."), prefix = ""): string[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+        entry.isDirectory()
+            ? allPages(join(dir, entry.name), `${prefix}${entry.name}/`)
+            : entry.name.endsWith(".mdx")
+              ? [`${prefix}${entry.name.slice(0, -".mdx".length)}`]
+              : [],
+    );
+}
+
+/** A page's text outside its `<Framework>` blocks. */
+const outsideFrameworks = (mdx: string) =>
+    mdx.replace(/<Framework name="[a-z]+">[\s\S]*?<\/Framework>/g, "");
 
 describe("the Vue reference", () => {
     const vueIndex = read(join(VUE_SRC, "index.ts"));
@@ -668,6 +704,37 @@ describe("the Vue reference", () => {
             expect(mdx.split('<Framework name="vue">').length, slug).toBe(
                 mdx.split('<Framework name="react">').length,
             );
+        }
+    });
+
+    it("leaves no React code outside a React block: JSX, or an import of the React package", () => {
+        const listed = new Set(PAGES_IN_VUE);
+        for (const slug of allPages()) {
+            const outside = outsideFrameworks(
+                read(join(API, "..", `${slug}.mdx`)),
+            );
+            const fences = [
+                ...outside.matchAll(/^```(\w+)[^\n]*\n([\s\S]*?)^```/gm),
+            ];
+            for (const [, lang, code] of fences) {
+                expect(
+                    lang,
+                    `${slug}: a ${lang} snippet outside a block`,
+                ).not.toBe("tsx");
+                expect(
+                    code,
+                    `${slug}: React's package outside a block`,
+                ).not.toMatch(/@fragiola\/flow-react|from "react"/);
+            }
+            if (
+                outside !== read(join(API, "..", `${slug}.mdx`)) &&
+                !slug.startsWith("api/primitives/")
+            ) {
+                expect(
+                    listed.has(slug),
+                    `${slug} has blocks: list it in PAGES_IN_VUE`,
+                ).toBe(true);
+            }
         }
     });
 });

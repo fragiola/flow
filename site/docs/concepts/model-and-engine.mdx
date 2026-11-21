@@ -105,6 +105,8 @@ The engine never touches the global `document` or `window`: it uses its root ele
 document and window (its `ResizeObserver`, its microtasks). The model never touches the DOM at
 all, so you test rules on a model in Node, without rendering anything.
 
+<Framework name="react">
+
 ```ts title="rules.test.ts"
 import { createFlowModel } from "@fragiola/flow-react";
 import { expect, it } from "vitest";
@@ -118,3 +120,23 @@ it("refuses an edge to the same node", () => {
     });
 });
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts title="rules.test.ts"
+import { createFlowModel } from "@fragiola/flow-vue";
+import { expect, it } from "vitest";
+
+it("refuses an edge to the same node", () => {
+    const model = createFlowModel(json);
+    model.use(rules);
+    expect(model.check("edge.add", { source: "a", target: "a" })).toMatchObject({
+        ok: false,
+        error: { code: "vetoed" },
+    });
+});
+```
+
+</Framework>

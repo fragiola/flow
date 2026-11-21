@@ -75,6 +75,8 @@ ends to draw your own ([Custom edges](/docs/guides/custom-edges)).
 
 ## Loading and validating
 
+<Framework name="react">
+
 ```ts
 import { createFlowModel, FlowValidationError, validateFlow } from "@fragiola/flow-react";
 
@@ -89,6 +91,27 @@ try {
 // or, without throwing: every problem with its JSON path, none for a valid document
 const issues = validateFlow(json, { features });
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+import { createFlowModel, FlowValidationError, validateFlow } from "@fragiola/flow-vue";
+
+try {
+    const model = createFlowModel<Types, typeof features>(json, { features });
+} catch (error) {
+    if (error instanceof FlowValidationError) {
+        for (const issue of error.issues) console.warn(issue.path, issue.message);
+    }
+}
+
+// or, without throwing: every problem with its JSON path, none for a valid document
+const issues = validateFlow(json, { features });
+```
+
+</Framework>
 
 `model.get("flow-json")` gives the document back as a writable copy, every id present: it loads
 again into `createFlowModel` unchanged. See [Flow JSON](/docs/api/json-document).

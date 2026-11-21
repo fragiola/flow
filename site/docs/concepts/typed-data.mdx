@@ -10,6 +10,8 @@ a type, and the document stays plain JSON.
 
 ## The registry
 
+<Framework name="react">
+
 ```ts title="types.ts"
 import type { FlowTypes } from "@fragiola/flow-react";
 
@@ -23,6 +25,26 @@ export interface Types extends FlowTypes {
     };
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts title="types.ts"
+import type { FlowTypes } from "@fragiola/flow-vue";
+
+export interface Types extends FlowTypes {
+    readonly nodes: {
+        task: { title: string; done: boolean };
+        note: { text: string };
+    };
+    readonly edges: {
+        dependency: { weight: number };
+    };
+}
+```
+
+</Framework>
 
 `nodes` names each node type and the shape of its `data`; `edges` names your edge types and
 theirs. The built-in edge types (`bezier`, `smoothstep`, `step`, `straight`) are always allowed,
@@ -92,9 +114,10 @@ const selected = useSelection<Types>();
 
 <Framework name="vue">
 
-```vue
+```vue title="editor.vue"
 <script setup lang="ts">
-import { createFlowModel, typedFlow, useFlow, useSelection } from "@fragiola/flow-vue";
+import { createFlowModel, typedFlow } from "@fragiola/flow-vue";
+import StepNode from "./step-node.vue";
 
 const features = [selection(), drag(), connection()] as const;
 
@@ -103,29 +126,36 @@ const model = createFlowModel<Types, typeof features>(json, { features });
 
 // the components: a template takes no type argument, so `typedFlow` types them once
 const Flow = typedFlow<Types, typeof features>();
-
-// a composable under the root: it cannot infer them through injection
-const { engine } = useFlow<Types, typeof features>();
-const selected = useSelection<Types>();
 </script>
 
 <template>
-    <Flow.Root :features="features" :default-nodes="nodes">
+    <Flow.Root :model="model">
         <Flow.Viewport>
             <Flow.Edges v-slot="{ edge }"><Flow.Edge :edge="edge" /></Flow.Edges>
-            <Flow.Nodes v-slot="{ node }"><FlowNode :node="node" /></Flow.Nodes>
+            <Flow.Nodes v-slot="{ node }"><StepNode :node="node" /></Flow.Nodes>
         </Flow.Viewport>
     </Flow.Root>
 </template>
 ```
 
-`typedFlow<Types, typeof features>()` types `Root` (its model, lists, features and events),
-`Nodes`, `Node`, `Edges` and `Edge`; the untyped `Flow` takes any registry and any features.
+```vue title="selection-count.vue"
+<script setup lang="ts">
+import { useFlow, useSelection } from "@fragiola/flow-vue";
 
-</Framework>
+// a composable in a component under the root: it cannot infer them through injection
+const { engine } = useFlow<Types, typeof features>();
+const selected = useSelection<Types>();
+</script>
 
-Commands are checked against it:
-
+<template>
+    <button
+        type="button"
+        :disabled="selected.nodes.length === 0"
+        @click="engine.run('fit-view', { nodeIds: selected.nodes.map((node) => node.id) })"
+    >
+        Show the selection
+    </button>
+</template>
 ```ts
 model.run("node.add", { type: "task", position: { x: 0, y: 0 }, data: { title: "Ship it", done: false } });
 // @ts-expect-error: a note's data is { text }

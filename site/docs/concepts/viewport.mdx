@@ -63,7 +63,7 @@ export function ViewButtons({ nodeId }: { nodeId: string }) {
 
 ```vue title="view-buttons.vue"
 <script setup lang="ts">
-import { useFlow } from "@fragiola/flow-vue";
+import { Flow, useFlow } from "@fragiola/flow-vue";
 
 defineProps<{ nodeId: string }>();
 const { engine } = useFlow();
@@ -76,10 +76,15 @@ const { engine } = useFlow();
             Show the node
         </button>
         <button type="button" @click="engine.run('zoom-to', { zoom: 1 })">100%</button>
-        <button type="button" :disabled="!engine.can('zoom-in')" @click="engine.run('zoom-in')">Zoom in</button>
+        <!-- disabled at the limit: `engine.can` read through the part, which follows the view -->
+        <Flow.ZoomIn aria-label="Zoom in">Zoom in</Flow.ZoomIn>
     </div>
 </template>
 ```
+
+`useFlow().engine` is not reactive: a template that reads `engine.can(…)` is not rendered again
+when the view changes. `Flow.ZoomIn`, `Flow.ZoomOut` and `Flow.FitView` are, and `useViewport()`
+is a computed ref of the view.
 
 </Framework>
 

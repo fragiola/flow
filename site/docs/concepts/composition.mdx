@@ -39,8 +39,8 @@ order they are drawn; inside the layers, your nodes and edges, rendered by child
         <Flow.Background variant="dots" />
         <!-- the pannable, zoomable layer: what is inside is in flow coordinates -->
         <Flow.Viewport>
-            <Flow.Edges v-slot="{ edge }"><FlowEdge :edge="edge" /></Flow.Edges>
-            <Flow.Nodes v-slot="{ node }"><FlowNode :node="node" /></Flow.Nodes>
+            <Flow.Edges v-slot="{ edge }"><MyEdge :edge="edge" /></Flow.Edges>
+            <Flow.Nodes v-slot="{ node }"><MyNode :node="node" /></Flow.Nodes>
             <Flow.ConnectionLine />
         </Flow.Viewport>
         <!-- over the viewport, in screen space -->
@@ -51,7 +51,7 @@ order they are drawn; inside the layers, your nodes and edges, rendered by child
 </template>
 ```
 
-`FlowNode` and `FlowEdge` stand for your own components (below): the slot renders one per node
+`MyNode` and `MyEdge` stand for your own components (below): the slot renders one per node
 and per edge.
 
 </Framework>
@@ -103,7 +103,7 @@ function renderNode(node: FlowNode<Types>) {
 
 <Framework name="vue">
 
-```vue title="flow-node.vue"
+```vue title="my-node.vue"
 <script setup lang="ts">
 import { type FlowNode, type FlowTypes, typedFlow } from "@fragiola/flow-vue";
 
@@ -169,7 +169,7 @@ function renderEdge(edge: FlowEdge<Types>) {
 
 <Framework name="vue">
 
-```vue title="flow-edge.vue"
+```vue title="my-edge.vue"
 <script setup lang="ts">
 import { type FlowEdge, typedFlow } from "@fragiola/flow-vue";
 
