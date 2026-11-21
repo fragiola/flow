@@ -50,6 +50,26 @@ while an edge's end is moved: a middleware's veto makes it invalid).
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div flowViewport>
+    <div flowEdges>
+        <ng-template [flowEdgesItem]="model" let-edge>
+            <svg:g [flowEdge]="edge" [appEdge]="edge"></svg:g>
+        </ng-template>
+    </div>
+    <div flowNodes>
+        <ng-template [flowNodesItem]="model" let-node>
+            <div [flowNode]="node"><app-node-body [node]="node" /></div>
+        </ng-template>
+    </div>
+    <svg flowConnectionLine class="stroke-blue-500 data-invalid:stroke-red-500"></svg>
+</div>
+```
+
+</Framework>
+
 <Framework name="react">
 
 ```tsx
@@ -83,6 +103,20 @@ In Vue, the children function is the default scoped slot, `v-slot="{ connection 
 ```
 
 In Svelte, the children function is the `children` snippet, `{#snippet children(connection)}`.
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<svg flowConnectionLine #line="flowConnectionLine">
+    <svg:path [attr.d]="line.state()?.connection?.path" fill="none" stroke-dasharray="4 4" stroke="currentColor" />
+</svg>
+```
+
+In Angular, the children function is the elements you write inside `flowConnectionLine`, reading
+`#line="flowConnectionLine"`'s `line.state()?.connection`; with no element written, it draws the
+connection's path. The line is in the document only while a connection is drawn.
 
 </Framework>
 

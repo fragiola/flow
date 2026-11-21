@@ -96,8 +96,40 @@ const Flow = typedFlow<Types, typeof features>();
 
 </Framework>
 
+<Framework name="angular">
+
+```ts
+import { Component } from "@angular/core";
+import { FLOW } from "@fragiola/flow-angular";
+import { connection } from "@fragiola/flow-angular/connection";
+import { drag } from "@fragiola/flow-angular/drag";
+import { keyboard } from "@fragiola/flow-angular/keyboard";
+import { reconnection } from "@fragiola/flow-angular/reconnection";
+import { selection } from "@fragiola/flow-angular/selection";
+
+const features = [
+    selection({ boxOnDrag: false }),
+    drag({ snapGrid: [20, 20] }),
+    connection({ mode: "strict", radius: 20 }),
+    reconnection(),
+    keyboard({ step: 5, fastStep: 20 }),
+] as const;
+
+@Component({
+    selector: "app-editor",
+    imports: [FLOW],
+    template: `<div flowRoot [features]="features" [defaultNodes]="nodes" class="h-96">…</div>`,
+})
+export class Editor {
+    protected readonly features = features;
+    protected readonly nodes = nodes;
+}
+```
+
+</Framework>
+
 Make the list once (a module constant, React's `useState`, a Vue component's setup, a Svelte
-component's `<script module>`): the features are fixed when the model is
+component's `<script module>`, an Angular module constant): the features are fixed when the model is
 created, and the root warns if the `features` prop changes later. A model you create yourself takes
 them in `createFlowModel(json, { features })`. A feature installed twice, or one installed without
 a feature it requires (`reconnection()` needs `connection()`), throws when the model is created,
@@ -117,7 +149,7 @@ naming both.
 | `minimap()` | `/minimap` | the `MiniMap` view, pan and zoom from it | `pannable: true`, `zoomable: true`, `padding: 0.1` |
 
 Each entry is `@fragiola/flow-react/<feature>` (`@fragiola/flow-vue/<feature>` in Vue,
-`@fragiola/flow-svelte/<feature>` in Svelte), which re-exports the core's
+`@fragiola/flow-svelte/<feature>` in Svelte, `@fragiola/flow-angular/<feature>` in Angular), which re-exports the core's
 `@fragiola/flow/<feature>`; `/minimap` and `/resize` add their primitives. Every option is on
 [Features](/docs/api/features).
 

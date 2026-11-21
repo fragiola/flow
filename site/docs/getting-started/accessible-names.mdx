@@ -121,6 +121,41 @@ In Svelte, every attribute a primitive does not take as a prop goes on its eleme
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="named-flow.html"
+<div flowRoot [model]="model" role="group" aria-label="Delivery workflow" class="h-96">
+    <div flowViewport>
+        <div flowEdges>
+            <ng-template [flowEdgesItem]="model" let-edge>
+                <svg:g
+                    [flowEdge]="edge"
+                    role="group"
+                    aria-roledescription="edge"
+                    [attr.aria-label]="edge.source + ' to ' + edge.target"
+                >
+                    <svg:path flowEdgePath />
+                </svg:g>
+            </ng-template>
+        </div>
+        <div flowNodes>
+            <ng-template [flowNodesItem]="model" let-node>
+                <div [flowNode]="node" role="group" aria-roledescription="node" [attr.aria-label]="node.data.label">
+                    {{ node.data.label }}
+                    <div flowHandle type="target" side="top" title="Input"></div>
+                    <div flowHandle type="source" side="bottom" title="Output"></div>
+                </div>
+            </ng-template>
+        </div>
+    </div>
+</div>
+```
+
+In Angular, the element is yours: write its role and name on it as on any element
+(`[attr.aria-label]` for a computed name).
+
+</Framework>
+
 Write the roles and names your app's language and your users need: the nodes' and edges' roles
 are the `announcements` example's choice, the root's name is this page's suggestion, and neither
 is a rule.
@@ -183,6 +218,20 @@ import { LockIcon, MaximizeIcon, MinusIcon, PlusIcon } from "@lucide/vue";
     <Flow.FitView aria-label="Fit view"><MaximizeIcon /></Flow.FitView>
     <Flow.ToggleInteractive aria-label="Lock the flow"><LockIcon /></Flow.ToggleInteractive>
 </Flow.Controls>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<!-- the component imports FLOW, LucidePlus, LucideMinus, LucideMaximize and LucideLock (@lucide/angular) -->
+<div flowControls role="group" aria-label="Zoom and lock" class="absolute bottom-3 left-3 flex flex-col">
+    <button flowZoomIn aria-label="Zoom in"><svg lucidePlus aria-hidden="true"></svg></button>
+    <button flowZoomOut aria-label="Zoom out"><svg lucideMinus aria-hidden="true"></svg></button>
+    <button flowFitView aria-label="Fit view"><svg lucideMaximize aria-hidden="true"></svg></button>
+    <button flowToggleInteractive aria-label="Lock the flow"><svg lucideLock aria-hidden="true"></svg></button>
+</div>
 ```
 
 </Framework>
@@ -331,7 +380,59 @@ onUnmounted(
 
 </Framework>
 
-Render `LiveRegion` (`live-region.vue`, `live-region.svelte`) inside `Flow.Root`: it reads the root's engine with
+<Framework name="angular">
+
+```ts title="live-region.ts"
+import { Component, effect, signal } from "@angular/core";
+import { type FlowEngineEvent, type FlowModel, injectFlow } from "@fragiola/flow-angular";
+
+type Model = FlowModel<Types, typeof features>;
+
+/** The app's words for an engine event, or nothing for one it keeps quiet about. */
+function describe(event: FlowEngineEvent, model: Model): string | undefined {
+    const name = (id: string) => model.get("node-by", { id })?.data.label ?? id;
+    switch (event.type) {
+        case "nodes-move":
+            return `Moved ${event.nodeIds.map(name).join(", ")}.`;
+        case "connect":
+            return `Connected ${name(event.source)} to ${name(event.target)}.`;
+        case "connect-cancel":
+            return event.refused ? "That connection is not allowed." : undefined;
+        case "remove":
+            return `Removed ${event.nodeIds.length} node(s) and ${event.edgeIds.length} edge(s).`;
+        default:
+            return undefined;
+    }
+}
+
+// rendered inside [flowRoot]: <app-live-region />
+@Component({
+    selector: "app-live-region",
+    template: `<p role="status" class="sr-only">{{ message() }}</p>`,
+})
+export class LiveRegion {
+    private readonly flow = injectFlow<Types, typeof features>();
+    protected readonly message = signal("");
+
+    constructor() {
+        // the engine of injectFlow is there from the start: it forwards to the root's once it is
+        // created. The effect's cleanup removes the listener
+        effect((onCleanup) => {
+            const model = this.flow.model();
+            onCleanup(
+                this.flow.engine.subscribe((event) => {
+                    const text = describe(event, model);
+                    if (text) this.message.set(text);
+                }),
+            );
+        });
+    }
+}
+```
+
+</Framework>
+
+Render `LiveRegion` (`live-region.vue`, `live-region.svelte`, `live-region.ts`) inside `Flow.Root`: it reads the root's engine with
 `useFlow`. The events
 carry ids, so the words can name the nodes the way your app names them, in its language.
 

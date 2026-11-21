@@ -60,6 +60,25 @@ something its snippet reads does, whatever its neighbours do.
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div flowEdges>
+    <ng-template [flowEdgesItem]="model" let-edge>
+        <svg:g [flowEdge]="edge">
+            <svg:path flowEdgePath class="stroke-gray-400 data-selected:stroke-blue-500" />
+        </svg:g>
+    </ng-template>
+</div>
+```
+
+In Angular, the children function is the item template, `<ng-template flowEdgesItem let-edge>`,
+whose elements are SVG (`svg:` prefix). `flowEdges` adds the `<svg>` they are drawn in to your
+element, which is the HTML layer edge labels go to. An edge's view is checked again when its edge
+object changes, whatever its neighbours do.
+
+</Framework>
+
 The layer lets presses through to the pane; the edges' own parts take them. Each edge's render is
 memoized on the edge and the children function (its path re-renders by itself): keep the function
 stable, as for [`Flow.Nodes`](/docs/api/primitives/nodes).

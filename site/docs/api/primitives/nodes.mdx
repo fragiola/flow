@@ -69,6 +69,29 @@ function does in React.
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div flowNodes>
+    <ng-template [flowNodesItem]="model" let-node>
+        <div [flowNode]="node" class="rounded border bg-white p-2">
+            {{ node.data.label }}
+            <div flowHandle type="target" side="left"></div>
+            <div flowHandle type="source" side="right"></div>
+        </div>
+    </ng-template>
+</div>
+```
+
+In Angular, the children function is the item template, `<ng-template flowNodesItem let-node>`
+(or `*flowNodesItem="let node"` on the node's element); `[flowNodesItem]="model"` types the node
+by the model's registry. Each node's view is its own, checked again only when its node object
+changes (the model shares the nodes a command did not change), so a drag step checks the moved
+nodes only; whenever your component is checked, every node's view is too, as embedded views are.
+Another template (an `@if` around two) renders every node again.
+
+</Framework>
+
 In React, each node's render is memoized on the node and the children function: a drag step
 re-renders the moved nodes only. A new children function re-renders every node, so keep it stable (a module
 function as above, or `useCallback`) when the app re-renders on each change (controlled `nodes`).

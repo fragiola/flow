@@ -141,6 +141,27 @@ const stop = model.use(rules);
 
 </Framework>
 
+<Framework name="angular">
+
+```ts
+import { type Middleware, veto } from "@fragiola/flow-angular";
+
+/** Connection rules: no self loop, and a "trigger" node takes no incoming edge. */
+const rules: Middleware<Types, typeof features> = (ctx, next) => {
+    if (ctx.command !== "edge.add") return next();
+    const { source, target } = ctx.payload;
+    if (source === target) return veto("an edge joins two different nodes");
+    if (ctx.get("node-by", { id: target })?.type === "trigger") {
+        return veto("a trigger starts a workflow: nothing connects into it");
+    }
+    return next();
+};
+
+const stop = model.use(rules);
+```
+
+</Framework>
+
 The payload is a frozen copy: rewrite it by assigning a new object, never by writing into it.
 Because the engine asks `model.can("edge.add", …)` while a connection is drawn, a vetoed target is
 marked `data-invalid` before the drop (see [Connection rules](/docs/guides/connection-rules)).

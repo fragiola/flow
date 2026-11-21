@@ -47,6 +47,16 @@ colours:
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div flowRoot class="palette-surface bg-palette-soft text-palette-contrast" …></div>
+<div [flowNode]="node" class="palette-raised border border-palette-line bg-palette-base"></div>
+<div [flowNode]="node" class="palette-blue bg-palette-soft text-palette-accent"></div>
+```
+
+</Framework>
+
 A node of another kind takes another palette class (`palette-green` for a trigger, `palette-orange`
 for a condition): its roles change, its markup does not.
 
@@ -119,6 +129,24 @@ And per palette, the colours that depend on it: `--fl-canvas-bg`, `--fl-grid-col
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div
+    [flowNode]="node"
+    class="rounded-(--fl-node-radius) border-(length:--fl-node-border) border-(--fl-node-line) bg-(--fl-node-bg) p-(--fl-node-padding) shadow-(--fl-node-shadow)"
+></div>
+<div
+    flowHandle
+    type="source"
+    side="bottom"
+    class="size-(--fl-handle-size) rounded-(--fl-handle-radius) border-(length:--fl-handle-border) border-(--fl-handle-line) bg-(--fl-handle-bg)"
+></div>
+<svg:path flowEdgePath class="fill-none stroke-(--fl-edge-color) stroke-(length:--fl-edge-width) [stroke-dasharray:var(--fl-edge-dash)]" />
+```
+
+</Framework>
+
 Geometry is never a token: positions and sizes are the flow's document.
 
 ## A background pattern per theme
@@ -152,6 +180,16 @@ pattern, and let the theme's tokens show one:
 <Flow.Background variant="dots" size={2} class="text-(--fl-grid-color) [display:var(--fl-grid-dots)]" />
 <Flow.Background variant="lines" class="text-(--fl-grid-color) [display:var(--fl-grid-lines)]" />
 <Flow.Background variant="cross" class="text-(--fl-grid-color) [display:var(--fl-grid-cross)]" />
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<svg flowBackground variant="dots" [size]="2" class="text-(--fl-grid-color) [display:var(--fl-grid-dots)]"></svg>
+<svg flowBackground variant="lines" class="text-(--fl-grid-color) [display:var(--fl-grid-lines)]"></svg>
+<svg flowBackground variant="cross" class="text-(--fl-grid-color) [display:var(--fl-grid-cross)]"></svg>
 ```
 
 </Framework>

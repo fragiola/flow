@@ -270,6 +270,57 @@ whose cleanup disposes it (React's effect).
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="editor.ts"
+import { afterNextRender, Component, DestroyRef, inject, signal } from "@angular/core";
+import { createFlowModel, FLOW } from "@fragiola/flow-angular";
+import { createUndoHistory, handleUndoKeys, type UndoHistory, type UndoSnapshot } from "./undo";
+
+@Component({
+    selector: "app-editor",
+    imports: [FLOW],
+    template: `
+        <div flowRoot [model]="model" class="flow">
+            <!-- the viewport, edges and nodes -->
+            <div role="toolbar" aria-label="History">
+                <button type="button" [disabled]="!snapshot()?.canUndo" (click)="history()?.undo()">Undo</button>
+                <button type="button" [disabled]="!snapshot()?.canRedo" (click)="history()?.redo()">Redo</button>
+            </div>
+        </div>
+    `,
+})
+export class Editor {
+    protected readonly model = createFlowModel<Types, typeof features>({ version: 1, nodes, edges }, { features });
+    protected readonly history = signal<UndoHistory | null>(null);
+    protected readonly snapshot = signal<UndoSnapshot | null>(null);
+
+    constructor() {
+        const destroyRef = inject(DestroyRef);
+        // one history per model, made once rendered in a browser, as React's effect
+        afterNextRender(() => {
+            const created = createUndoHistory(this.model);
+            this.history.set(created);
+            this.snapshot.set(created.getSnapshot());
+            const unsubscribe = created.subscribe(() => this.snapshot.set(created.getSnapshot()));
+            const onKeyDown = (event: KeyboardEvent) => handleUndoKeys(created, event);
+            window.addEventListener("keydown", onKeyDown);
+            destroyRef.onDestroy(() => {
+                window.removeEventListener("keydown", onKeyDown);
+                unsubscribe();
+                created.dispose();
+            });
+        });
+    }
+}
+```
+
+In Angular, the snapshot goes into a signal from `history.subscribe` (what
+`useSyncExternalStore` does in React), the history is made after the first render
+(`afterNextRender`, browser only) and disposed with the component (`DestroyRef`).
+
+</Framework>
+
 `handleUndoKeys` maps Ctrl/⌘ + Z to undo and Ctrl/⌘ + Shift + Z or Ctrl/⌘ + Y to redo, and leaves
 a text field its own undo.
 

@@ -73,6 +73,26 @@ takes any of Svelte's forms: a string, an array, an object); `bind:ref` is the n
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div flowNodes>
+    <ng-template [flowNodesItem]="model" let-node>
+        <div [flowNode]="node" #n="flowNode" [attr.aria-label]="node.data.label" class="node" [class.node-selected]="n.state()?.selected">
+            {{ node.data.label }}
+            <div flowHandle type="target" side="top"></div>
+            <div flowHandle type="source" side="bottom"></div>
+        </div>
+    </ng-template>
+</div>
+```
+
+In Angular, `flowNode` goes on your element (any element: `<article [flowNode]>`), its state is
+the `state()` signal (`#n="flowNode"`), and a class from the state is your `[class.x]` binding.
+`injectNode` binds a component's host as the node instead.
+
+</Framework>
+
 It has no role and no name: give it the ones your app means (see
 [Accessible names](/docs/getting-started/accessible-names)), and `user-select: none` so a drag does
 not select its text. For a node rendered by hand, [`useNode`](/docs/api/primitives/hooks) gives

@@ -116,6 +116,43 @@ In Svelte, `NodeResizer` comes from `@fragiola/flow-svelte/resize` with React's 
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="resizable-node.ts"
+import { Component, input } from "@angular/core";
+import type { FlowNode, FlowTypes } from "@fragiola/flow-angular";
+import { drag } from "@fragiola/flow-angular/drag";
+import { FLOW_RESIZE, resize } from "@fragiola/flow-angular/resize";
+import { selection } from "@fragiola/flow-angular/selection";
+
+export interface Types extends FlowTypes {
+    readonly nodes: { note: { label: string } };
+}
+
+export const features = [selection(), drag(), resize({ minWidth: 80, minHeight: 60 })] as const;
+
+// rendered inside [flowNode] (give the node `position: relative` with your class)
+@Component({
+    selector: "app-resizable-node",
+    imports: [FLOW_RESIZE],
+    template: `
+        {{ node().data.label }}
+        @if (node().selected) {
+            <div flowNodeResizer [minWidth]="120" [maxWidth]="360" [keepAspectRatio]="false"></div>
+        }
+    `,
+})
+export class ResizableNode {
+    readonly node = input.required<FlowNode<Types>>();
+}
+```
+
+In Angular, `flowNodeResizer` comes from `@fragiola/flow-angular/resize` (`FLOW_RESIZE`) with
+React's props as inputs (`minWidth`, `keepAspectRatio`); it adds a handle at each corner and side
+when you write no element inside it.
+
+</Framework>
+
 ## Props
 
 `NodeResizerProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and

@@ -95,6 +95,35 @@ factories and the same options.
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="editor.ts"
+import { Component } from "@angular/core";
+import { FLOW } from "@fragiola/flow-angular";
+import { connection } from "@fragiola/flow-angular/connection";
+import { drag } from "@fragiola/flow-angular/drag";
+import { keyboard } from "@fragiola/flow-angular/keyboard";
+import { selection } from "@fragiola/flow-angular/selection";
+
+// once, at module level: the features are fixed when the model is created
+const features = [selection({ boxMode: "partial" }), drag({ snapGrid: [20, 20] }), connection(), keyboard()] as const;
+
+@Component({
+    selector: "app-editor",
+    imports: [FLOW],
+    template: `<div flowRoot [features]="features" [defaultNodes]="nodes" class="size-full">…</div>`,
+})
+export class Editor {
+    protected readonly features = features;
+    protected readonly nodes = nodes;
+}
+```
+
+The Angular package mirrors every feature entry (`@fragiola/flow-angular/<feature>`, ng-packagr
+secondary entry points), with the same factories and the same options.
+
+</Framework>
+
 Each React entry re-exports the core's (`@fragiola/flow-react/drag` is `@fragiola/flow/drag`),
 so a React app imports everything from the one package it installs; `/minimap` and `/resize` add
 their primitives. Pass `typeof features` as the type argument so the verbs know the keys. Each
@@ -250,6 +279,17 @@ FEATURE_KEYS.selection.nodeFields; // ["selected"]
 
 ```ts
 import { FEATURE_KEYS } from "@fragiola/flow-svelte";
+
+FEATURE_KEYS.subflows.commands; // ["node.set-parent"]
+FEATURE_KEYS.selection.nodeFields; // ["selected"]
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+import { FEATURE_KEYS } from "@fragiola/flow-angular";
 
 FEATURE_KEYS.subflows.commands; // ["node.set-parent"]
 FEATURE_KEYS.selection.nodeFields; // ["selected"]

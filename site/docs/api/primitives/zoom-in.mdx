@@ -54,6 +54,19 @@ In Svelte, its `children` snippet gets `{ state }` (`ControlButtonState`).
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<button flowZoomIn aria-label="Zoom in" class="p-1 data-disabled:opacity-40">
+    <svg lucidePlus aria-hidden="true"></svg>
+</button>
+```
+
+In Angular, the button is yours; its state is the `state()` signal (`ControlButtonState`,
+`#z="flowZoomIn"`).
+
+</Framework>
+
 The same action from code: `engine.run("zoom-in")` ([engine](/docs/api/engine)).
 
 ## Props

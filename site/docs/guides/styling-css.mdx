@@ -157,6 +157,19 @@ function's result may be any of Svelte's class forms (a string, an array, an obj
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div [flowNode]="node" #n="flowNode" class="node" [class.node--selected]="n.state()?.selected">
+    {{ node.data.label }}
+</div>
+```
+
+In Angular, a class function of the state is your own `[class.x]` binding over the part's
+`state()` (`#n="flowNode"`), or a `[data-selected]` selector in your CSS.
+
+</Framework>
+
 See the [common props](/docs/api/primitives/root#common-props).
 
 ## What the structural style leaves you

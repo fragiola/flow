@@ -93,6 +93,33 @@ const Flow = typedFlow<Types, typeof features>();
 
 </Framework>
 
+<Framework name="angular">
+
+```ts
+import { drag } from "@fragiola/flow-angular/drag";
+import { FLOW_RESIZE, resize } from "@fragiola/flow-angular/resize";
+import { selection } from "@fragiola/flow-angular/selection";
+
+const features = [selection(), drag(), resize({ minWidth: 80, minHeight: 60 })] as const;
+// the component imports FLOW and FLOW_RESIZE
+```
+
+```html
+<div flowNodes>
+    <ng-template [flowNodesItem]="model" let-node>
+        <div [flowNode]="node" class="node group">
+            {{ node.data.label }}
+            <div flowNodeResizer class="hidden group-data-selected:block"></div>
+        </div>
+    </ng-template>
+</div>
+```
+
+In Angular, `flowNodeResizer` adds a handle at each corner and side when you write no element
+inside it.
+
+</Framework>
+
 `NodeResizer` goes inside `Flow.Node`: a box over the node holding a `ResizeHandle` at each corner
 and side by default. Give the handles their size and look; they are placed on their corner or
 along their side, and carry `data-position` (`top-left`, `top`, …, `left`).
@@ -130,6 +157,15 @@ along their side, and carry `data-position` (`top-left`, `top`, …, `left`).
 ```svelte
 <NodeResizer minWidth={120} maxWidth={360} minHeight={80} maxHeight={240} />
 <NodeResizer keepAspectRatio />
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowNodeResizer [minWidth]="120" [maxWidth]="360" [minHeight]="80" [maxHeight]="240"></div>
+<div flowNodeResizer keepAspectRatio></div>
 ```
 
 </Framework>
@@ -208,6 +244,32 @@ import { NodeResizer, RESIZE_POSITIONS, ResizeHandle } from "@fragiola/flow-vue/
 <NodeResizer>
     <ResizeHandle position="bottom-right" aria-hidden="true" class="size-3 cursor-nwse-resize" />
 </NodeResizer>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+import { FLOW_RESIZE, RESIZE_POSITIONS } from "@fragiola/flow-angular/resize";
+
+// a field of the component: protected readonly positions = RESIZE_POSITIONS;
+```
+
+```html
+<div flowNodeResizer keepAspectRatio class="resizer">
+    @for (position of positions; track position) {
+        <div
+            flowResizeHandle
+            [position]="position"
+            class="size-2.5 rounded-sm border border-palette-ring bg-palette-base data-[position=top]:h-1.5 data-[position=bottom]:h-1.5 data-[position=left]:w-1.5 data-[position=right]:w-1.5"
+        ></div>
+    }
+</div>
+
+<div flowNodeResizer>
+    <div flowResizeHandle position="bottom-right" aria-hidden="true" class="size-3 cursor-nwse-resize"></div>
+</div>
 ```
 
 </Framework>

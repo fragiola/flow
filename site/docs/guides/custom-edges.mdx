@@ -56,6 +56,20 @@ type. Give the path its stroke: it is unfilled, and has no colour of its own.
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div flowEdges>
+    <ng-template [flowEdgesItem]="model" let-edge>
+        <svg:g [flowEdge]="edge">
+            <svg:path flowEdgePath class="edge" />
+        </svg:g>
+    </ng-template>
+</div>
+```
+
+</Framework>
+
 ```ts
 const edges: FlowEdgeInput<Types>[] = [
     { id: "a-b", source: "a", target: "b" }, // bezier
@@ -88,6 +102,14 @@ step corners, default 5) and `offset` (how far a step leaves its node before tur
 
 ```svelte
 <Flow.Root pathOptions={{ borderRadius: 12, offset: 30 }} … />
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowRoot [pathOptions]="{ borderRadius: 12, offset: 30 }" …></div>
 ```
 
 </Framework>
@@ -276,6 +298,73 @@ over the engine's.
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="wave-edge.ts"
+import { Component, input } from "@angular/core";
+import { type EdgePath, FLOW, type FlowEdge, type FlowTypes } from "@fragiola/flow-angular";
+
+export interface Types extends FlowTypes {
+    readonly nodes: { point: { label: string } };
+    readonly edges: { wave: { amplitude: number } };
+}
+
+/** A sine wave of `amplitude` across the straight line between the two ends. */
+function wavePath({ source, target }: EdgePath, amplitude: number): string {
+    const dx = target.x - source.x;
+    const dy = target.y - source.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const nx = -dy / length;
+    const ny = dx / length;
+    const waves = Math.max(1, Math.round(length / 60));
+    const steps = waves * 16;
+    const points: string[] = [];
+    for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const offset = Math.sin(t * waves * 2 * Math.PI) * amplitude;
+        points.push(`${source.x + dx * t + nx * offset},${source.y + dy * t + ny * offset}`);
+    }
+    return `M ${points.join(" L ")}`;
+}
+
+// on the edge's element, beside [flowEdge]: <svg:g [flowEdge]="edge" [appWaveEdge]="edge">
+@Component({
+    selector: "g[appWaveEdge]",
+    imports: [FLOW],
+    template: `<svg:path flowEdgePath #p="flowEdgePath" [attr.d]="wave(p.state()?.path)" class="edge" />`,
+})
+export class WaveEdge {
+    readonly edge = input.required<FlowEdge<Types>>({ alias: "appWaveEdge" });
+
+    /** no path until its nodes have a size: the engine's `d` meanwhile */
+    protected wave(path: EdgePath | undefined): string | null {
+        const edge = this.edge();
+        const amplitude = edge.type === "wave" ? (edge.data?.amplitude ?? 8) : 8;
+        return path ? wavePath(path, amplitude) : null;
+    }
+}
+```
+
+```html
+<div flowEdges>
+    <ng-template [flowEdgesItem]="model" let-edge>
+        @if (edge.type === "wave") {
+            <svg:g [flowEdge]="edge" [appWaveEdge]="edge"></svg:g>
+        } @else {
+            <svg:g [flowEdge]="edge">
+                <svg:path flowEdgePath class="edge" />
+            </svg:g>
+        }
+    </ng-template>
+</div>
+```
+
+In Angular, your `<svg:path flowEdgePath>` reads the engine's ends from its `state()?.path`
+(`#p="flowEdgePath"`), and a `d` of your own (`[attr.d]`) wins over the engine's. `injectEdge`
+gives the same state to a component that is the edge itself.
+
+</Framework>
+
 The core's own path math is public too: `bezierPath`, `smoothStepPath`, `stepPath` and
 `straightPath` take the ends and return `{ path, label }`, a start for a path of your own. See
 [Path helpers](/docs/api/path-helpers).
@@ -314,6 +403,17 @@ the edge easier to click (to select it) without a thicker line:
     <Flow.EdgePath class="stroke-transparent stroke-[14px]" />
     <Flow.EdgePath class="edge" />
 </Flow.Edge>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<svg:g [flowEdge]="edge">
+    <svg:path flowEdgePath class="stroke-transparent stroke-[14px]" />
+    <svg:path flowEdgePath class="edge" />
+</svg:g>
 ```
 
 </Framework>
@@ -427,6 +527,51 @@ its place, so `useFlow` and the label's snippet work there as written.
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="labelled-edge.ts"
+import { Component, input } from "@angular/core";
+import { FLOW, type FlowEdge, injectFlow } from "@fragiola/flow-angular";
+
+// on the edge's element, beside [flowEdge]: <svg:g [flowEdge]="edge" [appLabelledEdge]="edge">
+@Component({
+    selector: "g[appLabelledEdge]",
+    imports: [FLOW],
+    template: `
+        @let e = edge();
+        <svg:path flowEdgePath class="edge" />
+        <xhtml:div flowEdgeLabel class="label">
+            @if (e.type === "text") {
+                <span>{{ e.data?.text }}</span>
+            }
+            @if (e.type === "removable") {
+                <button
+                    type="button"
+                    [attr.aria-label]="'Remove the edge from ' + e.source + ' to ' + e.target"
+                    (click)="remove()"
+                >
+                    ×
+                </button>
+            }
+        </xhtml:div>
+    `,
+})
+export class LabelledEdge {
+    readonly edge = input.required<FlowEdge<Types>>({ alias: "appLabelledEdge" });
+    private readonly flow = injectFlow<Types, typeof features>();
+
+    protected remove(): void {
+        this.flow.model().run("edge.remove", { edgeId: this.edge().id });
+    }
+}
+```
+
+In Angular, the label is written inside the edge's SVG group with the `xhtml:` prefix (an HTML
+element), and `flowEdgeLabel` moves its element into the edges' HTML layer: your bindings, your
+listeners and `injectFlow` keep working there, as written.
+
+</Framework>
+
 Labels render in an HTML layer of `Flow.Edges` (SVG holds no HTML), so they sit above the edges
 and below the nodes.
 
@@ -479,6 +624,22 @@ Markers are plain SVG: define one in an `svg` of your own and point the path's `
 </svg>
 
 <Flow.EdgePath marker-end="url(#arrow)" class="edge text-palette-line" />
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<svg width="0" height="0" aria-hidden="true">
+    <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
+        </marker>
+    </defs>
+</svg>
+
+<svg:path flowEdgePath marker-end="url(#arrow)" class="edge text-palette-line" />
 ```
 
 </Framework>

@@ -141,6 +141,55 @@ snippet holds.
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="custom-nodes.ts"
+import { Component } from "@angular/core";
+import { FLOW, type FlowTypes } from "@fragiola/flow-angular";
+import { ColourNode } from "./colour-node";
+import { NumberNode } from "./number-node";
+import { PreviewNode } from "./preview-node";
+
+export interface Types extends FlowTypes {
+    readonly nodes: {
+        colour: { label: string; colour: string };
+        number: { label: string; value: number };
+        preview: { label: string };
+    };
+}
+
+@Component({
+    selector: "app-custom-nodes",
+    imports: [FLOW, ColourNode, NumberNode, PreviewNode],
+    template: `
+        <!-- inside the root -->
+        <div flowNodes>
+            <ng-template [flowNodesItem]="model" let-node>
+                <div [flowNode]="node" class="node">
+                    @if (node.type === "colour") {
+                        <app-colour-node [node]="node" />
+                    } @else if (node.type === "number") {
+                        <app-number-node [node]="node" />
+                    } @else {
+                        <app-preview-node [node]="node" />
+                    }
+                </div>
+            </ng-template>
+        </div>
+    `,
+})
+export class CustomNodes {
+    protected readonly model = model;
+}
+```
+
+In Angular, the children function is the `flowNodesItem` template, typed by the model
+(`[flowNodesItem]="model"`), and `@if` on `node.type` narrows `node.data` in the template too.
+Each node's view is its own (checked on its own): a drag step checks again only the nodes it
+moved, whatever the template holds.
+
+</Framework>
+
 ## A component per type
 
 Each branch is an ordinary component. `Extract` gives it the node of its own type, and
@@ -254,6 +303,45 @@ is inline to keep the snippet whole.
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="colour-node.ts"
+import { Component, input } from "@angular/core";
+import { FLOW, type FlowNode, injectFlow } from "@fragiola/flow-angular";
+import { connection } from "@fragiola/flow-angular/connection";
+import { drag } from "@fragiola/flow-angular/drag";
+import { selection } from "@fragiola/flow-angular/selection";
+
+const features = [selection(), drag(), connection()] as const;
+
+// rendered inside [flowNode]: its handle finds the node through it
+@Component({
+    selector: "app-colour-node",
+    imports: [FLOW],
+    template: `
+        <label>
+            <span>{{ node().data.label }}</span>
+            <input type="color" [value]="node().data.colour" (input)="pick($event)" />
+        </label>
+        <div flowHandle type="source" side="right" class="handle"></div>
+    `,
+})
+export class ColourNode {
+    readonly node = input.required<Extract<FlowNode<Types>, { type: "colour" }>>();
+    private readonly flow = injectFlow<Types, typeof features>();
+
+    protected pick(event: Event): void {
+        const colour = (event.target as HTMLInputElement).value;
+        this.flow.model().run("node.set-data", { nodeId: this.node().id, data: { colour } });
+    }
+}
+```
+
+Declare `features` once in a module of its own and import it where you need its type: here it
+is inline to keep the snippet whole.
+
+</Framework>
+
 A press on a field, a button or a link inside a node starts no gesture: typing in the input never
 drags the node. Mark anything else that must keep its presses with `data-flow-no-gesture`, and an
 element that scrolls with `data-flow-no-wheel` (the wheel then scrolls it instead of zooming).
@@ -286,6 +374,15 @@ type with a `handleId` each, and move them along the side with your style:
 ```svelte
 <Flow.Handle type="target" side="left" handleId="colour" class="handle" style="top: 35%" />
 <Flow.Handle type="target" side="left" handleId="size" class="handle" style="top: 75%" />
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowHandle type="target" side="left" handleId="colour" class="handle" style="top: 35%"></div>
+<div flowHandle type="target" side="left" handleId="size" class="handle" style="top: 75%"></div>
 ```
 
 </Framework>
@@ -358,6 +455,28 @@ export function useInput(nodeId: string, handleId: string) {
 
 In Svelte, `useEdges` and `useNodes` give `{ current }`: derive from them with `$derived`, in a
 `.svelte.ts` module (a rune needs the suffix), and call your rune in a component's script.
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="inject-input.ts"
+import { computed, type Signal } from "@angular/core";
+import { type FlowNode, injectEdges, injectNodes } from "@fragiola/flow-angular";
+
+/** The node wired into one of `nodeId`'s target handles, if any. */
+export function injectInput(nodeId: () => string, handleId: string): Signal<FlowNode<Types> | undefined> {
+    const edges = injectEdges<Types>();
+    const nodes = injectNodes<Types>();
+    return computed(() => {
+        const edge = edges().find((e) => e.target === nodeId() && e.targetHandle === handleId);
+        return nodes().find((n) => n.id === edge?.source);
+    });
+}
+```
+
+In Angular, `injectEdges` and `injectNodes` return signals: derive from them with `computed`, in
+a function you call in an injection context (a field of a component inside the root).
 
 </Framework>
 
@@ -544,6 +663,64 @@ element takes your listeners (`@dragover`, `@drop`) as it takes any attribute.
 
 In Svelte, `flowRef={flow}` and `flow.current` are React's; the root's element takes your
 handlers (`ondragover`, `ondrop`) as it takes any attribute.
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="add-nodes.ts"
+import { Component } from "@angular/core";
+import { createFlowRef, FLOW, type FlowTypes } from "@fragiola/flow-angular";
+
+type Shape = "circle" | "square" | "diamond";
+
+interface Types extends FlowTypes {
+    readonly nodes: { shape: { shape: Shape; label: string } };
+}
+
+const MIME = "application/x-flow-shape";
+
+@Component({
+    selector: "app-add-nodes",
+    imports: [FLOW],
+    template: `
+        <div class="layout">
+            <button type="button" draggable="true" (dragstart)="$event.dataTransfer?.setData(mime, 'square')">
+                Task
+            </button>
+            <div flowRoot [features]="features" [flowRef]="flow" class="flow" (dragover)="over($event)" (drop)="drop($event)">
+                <!-- the viewport, edges and nodes -->
+            </div>
+        </div>
+    `,
+})
+export class AddNodes {
+    protected readonly mime = MIME;
+    protected readonly features = features;
+    protected readonly flow = createFlowRef<Types, typeof features>();
+
+    protected over(event: DragEvent): void {
+        if (event.dataTransfer?.types.includes(MIME)) event.preventDefault();
+    }
+
+    protected drop(event: DragEvent): void {
+        const shape = event.dataTransfer?.getData(MIME) as Shape | undefined;
+        const current = this.flow.current;
+        if (!shape || !current) return;
+        event.preventDefault();
+        const point = current.engine.get("screen-to-flow", { x: event.clientX, y: event.clientY });
+        current.model.run("node.add", {
+            type: "shape",
+            // the node's top-left corner, so that its middle lands on the point
+            position: { x: point.x - 50, y: point.y - 20 },
+            data: { shape, label: shape },
+        });
+    }
+}
+```
+
+In Angular, the root's element is yours: `(dragover)` and `(drop)` are listeners on it like on any
+element, and `[flowRef]="flow"`, `flow.current` are React's flow ref.
 
 </Framework>
 

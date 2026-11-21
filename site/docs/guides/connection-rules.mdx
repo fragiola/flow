@@ -189,6 +189,58 @@ export const connectionRules: Middleware<Types, typeof features> = (ctx, next) =
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="connection-rules.ts"
+import { type FlowEdge, type FlowTypes, type Middleware, veto } from "@fragiola/flow-angular";
+import { connection } from "@fragiola/flow-angular/connection";
+import { drag } from "@fragiola/flow-angular/drag";
+import { selection } from "@fragiola/flow-angular/selection";
+
+type Port = "number" | "text";
+
+export interface Types extends FlowTypes {
+    readonly nodes: { block: { label: string; inputs: Port[]; outputs: Port[] } };
+}
+
+export const features = [selection(), drag(), connection()] as const;
+
+/** A handle id says its port's type: `number-0`, `text-1`. */
+const portType = (handleId: string | undefined) => handleId?.split("-")[0] as Port | undefined;
+
+/** Whether `to` already reaches `from`: an edge from `from` to `to` would close a cycle. */
+function reaches(edges: readonly FlowEdge<Types>[], to: string, from: string): boolean {
+    const seen = new Set<string>();
+    const queue = [to];
+    while (queue.length > 0) {
+        const id = queue.shift() as string;
+        if (id === from) return true;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        for (const edge of edges) if (edge.source === id) queue.push(edge.target);
+    }
+    return false;
+}
+
+export const connectionRules: Middleware<Types, typeof features> = (ctx, next) => {
+    if (ctx.command !== "edge.add") return next();
+    const { source, target, sourceHandle, targetHandle } = ctx.payload;
+    if (portType(sourceHandle) !== portType(targetHandle)) {
+        return veto("a port only joins a port of its own type");
+    }
+    if (source === target || reaches(ctx.state.edges, target, source)) {
+        return veto("that edge would close a cycle");
+    }
+    const taken = ctx.state.edges.some(
+        (edge) => edge.target === target && edge.targetHandle === targetHandle,
+    );
+    if (taken) return veto("that input already has an edge");
+    return next();
+};
+```
+
+</Framework>
+
 `ctx.state` is the committed document the command applies to; `ctx.dryRun` is true while the
 engine asks during a drag, so a middleware with side effects (a log, a request) skips them then.
 
@@ -266,6 +318,38 @@ model.use(connectionRules);
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="pipeline.ts"
+import { Component, input, type OnInit } from "@angular/core";
+import { createFlowModel, FLOW, type FlowJson, type FlowModel } from "@fragiola/flow-angular";
+import { connectionRules, features, type Types } from "./connection-rules";
+
+@Component({
+    selector: "app-pipeline",
+    imports: [FLOW],
+    template: `
+        @if (model; as model) {
+            <div flowRoot [model]="model" class="flow">
+                <!-- … -->
+            </div>
+        }
+    `,
+})
+export class Pipeline implements OnInit {
+    readonly json = input.required<FlowJson<Types>>();
+    protected model?: FlowModel<Types, typeof features>;
+
+    ngOnInit(): void {
+        // created once, from the first json: another model would get another engine
+        this.model = createFlowModel<Types, typeof features>(this.json(), { features });
+        this.model.use(connectionRules);
+    }
+}
+```
+
+</Framework>
+
 The same rule now holds for code: `model.run("edge.add", …)` from a paste or an import returns
 `{ ok: false, error: { code: "vetoed", message } }`.
 
@@ -312,6 +396,21 @@ does `Flow.ConnectionLine`. Style both:
     class="handle data-valid:bg-(--fl-valid) data-invalid:bg-(--fl-invalid)"
 />
 <Flow.ConnectionLine class="fill-none stroke-(--fl-edge-selected) data-invalid:stroke-(--fl-invalid)" />
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div
+    flowHandle
+    type="target"
+    side="left"
+    handleId="text-0"
+    class="handle data-valid:bg-(--fl-valid) data-invalid:bg-(--fl-invalid)"
+></div>
+<svg flowConnectionLine class="fill-none stroke-(--fl-edge-selected) data-invalid:stroke-(--fl-invalid)"></svg>
 ```
 
 </Framework>
@@ -395,6 +494,39 @@ cleanup (the remover `subscribe` returns) stops the listener.
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="outcome.ts"
+import { Component, DestroyRef, inject, signal } from "@angular/core";
+import { injectFlow } from "@fragiola/flow-angular";
+
+// rendered inside [flowRoot]
+@Component({
+    selector: "app-outcome",
+    template: `<p role="status">{{ outcome() }}</p>`,
+})
+export class Outcome {
+    private readonly flow = injectFlow<Types, typeof features>();
+    protected readonly outcome = signal("Drag from an output to an input.");
+
+    constructor() {
+        const stop = this.flow.engine.subscribe((event) => {
+            if (event.type === "connect") this.outcome.set("Connected.");
+            if (event.type === "connect-cancel") {
+                this.outcome.set(event.refused ? "Refused by the rules." : "Dropped nowhere.");
+            }
+        });
+        inject(DestroyRef).onDestroy(stop);
+    }
+}
+```
+
+The engine `injectFlow` gives is there from the start: subscribe in the constructor, and remove
+the listener with the component (`DestroyRef`). A signal set from the listener updates only what
+reads it.
+
+</Framework>
+
 ## Move an edge's ends
 
 <Example id="edge-reconnect" />
@@ -466,6 +598,24 @@ const Flow = typedFlow<Types, typeof features>();
     <Flow.ReconnectAnchor end="source" r={6} class="fill-transparent stroke-current" />
     <Flow.ReconnectAnchor end="target" r={6} class="fill-transparent stroke-current" />
 </Flow.Edge>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+import { reconnection } from "@fragiola/flow-angular/reconnection";
+
+const features = [selection(), drag(), connection(), reconnection()] as const;
+```
+
+```html
+<svg:g [flowEdge]="edge">
+    <svg:path flowEdgePath class="edge" />
+    <svg:circle flowReconnectAnchor end="source" r="6" class="fill-transparent stroke-current" />
+    <svg:circle flowReconnectAnchor end="target" r="6" class="fill-transparent stroke-current" />
+</svg:g>
 ```
 
 </Framework>

@@ -146,6 +146,50 @@ describe("the connection rules", () => {
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="connection-rules.test.ts"
+import { createFlowModel } from "@fragiola/flow-angular";
+import { describe, expect, it } from "vitest";
+import { connectionRules, features, type Types } from "./connection-rules";
+
+function model() {
+    const created = createFlowModel<Types, typeof features>(
+        {
+            version: 1,
+            nodes: [
+                { id: "a", type: "block", position: { x: 0, y: 0 }, data: { label: "A", inputs: [], outputs: ["number"] } },
+                { id: "b", type: "block", position: { x: 200, y: 0 }, data: { label: "B", inputs: ["text"], outputs: [] } },
+            ],
+            edges: [],
+        },
+        { features },
+    );
+    created.use(connectionRules);
+    return created;
+}
+
+describe("the connection rules", () => {
+    it("refuse a port of another type", () => {
+        const result = model().run("edge.add", {
+            source: "a",
+            target: "b",
+            sourceHandle: "number-0",
+            targetHandle: "text-0",
+        });
+        expect(result).toMatchObject({ ok: false, error: { code: "vetoed" } });
+    });
+
+    it("say so before the drop, without changing anything", () => {
+        const flow = model();
+        expect(flow.can("edge.add", { source: "a", target: "b", sourceHandle: "number-0", targetHandle: "text-0" })).toBe(false);
+        expect(flow.get("all-edges")).toHaveLength(0);
+    });
+});
+```
+
+</Framework>
+
 `model.check` returns what `run` would return without committing; `model.subscribe` lets a test
 assert the events your app would hear. The core is also `@fragiola/flow` on its own, without React:
 a server, a worker or a script can use the same model.
@@ -266,6 +310,38 @@ it("draws an edge once its nodes are measured", async () => {
 In Svelte, `@testing-library/svelte` mounts the component in the document (the engine needs its
 root there to measure); the same layout stub serves. Run the tests with Svelte's Vite plugin
 (`@sveltejs/vite-plugin-svelte`) and a browser-like environment (jsdom).
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="editor.test.ts"
+// @vitest-environment jsdom
+import { TestBed } from "@angular/core/testing";
+import { beforeEach, expect, it, vi } from "vitest";
+import { Editor } from "./editor";
+import { installLayout } from "./test/layout";
+
+beforeEach(() => installLayout());
+
+it("draws an edge once its nodes are measured", async () => {
+    const fixture = TestBed.createComponent(Editor);
+    // the component's element in the document: the engine measures its root there
+    document.body.append(fixture.nativeElement);
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    // the root creates its engine after the first render, and the engine tells its measurements
+    // once per task: wait for the edge to be drawn
+    await vi.waitFor(() => expect(element.querySelectorAll('[data-flow-part="edge"]')).toHaveLength(1));
+    expect(element.querySelector('[role="group"][aria-label="Fetch data"]')).not.toBeNull();
+    fixture.destroy();
+});
+```
+
+In Angular, `TestBed` renders the component (zoneless: `setupTestBed({ zoneless: true })` of
+`@analogjs/vitest-angular` in the setup file, with Analog's Vite plugin compiling the
+components); put its element in the document, where the engine measures it. The same layout
+stub serves.
 
 </Framework>
 

@@ -6,8 +6,8 @@ description: What the package does for a node-based editor (panning, zooming, dr
 A node-based editor shows **nodes** joined by **edges** on a canvas you pan and zoom: a workflow
 builder, a data pipeline, a mind map, a state machine. Each node has **handles**, the points an
 edge starts or ends at, and a user draws a **connection** from one handle to another to add an
-edge. `@fragiola/flow-react` (React 19), `@fragiola/flow-vue` (Vue 3.5) and `@fragiola/flow-svelte`
-(Svelte 5) give you that behaviour as headless primitives under one namespace, `Flow.*`, over a framework-free core, `@fragiola/flow`.
+edge. `@fragiola/flow-react` (React 19), `@fragiola/flow-vue` (Vue 3.5), `@fragiola/flow-svelte`
+(Svelte 5) and `@fragiola/flow-angular` (Angular 22) give you that behaviour as headless primitives under one namespace, `Flow.*`, over a framework-free core, `@fragiola/flow`.
 
 What the package gives you:
 
@@ -163,6 +163,67 @@ const nodes: FlowNodeInput[] = [
     </Flow.Viewport>
 </Flow.Root>
 ```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="pipeline.ts"
+import { Component } from "@angular/core";
+import { FLOW, type FlowEdgeInput, type FlowNodeInput, type FlowTypes } from "@fragiola/flow-angular";
+import { connection } from "@fragiola/flow-angular/connection";
+import { drag } from "@fragiola/flow-angular/drag";
+
+interface Types extends FlowTypes {
+    readonly nodes: { step: { label: string } };
+}
+
+const features = [drag(), connection()] as const;
+
+const nodes: FlowNodeInput<Types>[] = [
+    { id: "read", type: "step", position: { x: 0, y: 0 }, data: { label: "Read" } },
+    { id: "write", type: "step", position: { x: 0, y: 120 }, data: { label: "Write" } },
+];
+
+const edges: FlowEdgeInput<Types>[] = [{ id: "read-write", source: "read", target: "write" }];
+
+@Component({
+    selector: "app-pipeline",
+    imports: [FLOW],
+    template: `
+        <div flowRoot [features]="features" [defaultNodes]="nodes" [defaultEdges]="edges" class="h-96 bg-gray-50">
+            <div flowViewport>
+                <div flowEdges>
+                    <ng-template flowEdgesItem let-edge>
+                        <svg:g [flowEdge]="edge">
+                            <svg:path flowEdgePath class="stroke-gray-400" />
+                        </svg:g>
+                    </ng-template>
+                </div>
+                <div flowNodes>
+                    <ng-template flowNodesItem let-node>
+                        <div [flowNode]="node" class="rounded border bg-white px-3 py-2 select-none">
+                            {{ node.data["label"] }}
+                            <div flowHandle type="target" side="top" class="size-2 rounded-full bg-gray-500"></div>
+                            <div flowHandle type="source" side="bottom" class="size-2 rounded-full bg-gray-500"></div>
+                        </div>
+                    </ng-template>
+                </div>
+                <svg flowConnectionLine class="stroke-blue-500"></svg>
+            </div>
+        </div>
+    `,
+})
+export class Pipeline {
+    protected readonly features = features;
+    protected readonly nodes = nodes;
+    protected readonly edges = edges;
+}
+```
+
+In Angular, the primitives are directives on your own elements (`<div flowRoot>`, `<div [flowNode]="node">`),
+imported with `FLOW`; a template per node and per edge (`<ng-template flowNodesItem let-node>`)
+replaces React's children function, and an edge's SVG elements take the `svg:` prefix.
 
 </Framework>
 

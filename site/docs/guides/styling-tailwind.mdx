@@ -68,6 +68,25 @@ Tailwind v4 turns every attribute into a variant. The primitives expose their st
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div
+    [flowNode]="node"
+    class="min-w-28 select-none rounded-lg border border-palette-line bg-palette-base px-3 py-2 data-dragging:cursor-grabbing data-selected:border-palette-ring data-selected:ring-2 data-selected:ring-palette-ring/30 focus-visible:outline-2"
+>
+    {{ node.data.label }}
+    <div
+        flowHandle
+        type="source"
+        side="bottom"
+        class="size-2.5 rounded-full border border-palette-line bg-palette-base data-valid:bg-green-500 data-invalid:bg-red-500"
+    ></div>
+</div>
+```
+
+</Framework>
+
 Valued attributes take the bracket form: `data-[side=left]:-translate-x-1/2`,
 `data-[handle-type=target]:rounded-none`, `data-[position=top-left]:cursor-nwse-resize`.
 
@@ -102,6 +121,16 @@ Edges, the connection line, the background and the minimap are SVG: use the `str
 <Flow.EdgePath class="fill-none stroke-palette-line stroke-[1.5px] data-selected:stroke-palette-ring data-selected:stroke-[2.5px]" />
 <Flow.ConnectionLine class="fill-none stroke-palette-ring [stroke-dasharray:4_3]" />
 <Flow.Background variant="dots" size={2} class="text-palette-line" />
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<svg:path flowEdgePath class="fill-none stroke-palette-line stroke-[1.5px] data-selected:stroke-palette-ring data-selected:stroke-[2.5px]" />
+<svg flowConnectionLine class="fill-none stroke-palette-ring [stroke-dasharray:4_3]"></svg>
+<svg flowBackground variant="dots" [size]="2" class="text-palette-line"></svg>
 ```
 
 </Framework>
@@ -141,6 +170,17 @@ A part inside a node styles itself from the node's state with a `group` on the n
     <span class="opacity-60 group-data-selected:opacity-100">{node.data.label}</span>
     <NodeResizer class="hidden group-data-selected:block" />
 </Flow.Node>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div [flowNode]="node" class="group node">
+    <span class="opacity-60 group-data-selected:opacity-100">{{ node.data.label }}</span>
+    <div flowNodeResizer class="hidden group-data-selected:block"></div>
+</div>
 ```
 
 </Framework>
@@ -209,6 +249,30 @@ lookup of your own reads the node the slot gives, and the state reads its `data-
 
 In Svelte, a class function of the state works as in React, and returns any of Svelte's class
 forms: here an array, whose falsy entries are dropped.
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+export class TaskNodes {
+    // complete class names, so Tailwind finds them
+    protected readonly tone = { draft: "border-dashed", ready: "border-solid" } as const;
+}
+```
+
+```html
+<div flowNodes>
+    <ng-template [flowNodesItem]="model" let-node>
+        <div [flowNode]="node" #n="flowNode" class="node" [class]="tone[node.data.status]" [class.invisible]="!n.state()?.measured">
+            {{ node.data.label }}
+        </div>
+    </ng-template>
+</div>
+```
+
+In Angular, a class from the state is your `[class.x]` binding over the part's `state()`; a class
+from the node's data is a `[class]` binding beside your static `class` (Angular merges them).
 
 </Framework>
 

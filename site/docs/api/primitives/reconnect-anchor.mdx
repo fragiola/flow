@@ -48,6 +48,18 @@ id); dropped nowhere or on a refused handle, it goes back. A press on the edge's
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<svg:g [flowEdge]="edge">
+    <svg:path flowEdgePath />
+    <svg:circle flowReconnectAnchor end="source" r="8" class="fill-transparent hover:stroke-blue-500" />
+    <svg:circle flowReconnectAnchor end="target" r="8" class="fill-transparent hover:stroke-blue-500" />
+</svg:g>
+```
+
+</Framework>
+
 It is transparent by default: give it its radius and look. Edges are drawn before the nodes, so an
 anchor lies under its node's handle: the mouse grabs it beside the handle.
 

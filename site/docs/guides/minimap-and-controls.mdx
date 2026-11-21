@@ -107,6 +107,30 @@ In Svelte, a button's `children` snippet gets its state (`{#snippet children({ s
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<!-- the component imports FLOW and LucidePlus, LucideMinus, LucideMaximize, LucideLock, LucideLockOpen (@lucide/angular) -->
+<div flowControls role="group" aria-label="Zoom and lock" class="absolute bottom-3 start-3 flex flex-col">
+    <button flowZoomIn aria-label="Zoom in" class="control"><svg lucidePlus aria-hidden="true"></svg></button>
+    <button flowZoomOut aria-label="Zoom out" class="control"><svg lucideMinus aria-hidden="true"></svg></button>
+    <button flowFitView aria-label="Fit view" class="control"><svg lucideMaximize aria-hidden="true"></svg></button>
+    <button flowToggleInteractive #lock="flowToggleInteractive" aria-label="Lock the flow" class="control">
+        @if (lock.state().interactive) {
+            <svg lucideLockOpen aria-hidden="true"></svg>
+        } @else {
+            <svg lucideLock aria-hidden="true"></svg>
+        }
+    </button>
+</div>
+```
+
+In Angular, the buttons are yours (`<button flowZoomIn>`) and a button's state is its `state()`
+signal through its `exportAs` (`#lock="flowToggleInteractive"`): no `render` needed to swap the
+icon.
+
+</Framework>
+
 | button | runs | disabled while |
 | --- | --- | --- |
 | `Flow.ZoomIn` | `zoom-in` (a step of `zoomStep`, default 1.2, around the root's centre) | at `maxZoom` |
@@ -143,6 +167,14 @@ wheel's and a pinch's:
 
 ```svelte
 <Flow.Root minZoom={0.25} maxZoom={2} zoomStep={1.5} fitView={{ padding: 0.1 }} … />
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowRoot [minZoom]="0.25" [maxZoom]="2" [zoomStep]="1.5" [fitView]="{ padding: 0.1 }" …></div>
 ```
 
 </Framework>
@@ -209,6 +241,33 @@ const viewport = useViewport();
 
 `useViewport` gives `{ current }` in Svelte: a template and a script both read
 `viewport.current`, which follows the view.
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="zoom-readout.ts"
+import { Component, computed } from "@angular/core";
+import { injectFlow, injectViewport } from "@fragiola/flow-angular";
+
+// rendered inside [flowRoot]
+@Component({
+    selector: "app-zoom-readout",
+    template: `<button type="button" (click)="reset()">{{ percent() }}%</button>`,
+})
+export class ZoomReadout {
+    private readonly flow = injectFlow();
+    private readonly viewport = injectViewport();
+    protected readonly percent = computed(() => Math.round(this.viewport().zoom * 100));
+
+    protected reset(): void {
+        this.flow.engine.run("zoom-to", { zoom: 1 });
+    }
+}
+```
+
+`injectViewport` gives a signal in Angular: a template and a `computed` both read `viewport()`,
+which follows the view, and only what reads it is checked again on a pan.
 
 </Framework>
 
@@ -322,6 +381,41 @@ In Vue, the children function is `MiniMap`'s default scoped slot, `v-slot="{ vie
 ```
 
 In Svelte, the children function is `MiniMap`'s `children` snippet, `{#snippet children(view)}`.
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+import { FLOW_MINIMAP, minimap } from "@fragiola/flow-angular/minimap";
+
+const features = [selection(), drag(), minimap()] as const;
+// the component imports FLOW and FLOW_MINIMAP
+```
+
+```html
+<svg
+    flowMiniMap
+    #map="flowMiniMap"
+    [width]="180"
+    [height]="130"
+    role="img"
+    aria-label="Minimap of the route"
+    class="absolute end-3 bottom-3 rounded border bg-palette-base"
+>
+    @for (node of map.state().view.nodes; track node.nodeId) {
+        <!-- a minimap node leaves the document while it is not shown: wrap it in a group -->
+        <svg:g>
+            <svg:rect flowMiniMapNode [nodeId]="node.nodeId" class="fill-palette-line data-selected:fill-(--fl-edge-selected)" />
+        </svg:g>
+    }
+    <svg:path flowMiniMapMask class="fill-(--fl-minimap-mask) stroke-(--fl-edge-selected)" />
+</svg>
+```
+
+In Angular, the children function is the elements you write inside `flowMiniMap`, reading
+`#map="flowMiniMap"`'s `map.state().view`; with no element written, it draws a node per node and
+the mask.
 
 </Framework>
 

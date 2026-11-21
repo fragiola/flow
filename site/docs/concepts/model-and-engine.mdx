@@ -105,6 +105,42 @@ const viewport = useViewport();
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="zoom-readout.ts"
+import { Component, computed } from "@angular/core";
+import { injectFlow, injectViewport } from "@fragiola/flow-angular";
+
+// rendered inside [flowRoot]
+@Component({
+    selector: "app-zoom-readout",
+    template: `
+        <button type="button" [disabled]="!canReset()" (click)="reset()">
+            {{ percent() }}%
+        </button>
+    `,
+})
+export class ZoomReadout {
+    private readonly flow = injectFlow();
+    // a signal that follows the view: what reads it updates when the zoom changes
+    private readonly viewport = injectViewport();
+    protected readonly percent = computed(() => Math.round(this.viewport().zoom * 100));
+    // `engine.can` reads no signal of its own: compute it from the viewport it depends on
+    protected readonly canReset = computed(
+        () => this.viewport() && this.flow.engine.can("zoom-to", { zoom: 1 }),
+    );
+
+    protected reset(): void {
+        this.flow.engine.run("zoom-to", { zoom: 1 });
+    }
+}
+```
+
+In Angular, engine state reaches a template through a signal: `engine.can(…)` read alone in a
+template never updates, so compute it from `injectViewport()` (or a part's `state()`).
+
+</Framework>
+
 ## Events, not text
 
 `engine.subscribe` hears what happened on screen: `viewport-change`, `drag-start`, `nodes-move`,
@@ -116,10 +152,10 @@ controlled viewport.
 ## The engine's lifetime
 
 The root creates its engine once it is mounted (React: in a layout effect; Vue: in its
-`onMounted`; Svelte: in an `$effect`), and destroys it when it unmounts. Before that (the
+`onMounted`; Svelte: in an `$effect`; Angular: after its first render), and destroys it when it unmounts. Before that (the
 first render, a server render) there is no engine: nodes render at their model position, edges
 wait for their nodes' sizes. The `engine` `useFlow()` returns is there from the first render (Vue: from
-`setup`; Svelte: from the component's script) all the same: before the mount, an action is refused and a read is empty.
+`setup`; Svelte: from the component's script; Angular: from `injectFlow()`) all the same: before the mount, an action is refused and a read is empty.
 
 The engine never touches the global `document` or `window`: it uses its root element's owner
 document and window (its `ResizeObserver`, its microtasks). The model never touches the DOM at
@@ -165,6 +201,24 @@ it("refuses an edge to the same node", () => {
 
 ```ts title="rules.test.ts"
 import { createFlowModel } from "@fragiola/flow-svelte";
+import { expect, it } from "vitest";
+
+it("refuses an edge to the same node", () => {
+    const model = createFlowModel(json);
+    model.use(rules);
+    expect(model.check("edge.add", { source: "a", target: "a" })).toMatchObject({
+        ok: false,
+        error: { code: "vetoed" },
+    });
+});
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="rules.test.ts"
+import { createFlowModel } from "@fragiola/flow-angular";
 import { expect, it } from "vitest";
 
 it("refuses an edge to the same node", () => {

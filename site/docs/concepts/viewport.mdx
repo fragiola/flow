@@ -115,6 +115,40 @@ alone is not evaluated again when the view changes. `Flow.ZoomIn`, `Flow.ZoomOut
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="view-buttons.ts"
+import { Component, input } from "@angular/core";
+import { FLOW, injectFlow } from "@fragiola/flow-angular";
+
+// rendered inside [flowRoot]
+@Component({
+    selector: "app-view-buttons",
+    imports: [FLOW],
+    template: `
+        <div data-flow-no-gesture class="absolute top-2 left-2 flex gap-1">
+            <button type="button" (click)="flow.engine.run('fit-view', { padding: 0.2 })">Fit</button>
+            <button type="button" (click)="flow.engine.run('fit-view', { nodeIds: [nodeId()], maxZoom: 1.5 })">
+                Show the node
+            </button>
+            <button type="button" (click)="flow.engine.run('zoom-to', { zoom: 1 })">100%</button>
+            <!-- disabled at the limit: engine.can read through the directive's signal -->
+            <button flowZoomIn aria-label="Zoom in">Zoom in</button>
+        </div>
+    `,
+})
+export class ViewButtons {
+    readonly nodeId = input.required<string>();
+    protected readonly flow = injectFlow();
+}
+```
+
+The engine holds no signal: a template that reads `engine.can(…)` alone is not checked again when
+the view changes. `flowZoomIn`, `flowZoomOut` and `flowFitView` are (their `state()` signals), and
+`injectViewport()` follows the view.
+
+</Framework>
+
 | action | payload |
 | --- | --- |
 | `set-viewport` | `{ x?, y?, zoom? }` |
@@ -168,11 +202,22 @@ function onDrop(event: DragEvent): void {
 
 </Framework>
 
+<Framework name="angular">
+
+```ts
+function onDrop(event: DragEvent): void {
+    const point = engine.get("screen-to-flow", { x: event.clientX, y: event.clientY });
+    model.run("node.add", { type: "task", position: point, data: { title: "New task", done: false } });
+}
+```
+
+</Framework>
+
 ## Reading it
 
 `useViewport()` re-renders a component when the viewport changes (a zoom readout);
 `engine.get("viewport")` reads it once. `onViewportChange(viewport, gesture)` on the root (Vue:
-`@update:viewport`; Svelte: `onviewportchange`) hears every change, with `gesture` true for a pan, a zoom or a pinch by the user.
+`@update:viewport`; Svelte: `onviewportchange`; Angular: `(viewportMove)`) hears every change, with `gesture` true for a pan, a zoom or a pinch by the user.
 
 ## Controlled or not
 
@@ -229,7 +274,36 @@ In Svelte, `viewport` + `onViewportChange` is `bind:viewport`, or `viewport` wit
 
 </Framework>
 
-Neither React, Vue nor Svelte renders the viewport's transform: the engine writes it on `Flow.Viewport`'s element
+<Framework name="angular">
+
+```ts
+import { Component, signal } from "@angular/core";
+import { FLOW, type Viewport, type ViewportMoveEvent } from "@fragiola/flow-angular";
+
+@Component({
+    selector: "app-controlled-viewport",
+    imports: [FLOW],
+    template: `
+        <div flowRoot [(viewport)]="viewport" (viewportMove)="moved($event)" [defaultNodes]="nodes" class="h-96">…</div>
+    `,
+})
+export class ControlledViewport {
+    protected readonly nodes = nodes;
+    protected readonly viewport = signal<Viewport>({ x: 0, y: 0, zoom: 1 });
+
+    protected moved({ viewport, gesture }: ViewportMoveEvent): void {
+        if (gesture) console.log("moved by the user", viewport);
+    }
+}
+```
+
+In Angular, `viewport` + `onViewportChange` is `[(viewport)]`, and `(viewportMove)` hears the
+`gesture` flag too (`{ viewport, gesture }`). A bound output checks your component's template on
+every pan step: read the viewport with `injectViewport()` where you only show it.
+
+</Framework>
+
+Neither React, Vue, Svelte nor Angular renders the viewport's transform: the engine writes it on `Flow.Viewport`'s element
 itself, so a pan re-renders only what shows the viewport (the background, the minimap, toolbars,
 the zoom buttons), never the nodes.
 

@@ -55,6 +55,22 @@ string or a record; its `children` snippet gets `{ state }`.
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div [flowNode]="node">
+    {{ node.data.label }}
+    <div flowHandle type="target" side="left" title="Input" class="size-2 rounded-full bg-gray-500"></div>
+    <div flowHandle type="source" side="right" handleId="ok" style="top: 30%"></div>
+    <div flowHandle type="source" side="right" handleId="error" [style.top]="'70%'"></div>
+</div>
+```
+
+In Angular, the inputs are React's props (`handleId`, `nodeId`, `[connectable]="false"`) on your
+element; its state is the `state()` signal (`#h="flowHandle"`).
+
+</Framework>
+
 It sits at the middle of its side by default (a default your `style` overrides: several handles on
 one side are placed by you). A handle without `handleId` is the node's default handle of its type.
 Sides are physical (`top`, `right`, `bottom`, `left`): a diagram does not flip in right-to-left.

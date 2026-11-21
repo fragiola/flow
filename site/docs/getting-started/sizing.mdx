@@ -41,6 +41,16 @@ A fixed height:
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div flowRoot [defaultNodes]="nodes" class="h-[600px] w-full">
+    …
+</div>
+```
+
+</Framework>
+
 Or the room a parent leaves, in a flex or grid layout (the `min-h-0` lets a flex child shrink
 below its content):
 
@@ -85,6 +95,31 @@ export function EditorPage() {
         …
     </Flow.Root>
 </div>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="editor-page.ts"
+import { Component } from "@angular/core";
+import { FLOW } from "@fragiola/flow-angular";
+
+@Component({
+    selector: "app-editor-page",
+    imports: [FLOW],
+    template: `
+        <div class="flex h-dvh flex-col">
+            <header class="h-12 border-b">Workflow</header>
+            <div flowRoot [defaultNodes]="nodes" class="min-h-0 flex-1">
+                …
+            </div>
+        </div>
+    `,
+})
+export class EditorPage {
+    protected readonly nodes = nodes;
+}
 ```
 
 </Framework>
@@ -152,6 +187,18 @@ A bare `fitView` attribute is `fitView={true}`.
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div flowRoot [defaultNodes]="nodes" [fitView]="{ padding: 0.2, maxZoom: 1 }" class="h-96">
+    …
+</div>
+```
+
+A bare `fitView` attribute is `[fitView]="true"`.
+
+</Framework>
+
 Later, fit again from code with `engine.run("fit-view")`, or with a `Flow.FitView` button
 ([The viewport](/docs/concepts/viewport)).
 
@@ -197,6 +244,19 @@ block. A panel of your own marks itself `data-flow-no-gesture` (presses on it st
         …
     </aside>
 </Flow.Root>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowRoot [defaultNodes]="nodes" class="relative h-96">
+    <div flowViewport>…</div>
+    <aside data-flow-no-gesture data-flow-no-wheel class="absolute top-2 right-2 w-56 overflow-auto">
+        …
+    </aside>
+</div>
 ```
 
 </Framework>

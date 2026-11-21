@@ -132,6 +132,25 @@ const issues = validateFlow(json, { features });
 
 </Framework>
 
+<Framework name="angular">
+
+```ts
+import { createFlowModel, FlowValidationError, validateFlow } from "@fragiola/flow-angular";
+
+try {
+    const model = createFlowModel<Types, typeof features>(json, { features });
+} catch (error) {
+    if (error instanceof FlowValidationError) {
+        for (const issue of error.issues) console.warn(issue.path, issue.message);
+    }
+}
+
+// or, without throwing: every problem with its JSON path, none for a valid document
+const issues = validateFlow(json, { features });
+```
+
+</Framework>
+
 `model.get("flow-json")` gives the document back as a writable copy, every id present: it loads
 again into `createFlowModel` unchanged. See [Flow JSON](/docs/api/json-document).
 
@@ -148,7 +167,7 @@ model.is("node-deletable", { nodeId: "fetch" });
 
 In a component under the root, `useNodes()` and `useEdges()` re-render on every change, and
 `useSelection()` when the selection changes (in Vue, computed refs that change then; in Svelte,
-their `current`) ([Hooks](/docs/api/primitives/hooks)).
+their `current`; in Angular, signals) ([Hooks](/docs/api/primitives/hooks)).
 
 ## Controlled or not
 
@@ -213,6 +232,33 @@ In Svelte, `nodes` + `onNodesChange` is `bind:nodes` (and `bind:edges`), or `nod
 `onnodeschange`: the root writes the model's list back after every change. Assign a new list
 (`nodes = [...nodes, node]`): a list mutated in place (`push`) keeps its identity and is not
 synced, as in React.
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+import { Component, signal } from "@angular/core";
+import { FLOW, type FlowNode } from "@fragiola/flow-angular";
+
+@Component({
+    selector: "app-controlled",
+    imports: [FLOW],
+    template: `<div flowRoot [features]="features" [(nodes)]="nodes" [defaultEdges]="edges">…</div>`,
+})
+export class Controlled {
+    protected readonly features = features;
+    protected readonly edges = edges;
+    // the model's lists are frozen: a signal holds them as they are
+    protected readonly nodes = signal<readonly FlowNode<Types>[]>(initialNodes);
+}
+```
+
+In Angular, `nodes` + `onNodesChange` is `[(nodes)]` (and `[(edges)]`), or `[nodes]` with
+`(nodesChange)`: the root emits the model's list after every change. Set a new list
+(`nodes.set([...nodes(), node])`). A bound output checks your component's whole template on every
+emit (each drag step): bind it where you need the list, and read it with `injectNodes()` or the
+flow ref otherwise.
 
 </Framework>
 

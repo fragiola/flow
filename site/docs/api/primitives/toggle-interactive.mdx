@@ -63,6 +63,23 @@ React's `render` does.
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<button flowToggleInteractive #lock="flowToggleInteractive" aria-label="Lock the flow">
+    @if (lock.state().interactive) {
+        <svg lucideLockOpen aria-hidden="true"></svg>
+    } @else {
+        <svg lucideLock aria-hidden="true"></svg>
+    }
+</button>
+```
+
+In Angular, the button is yours and its state is the `state()` signal, through its `exportAs`
+(`#lock="flowToggleInteractive"`), so the icon switches without replacing the button.
+
+</Framework>
+
 The root's `interactive` prop sets the same lock from your state; a root whose `interactive` does
 not change leaves the toggle's lock alone.
 
