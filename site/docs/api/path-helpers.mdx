@@ -6,7 +6,8 @@ description: The edge path functions the engine draws with, bezier, smooth step,
 The engine draws the built-in edge types (`bezier`, `smoothstep`, `step`, `straight`) with four
 pure functions, exported so an app can draw its own edge types from the same geometry. Each takes
 the two ends (and, for the curved and orthogonal ones, the sides they leave and enter by) and
-returns a `PathResult`: the SVG path data and the point a label goes at, halfway along the path.
+returns a `PathResult`: the SVG path data and the point a label goes at, in the middle of the path (a bezier's at its
+parameter t = 0.5, the others halfway along their length).
 They are written from the geometry (no code is ported from another library) and tested on known
 points.
 
@@ -91,7 +92,7 @@ straight line, so it takes the points only.
 | field | type | description |
 | --- | --- | --- |
 | `path` | `string` | the SVG path data, for a `path` element's `d` |
-| `label` | `XY` | where a label goes: halfway along the path, in flow coordinates |
+| `label` | `XY` | where a label goes, in flow coordinates: a bezier's point at t = 0.5, halfway along the length for the others |
 
 `EdgePath` is both: what `"edge-path-by"` returns for an edge. `HandleSide` is
 `"top" | "right" | "bottom" | "left"`: physical diagram directions (x to the right, y down) that

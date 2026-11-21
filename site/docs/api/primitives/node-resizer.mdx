@@ -4,24 +4,37 @@ description: NodeResizer holds the resize handles of a node, with that node's ow
 ---
 
 `NodeResizer` comes from `@fragiola/flow-react/resize`, with the `resize()` feature it needs. It
-goes inside `Flow.Node` and renders a box over the node holding its `ResizeHandle`s: by default
+must be rendered inside its node's element (`Flow.Node`): the engine finds the node a press
+resizes from the DOM, the closest node part, and `nodeId` only names the node for the state and
+the limits. It and renders a box over the node holding its `ResizeHandle`s: by default
 one at each corner and side. A drag on a handle resizes the node (`node.resize`, transient steps
 then a final one), within this node's limits, which override `resize()`'s
-(`engine.adapter.setPartOptions("resizer", nodeId, …)`). In a sub-flow, a child stays inside its
-parent and a parent never shrinks past its children. Render it only when the node should be
+(`engine.adapter.setPartOptions("resizer", nodeId, …)`). In a sub-flow, a child with `extent: "parent"`
+stays inside its parent, and a parent never shrinks past its `extent: "parent"` children. Render it only when the node should be
 resizable (while it is selected, say).
 
 <Example id="node-resizer" />
 
-```tsx
+```tsx title="resizable-node.tsx"
+import { Flow, type FlowNode, type FlowTypes } from "@fragiola/flow-react";
+import { drag } from "@fragiola/flow-react/drag";
 import { NodeResizer, resize } from "@fragiola/flow-react/resize";
+import { selection } from "@fragiola/flow-react/selection";
 
-const features = [selection(), drag(), resize({ minWidth: 80, minHeight: 60 })] as const;
+interface Types extends FlowTypes {
+    readonly nodes: { note: { label: string } };
+}
 
-<Flow.Node<Types> node={node} className="relative">
-    {node.data.label}
-    {node.selected && <NodeResizer minWidth={120} maxWidth={360} keepAspectRatio={false} />}
-</Flow.Node>;
+export const features = [selection(), drag(), resize({ minWidth: 80, minHeight: 60 })] as const;
+
+export function ResizableNode({ node }: { node: FlowNode<Types> }) {
+    return (
+        <Flow.Node<Types> node={node} className="relative">
+            {node.data.label}
+            {node.selected && <NodeResizer minWidth={120} maxWidth={360} keepAspectRatio={false} />}
+        </Flow.Node>
+    );
+}
 ```
 
 ## Props
@@ -31,7 +44,7 @@ every `div` attribute.
 
 | prop | type | default | description |
 | --- | --- | --- | --- |
-| `nodeId` | `string` | the enclosing `Flow.Node`'s | its node |
+| `nodeId` | `string` | the enclosing `Flow.Node`'s | the node its state and its limits name (the node a press resizes is the one it is rendered in) |
 | `minWidth` | `number` | `resize()`'s (`10`) | this node's smallest width, in flow units |
 | `minHeight` | `number` | `resize()`'s (`10`) | this node's smallest height |
 | `maxWidth` | `number` | `resize()`'s (none) | this node's largest width |

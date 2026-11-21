@@ -19,7 +19,7 @@ any element:
 <Flow.Root<Types, typeof features>
     features={features}
     defaultNodes={nodes}
-    role="application"
+    role="group"
     aria-label="Delivery workflow"
     className="h-96"
 >
@@ -49,8 +49,9 @@ any element:
 </Flow.Root>
 ```
 
-Write the roles and names your app's language and your users need; the snippet is the
-`announcements` example's choice, not a rule.
+Write the roles and names your app's language and your users need: the nodes' and edges' roles
+are the `announcements` example's choice, the root's name is this page's suggestion, and neither
+is a rule.
 
 ## Name the buttons
 

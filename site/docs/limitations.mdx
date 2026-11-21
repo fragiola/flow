@@ -16,7 +16,7 @@ something missing from this page? [Open an issue](https://github.com/fragiola/fl
 | **Auto-pan**: the viewport scrolls while a node or a connection is dragged near the root's edge. | The viewport stays still during a gesture. | Zoom out first, or pan with the wheel or the minimap while you work. |
 | **Animated viewport changes** (`duration` on `fitView`, `setCenter`, `zoomIn`). | Every viewport action applies at once. | Animate it yourself: run `set-viewport` from `requestAnimationFrame` steps between two viewports. |
 | **Raising nodes and edges** (`zIndex`, `elevateNodesOnSelect`, `elevateEdgesOnSelect`). | Nodes are drawn in document order, edges below every node. | Order `nodes` in the document, or set `z-index` on a node in your style (from `data-selected`). |
-| **A toolbar for several nodes** (`NodeToolbar` with a list of node ids). | `Flow.NodeToolbar` stands next to one node. | Render one per node, or place your own panel at `engine.get("nodes-bounds", { nodeIds })` through `flow-to-screen`. |
+| **A toolbar for several nodes** (`NodeToolbar` with a list of node ids). | `Flow.NodeToolbar` stands next to one node. | Render one per node, or place your own panel at `engine.get("nodes-bounds", { nodeIds })` through `flow-to-screen` (client points: subtract the root's client rect for a panel inside the root). |
 | **Keyboard connections and resizing.** | Drawing an edge and resizing a node are pointer gestures. | Offer commands: a menu that runs `edge.add` between two chosen nodes, fields that run `node.resize` (see [Keyboard and accessibility](/docs/guides/keyboard)). |
 | Vue, Svelte and Angular adapters. | React only. | They come with their own releases, over the same core and the same examples. |
 

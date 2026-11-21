@@ -7,7 +7,8 @@ description: Flow.Handle is a connection point on a side of its node, registered
 with the engine, which measures its centre relative to its node: an edge naming this handle
 (`sourceHandle`, `targetHandle`) starts or ends at that centre, leaving or entering by its `side`.
 With `connection()`, a press on it draws a connection; while one is drawn it says whether the
-drop here would be accepted (`data-valid`, `data-invalid`, from `model.can("edge.add", …)`).
+drop here would be accepted (`data-valid`, `data-invalid`, from `model.can("edge.add", …)`, or
+`model.can("edge.reconnect", …)` while an edge's end is moved).
 
 ```tsx
 <Flow.Node<Types> node={node}>

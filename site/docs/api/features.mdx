@@ -7,7 +7,9 @@ The core holds the document, nodes, edges, handles, the viewport, measurement, e
 `fit-view`. Everything else is an opt-in feature: a factory on its own entry, installed on the
 model once, when it is created. A flow that never imports a feature ships none of its code (the
 build's bundle guard checks the main entry imports none), and a command, key or document field of
-a feature that is not installed is a type error and a runtime refusal that names the feature. The
+a feature that is not installed is a type error; at run time its command returns `not_found` and
+a document field is a validation issue, both naming the feature, while its `get` and `is` keys
+answer `undefined` and `false`. The
 concept is on [Features](/docs/concepts/features).
 
 ```tsx
@@ -39,8 +41,8 @@ factory returns a frozen object with its resolved `options`.
 ## `selection()`
 
 `selection(options?)` from `@fragiola/flow-react/selection` returns a `SelectionFeature`: clicking
-selects a node or an edge, a modifier click adds to the selection, Shift + drag on the pane draws a
-selection box. It owns the `selected` field of nodes and edges, the commands `selection.set`,
+selects a node or an edge (replacing the selection), a modifier click toggles it in the selection,
+a plain click on the pane clears it, and Shift + drag on the pane draws a selection box. It owns the `selected` field of nodes and edges, the commands `selection.set`,
 `selection.clear` and `selection.remove`, the keys `"selected-nodes"`, `"selected-edges"`,
 `"node-selected"`, `"edge-selected"`, and on the engine `"selection-box"` and `"box-selecting"`.
 
@@ -49,7 +51,7 @@ selection box. It owns the `selected` field of nodes and edges, the commands `se
 | option | type | default | description |
 | --- | --- | --- | --- |
 | `boxMode` | `BoxSelectionMode` | `"full"` | a box takes the nodes it holds whole (`"full"`) or those it touches (`"partial"`), with the edges between them |
-| `multiple` | `boolean` | `true` | a modifier click (Ctrl / Cmd, Shift) adds to the selection |
+| `multiple` | `boolean` | `true` | a modifier click (Ctrl / Cmd, Shift) toggles the item in the selection (adds it, or removes a selected one) |
 | `boxOnDrag` | `boolean` | `false` | any drag on the pane draws a box (instead of panning); otherwise Shift + drag |
 
 ## `drag()`

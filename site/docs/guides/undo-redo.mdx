@@ -15,24 +15,51 @@ costs nothing.
 ## Copy the history
 
 The example's `_kit/undo.ts` is a complete history you can copy and change freely (open it in the
-example's code panel). Its core is a listener and a restore:
+example's code panel). It never imports the package: it describes the few members of the model it
+uses, so any model fits, typed by your registry or not. Its core is a listener and a restore:
 
-```ts title="undo.ts"
-import type { CommandEvent, FlowDocument, FlowModel } from "@fragiola/flow-react";
+```ts title="undo.ts (its core)"
+/** The part of a document the history keeps (the model's documents fit). */
+interface DocumentLike {
+    readonly nodes: readonly object[];
+    readonly edges: readonly object[];
+}
+
+/** The members of a model the history uses: any `FlowModel`, typed or not, fits. */
+interface HistoryModel {
+    subscribe(
+        listener: (event: {
+            readonly command: string;
+            readonly before: DocumentLike;
+            readonly after: DocumentLike;
+            readonly transient: boolean;
+            readonly meta: Readonly<Record<string, unknown>> | undefined;
+        }) => void,
+    ): () => void;
+    get(
+        key: "commands-to",
+        payload: { nodes: readonly never[]; edges: readonly never[] },
+    ): readonly unknown[];
+    run(
+        command: "batch",
+        payload: { commands: never[] },
+        options: { meta: Readonly<Record<string, unknown>> },
+    ): { readonly ok: boolean };
+}
 
 /** What the history runs itself: it records none of it. */
 const UNDO_META = Object.freeze({ undo: true });
 /** Commands that make no step: a selection is not an edit. */
 const IGNORE = ["selection.set", "selection.clear"];
 
-export function createUndoHistory(model: FlowModel) {
-    const undos: FlowDocument[] = [];
-    const redos: FlowDocument[] = [];
-    let last: FlowDocument | undefined; // the document before the step under way
-    let present: FlowDocument | undefined;
+export function createUndoHistory(model: HistoryModel) {
+    const undos: DocumentLike[] = [];
+    const redos: DocumentLike[] = [];
+    let last: DocumentLike | undefined; // the document before the step under way
+    let present: DocumentLike | undefined;
     let inGesture = false;
 
-    const stop = model.subscribe((event: CommandEvent) => {
+    const stop = model.subscribe((event) => {
         present = event.after;
         if (event.meta?.undo === true || event.before === event.after) return;
         last ??= event.before;
@@ -51,13 +78,16 @@ export function createUndoHistory(model: FlowModel) {
     });
 
     /** Brings the model to `target` as one step; says whether it could. */
-    function restore(target: FlowDocument): boolean {
-        const commands = model.get("commands-to", { nodes: target.nodes, edges: target.edges });
+    function restore(target: DocumentLike): boolean {
+        const commands = model.get("commands-to", {
+            nodes: target.nodes as never[],
+            edges: target.edges as never[],
+        });
         if (commands.length === 0) return true;
-        return model.run("batch", { commands: [...commands] }, { meta: UNDO_META }).ok;
+        return model.run("batch", { commands: commands as never[] }, { meta: UNDO_META }).ok;
     }
 
-    function swap(from: FlowDocument[], to: FlowDocument[]): boolean {
+    function swap(from: DocumentLike[], to: DocumentLike[]): boolean {
         const document = from.pop();
         if (!document || !present) return false;
         const now = present;
@@ -80,11 +110,13 @@ export function createUndoHistory(model: FlowModel) {
 ```
 
 The kit's version adds a step limit, the list of steps (for a history panel), a snapshot for
-`useSyncExternalStore` and the keyboard shortcuts.
+`useSyncExternalStore` (`subscribe`, `getSnapshot`), the `UndoHistory` type and the keyboard
+shortcuts (`handleUndoKeys`): copy the whole file as `undo.ts` to use the editor below.
 
 ## What one step is
 
-- **A drag** moves its nodes with transient `node.move` commands and ends with a final one: the
+- **A drag** moves its nodes with transient `node.move` commands (a `batch` of them for several
+  nodes) and ends with a final one: the
   history records the final one only, with the document from before the drag. A resize too.
 - **A connection** is one `edge.add`; **a reconnection** one `edge.reconnect`.
 - **Delete** runs `selection.remove`: the selected nodes, their edges and their children, in one

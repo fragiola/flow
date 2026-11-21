@@ -1,13 +1,14 @@
 ---
 title: Root
-description: Flow.Root holds the model and the engine of one flow, takes its nodes and edges controlled or uncontrolled, and fills the element you size.
+description: Flow.Root holds the model and the engine of one flow, takes its nodes and edges controlled or uncontrolled. Give it a size, and the flow fills it.
 ---
 
 `Flow.Root` is the flow. It owns the model (or takes yours with `model`), creates the engine once
 it is mounted, and attaches the engine to its element: the engine listens to the root itself
 (pointer, wheel, keys, focus), so no event is forwarded by React. It renders a `div` with only your
-children, no role and no name; no Provider is needed above it. It fills the element you give a
-size (see [Sizing the root](/docs/getting-started/sizing)).
+children, no role and no name; no Provider is needed above it. Its only structural style is
+`position: relative; overflow: hidden`: give it a size, and the flow fills it (see
+[Sizing the root](/docs/getting-started/sizing)).
 
 ```tsx
 import { Flow, type FlowEdgeInput, type FlowNodeInput, type FlowTypes } from "@fragiola/flow-react";
@@ -130,7 +131,7 @@ through `engine.adapter.setOptions`).
 | attribute | value |
 | --- | --- |
 | `data-flow-part` | `"root"` |
-| `data-interactive` | present while gestures may change the flow |
+| `data-interactive` | present while gestures may change the flow; absent before the engine exists (the first render, a server render), while `state.interactive` is already true |
 | `data-panning` | present while panning |
 | `data-dragging` | present while nodes are dragged (`drag()`) |
 | `data-connecting` | present while a connection is drawn (`connection()`) |

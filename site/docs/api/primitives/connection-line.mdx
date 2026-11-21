@@ -7,8 +7,8 @@ description: Flow.ConnectionLine draws the connection under way from a handle, a
 while a connection is drawn (`connection()`): from the handle it started at to the pointer, or to
 the handle it snaps to within `connection({ radius })`. By default it draws an unfilled `path` of
 the connection's path; a children function draws your own. Its `data-valid` / `data-invalid` say
-whether the drop would add the edge (`model.can("edge.add", …)`: a middleware's veto makes it
-invalid).
+whether the drop would be accepted (`model.can("edge.add", …)`, or `model.can("edge.reconnect", …)`
+while an edge's end is moved: a middleware's veto makes it invalid).
 
 ```tsx
 <Flow.Viewport>
@@ -43,7 +43,7 @@ and every SVG attribute of an `svg` but `children`.
 | field | type | description |
 | --- | --- | --- |
 | `connection` | `Connection` | the connection being drawn ([engine reads](/docs/api/engine)) |
-| `valid` | `boolean` | the drop would add the edge |
+| `valid` | `boolean` | the drop would be accepted (the edge added, or reconnected) |
 | `invalid` | `boolean` | the drop would be refused |
 
 ## Data attributes

@@ -36,7 +36,7 @@ const features = [selection(), drag()] as const;
 | option | default | does |
 | --- | --- | --- |
 | `boxMode` | `"full"` | a box takes the nodes it holds whole (`"full"`) or every node it touches (`"partial"`) |
-| `multiple` | `true` | a modifier click adds to the selection; `false`: a click always selects one |
+| `multiple` | `true` | a modifier click toggles the item in the selection; `false`: a click always selects one |
 | `boxOnDrag` | `false` | any drag on the canvas draws a box, instead of Shift + drag (the canvas then never pans by dragging) |
 
 ```ts

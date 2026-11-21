@@ -14,7 +14,8 @@ package only asks them.
 
 ## The built-in rules
 
-Before your middleware sees anything, the model refuses what no flow allows:
+Whatever your middleware decides, `next()` still refuses what no flow allows (your middleware sees
+the command first: a veto there returns `vetoed` before any of these is `refused`):
 
 - a node that is not connectable (`connectable: false`); a `Flow.Handle` with
   `connectable={false}` never starts or ends a connection either;
@@ -40,7 +41,7 @@ import { selection } from "@fragiola/flow-react/selection";
 
 type Port = "number" | "text";
 
-interface Types extends FlowTypes {
+export interface Types extends FlowTypes {
     readonly nodes: { block: { label: string; inputs: Port[]; outputs: Port[] } };
 }
 
@@ -90,7 +91,7 @@ Create the model yourself, once, add the middleware, and hand the model to the r
 ```tsx
 import { createFlowModel, Flow, type FlowJson, type FlowModel } from "@fragiola/flow-react";
 import { useState } from "react";
-import { connectionRules, features } from "./connection-rules";
+import { connectionRules, features, type Types } from "./connection-rules";
 
 export function Pipeline({ json }: { json: FlowJson<Types> }) {
     const [model] = useState<FlowModel<Types, typeof features>>(() => {

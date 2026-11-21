@@ -134,8 +134,8 @@ says the nodes changed, and keeping a document for undo costs nothing.
 
 ## Transient steps and batches
 
-A drag moves its nodes with **transient** `node.move` commands, one per pointer move, and ends with
-a final one that is not: a listener that saves or records history skips the transient ones. Pass
+A drag moves its nodes with **transient** `node.move` commands (a `batch` of them when several
+nodes move), one per pointer move, and ends with a final one that is not: a listener that saves or records history skips the transient ones. Pass
 `{ transient: true }` yourself for the steps of a gesture of your own.
 
 `batch` runs several commands as one, all or nothing, with one event:

@@ -20,7 +20,7 @@ The core's viewport needs no feature. On the root:
 | wheel | zooms around the pointer | `zoomOnScroll` (`true`) |
 | wheel, with `panOnScroll` | pans (Ctrl and the wheel zoom) | `panOnScroll` (`false`) |
 | two-finger pinch, trackpad pinch | zooms | `zoomOnPinch` (`true`) |
-| double click on the pane | zooms in by a step | `zoomOnDoubleClick` (`true`) |
+| double click on the pane | doubles the zoom around the pointer | `zoomOnDoubleClick` (`true`) |
 
 The zoom stays within `minZoom` (0.5) and `maxZoom` (2); `zoomStep` (1.2) is the factor of one
 step; `translateExtent`, a flow rectangle, keeps the view inside it. Every one of these props

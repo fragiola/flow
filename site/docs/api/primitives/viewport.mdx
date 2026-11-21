@@ -44,8 +44,8 @@ every `div` attribute.
 | --- | --- | --- |
 | `viewport` | `Viewport` | the pan (`x`, `y`, pixels) and the zoom |
 
-A `className` or `style` function of the viewport re-renders the element on every pan step; the
-engine's transform does not need it.
+The viewport element itself re-renders on every viewport change (it reads `useViewport` for its
+state), while its children do not: the engine writes the transform, so nodes and edges stay put.
 
 ## Data attributes
 

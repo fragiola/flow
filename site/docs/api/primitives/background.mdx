@@ -30,7 +30,7 @@ every SVG attribute of an `svg` but `children` and `offset`.
 | --- | --- | --- | --- |
 | `variant` | `BackgroundVariant` | `"dots"` | the marks: `"dots"`, `"lines"` or `"cross"` |
 | `gap` | `number \| readonly [number, number]` | `20` | the distance between two marks, in flow units (`[x, y]` for two) |
-| `size` | `number` | the variant's | a dot's diameter, or a cross's arm length, in flow units |
+| `size` | `number` | 1 (dots, lines), 6 (cross) | `dots`: a dot's diameter, in flow units; `lines`: the stroke width, in screen pixels (not scaled by the zoom); `cross`: the length of each bar (an arm is half of it), in flow units |
 | `offset` | `number \| readonly [number, number]` | `0` | the pattern's shift from the flow's origin, in flow units |
 
 ## State

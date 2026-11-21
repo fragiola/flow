@@ -3,7 +3,9 @@ title: ResizeHandle
 description: ResizeHandle is a grab area on a corner or a side of a node; a press on it resizes the node from there, with resize() installed.
 ---
 
-`ResizeHandle` comes from `@fragiola/flow-react/resize` and goes inside `NodeResizer`. A press on it
+`ResizeHandle` comes from `@fragiola/flow-react/resize` and goes inside `NodeResizer`, inside its
+node's element: the engine finds the node a press resizes from the DOM (the closest node part),
+and `nodeId` only names the node in the state. A press on it
 resizes its node from its `position`, a `ResizePosition`: a corner (`top-left`, `top-right`,
 `bottom-right`, `bottom-left`) moves both dimensions, a side (`top`, `right`, `bottom`, `left`)
 one. A corner is centred on its corner and sits above the two sides it joins; a side spans its
@@ -32,7 +34,7 @@ every `div` attribute.
 | prop | type | default | description |
 | --- | --- | --- | --- |
 | `position` | `ResizePosition` | required | the corner or side it moves |
-| `nodeId` | `string` | the enclosing `Flow.Node`'s | its node |
+| `nodeId` | `string` | the enclosing `Flow.Node`'s | the node its state names (the node a press resizes is the one it is rendered in) |
 | `children` | `ReactNode` | none | its content |
 
 ## State

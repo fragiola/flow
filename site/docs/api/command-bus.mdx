@@ -65,7 +65,7 @@ Nothing on the bus throws on bad input. A `CommandResult<R>` is `{ ok: true, val
 | `invalid_payload` | the payload does not match the command's schema, or names a field of a feature that is not installed |
 | `not_found` | a node or edge the payload names does not exist, or the command's feature is not installed (the message names it) |
 | `refused` | a rule of the flow forbids it: a permission flag, a duplicate edge, a parent cycle, a command issued during a dry run |
-| `vetoed` | a middleware returned `veto()` or another failure |
+| `vetoed` | a middleware returned `veto()`, or returned nothing without calling `next()` (another failure a middleware returns keeps its own code) |
 | `queued` | it was issued from a middleware while another command ran: it runs after that one |
 | `middleware_error` | a middleware threw |
 

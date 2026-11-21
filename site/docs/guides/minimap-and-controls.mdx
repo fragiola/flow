@@ -45,7 +45,7 @@ import { LockIcon, MaximizeIcon, MinusIcon, PlusIcon, UnlockIcon } from "lucide-
 | `Flow.ZoomIn` | `zoom-in` (a step of `zoomStep`, default 1.2, around the root's centre) | at `maxZoom` |
 | `Flow.ZoomOut` | `zoom-out` | at `minZoom` |
 | `Flow.FitView` | `fit-view` (every node in view) | before a node is measured |
-| `Flow.ToggleInteractive` | `set-interactive` | never; `aria-pressed` while the flow is locked |
+| `Flow.ToggleInteractive` | `set-interactive` | only before the root is mounted (no engine yet); `aria-pressed` while the flow is locked |
 
 A disabled button has `disabled` and `data-disabled`: style it with `disabled:opacity-40`. While
 locked, gestures and keys change nothing (no drag, no connection, no selection, no Delete), and

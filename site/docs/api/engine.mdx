@@ -125,9 +125,9 @@ take and give client points (a pointer's `clientX` / `clientY`, a drop's).
 | `"handles-by"` | `{ nodeId }` | a node's registered handles (`FlowHandle[]`), with their centres |
 | `"background-pattern"` | `BackgroundPatternPayload` | one tile of a background pattern at the current viewport |
 | `"node-toolbar-by"` | `NodeToolbarPayload` | where a node's toolbar goes, outside the zoom |
-| `"selection-box"` | none | the box being drawn (a root-relative `SelectionBox`), or null (`selection()`) |
+| `"selection-box"` | none | the box being drawn (a root-relative `SelectionBox`), or null (`selection()`; `undefined` without it) |
 | `"dragging-node-ids"` | none | the nodes being dragged (`drag()`) |
-| `"connection"` | none | the `Connection` being drawn, or null (`connection()`) |
+| `"connection"` | none | the `Connection` being drawn, or null (`connection()`; `undefined` without it) |
 | `"minimap-view"` | `{ width, height }` | what a minimap of that many pixels draws (`minimap()`) |
 
 `BackgroundPatternPayload`:
@@ -136,7 +136,7 @@ take and give client points (a pointer's `clientX` / `clientY`, a drop's).
 | --- | --- | --- |
 | `variant` | `BackgroundVariant` | `"dots"` (default), `"lines"` or `"cross"` |
 | `gap` | `number \| [number, number]` | the distance between two marks, in flow units; default 20 |
-| `size` | `number` | a dot's diameter or a cross's arm length, in flow units; default 1 (dots), 6 (cross) |
+| `size` | `number` | `dots`: a dot's diameter, in flow units, default 1; `lines`: the stroke width in screen pixels (not scaled by the zoom), default 1; `cross`: each bar's length (an arm is half of it), in flow units, default 6 |
 | `offset` | `number \| [number, number]` | the pattern's shift from the flow's origin, in flow units; default 0 |
 
 `BackgroundPattern`, one tile for an SVG `pattern` with `patternUnits="userSpaceOnUse"`:
@@ -190,7 +190,7 @@ take and give client points (a pointer's `clientX` / `clientY`, a drop's).
 | `viewBox` | `Rect` | the SVG `viewBox`: the nodes and the view, fitted to the minimap's aspect |
 | `viewBoxAttribute` | `string` | `viewBox` as the attribute writes it |
 | `scale` | `number` | the flow units one minimap pixel stands for |
-| `nodes` | `{ nodeId, x, y, width, height }[]` | each visible node's box |
+| `nodes` | `{ nodeId, x, y, width, height }[]` | the box of every node shown (not hidden) and measured, in view or not |
 | `view` | `Rect` | what the root shows |
 | `maskPath` | `string` | the view box with the view cut out, for `fill-rule="evenodd"` |
 

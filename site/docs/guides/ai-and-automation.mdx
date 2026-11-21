@@ -37,7 +37,12 @@ Most tool-calling APIs take a name, a description and an input schema, so a comm
 tool one to one. Tool names are usually restricted to letters, digits, `_` and `-`, so the dots go:
 
 ```ts title="tools.ts"
-import type { CommandInfo, CommandName, FlowModel, JsonSchema } from "@fragiola/flow-react";
+import type { CommandInfo, CommandName, JsonSchema } from "@fragiola/flow-react";
+
+/** What the tools read of a model: any `FlowModel`, typed by your registry or not, fits. */
+interface CommandsModel {
+    get(key: "commands"): readonly CommandInfo[];
+}
 
 /** The provider-neutral shape: rename the fields to what your API expects. */
 interface ToolDefinition {
@@ -48,8 +53,8 @@ interface ToolDefinition {
 
 const toolName = (command: CommandName) => command.replaceAll(".", "_");
 
-export function toolsOf(model: FlowModel): ToolDefinition[] {
-    return model.get("commands").map((info: CommandInfo) => ({
+export function toolsOf(model: CommandsModel): ToolDefinition[] {
+    return model.get("commands").map((info) => ({
         name: toolName(info.name),
         description: info.description,
         input_schema: info.payloadSchema,
@@ -57,7 +62,7 @@ export function toolsOf(model: FlowModel): ToolDefinition[] {
 }
 
 /** The command a tool call names, back from its tool name. */
-export function commandOf(model: FlowModel, tool: string): CommandName | undefined {
+export function commandOf(model: CommandsModel, tool: string): CommandName | undefined {
     return model.get("commands").find((info) => toolName(info.name) === tool)?.name;
 }
 ```

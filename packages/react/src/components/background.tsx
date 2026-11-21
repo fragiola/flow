@@ -22,7 +22,7 @@ export interface BackgroundProps
     variant?: BackgroundVariant | undefined;
     /** the distance between two marks, in flow units; default 20 (`[x, y]` for two) */
     gap?: number | readonly [number, number] | undefined;
-    /** a dot's diameter, or a cross's arm length, in flow units */
+    /** dots: a dot's diameter (flow units); lines: the stroke width (screen pixels); cross: a bar's length */
     size?: number | undefined;
     /** the pattern's shift from the flow's origin, in flow units */
     offset?: number | readonly [number, number] | undefined;

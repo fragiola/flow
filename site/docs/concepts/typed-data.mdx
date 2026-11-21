@@ -93,9 +93,11 @@ const bare = createFlowModel<Types, readonly []>(json);
 bare.get("selected-nodes");
 ```
 
-Without type arguments, a hook or a primitive allows every key of every feature (`FlowFeatures`,
-"any features"): a model with features is assignable to it, and a key of a feature that is not
-installed answers `undefined`, `false` or `not_found` at run time.
+Without type arguments, `useFlow`, `useFlowRef`, `createFlowRef` and a `FlowEngine` know no
+feature (`readonly []`): only the core's commands and keys typecheck, so pass `typeof features`.
+A bare `FlowModel` is the exception: its default is "any features" (`FlowFeatures`), so a model
+with features is assignable to it, and a key of a feature that is not installed answers
+`undefined` or `false`, and its command `not_found`, at run time.
 
 ## What the registry does not check
 

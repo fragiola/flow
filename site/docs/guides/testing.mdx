@@ -15,12 +15,9 @@ The model is a pure function of its commands: create it, run commands, read the 
 no React, no mocks.
 
 ```ts title="connection-rules.test.ts"
-import { createFlowModel } from "@fragiola/flow";
-import { connection } from "@fragiola/flow/connection";
+import { createFlowModel } from "@fragiola/flow-react";
 import { describe, expect, it } from "vitest";
-import { connectionRules } from "./connection-rules";
-
-const features = [connection()] as const;
+import { connectionRules, features, type Types } from "./connection-rules";
 
 function model() {
     const created = createFlowModel<Types, typeof features>(
