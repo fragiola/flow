@@ -138,7 +138,7 @@
             ]
         },
         {
-            "label": "API: primitives (@fragiola/flow-react, @fragiola/flow-vue, @fragiola/flow-svelte)",
+            "label": "API: primitives (@fragiola/flow-react, @fragiola/flow-vue, @fragiola/flow-svelte, @fragiola/flow-angular)",
             "collapsible": true,
             "pages": [
                 {
@@ -252,6 +252,10 @@
                 {
                     "label": "Svelte components",
                     "path": "api/primitives/svelte"
+                },
+                {
+                    "label": "Angular directives",
+                    "path": "api/primitives/angular"
                 }
             ]
         },

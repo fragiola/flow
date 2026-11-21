@@ -1,0 +1,276 @@
+---
+title: Angular directives
+description: The same primitives and hooks for Angular 22, from @fragiola/flow-angular, and how each React prop maps onto directives, inputs, outputs and templates.
+---
+
+`@fragiola/flow-angular` has every primitive of the React package as an Angular standalone
+directive you put on your own elements, and every hook as an injection function returning
+signals, over the same core (re-exported whole). The `data-*` attributes, the structural styles,
+the props (as inputs) and the state of every part are the same, so every page of these docs
+applies: this page says how the React API is written in Angular.
+
+```ts
+import {
+    createFlowModel,
+    createFlowRef,
+    FLOW,
+    type FlowTypes,
+    injectFlow,
+    injectViewport,
+} from "@fragiola/flow-angular";
+import { FLOW_MINIMAP, minimap } from "@fragiola/flow-angular/minimap";
+import { FLOW_RESIZE, resize } from "@fragiola/flow-angular/resize";
+```
+
+The feature entries are React's: `@fragiola/flow-angular/selection`, `/drag`, `/connection`,
+`/reconnection`, `/resize`, `/subflows`, `/keyboard` and `/minimap` (ng-packagr secondary entry
+points), each re-exporting the core's factory, `/minimap` and `/resize` with their directives. The
+package is built by ng-packagr in partial compilation, so your app's Angular compiler compiles its
+directives; it needs Angular 22 (`@angular/core` `^22.0.0`), and works zoneless with OnPush
+components (Angular 22's defaults).
+
+## A flow in a template
+
+```ts title="editor.ts"
+import { Component, signal } from "@angular/core";
+import { createFlowModel, FLOW, type FlowNode, type FlowTypes } from "@fragiola/flow-angular";
+import { connection } from "@fragiola/flow-angular/connection";
+import { drag } from "@fragiola/flow-angular/drag";
+import { selection } from "@fragiola/flow-angular/selection";
+
+interface Types extends FlowTypes {
+    readonly nodes: { step: { label: string } };
+}
+
+const features = [selection(), drag(), connection()] as const;
+
+@Component({
+    selector: "app-editor",
+    imports: [FLOW],
+    template: `
+        <p>{{ nodes().length }} nodes</p>
+        <div flowRoot [model]="model" [(nodes)]="nodes" fitView class="h-96">
+            <svg flowBackground variant="dots" class="text-slate-300"></svg>
+            <!-- the edges before the nodes: the nodes are drawn on top -->
+            <div flowViewport>
+                <div flowEdges>
+                    <ng-template [flowEdgesItem]="model" let-edge>
+                        <svg:g [flowEdge]="edge">
+                            <svg:path flowEdgePath class="stroke-slate-400 data-selected:stroke-blue-500" />
+                        </svg:g>
+                    </ng-template>
+                </div>
+                <div flowNodes>
+                    <ng-template [flowNodesItem]="model" let-node>
+                        <div [flowNode]="node" #n="flowNode" class="rounded border bg-white px-3 py-2" [class.border-blue-500]="n.state()?.selected">
+                            {{ node.data.label }}
+                            <div flowHandle type="target" side="top" class="size-2 rounded-full bg-slate-500"></div>
+                            <div flowHandle type="source" side="bottom" class="size-2 rounded-full bg-slate-500"></div>
+                        </div>
+                    </ng-template>
+                </div>
+                <svg flowConnectionLine class="stroke-blue-500"></svg>
+            </div>
+        </div>
+    `,
+})
+export class Editor {
+    // the model types the templates' nodes and edges (a template takes no type argument)
+    protected readonly model = createFlowModel<Types, typeof features>(
+        {
+            version: 1,
+            nodes: [
+                { id: "fetch", type: "step", position: { x: 0, y: 0 }, data: { label: "Fetch" } },
+                { id: "save", type: "step", position: { x: 0, y: 140 }, data: { label: "Save" } },
+            ],
+            edges: [{ id: "fetch-save", source: "fetch", target: "save" }],
+        },
+        { features },
+    );
+    // controlled nodes: the root emits the model's frozen list after every change
+    protected readonly nodes = signal<readonly FlowNode<Types>[]>(this.model.get("all-nodes"));
+}
+```
+
+`[(nodes)]` gives you the model's nodes on every change, drag steps included, and a list you set
+is brought into the model with the commands a user would have run (one `batch` with
+`meta: { source: "controlled" }`), so middleware still sees every change; the model's own list
+given back is recognized and diffs nothing. Set a new list (`nodes.set([...nodes(), node])`): a
+list mutated in place keeps its identity and is not synced, as in React. A bound output checks
+your component's whole template on every emit (every drag step): bind one only where you need it.
+
+<Example id="basic" />
+
+## How React's props map
+
+| React | Angular |
+| --- | --- |
+| `<Flow.Root …>` and every part | the part's directive on your own element: `flowRoot`, `flowViewport`, `flowNodes`, `flowNode`, `flowHandle`, `flowEdges`, `flowEdge`, `flowEdgePath`, `flowEdgeLabel`, `flowReconnectAnchor`, `flowConnectionLine`, `flowSelectionBox`, `flowBackground`, `flowControls`, `flowZoomIn`, `flowZoomOut`, `flowFitView`, `flowToggleInteractive`, `flowNodeToolbar`, `flowMiniMap`, `flowMiniMapNode`, `flowMiniMapMask`, `flowNodeResizer`, `flowResizeHandle` |
+| the parts' props | the same names as inputs (`[defaultNodes]`, `[fitView]`, `handleId`, `[minWidth]`); a bare boolean attribute is `true` (`panOnScroll`, `fitView`, `open`, `keepAspectRatio`); `node` and `edge` are the directives' own inputs (`[flowNode]="node"`, `[flowEdge]="edge"`) |
+| `render={<section />}`, `render={(props, state) => …}` | not needed: the element is yours (`<section [flowNode]="node">`), and a `d` of your own on `flowEdgePath` wins over the engine's |
+| children functions of `Flow.Nodes`, `Flow.Edges` | an item template: `<ng-template flowNodesItem let-node>` inside `[flowNodes]` (or `*flowNodesItem="let node"`), `<ng-template flowEdgesItem let-edge>` inside `[flowEdges]`, its elements with the `svg:` prefix; `[flowNodesItem]="model"` types the node by the model's registry |
+| children functions of `Flow.ConnectionLine`, `MiniMap` | your elements inside them, reading `#line="flowConnectionLine"`'s `line.state()?.connection`, `#map="flowMiniMap"`'s `map.state().view` |
+| a part's default children (`Flow.Edge`'s path, `NodeResizer`'s handles, `MiniMap`'s nodes and mask, `Flow.ConnectionLine`'s path) | added by the directive when you write no element inside it |
+| `className`, `style` | your own `class` and `style` and their bindings, under the structural style (whose keys win) |
+| `className={(state) => …}`, `style={(state) => …}` | `[class.x]` and `[style.x]` bindings over the part's state (`#n="flowNode"`, `[class.selected]="n.state()?.selected"`), and the `data-*` attributes |
+| `onClick`, `onKeyDown`, … on a part | `(click)`, `(keydown)`, …: the directive's own listener runs first |
+| `ref` on a part | the element is yours (a template reference, `viewChild`); the directive through its `exportAs` (`#flow="flowRoot"`: `model()`, `engine`, `state()`) |
+| `nodes` + `onNodesChange`, `edges` + `onEdgesChange` | `[(nodes)]`, `[(edges)]` (inputs with the outputs `nodesChange`, `edgesChange`) |
+| `viewport` + `onViewportChange(viewport, gesture)` | `[(viewport)]` (`viewportChange`), and `(viewportMove)`, which emits `{ viewport, gesture }` (`ViewportMoveEvent`) |
+| `flowRef={flow}`, `flow.current` | `[flowRef]="flow"`, `flow.current` (a signal's value: see [Flow ref](#flow-ref)) |
+| `<Flow.Root<Types, typeof features>>` | inferred from the inputs (`[model]`, `[features]`); a child types `injectFlow<Types, typeof features>()` |
+
+## Directives
+
+Every part takes the props of its React page as inputs (for example
+[Root](/docs/api/primitives/root#props), [Node](/docs/api/primitives/node#props),
+[Handle](/docs/api/primitives/handle#props)); these are Angular's own:
+
+| input or output | of | description |
+| --- | --- | --- |
+| `model` | `flowRoot` (`FlowRootDirective`) | the model you made with `createFlowModel` (its input is `modelInput`, aliased `model`); it types the root by its registry and features |
+| `nodesChange` | `flowRoot` | output: the model's nodes after every command that changes them (a drag step too); `[(nodes)]` binds it |
+| `edgesChange` | `flowRoot` | output: the model's edges after every command that changes them; `[(edges)]` binds it |
+| `viewportChange` | `flowRoot` | output: the viewport on every change; `[(viewport)]` binds it |
+| `viewportMove` | `flowRoot` | output: `ViewportMoveEvent`, `{ viewport, gesture }`, `gesture` true for a pan, a zoom or a pinch |
+| `flowNode` | `[flowNode]` (`FlowNodeDirective`) | the node it renders (React's `node`) |
+| `flowEdge` | `[flowEdge]` (`FlowEdgeDirective`) | the edge it renders (React's `edge`), on an SVG group |
+| `flowNodesItem` | `ng-template[flowNodesItem]` (`FlowNodesItemDirective`) | optional: the model, which types the template's `node` (`TypedBy<T>`); the template's context is `NodesItemContext<T>` (`$implicit`, `node`) |
+| `flowEdgesItem` | `ng-template[flowEdgesItem]` (`FlowEdgesItemDirective`) | optional: the model, which types the template's `edge` (`TypedBy<T>`); the context is `EdgesItemContext<T>` (`$implicit`, `edge`) |
+| `state` | every directive | a signal of the part's state, as on its page (`RootState`, `NodeState<T>`, `EdgeState<T>`, `HandleState`, `ControlButtonState`, …), through its `exportAs` (`#n="flowNode"`) |
+
+Each directive's `exportAs` is its selector's name (`flowRoot`, `flowNode`, `flowEdgePath`,
+`flowMiniMap`, …); `flowRoot` also gives `model()` (a signal) and `engine`. `FLOW` lists every
+directive of the main entry for a component's `imports`: `FlowRootDirective`,
+`FlowViewportDirective`, `FlowNodesDirective`, `FlowNodesItemDirective`, `FlowNodeDirective`,
+`FlowHandleDirective`, `FlowEdgesDirective`, `FlowEdgesItemDirective`, `FlowEdgeDirective`,
+`FlowEdgePathDirective`, `FlowEdgeLabelDirective`, `FlowReconnectAnchorDirective`,
+`FlowConnectionLineDirective`, `FlowSelectionBoxDirective`, `FlowBackgroundDirective`,
+`FlowControlsDirective`, `FlowZoomInDirective`, `FlowZoomOutDirective`, `FlowFitViewDirective`,
+`FlowToggleInteractiveDirective`, `FlowNodeToolbarDirective`. `FLOW_MINIMAP`
+(`@fragiola/flow-angular/minimap`) lists `FlowMiniMapDirective`, `FlowMiniMapNodeDirective`,
+`FlowMiniMapMaskDirective`; `FLOW_RESIZE` (`@fragiola/flow-angular/resize`) lists
+`FlowNodeResizerDirective`, `FlowResizeHandleDirective`, beside `RESIZE_POSITIONS`.
+
+Each node's and each edge's view is a view of its own, checked again only when its entity changes
+(the model shares those a command did not change), so a drag step checks the moved nodes only and
+a pan none; whenever your component is checked, every one of them is too, as embedded views are.
+Another template (an `@if` around two) renders every entity again.
+
+What differs from React, part by part:
+
+- **`flowRoot`** creates the engine after its first render (`afterNextRender`), in a browser only,
+  and destroys it with the root (`DestroyRef`). Another `model` gets another engine at the last
+  viewport, as React swaps it in place. Its model is not read before its inputs are set: a read
+  from a child's constructor throws Angular's NG0950.
+- **`flowEdges`** adds the `<svg>` its edges are drawn in to your element, which is the HTML layer
+  labels go to.
+- **`flowEdgeLabel`** (written `<xhtml:div flowEdgeLabel>` in the edge's SVG group) moves its
+  element into the edges' HTML layer, and **`flowNodeToolbar`** into the root's element: Angular
+  has no portal, so each part moves its own element, a comment keeping its place. A part shown
+  only sometimes (the connection line, the selection box, a minimap node, a toolbar not open)
+  leaves the document meanwhile; wrap one that would be the first element of an `@for`'s view.
+- **`flowMiniMap`** and **`flowNodeResizer`** come from `@fragiola/flow-angular/minimap` and
+  `@fragiola/flow-angular/resize`, with `flowMiniMapNode`, `flowMiniMapMask`, `flowResizeHandle`
+  and `RESIZE_POSITIONS`.
+- No server render nor hydration: the directives write to their elements in the browser.
+
+The state of each part is typed by its exports: `RootState`, `RootEngineProps` (the engine
+options the root takes), `ViewportMoveEvent`; `ViewportState`; `BackgroundState`; `NodesState`,
+`NodesItemContext`; `EdgesState`, `EdgesItemContext`; `EdgePathState`; `EdgeLabelState`;
+`ReconnectAnchorState`; `ConnectionLineState`; `SelectionBoxState`; `NodeToolbarState`;
+`ControlsState`; `ToggleInteractiveState`; `ControlButtonState` (`flowZoomIn`, `flowZoomOut`,
+`flowFitView`); `TypedBy`. On the feature entries: `MiniMapState`, `MiniMapNodeState`,
+`MiniMapMaskState`; `NodeResizerState`, `ResizeHandleState`, `ResizePosition`. The shared ones:
+`ValueOrSignal` (a value, a signal or a getter), `AttributeRecord` and `StructuralStyle` (what an
+element is given).
+
+## Injection functions
+
+The hooks are injection functions of the same meaning, called in an injection context (a field or
+a constructor) of a component or directive inside the root. A value that changes is a signal.
+
+| React | Angular |
+| --- | --- |
+| `useFlow<T, F>()` | `injectFlow<T, F>()`: `InjectFlowResult<T, F>`, `model` a signal (it follows another `model` given to the root) and `engine`, there from the start (an action is refused before the root created its engine) |
+| `useViewport()` | `injectViewport()`: `Signal<Viewport>` |
+| `useConnection()` | `injectConnection()`: `Signal<Connection \| null>` |
+| `useSelection<T>()` | `injectSelection<T>()`: `Signal<FlowSelection<T>>`, a `FlowSelection<T>` of the selected `nodes` and `edges` |
+| `useNodes<T>()`, `useEdges<T>()` | `injectNodes<T>()`, `injectEdges<T>()`: signals of the model's frozen lists |
+| `useNode(node)` | `injectNode(node)`: `InjectNodeResult<T>`, `state` (`NodeState<T>`) and `props` (`NodeElementProps`) as signals; it binds the host element of its injection context (`article[appNode]`) as the node |
+| `useEdge(edge)` | `injectEdge(edge)`: `InjectEdgeResult<T>`, `state` (`EdgeState<T>`) and `props` as signals, binding its host |
+| `useHandle(options)` | `injectHandle(options)`: `InjectHandleResult`, `state` (`HandleState`) and `props` as signals; `InjectHandleOptions` as React's, with a `nodeId` outside `[flowNode]` |
+| `useFlowRef()`, `createFlowRef()` | `injectFlowRef()`, `createFlowRef()`: a `FlowRef<T, F>` whose `current` is a signal's value |
+
+Each function takes its argument as a value, a signal or a getter (`ValueOrSignal`), so an input
+signal is followed:
+
+```ts title="plain-node.ts"
+import { Component, input } from "@angular/core";
+import { type FlowNode, injectNode, injectSelection } from "@fragiola/flow-angular";
+
+// <article [appPlainNode]="node"></article> inside a flowNodesItem template
+@Component({
+    selector: "article[appPlainNode]",
+    host: { "[class.ring-2]": "own.state()?.selected" },
+    template: "{{ node().data.label }} ({{ selection().nodes.length }} selected)",
+})
+export class PlainNode {
+    readonly node = input.required<FlowNode<Types>>({ alias: "appPlainNode" });
+    // binds this component's element: attributes, tabindex, structural style, registration
+    protected readonly own = injectNode(this.node);
+    protected readonly selection = injectSelection<Types>();
+}
+```
+
+The engine holds no signal: a template that reads `engine.can(…)` alone is never checked again
+when the view changes. Read engine state through a signal: `injectViewport()`, a part's
+`state()`, `flow.current`, or a `computed` that reads one of them before asking the engine.
+
+## Flow ref
+
+`createFlowRef<T, F>()` (anywhere: a field, a service, a test) and `injectFlowRef<T, F>()` (in an
+injection context) make a `FlowRef<T, F>`: pass it as the root's `[flowRef]`, and `flow.current`
+is a `FlowRefValue<T, F>` (`model`, `engine`) while the root lives, `null` otherwise.
+
+| field | type | description |
+| --- | --- | --- |
+| `current` | `FlowRefValue<T, F> \| null` | the root's model and engine while it lives; a signal's value, so a template, a `computed` or an `effect` that reads it follows the root as it attaches and detaches |
+
+```ts title="toolbar.ts"
+import { Component } from "@angular/core";
+import { createFlowRef, FLOW } from "@fragiola/flow-angular";
+
+@Component({
+    selector: "app-toolbar",
+    imports: [FLOW],
+    template: `
+        <button type="button" [disabled]="!flow.current" (click)="flow.current?.engine.run('fit-view')">Fit</button>
+        <div flowRoot [flowRef]="flow" [features]="features" [defaultNodes]="nodes">…</div>
+    `,
+})
+export class Toolbar {
+    protected readonly features = features;
+    protected readonly nodes = nodes;
+    protected readonly flow = createFlowRef<Types, typeof features>();
+}
+```
+
+## Reactivity
+
+The model's state never becomes reactive: the root bumps one signal on every model commit and
+every engine notification, and each part reads what it shows in a `computed` that keeps its last
+value while it is equal, so Angular checks only what changed. The directives write their
+attributes and structural style to your element in effects. A bound output marks your component
+for check on every emit (Angular's listeners do), so `(viewportChange)` or `[(nodes)]` checks
+your whole template on every pan or drag step: bind them where needed, and read live values with
+`injectViewport()` or the flow ref's `engine.subscribe` otherwise.
+
+## Not an app's API
+
+The feature entries build on the main entry's public API, so it exports what they need with
+Angular's `ɵ` prefix, as Angular's own private names: `ɵinjectFlowContext`, `ɵinjectNodeContext`,
+`ɵFlowContext`, `ɵAnyFlowModel`, `ɵAnyFlowEngine`, `ɵflowValue`, `ɵpartOwnerId`,
+`ɵdefaultContent`, `ɵbeforeInputs`, `ɵbindAttributes`, `ɵbindBaseAttributes`,
+`ɵbindStructuralStyle`, `ɵbindPresence`, `ɵinjectHost`, `ɵonDestroy`, `ɵoptionalBoolean`,
+`ɵoptionalNumber` and `ɵpx`. Do not use them: they may change in any release.

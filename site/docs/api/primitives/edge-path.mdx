@@ -44,6 +44,18 @@ selected look.
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<svg:g [flowEdge]="edge">
+    <!-- a wide transparent path: a bigger press target -->
+    <svg:path flowEdgePath class="stroke-transparent stroke-[16]" />
+    <svg:path flowEdgePath class="stroke-gray-400 stroke-2 data-selected:stroke-blue-500" />
+</svg:g>
+```
+
+</Framework>
+
 A `d` of your own draws an app type: read the ends from `state.path` (`render` gets the state) or
 from [`useEdge`](/docs/api/primitives/hooks).
 
@@ -91,6 +103,28 @@ In Vue, the render function is the `render` scoped slot: bind `v-bind="props"`, 
 
 In Svelte, the render function is the `render` snippet: spread `{...props}`, then your own `d`
 (an attribute after the spread wins).
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+// the edge's component: a step path from the engine's ends
+export class StepEdge {
+    protected step(path: EdgePath | undefined): string | null {
+        if (!path) return null;
+        const { source, target } = path;
+        return `M${source.x},${source.y} V${(source.y + target.y) / 2} H${target.x} V${target.y}`;
+    }
+}
+```
+
+```html
+<svg:path flowEdgePath #p="flowEdgePath" [attr.d]="step(p.state()?.path)" />
+```
+
+In Angular, there is no render function: give your `<svg:path flowEdgePath>` your own `d`
+(`[attr.d]`), which wins over the engine's, from the directive's `state()?.path`.
 
 </Framework>
 

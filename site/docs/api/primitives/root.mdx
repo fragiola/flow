@@ -168,6 +168,73 @@ content works), given `{ state }`. [Svelte components](/docs/api/primitives/svel
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="editor.ts"
+import { Component } from "@angular/core";
+import { FLOW, type FlowEdgeInput, type FlowNodeInput, type FlowTypes } from "@fragiola/flow-angular";
+import { connection } from "@fragiola/flow-angular/connection";
+import { drag } from "@fragiola/flow-angular/drag";
+import { selection } from "@fragiola/flow-angular/selection";
+
+interface Types extends FlowTypes {
+    readonly nodes: { step: { label: string } };
+}
+
+const features = [selection(), drag(), connection()] as const;
+
+const nodes: FlowNodeInput<Types>[] = [
+    { id: "a", type: "step", position: { x: 0, y: 0 }, data: { label: "Start" } },
+    { id: "b", type: "step", position: { x: 0, y: 140 }, data: { label: "Save" } },
+];
+const edges: FlowEdgeInput<Types>[] = [{ id: "a-b", source: "a", target: "b" }];
+
+@Component({
+    selector: "app-editor",
+    imports: [FLOW],
+    template: `
+        <div style="height: 480px">
+            <div
+                flowRoot
+                [features]="features"
+                [defaultNodes]="nodes"
+                [defaultEdges]="edges"
+                [fitView]="{ padding: 0.2 }"
+                class="size-full"
+            >
+                <div flowViewport>
+                    <div flowEdges>
+                        <svg:g *flowEdgesItem="let edge" [flowEdge]="edge"></svg:g>
+                    </div>
+                    <div flowNodes>
+                        <div *flowNodesItem="let node" [flowNode]="node">
+                            {{ node.data["label"] }}
+                            <div flowHandle type="target" side="top"></div>
+                            <div flowHandle type="source" side="bottom"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `,
+})
+export class Editor {
+    protected readonly features = features;
+    protected readonly nodes = nodes;
+    protected readonly edges = edges;
+}
+```
+
+In Angular, `flowRoot` goes on your own element; its inputs are the props of the table below. The
+controlled lists and the viewport are two-way bindings, `[(nodes)]`, `[(edges)]`, `[(viewport)]`
+(outputs `nodesChange`, `edgesChange`, `viewportChange`), and `(viewportMove)` emits
+`{ viewport, gesture }`. Without a `model` of yours, the templates' nodes are untyped
+(`FlowNode<AnyTypes>`): give the root a model you make with `createFlowModel` and
+`[flowNodesItem]="model"` types them. `#flow="flowRoot"` gives the template its `model()`,
+`engine` and `state()`. [Angular directives](/docs/api/primitives/angular) maps the rest.
+
+</Framework>
+
 Pass the registry and the features as type arguments (`Flow.Root<Types, typeof features>`): the
 commands, keys and data are then typed. The features are fixed when the model is created: a
 changed `features` prop warns and is ignored.
@@ -187,7 +254,7 @@ changed `features` prop warns and is ignored.
 - **Your own model**: `model` takes a model made with `createFlowModel`, with its features and its
   middleware; `defaultNodes`, `features` and `createId` are then unused.
 
-The engine is created in the root's layout effect (Vue: its `onMounted`; Svelte: an `$effect`): the first render, and a
+The engine is created in the root's layout effect (Vue: its `onMounted`; Svelte: an `$effect`; Angular: after its first render): the first render, and a
 server render, have no engine (nodes at their model position, no edges drawn).
 
 ## Props
@@ -271,7 +338,10 @@ In Vue, `render` is the `as` prop and the `render` scoped slot, `className` and 
 and `style` without the function form, and `ref` is a template ref on the component: see
 [Vue components](/docs/api/primitives/vue). In Svelte, `render` is a snippet of
 `{ props, state, children }`, `className` is `class` (a value or a function of the state, as
-`style`), and `ref` is `bind:ref`: see [Svelte components](/docs/api/primitives/svelte).
+`style`), and `ref` is `bind:ref`: see [Svelte components](/docs/api/primitives/svelte). In Angular, every
+part is a directive on your own element, so there is no `render`; `className` and `style` are
+your `class`, `style` and their bindings, and `ref` is your template reference: see
+[Angular directives](/docs/api/primitives/angular).
 
 Your handlers run after the primitive's own. A primitive sets no text and no `aria-label`: names
 are yours ([Accessible names](/docs/getting-started/accessible-names)).

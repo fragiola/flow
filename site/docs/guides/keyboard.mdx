@@ -45,6 +45,17 @@ const features = [selection(), drag(), keyboard()] as const;
 
 </Framework>
 
+<Framework name="angular">
+
+```ts
+import { keyboard } from "@fragiola/flow-angular/keyboard";
+import { selection } from "@fragiola/flow-angular/selection";
+
+const features = [selection(), drag(), keyboard()] as const;
+```
+
+</Framework>
+
 With it, every node and edge gets `tabIndex={0}` (`engine.is("node-focusable", { nodeId })`), so
 Tab walks them in drawing order, and a node that takes focus is panned into view. On a focused
 node or edge:
@@ -153,6 +164,34 @@ function renderEdge(edge: FlowEdge<Types>) {
         </Flow.Node>
     {/snippet}
 </Flow.Nodes>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowEdges>
+    <ng-template [flowEdgesItem]="model" let-edge>
+        <svg:g
+            [flowEdge]="edge"
+            role="group"
+            aria-roledescription="edge"
+            [attr.aria-label]="edge.source + ' to ' + edge.target"
+        >
+            <svg:path flowEdgePath class="edge" />
+        </svg:g>
+    </ng-template>
+</div>
+<div flowNodes>
+    <ng-template [flowNodesItem]="model" let-node>
+        <div [flowNode]="node" role="group" aria-roledescription="node" [attr.aria-label]="node.data.label" class="node">
+            {{ node.data.label }}
+            <div flowHandle type="target" side="left" class="handle"></div>
+            <div flowHandle type="source" side="right" class="handle"></div>
+        </div>
+    </ng-template>
+</div>
 ```
 
 </Framework>
@@ -306,6 +345,52 @@ onUnmounted(
 </script>
 
 <p role="status" class="sr-only">{message}</p>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="live-region.ts"
+import { Component, DestroyRef, inject, signal } from "@angular/core";
+import { type FlowEngineEvent, type FlowModel, injectFlow } from "@fragiola/flow-angular";
+
+type Model = FlowModel<Types, typeof features>;
+
+/** Your words for an event, or nothing for one you keep quiet about. */
+function describe(event: FlowEngineEvent, model: Model): string | undefined {
+    const name = (id: string) => model.get("node-by", { id })?.data.label ?? id;
+    switch (event.type) {
+        case "nodes-move":
+            return `Moved ${event.nodeIds.map(name).join(", ")}.`;
+        case "connect":
+            return `Connected ${name(event.source)} to ${name(event.target)}.`;
+        case "connect-cancel":
+            return event.refused ? "That connection is not allowed." : undefined;
+        case "remove":
+            return `Removed ${event.nodeIds.length} node(s) and ${event.edgeIds.length} edge(s).`;
+        default:
+            return undefined;
+    }
+}
+
+// rendered inside [flowRoot]
+@Component({
+    selector: "app-live-region",
+    template: `<p role="status" class="sr-only">{{ message() }}</p>`,
+})
+export class LiveRegion {
+    private readonly flow = injectFlow<Types, typeof features>();
+    protected readonly message = signal("");
+
+    constructor() {
+        const stop = this.flow.engine.subscribe((event) => {
+            const next = describe(event, this.flow.model());
+            if (next) this.message.set(next);
+        });
+        inject(DestroyRef).onDestroy(stop);
+    }
+}
 ```
 
 </Framework>

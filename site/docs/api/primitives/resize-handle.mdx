@@ -72,6 +72,32 @@ import { NodeResizer, RESIZE_POSITIONS, ResizeHandle } from "@fragiola/flow-vue/
 
 </Framework>
 
+<Framework name="angular">
+
+```ts
+import { FLOW_RESIZE, RESIZE_POSITIONS } from "@fragiola/flow-angular/resize";
+
+// the node's component, which imports FLOW_RESIZE
+export class Resizable {
+    protected readonly positions = RESIZE_POSITIONS;
+    protected corner(position: string): string {
+        return position.includes("-")
+            ? "size-2 bg-blue-500"
+            : "data-[position=left]:w-1 data-[position=right]:w-1 data-[position=top]:h-1 data-[position=bottom]:h-1";
+    }
+}
+```
+
+```html
+<div flowNodeResizer class="outline outline-blue-500">
+    @for (position of positions; track position) {
+        <div flowResizeHandle [position]="position" [class]="corner(position)"></div>
+    }
+</div>
+```
+
+</Framework>
+
 ## Props
 
 `ResizeHandleProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and

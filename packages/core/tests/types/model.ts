@@ -2,7 +2,7 @@
 // app's registry and by the installed features.
 import { veto } from "../../src/commands/veto";
 import { connection } from "../../src/connection/connection";
-import type { FlowJson } from "../../src/document/types";
+import type { AnyTypes, FlowEdge, FlowJson } from "../../src/document/types";
 import {
     createFlowModel,
     type FlowModel,
@@ -21,6 +21,11 @@ export const modelSurface: Same<
     keyof FlowModel,
     "run" | "dispatch" | "can" | "check" | "get" | "is" | "use" | "subscribe"
 > = true;
+
+// an `any` registry (what Angular's template check gives a generic directive from a package) takes
+// every edge type, as `AnyTypes` does, not only the built-in ones (#17)
+// biome-ignore lint/suspicious/noExplicitAny: the registry Angular's template check gives
+export const anyEdges: Same<FlowEdge<any>, FlowEdge<AnyTypes>> = true;
 
 interface Types {
     nodes: { task: { title: string; done: boolean }; note: { text: string } };

@@ -57,6 +57,21 @@ In Svelte the props are React's (`handleId`, `connectable={false}`), `class` for
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div [flowNode]="node" class="node">
+    {{ node.data.label }}
+    <div flowHandle type="target" side="left" handleId="in" class="handle"></div>
+    <div flowHandle type="source" side="right" handleId="ok" style="top: 30%" class="handle"></div>
+    <div flowHandle type="source" side="right" handleId="error" style="top: 70%" class="handle"></div>
+</div>
+```
+
+In Angular the inputs are React's props (`handleId`, `[connectable]="false"`), on your element.
+
+</Framework>
+
 | prop | means |
 | --- | --- |
 | `type` | `"source"`: edges start here; `"target"`: edges end here |
@@ -112,6 +127,26 @@ inside the viewport, draws it while it lasts; `useConnection()` reads it:
     </Flow.Nodes>
     <Flow.ConnectionLine class="stroke-blue-500 data-invalid:stroke-red-500" />
 </Flow.Viewport>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowViewport>
+    <div flowEdges>
+        <ng-template [flowEdgesItem]="model" let-edge>
+            <svg:g [flowEdge]="edge" [appEdge]="edge"></svg:g>
+        </ng-template>
+    </div>
+    <div flowNodes>
+        <ng-template [flowNodesItem]="model" let-node>
+            <div [flowNode]="node"><app-node-body [node]="node" /></div>
+        </ng-template>
+    </div>
+    <svg flowConnectionLine class="stroke-blue-500 data-invalid:stroke-red-500"></svg>
+</div>
 ```
 
 </Framework>

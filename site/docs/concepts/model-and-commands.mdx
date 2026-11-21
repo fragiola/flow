@@ -80,6 +80,35 @@ function rename(): void {
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="rename-button.ts"
+import { Component, input } from "@angular/core";
+import { injectFlow } from "@fragiola/flow-angular";
+
+// rendered inside [flowRoot]
+@Component({
+    selector: "app-rename-button",
+    template: `<button type="button" (click)="rename()">Rename</button>`,
+})
+export class RenameButton {
+    readonly nodeId = input.required<string>();
+    private readonly flow = injectFlow<Types, typeof features>();
+
+    protected rename(): void {
+        const result = this.flow
+            .model()
+            .run("node.set-data", { nodeId: this.nodeId(), data: { label: "Renamed" } });
+        if (!result.ok) console.warn(result.error.code, result.error.message);
+    }
+}
+```
+
+In Angular, `injectFlow()` gives `model` as a signal (it follows another `model` given to the
+root) and the `engine`; call it in a field or a constructor of a component inside the root.
+
+</Framework>
+
 A result is `{ ok: true, value }` or `{ ok: false, error }`, where `error.code` is one of
 `unknown_command`, `invalid_payload`, `not_found`, `refused`, `vetoed`, `queued` or
 `middleware_error` ([The command bus](/docs/api/command-bus)). The commands are `node.add`,
@@ -178,6 +207,32 @@ Another `model` given to a Svelte root gets another engine, at the last viewport
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="workflow-editor.ts"
+import { Component } from "@angular/core";
+import { createFlowModel, FLOW } from "@fragiola/flow-angular";
+
+@Component({
+    selector: "app-workflow-editor",
+    imports: [FLOW],
+    template: `
+        <div class="flex h-dvh">
+            <button type="button" (click)="model.run('selection.clear')">Deselect</button>
+            <div flowRoot [model]="model" class="flex-1">…</div>
+        </div>
+    `,
+})
+export class WorkflowEditor {
+    // made once per component, in a field: the model is plain data, never a signal's value
+    protected readonly model = createFlowModel<Types, typeof features>(json, { features });
+}
+```
+
+Another `model` given to an Angular root gets another engine, at the last viewport, as in React.
+
+</Framework>
+
 A model given to the root keeps its own features: the root's `features`, `defaultNodes` and
 `defaultEdges` are for the model it creates when you give none. See also
 [The flow ref](/docs/api/primitives/flow-ref).
@@ -236,6 +291,28 @@ const stop = model.use(rules); // returns its remover
 
 ```ts title="rules.ts"
 import { type Middleware, veto } from "@fragiola/flow-svelte";
+
+/** No edge from a node to itself, and every move lands on whole numbers. */
+export const rules: Middleware<Types, typeof features> = (ctx, next) => {
+    if (ctx.command === "edge.add" && ctx.payload.source === ctx.payload.target) {
+        return veto("an edge joins two different nodes");
+    }
+    if (ctx.command === "node.move") {
+        const { x, y } = ctx.payload.position;
+        ctx.payload = { ...ctx.payload, position: { x: Math.round(x), y: Math.round(y) } };
+    }
+    return next();
+};
+
+const stop = model.use(rules); // returns its remover
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="rules.ts"
+import { type Middleware, veto } from "@fragiola/flow-angular";
 
 /** No edge from a node to itself, and every move lands on whole numbers. */
 export const rules: Middleware<Types, typeof features> = (ctx, next) => {

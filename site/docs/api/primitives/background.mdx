@@ -52,6 +52,21 @@ snippet receives the pattern as `state.pattern`.
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div flowRoot [features]="features" [defaultNodes]="nodes" class="bg-gray-50">
+    <svg flowBackground variant="dots" [gap]="20" [size]="2" class="text-gray-300"></svg>
+    <svg flowBackground variant="lines" [gap]="100" class="text-gray-200"></svg>
+    <div flowViewport>…</div>
+</div>
+```
+
+In Angular, the inputs are React's props (`[gap]="[20, 40]"`) on your `<svg flowBackground>`; the
+pattern is its `state().pattern` (`#bg="flowBackground"`).
+
+</Framework>
+
 Several layers combine (a fine grid and a coarse one). Its `variant` is a prop, so a CSS theme
 cannot switch it: the examples render the three variants and let the theme's tokens show one.
 

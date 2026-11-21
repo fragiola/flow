@@ -53,6 +53,22 @@ attachment reach the mounted element.
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<svg:g [flowEdge]="edge">
+    <svg:path flowEdgePath />
+    <xhtml:div flowEdgeLabel class="rounded bg-white px-1 text-xs">{{ edge.data?.text }}</xhtml:div>
+</svg:g>
+```
+
+In Angular, write the label inside the edge's SVG group with the `xhtml:` prefix (an HTML
+element): `flowEdgeLabel` moves its element into `flowEdges`' HTML layer (Angular has no portal),
+a comment keeping its place, so HTML content works inside an SVG edge and your bindings and
+listeners keep working. Its state is the `state()` signal (`#l="flowEdgeLabel"`).
+
+</Framework>
+
 ## Props
 
 `EdgeLabelProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and

@@ -84,6 +84,22 @@ if (node.type === "task") node.data.title; // string: the type narrows the data
 
 </Framework>
 
+<Framework name="angular">
+
+```ts
+import type { FlowNode, FlowTypes } from "@fragiola/flow-angular";
+
+interface Types extends FlowTypes {
+    readonly nodes: { trigger: { event: string }; task: { title: string } };
+    readonly edges: { dependency: { weight: number } };
+}
+
+declare const node: FlowNode<Types>;
+if (node.type === "task") node.data.title; // string: the type narrows the data
+```
+
+</Framework>
+
 `AnyTypes` types nothing (any type, any JSON object as data): the default. `NodeTypeOf<T>`,
 `NodeDataOf<T, K>`, `EdgeTypeOf<T>` (the built-in types and the app's) and `EdgeDataOf<T, K>` read
 a registry. `BuiltInEdgeType` is `"bezier" | "smoothstep" | "step" | "straight"`.
@@ -237,6 +253,25 @@ function restore(raw: string | null) {
 
 ```ts
 import { createFlowModel, type FlowJson, validateFlow } from "@fragiola/flow-svelte";
+
+function restore(raw: string | null) {
+    let json: unknown = null;
+    try {
+        json = JSON.parse(raw ?? "null");
+    } catch {
+        // not JSON: start empty
+    }
+    const valid = json !== null && validateFlow(json, { features }).length === 0;
+    return createFlowModel<Types, typeof features>(valid ? (json as FlowJson<Types>) : undefined, { features });
+}
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+import { createFlowModel, type FlowJson, validateFlow } from "@fragiola/flow-angular";
 
 function restore(raw: string | null) {
     let json: unknown = null;

@@ -78,6 +78,24 @@ const Flow = typedFlow<Types, typeof features>();
 
 </Framework>
 
+<Framework name="angular">
+
+```ts
+import { drag } from "@fragiola/flow-angular/drag";
+import { selection } from "@fragiola/flow-angular/selection";
+
+const features = [selection(), drag()] as const;
+```
+
+```html
+<div flowRoot [features]="features" [defaultNodes]="nodes" [defaultEdges]="edges">
+    <!-- … -->
+    <div flowSelectionBox class="border border-(--fl-selection-line) bg-(--fl-selection-bg)"></div>
+</div>
+```
+
+</Framework>
+
 - **A click** on a node or an edge selects it alone; a click on the canvas clears the selection.
 - **Shift, Ctrl or ⌘ with a click** toggles it in the selection (`multiple: true`, the default).
 - **Shift with a drag on the canvas** draws a box, rendered by `Flow.SelectionBox` (in screen
@@ -141,6 +159,19 @@ A selected node, edge, edge path, label and minimap node carries `data-selected`
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div
+    [flowNode]="node"
+    class="border border-(--fl-node-line) data-selected:border-(--fl-edge-selected) data-selected:ring-2"
+>
+    {{ node.data.label }}
+</div>
+```
+
+</Framework>
+
 ## Read the selection
 
 [`useSelection`](/docs/api/primitives/hooks) re-renders its component when the selection changes,
@@ -197,6 +228,31 @@ const selected = useSelection<Types>();
 {:else}
     <p role="status">{selected.current.nodes.length} nodes, {selected.current.edges.length} edges selected</p>
 {/if}
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="selection-status.ts"
+import { Component } from "@angular/core";
+import { injectSelection } from "@fragiola/flow-angular";
+
+// rendered inside [flowRoot]
+@Component({
+    selector: "app-selection-status",
+    template: `
+        @let selected = selection();
+        @if (selected.nodes.length === 0 && selected.edges.length === 0) {
+            <p role="status">Nothing selected</p>
+        } @else {
+            <p role="status">{{ selected.nodes.length }} nodes, {{ selected.edges.length }} edges selected</p>
+        }
+    `,
+})
+export class SelectionStatus {
+    protected readonly selection = injectSelection<Types>();
+}
 ```
 
 </Framework>

@@ -10,13 +10,15 @@
 import { FRAMEWORKS, type Framework, isFramework } from "../src/framework.ts";
 
 /**
- * The frameworks whose app has every example: for them, a spec never skips. React, Vue and Svelte;
- * the Angular adapter Epic adds its framework once its app has every example.
+ * The frameworks whose app has every example: for them, a spec never skips. Every framework of
+ * `FRAMEWORKS` today (Angular since #16); a framework added later joins once its app has every
+ * example.
  */
 export const COMPLETE_FRAMEWORKS: readonly Framework[] = [
     "react",
     "vue",
     "svelte",
+    "angular",
 ];
 
 /** The framework of `EXAMPLES_FRAMEWORK`; anything else throws (a config that forgot to set it). */

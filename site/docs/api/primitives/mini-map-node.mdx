@@ -50,6 +50,21 @@ node is not shown. Give it its fill, through `data-selected` for the selected lo
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<svg flowMiniMap #map="flowMiniMap">
+    @for (node of map.state().view.nodes; track node.nodeId) {
+        <svg:g><svg:rect flowMiniMapNode [nodeId]="node.nodeId" class="fill-gray-300 data-selected:fill-blue-500" /></svg:g>
+    }
+</svg>
+```
+
+In Angular, a minimap node leaves the document while its node is not shown: wrap it (here in an
+`<svg:g>`) when it would be the first element of an `@for`'s view.
+
+</Framework>
+
 ## Props
 
 `MiniMapNodeProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and

@@ -76,6 +76,41 @@ there with every context of its place, and unmounted with it); `bind:ref` reache
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="toolbar.ts"
+import { Component, input } from "@angular/core";
+import { FLOW, type FlowNode, injectFlow } from "@fragiola/flow-angular";
+import { LucideTrash2 } from "@lucide/angular";
+
+// rendered inside [flowNode]: <app-toolbar [node]="node" />
+@Component({
+    selector: "app-toolbar",
+    imports: [FLOW, LucideTrash2],
+    template: `
+        <div flowNodeToolbar role="toolbar" [attr.aria-label]="node().data.text + ': actions'" side="top" [offset]="8">
+            <button type="button" aria-label="Delete" (click)="remove()">
+                <svg lucideTrash2 aria-hidden="true"></svg>
+            </button>
+        </div>
+    `,
+})
+export class Toolbar {
+    readonly node = input.required<FlowNode<Types>>();
+    private readonly flow = injectFlow<Types, typeof features>();
+
+    protected remove(): void {
+        this.flow.model().run("node.remove", { nodeId: this.node().id });
+    }
+}
+```
+
+In Angular, the toolbar moves its element into the root's element (Angular has no portal), a
+comment keeping its place; it leaves the document while it is not open. Your bindings, listeners
+and `injectFlow` keep working there.
+
+</Framework>
+
 A toolbar has no role: give it `role="toolbar"` and a label when it holds several buttons.
 
 ## Props

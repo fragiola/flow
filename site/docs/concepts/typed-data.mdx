@@ -64,6 +64,24 @@ export interface Types extends FlowTypes {
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="types.ts"
+import type { FlowTypes } from "@fragiola/flow-angular";
+
+export interface Types extends FlowTypes {
+    readonly nodes: {
+        task: { title: string; done: boolean };
+        note: { text: string };
+    };
+    readonly edges: {
+        dependency: { weight: number };
+    };
+}
+```
+
+</Framework>
+
 `nodes` names each node type and the shape of its `data`; `edges` names your edge types and
 theirs. The built-in edge types (`bezier`, `smoothstep`, `step`, `straight`) are always allowed,
 with any JSON object as data; an edge with no `type` is a `bezier`. A node's `data` is required
@@ -116,6 +134,25 @@ function renderNode(node: FlowNode<Types>) {
 ```
 
 `Flow` here is `typedFlow<Types>()`, so the snippet's `node` is a `FlowNode<Types>`.
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowNodes>
+    <ng-template [flowNodesItem]="model" let-node>
+        @if (node.type === "task") {
+            <div [flowNode]="node">{{ node.data.done ? "✓ " : "" }}{{ node.data.title }}</div>
+        } @else {
+            <div [flowNode]="node">{{ node.data.text }}</div>
+        }
+    </ng-template>
+</div>
+```
+
+`[flowNodesItem]="model"` types the template's `node` by the model's registry, a
+`FlowNode<Types>` (its context guard); without it the node is a `FlowNode<AnyTypes>`.
 
 </Framework>
 
@@ -244,6 +281,63 @@ const selected = useSelection<Types>();
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="editor.ts"
+import { Component } from "@angular/core";
+import { createFlowModel, FLOW } from "@fragiola/flow-angular";
+import { StepNode } from "./step-node";
+
+const features = [selection(), drag(), connection()] as const;
+
+@Component({
+    selector: "app-editor",
+    imports: [FLOW, StepNode],
+    template: `
+        <div flowRoot [model]="model">
+            <div flowViewport>
+                <div flowEdges>
+                    <svg:g *flowEdgesItem="model; let edge" [flowEdge]="edge"></svg:g>
+                </div>
+                <div flowNodes>
+                    <ng-template [flowNodesItem]="model" let-node>
+                        <div [flowNode]="node"><app-step-node [node]="node" /></div>
+                    </ng-template>
+                </div>
+            </div>
+        </div>
+    `,
+})
+export class Editor {
+    // a model you create: the root and the item templates are typed by it
+    protected readonly model = createFlowModel<Types, typeof features>(json, { features });
+}
+```
+
+```ts title="selection-count.ts"
+import { Component, computed } from "@angular/core";
+import { injectFlow, injectSelection } from "@fragiola/flow-angular";
+
+// rendered inside [flowRoot]: an injection function cannot infer the types through the injector
+@Component({
+    selector: "app-selection-count",
+    template: `
+        <button type="button" [disabled]="ids().length === 0" (click)="show()">Show the selection</button>
+    `,
+})
+export class SelectionCount {
+    private readonly flow = injectFlow<Types, typeof features>();
+    private readonly selected = injectSelection<Types>();
+    protected readonly ids = computed(() => this.selected().nodes.map((node) => node.id));
+
+    protected show(): void {
+        this.flow.engine.run("fit-view", { nodeIds: this.ids() });
+    }
+}
+```
+
+</Framework>
+
 Commands are checked against it:
 
 ```ts
@@ -283,5 +377,5 @@ with features is assignable to it, and a key of a feature that is not installed 
 - **Untrusted JSON.** `model.dispatch` and `validateFlow` take `unknown` and check it against the
   JSON Schemas of the commands and the document, which know the shape of a node but not your data:
   validate your own `data` in a middleware if it comes from outside.
-- **Untyped hooks.** `useNodes()` (a hook, a composable in Vue, a rune in Svelte) without `Types` returns `FlowNode<AnyTypes>`, where `data` is a
+- **Untyped hooks.** `useNodes()` (a hook, a composable in Vue, a rune in Svelte, an injection function in Angular) without `Types` returns `FlowNode<AnyTypes>`, where `data` is a
   record of unknown values.

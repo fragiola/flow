@@ -55,6 +55,19 @@ the action.
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<button flowFitView aria-label="Fit view" class="p-1 data-disabled:opacity-40">
+    <svg lucideMaximize aria-hidden="true"></svg>
+</button>
+```
+
+In Angular, the button is yours; its state is the `state()` signal (`ControlButtonState`), and a
+`(click)` of yours runs after the action.
+
+</Framework>
+
 The same action from code: `engine.run("fit-view")` ([engine](/docs/api/engine)).
 
 ## Props

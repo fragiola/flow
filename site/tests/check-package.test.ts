@@ -201,6 +201,7 @@ describe("the adapters the package check covers", () => {
             ["react", "react"],
             ["vue", "vue"],
             ["svelte", "svelte"],
+            ["angular", "angular"],
         ]);
     });
 
@@ -292,15 +293,48 @@ describe("the adapters the package check covers", () => {
         expect(() => smokeVersion("svelte", "left-pad")).toThrow(/no pin/);
     });
 
+    it("pin the Angular smoke app at examples/angular's pins: ngc on TypeScript 6.0", () => {
+        const read = (path: string) =>
+            JSON.parse(
+                readFileSync(join(import.meta.dirname, "../..", path), "utf8"),
+            ) as {
+                dependencies?: Record<string, string>;
+                devDependencies?: Record<string, string>;
+            };
+        const examples = read("examples/angular/package.json");
+        const pins = { ...examples.dependencies, ...examples.devDependencies };
+        for (const name of [
+            "@angular/common",
+            "@angular/compiler",
+            "@angular/core",
+            "@angular/platform-browser",
+            "@angular/build",
+            "@angular/compiler-cli",
+            "@analogjs/vite-plugin-angular",
+            "rxjs",
+            "typescript",
+            "vite",
+        ]) {
+            expect(pins[name], name).toBeDefined();
+            expect(smokeVersion("angular", name), name).toBe(pins[name]);
+        }
+        // the Angular compiler takes TypeScript `>=6.0 <6.1`: the app and the package pin 6.0
+        expect(smokeVersion("angular", "typescript")).toMatch(/^6\.0\./);
+        const pkg = read("packages/angular/package.json").devDependencies;
+        expect(pkg?.typescript).toBe(pins.typescript);
+        expect(pkg?.["@angular/core"]).toBe(pins["@angular/core"]);
+        expect(() => smokeVersion("angular", "left-pad")).toThrow(/no pin/);
+    });
+
     it("finds a package that is neither the core nor a listed adapter", () => {
         const dirs = ["core", "react", "vue", "svelte", "angular", "solid"];
-        expect(unlistedPackages(dirs)).toEqual(["angular", "solid"]);
+        expect(unlistedPackages(dirs)).toEqual(["solid"]);
         expect(
-            unlistedPackages(dirs, [
-                ...ADAPTERS,
-                { dir: "angular", framework: "angular", smoke: async () => {} },
-            ]),
-        ).toEqual(["solid"]);
+            unlistedPackages(
+                dirs,
+                ADAPTERS.filter((adapter) => adapter.dir !== "angular"),
+            ),
+        ).toEqual(["angular", "solid"]);
     });
 
     it("require each adapter to pin the core at its exact version", () => {

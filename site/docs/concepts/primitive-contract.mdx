@@ -64,6 +64,22 @@ registers the element, and `children` is the part's content.
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<li [flowNode]="node">{{ node.data.label }}</li>
+
+<svg:g [flowEdge]="edge" #e="flowEdge" [attr.opacity]="e.state()?.reconnecting ? 0.4 : 1">
+    <svg:path flowEdgePath />
+</svg:g>
+```
+
+In Angular there is no `render`: the directive goes on your own element, which keeps every
+attribute and binding you write, and gets the part's attributes, structural style and
+registration. A part's state is its `state()` signal, through its `exportAs` (`#e="flowEdge"`).
+
+</Framework>
+
 `props.ref` is a callback ref, so it fits any element: `render={(props) => <section {...props} />}`
 needs no cast. The props carry what the engine depends on: the ref that registers a node or a
 handle, `data-flow-part` and `data-flow-id`, the state attributes and the structural style.
@@ -118,6 +134,22 @@ its `render` snippet.
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div [flowNode]="node" #n="flowNode" class="node data-selected:ring-2" [class.opacity-80]="n.state()?.dragging">
+    {{ node.data.label }}
+    @if (n.state()?.selected) {
+        <span>(selected)</span>
+    }
+</div>
+```
+
+In Angular, `className` and `style` functions of the state are your own `[class.x]` and
+`[style.x]` bindings over the part's `state()`; the `data-*` attributes carry the state too.
+
+</Framework>
+
 Each part's state is listed on its API page (`NodeState`, `HandleState`, `EdgeState`, …). For a
 style that only follows state, prefer the `data-*` attributes from a stylesheet: the same CSS then
 works for every framework's adapter ([State attributes](/docs/concepts/state-attributes)).
@@ -157,6 +189,15 @@ Two placements are defaults your style may override: where a `Flow.Handle` sits 
 ```svelte
 <Flow.Handle type="source" side="right" handleId="yes" style="top: 30%" />
 <Flow.Handle type="source" side="right" handleId="no" style={{ top: "70%" }} />
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowHandle type="source" side="right" handleId="yes" style="top: 30%"></div>
+<div flowHandle type="source" side="right" handleId="no" [style.top]="'70%'"></div>
 ```
 
 </Framework>
@@ -214,11 +255,37 @@ elsewhere; both reach it there.
 
 </Framework>
 
+<Framework name="angular">
+
+```ts
+import { Component, type ElementRef, viewChild } from "@angular/core";
+import { FLOW, type FlowNode, type FlowNodeDirective } from "@fragiola/flow-angular";
+
+@Component({
+    selector: "app-node-ref",
+    imports: [FLOW],
+    template: `<div [flowNode]="node" #element #part="flowNode"></div>`,
+})
+export class NodeRef {
+    node!: FlowNode;
+    // the element is yours: a template reference, or viewChild
+    readonly element = viewChild<ElementRef<HTMLDivElement>>("element");
+    // the directive, through its exportAs: its state() signal
+    readonly part = viewChild<FlowNodeDirective>("part");
+}
+```
+
+In Angular the element is your own, so `ref` is a template reference (`#element`) or
+`viewChild`; `#part="flowNode"` reaches the directive. An edge label and a toolbar move their
+element (into the edges' HTML layer, into the root): a reference still reaches it there.
+
+</Framework>
+
 ## Props are forwarded, handlers composed
 
 Every prop a part does not know goes to its element: `aria-*`, `data-*`, `title`, `role`,
 `tabIndex`, event handlers (in Vue, every fallthrough attribute and
-listener; in Svelte, every attribute and `on…` handler prop). A handler you pass
+listener; in Svelte, every attribute and `on…` handler prop; in Angular, the element is yours). A handler you pass
 runs after the part's own. Gestures are not the framework's handlers: the engine listens on the root and resolves every press from the part attributes, so a
 field, a button or a link inside a node starts no drag, and neither does an element marked
 `data-flow-no-gesture`.

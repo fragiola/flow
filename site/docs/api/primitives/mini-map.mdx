@@ -98,6 +98,37 @@ In Svelte, the children function is the `children` snippet, `{#snippet children(
 
 </Framework>
 
+<Framework name="angular">
+
+```ts
+import { FLOW_MINIMAP, minimap } from "@fragiola/flow-angular/minimap";
+
+const features = [minimap()] as const;
+// the component imports FLOW and FLOW_MINIMAP
+```
+
+```html
+<div flowRoot [features]="features" [defaultNodes]="nodes" class="relative size-full">
+    <div flowViewport>…</div>
+    <svg flowMiniMap #map="flowMiniMap" [width]="180" [height]="130" role="img" aria-label="Minimap" class="absolute right-3 bottom-3">
+        @for (node of map.state().view.nodes; track node.nodeId) {
+            <svg:g><svg:rect flowMiniMapNode [nodeId]="node.nodeId" class="fill-gray-300" /></svg:g>
+        }
+        <svg:path flowMiniMapMask class="fill-black/10" />
+    </svg>
+</div>
+```
+
+In Angular, the children function is the elements you write inside `flowMiniMap`, reading
+`#map="flowMiniMap"`'s `map.state().view`; with no element written, it draws a node per node and
+the mask. `map.state()` changes on every pan and drag step, and a template that reads it is
+checked again with all of its views: in the template that renders the nodes, every node. Read it
+in a component of its own on the minimap's element (`<svg flowMiniMap appMinimap>`, whose
+component injects `FlowMiniMapDirective` and holds the `@for`), as the examples do. A minimap node leaves the document while it is not shown, so wrap each one in a group
+when it would be the first element of an `@for`'s view.
+
+</Framework>
+
 ## Props
 
 `MiniMapProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and

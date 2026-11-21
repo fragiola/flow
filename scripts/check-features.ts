@@ -1,5 +1,6 @@
 // The features' bundle guard (D2): a feature not imported is not in the app's bundle. Fails when
-// the main entry of a package (`packages/*/dist/index.js`), or a chunk it imports, holds a
+// the main entry of a package (its published `exports["."]` target in `dist`: `index.js`, or
+// ng-packagr's `fesm2022/fragiola-flow-angular.mjs`), or a chunk it imports, holds a
 // feature's code: a source its source map names under a feature's folder (`src/selection/`), or an
 // import of a feature's entry point (`@fragiola/flow…/selection`). Run by `pnpm build`, after the
 // packages built. From Tree (fragiola/tree, scripts/check-features.ts), same author and licence:
@@ -51,6 +52,28 @@ export function chunksOf(source: string): string[] {
             /(?:from|import)\s*\(?\s*["'](\.{1,2}\/[^"']+\.(?:m?js|svelte))["']/g,
         ),
     ].map(([, path]) => (path ?? "").replace(/^\.\//, ""));
+}
+
+/**
+ * A package's built main entry, relative to its `dist`: the `import` (else `default`) target of its
+ * published `exports["."]` (`index.js`; an Angular package's FESM bundle).
+ */
+export function mainEntryOf(manifest: {
+    publishConfig?: { exports?: unknown };
+    exports?: unknown;
+}): string {
+    const exports = (manifest.publishConfig?.exports ?? manifest.exports) as
+        | Record<string, unknown>
+        | undefined;
+    const main = exports?.["."] as
+        | { import?: string; default?: string }
+        | string
+        | undefined;
+    const target =
+        typeof main === "string" ? main : (main?.import ?? main?.default);
+    return target?.startsWith("./dist/")
+        ? target.slice("./dist/".length)
+        : "index.js";
 }
 
 /** An import of a feature's entry point, from any package: `@fragiola/<package>/<subpath>`. */
@@ -116,8 +139,15 @@ function main() {
     const problems: string[] = [];
     for (const pkg of readdirSync(join(root, "packages"))) {
         const dist = join(root, "packages", pkg, "dist");
-        if (!existsSync(join(dist, "index.js"))) {
-            problems.push(`packages/${pkg}: no built main entry`);
+        // a Svelte package (`svelte` in its manifest) is built file for file, without maps
+        const manifest = JSON.parse(
+            readFileSync(join(root, "packages", pkg, "package.json"), "utf8"),
+        ) as { svelte?: string; publishConfig?: { exports?: unknown } };
+        const main = mainEntryOf(manifest);
+        if (!existsSync(join(dist, main))) {
+            problems.push(
+                `packages/${pkg}: no built main entry (dist/${main})`,
+            );
             continue;
         }
         const read = (file: string) => {
@@ -125,16 +155,12 @@ function main() {
             return existsSync(path) ? readFileSync(path, "utf8") : undefined;
         };
         const readMap = (file: string) => read(`${file}.map`);
-        // a Svelte package (`svelte` in its manifest) is built file for file, without maps
-        const manifest = JSON.parse(
-            readFileSync(join(root, "packages", pkg, "package.json"), "utf8"),
-        ) as { svelte?: string };
         const unbundled = manifest.svelte !== undefined;
-        if (!unbundled && readMap("index.js") === undefined) {
+        if (!unbundled && readMap(main) === undefined) {
             problems.push(`packages/${pkg}: no source map for the main entry`);
         }
         for (const leak of featureLeaks(
-            "index.js",
+            main,
             read,
             readMap,
             FEATURES,

@@ -87,6 +87,36 @@ from `state.path`.
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="rounded-edge.ts"
+import { Component, input } from "@angular/core";
+import { type EdgePath, FLOW, type FlowEdge, smoothStepPath } from "@fragiola/flow-angular";
+
+/** An app edge type drawn from the engine's ends: a smooth step with wider corners. */
+@Component({
+    selector: "g[appRoundedEdge]",
+    imports: [FLOW],
+    template: `
+        <svg:path flowEdgePath #p="flowEdgePath" [attr.d]="rounded(p.state()?.path)" />
+    `,
+})
+export class RoundedEdge {
+    // on the edge's element, beside [flowEdge]: <svg:g [flowEdge]="edge" [appRoundedEdge]="edge">
+    readonly edge = input.required<FlowEdge<Types>>({ alias: "appRoundedEdge" });
+
+    protected rounded(path: EdgePath | undefined): string | null {
+        return path ? smoothStepPath({ ...path, borderRadius: 16 }).path : null;
+    }
+}
+```
+
+In Angular, `render={(props, state) => …}` is your own `<svg:path flowEdgePath>` with a `d` of
+your own (`[attr.d]`), which wins over the engine's; read the engine's ends from the directive's
+`state()?.path`.
+
+</Framework>
+
 `state.path` is the edge's `EdgePath` (`engine.get("edge-path-by", { edgeId })`): its own path and
 label, and its ends (`PathEnds`), so spreading it gives a helper everything it needs. More on app
 edge types: [Custom edges](/docs/guides/custom-edges).

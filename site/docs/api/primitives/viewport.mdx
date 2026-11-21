@@ -63,6 +63,30 @@ the framework never renders a transform on it, so a pan or a zoom re-renders not
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div flowRoot [model]="model" class="size-full">
+    <svg flowBackground variant="dots"></svg>
+    <div flowViewport>
+        <div flowEdges>
+            <ng-template [flowEdgesItem]="model" let-edge>
+                <svg:g [flowEdge]="edge" [appEdge]="edge"></svg:g>
+            </ng-template>
+        </div>
+        <div flowNodes>
+            <ng-template [flowNodesItem]="model" let-node>
+                <div [flowNode]="node"><app-node-body [node]="node" /></div>
+            </ng-template>
+        </div>
+        <svg flowConnectionLine></svg>
+    </div>
+    <div flowSelectionBox></div>
+</div>
+```
+
+</Framework>
+
 Read the viewport with [`useViewport`](/docs/api/primitives/hooks) and change it with the engine
 (`engine.run("set-viewport", { x, y, zoom })`, `"fit-view"`): see
 [The viewport](/docs/concepts/viewport).

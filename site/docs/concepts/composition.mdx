@@ -84,6 +84,40 @@ per node and per edge.
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="editor.html"
+<div flowRoot [model]="model" class="h-[600px]">
+    <!-- behind the viewport, in screen space, panned and zoomed by the pattern itself -->
+    <svg flowBackground variant="dots"></svg>
+    <!-- the pannable, zoomable layer: what is inside is in flow coordinates -->
+    <div flowViewport>
+        <div flowEdges>
+            <ng-template [flowEdgesItem]="model" let-edge>
+                <svg:g [flowEdge]="edge" appEdge></svg:g>
+            </ng-template>
+        </div>
+        <div flowNodes>
+            <ng-template [flowNodesItem]="model" let-node>
+                <div [flowNode]="node"><app-node-body [node]="node" /></div>
+            </ng-template>
+        </div>
+        <svg flowConnectionLine></svg>
+    </div>
+    <!-- over the viewport, in screen space -->
+    <div flowSelectionBox></div>
+    <div flowControls>…</div>
+    <svg flowMiniMap></svg>
+</div>
+```
+
+In Angular, the item templates (`<ng-template flowNodesItem let-node>`, `flowEdgesItem`) are
+React's children functions: each renders once per node and per edge, and `[flowNodesItem]="model"`
+types the node by the model's registry. `app-node-body` and `appEdge` stand for your own
+components (below).
+
+</Framework>
+
 - `Flow.Edges` comes before `Flow.Nodes`, so nodes are drawn above edges.
 - `Flow.ConnectionLine` is in the viewport (it is in flow coordinates); `Flow.SelectionBox`,
   `Flow.Controls` and `MiniMap` are outside it (they are in screen pixels, and do not zoom).
@@ -202,6 +236,46 @@ a drag step renders the moved nodes only. `{#if}` on `node.type` narrows `node.d
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="node-body.ts"
+import { Component, input } from "@angular/core";
+import { FLOW, type FlowNode, type FlowTypes } from "@fragiola/flow-angular";
+
+interface Types extends FlowTypes {
+    readonly nodes: {
+        trigger: { label: string; event: string };
+        action: { label: string; service: string };
+    };
+}
+
+// rendered inside [flowNode]: its handles find their node through it
+@Component({
+    selector: "app-node-body",
+    imports: [FLOW],
+    template: `
+        @let step = node();
+        @if (step.type === "trigger") {
+            {{ step.data.label }} on {{ step.data.event }}
+            <div flowHandle type="source" side="right"></div>
+        } @else if (step.type === "action") {
+            <div flowHandle type="target" side="left"></div>
+            {{ step.data.label }} ({{ step.data.service }})
+            <div flowHandle type="source" side="right"></div>
+        }
+    `,
+})
+export class NodeBody {
+    readonly node = input.required<FlowNode<Types>>();
+}
+```
+
+In Angular, a node's content is a component like any other inside `[flowNode]`: its
+`[flowHandle]`s find their node through the element's injector. `@if` on `type` narrows `data`
+as React's `switch` does.
+
+</Framework>
+
 In React, keep the function stable (a module function, as here, or `useCallback`): a new function
 re-renders every node. `Flow.Nodes` re-renders a node only when its node object changes, so a drag step
 re-renders the moved nodes only.
@@ -280,6 +354,36 @@ defineProps<{ edge: FlowEdge<Types> }>();
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="edge.ts"
+import { Component, input } from "@angular/core";
+import { FLOW, type FlowEdge } from "@fragiola/flow-angular";
+
+// on the edge's own element, beside [flowEdge]: <svg:g [flowEdge]="edge" [appEdge]="edge">
+@Component({
+    selector: "g[appEdge]",
+    imports: [FLOW],
+    template: `
+        <svg:path flowEdgePath class="stroke-transparent stroke-[12]" />
+        <svg:path flowEdgePath class="stroke-slate-400" />
+        @if (edge().data?.label; as label) {
+            <xhtml:div flowEdgeLabel class="rounded bg-white px-1 text-xs">{{ label }}</xhtml:div>
+        }
+        <svg:circle flowReconnectAnchor end="source" />
+        <svg:circle flowReconnectAnchor end="target" />
+    `,
+})
+export class Edge {
+    readonly edge = input.required<FlowEdge<Types>>({ alias: "appEdge" });
+}
+```
+
+Inside an SVG group, the `svg:` prefix makes SVG elements and the `xhtml:` prefix the label's HTML
+(the label moves itself into the edges' HTML layer).
+
+</Framework>
+
 `Flow.EdgeLabel` is HTML, centred on the path's label point: SVG holds no HTML, so it is portalled
 into the edges' HTML layer. `Flow.NodeToolbar`, likewise, portals into the root, outside the zoom.
 
@@ -354,6 +458,28 @@ spread `{...props}` on your element (they carry the part's attachment, which reg
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<article [flowNode]="node">
+    {{ node.data.label }}
+</article>
+
+<button flowToggleInteractive #lock="flowToggleInteractive" aria-label="Lock the flow">
+    @if (lock.state().interactive) {
+        <svg lucideLockOpen aria-hidden="true"></svg>
+    } @else {
+        <svg lucideLock aria-hidden="true"></svg>
+    }
+</button>
+```
+
+In Angular there is no `render` prop: the element is yours, the directive goes on it
+(`<article [flowNode]>`), and a part's state is its `state()` signal, through the directive's
+`exportAs` (`#lock="flowToggleInteractive"`).
+
+</Framework>
+
 Spread the props on what you return: they carry the ref that registers the element with the
 engine, the part attributes the engine resolves presses from, and the structural style.
 
@@ -420,6 +546,30 @@ computed refs; `v-bind` puts the props, their template ref included, on your ele
 In Svelte the runes take the node or a getter of it and return `state` and `props` as getters;
 `{...own.props}` puts the props, the attachment that registers the element included, on your
 element.
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="plain-node.ts"
+import { Component, input } from "@angular/core";
+import { type FlowNode, injectNode } from "@fragiola/flow-angular";
+
+// <article [appPlainNode]="node"></article> inside a flowNodesItem template
+@Component({
+    selector: "article[appPlainNode]",
+    host: { "[class]": "own.state()?.selected ? 'node node-selected' : 'node'" },
+    template: "{{ node().data.label }}",
+})
+export class PlainNode {
+    readonly node = input.required<FlowNode<Types>>({ alias: "appPlainNode" });
+    // binds the host element: its attributes, structural style and registration with the engine
+    protected readonly own = injectNode(this.node);
+}
+```
+
+In Angular, `injectNode` takes the node (a value, a signal or a getter) and binds the host of the
+component that calls it; `state` and `props` are signals.
 
 </Framework>
 

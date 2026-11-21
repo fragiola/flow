@@ -96,6 +96,31 @@ const edges: FlowEdgeInput<Types>[] = [
 
 </Framework>
 
+<Framework name="angular">
+
+```ts
+import type { FlowEdgeInput, FlowNodeInput, FlowTypes } from "@fragiola/flow-angular";
+
+interface Types extends FlowTypes {
+    readonly nodes: { step: { label: string } };
+}
+
+const nodes: FlowNodeInput<Types>[] = [
+    { id: "start", type: "step", position: { x: 0, y: 0 }, data: { label: "Start" } },
+    { id: "fetch", type: "step", position: { x: -160, y: 140 }, data: { label: "Fetch data" } },
+    { id: "parse", type: "step", position: { x: 160, y: 140 }, data: { label: "Parse file" } },
+    { id: "save", type: "step", position: { x: 0, y: 280 }, data: { label: "Save" } },
+];
+
+const edges: FlowEdgeInput<Types>[] = [
+    { id: "start-fetch", source: "start", target: "fetch" },
+    { id: "start-parse", source: "start", target: "parse" },
+    { id: "fetch-save", source: "fetch", target: "save" },
+];
+```
+
+</Framework>
+
 Positions are in flow coordinates: x grows to the right, y grows down, and a node's position is
 its top-left corner.
 
@@ -157,6 +182,25 @@ slot is the registry's.
 A template cannot pass type arguments (`<Flow.Root<Types, typeof features>>`), so
 `typedFlow<Types, typeof features>()` gives you the same components, typed: `node.data` in a
 snippet is the registry's.
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+import { createFlowModel } from "@fragiola/flow-angular";
+import { connection } from "@fragiola/flow-angular/connection";
+import { drag } from "@fragiola/flow-angular/drag";
+import { selection } from "@fragiola/flow-angular/selection";
+
+const features = [selection(), drag(), connection()] as const;
+
+// a field of the component: the model types the templates' nodes and edges
+const model = createFlowModel<Types, typeof features>({ version: 1, nodes, edges }, { features });
+```
+
+A template cannot pass type arguments, so make the model yourself and give it to the root
+(`[model]="model"`): `[flowNodesItem]="model"` then types the template's `node` by the registry.
 
 </Framework>
 
@@ -223,13 +267,27 @@ The props are React's, `class` for `className`; a bare `fitView` attribute is `t
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div flowRoot [model]="model" [fitView]="{ padding: 0.2, maxZoom: 1 }" class="h-[480px] w-full bg-slate-50">
+    <!-- the layers below -->
+</div>
+```
+
+The root is a directive on your own element (`<div flowRoot>`); its inputs are React's props
+(`[defaultNodes]`, `[defaultEdges]` when it makes the model itself), and a bare `fitView`
+attribute is `true`.
+
+</Framework>
+
 </Step>
 <Step>
 
 **Add the layers.** `Flow.Background` sits behind the viewport. Inside `Flow.Viewport`, the edges
 come before the nodes so the nodes are drawn on top, and the connection line comes last. You
 render each node and each edge from a children function (a scoped slot in Vue, a snippet in
-Svelte).
+Svelte, an item template in Angular).
 
 <Framework name="react">
 
@@ -322,6 +380,41 @@ Svelte).
 
 `Flow.Edges` and `Flow.Nodes` render their `children` snippet once per edge and per node
 (`{#snippet children(edge)}`, `{#snippet children(node)}`), where React takes a children function.
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<!-- inside <div flowRoot> -->
+<svg flowBackground variant="dots" [gap]="20" [size]="2" class="text-slate-300"></svg>
+<div flowViewport>
+    <div flowEdges>
+        <ng-template [flowEdgesItem]="model" let-edge>
+            <svg:g [flowEdge]="edge">
+                <svg:path flowEdgePath class="stroke-slate-400 stroke-2 data-selected:stroke-blue-500" />
+            </svg:g>
+        </ng-template>
+    </div>
+    <div flowNodes>
+        <ng-template [flowNodesItem]="model" let-node>
+            <div
+                [flowNode]="node"
+                class="min-w-28 select-none rounded-lg border bg-white p-3 text-center data-selected:border-blue-500"
+            >
+                {{ node.data.label }}
+                <div flowHandle type="target" side="top" class="size-2.5 rounded-full border bg-white"></div>
+                <div flowHandle type="source" side="bottom" class="size-2.5 rounded-full border bg-white"></div>
+            </div>
+        </ng-template>
+    </div>
+    <svg flowConnectionLine class="stroke-blue-500 stroke-2"></svg>
+</div>
+```
+
+`flowEdges` and `flowNodes` render their item template once per edge and per node
+(`<ng-template flowEdgesItem let-edge>`, `flowNodesItem let-node`), where React takes a children
+function. An edge's elements are SVG: write them with the `svg:` prefix.
 
 </Framework>
 
@@ -535,6 +628,72 @@ const edges: FlowEdgeInput<Types>[] = [
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="basic-flow.ts"
+import { Component } from "@angular/core";
+import { createFlowModel, FLOW, type FlowEdgeInput, type FlowNodeInput, type FlowTypes } from "@fragiola/flow-angular";
+import { connection } from "@fragiola/flow-angular/connection";
+import { drag } from "@fragiola/flow-angular/drag";
+import { selection } from "@fragiola/flow-angular/selection";
+
+interface Types extends FlowTypes {
+    readonly nodes: { step: { label: string } };
+}
+
+const features = [selection(), drag(), connection()] as const;
+
+const nodes: FlowNodeInput<Types>[] = [
+    { id: "start", type: "step", position: { x: 0, y: 0 }, data: { label: "Start" } },
+    { id: "fetch", type: "step", position: { x: -160, y: 140 }, data: { label: "Fetch data" } },
+    { id: "parse", type: "step", position: { x: 160, y: 140 }, data: { label: "Parse file" } },
+    { id: "save", type: "step", position: { x: 0, y: 280 }, data: { label: "Save" } },
+];
+
+const edges: FlowEdgeInput<Types>[] = [
+    { id: "start-fetch", source: "start", target: "fetch" },
+    { id: "start-parse", source: "start", target: "parse" },
+    { id: "fetch-save", source: "fetch", target: "save" },
+];
+
+@Component({
+    selector: "app-basic-flow",
+    imports: [FLOW],
+    template: `
+        <div flowRoot [model]="model" [fitView]="{ padding: 0.2, maxZoom: 1 }" class="h-[480px] w-full bg-slate-50">
+            <svg flowBackground variant="dots" [gap]="20" [size]="2" class="text-slate-300"></svg>
+            <div flowViewport>
+                <div flowEdges>
+                    <ng-template [flowEdgesItem]="model" let-edge>
+                        <svg:g [flowEdge]="edge">
+                            <svg:path flowEdgePath class="stroke-slate-400 stroke-2 data-selected:stroke-blue-500" />
+                        </svg:g>
+                    </ng-template>
+                </div>
+                <div flowNodes>
+                    <ng-template [flowNodesItem]="model" let-node>
+                        <div
+                            [flowNode]="node"
+                            class="min-w-28 select-none rounded-lg border bg-white p-3 text-center data-selected:border-blue-500"
+                        >
+                            {{ node.data.label }}
+                            <div flowHandle type="target" side="top" class="size-2.5 rounded-full border bg-white"></div>
+                            <div flowHandle type="source" side="bottom" class="size-2.5 rounded-full border bg-white"></div>
+                        </div>
+                    </ng-template>
+                </div>
+                <svg flowConnectionLine class="stroke-blue-500 stroke-2"></svg>
+            </div>
+        </div>
+    `,
+})
+export class BasicFlow {
+    protected readonly model = createFlowModel<Types, typeof features>({ version: 1, nodes, edges }, { features });
+}
+```
+
+</Framework>
+
 ## What you have
 
 - **Pan** by dragging the pane, **zoom** with the wheel, a pinch or a double click: the core's
@@ -546,7 +705,7 @@ const edges: FlowEdgeInput<Types>[] = [
   the drop runs `edge.add`, and the new edge is drawn.
 
 Every one of those changes is a command on the model. Read it with `useFlow()` inside the root
-(a hook in React, a composable in Vue, a rune in Svelte), or a flow ref outside it ([The model and commands](/docs/concepts/model-and-commands)).
+(a hook in React, a composable in Vue, a rune in Svelte, an injection function in Angular), or a flow ref outside it ([The model and commands](/docs/concepts/model-and-commands)).
 
 ## Next steps
 

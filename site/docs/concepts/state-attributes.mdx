@@ -72,7 +72,7 @@ wheel (a scrolling list inside a node).
 }
 ```
 
-The same with Tailwind, on each part's `className` (`class` in Vue and Svelte):
+The same with Tailwind, on each part's `className` (`class` in Vue, Svelte and Angular):
 
 <Framework name="react">
 
@@ -100,6 +100,16 @@ The same with Tailwind, on each part's `className` (`class` in Vue and Svelte):
 <Flow.Node {node} class="rounded-lg border bg-white select-none data-dragging:cursor-grabbing data-selected:border-blue-500" />
 <Flow.Handle type="target" side="top" class="size-2.5 rounded-full bg-slate-400 data-valid:bg-green-500 data-invalid:bg-red-500" />
 <Flow.EdgePath class="stroke-slate-400 data-selected:stroke-blue-500" />
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div [flowNode]="node" class="rounded-lg border bg-white select-none data-dragging:cursor-grabbing data-selected:border-blue-500"></div>
+<div flowHandle type="target" side="top" class="size-2.5 rounded-full bg-slate-400 data-valid:bg-green-500 data-invalid:bg-red-500"></div>
+<svg:path flowEdgePath class="stroke-slate-400 data-selected:stroke-blue-500" />
 ```
 
 </Framework>

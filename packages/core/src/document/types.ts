@@ -46,12 +46,17 @@ export type NodeDataOf<T extends FlowTypes, K extends string> = T extends {
         : Record<string, unknown>
     : Record<string, unknown>;
 
-/** The edge types of a registry: the built-in ones and the app's. */
-export type EdgeTypeOf<T extends FlowTypes> =
-    | BuiltInEdgeType
-    | (T extends { readonly edges: infer E extends object }
-          ? keyof E & string
-          : never);
+/**
+ * The edge types of a registry: the built-in ones and the app's. An `any` registry (what Angular's
+ * template type-check gives a generic directive) takes every type, as `AnyTypes` does.
+ */
+export type EdgeTypeOf<T extends FlowTypes> = 0 extends 1 & T
+    ? string
+    :
+          | BuiltInEdgeType
+          | (T extends { readonly edges: infer E extends object }
+                ? keyof E & string
+                : never);
 
 /** The data of an edge type (a built-in type the registry does not name: any JSON object). */
 export type EdgeDataOf<T extends FlowTypes, K extends string> = T extends {

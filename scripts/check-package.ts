@@ -5,22 +5,24 @@
 // the packages are only ever packed and published through pnpm), then:
 //
 // - its packed `exports` (from `publishConfig.exports`) are the repo's `exports` without the source
-//   condition, and use only the `types`, `import` and `default` conditions, with targets in `dist`.
-//   A package published from its build output (`publishConfig.directory`, as an Angular adapter
-//   built by ng-packagr) is packed from that directory: its packed `exports` are the repo's
-//   without the source condition, relative to it (`./dist/x` is `./x`), and every target is a
-//   file of the tarball;
+//   condition, and use only the `types`, `import` and `default` conditions, with targets in `dist`
+//   (the Angular adapter's too: ng-packagr builds into `dist`, its manifests there removed, Data
+//   Grid's way). A package published from its build output (`publishConfig.directory`, Splitter's
+//   Angular adapter) is packed from that directory: its packed `exports` are the repo's without
+//   the source condition, relative to it (`./dist/x` is `./x`), and every target is a file of the
+//   tarball;
 // - publint (strict) and attw (`esm-only` profile) pass on the tarball;
-// - every adapter (`ADAPTERS`: each package under packages/ but the core) depends on the core at
-//   its exact version, and passes its smoke test: a scratch app outside the workspace installs
-//   that adapter's tarball (the core tarball comes as its dependency), typechecks, builds and
-//   loads its dev server. React's is a Vite + React app at the pins of examples/react; Vue's a
+// - every adapter (`ADAPTERS`: each package under packages/ but the core: React, Vue, Svelte,
+//   Angular) depends on the core at its exact version, and passes its smoke test: a scratch app
+//   outside the workspace installs that adapter's tarball (the core tarball comes as its
+//   dependency), typechecks, builds and loads its dev server. React's is a Vite + React app at the pins of examples/react; Vue's a
 //   Vite + Vue app whose single-file component vue-tsc checks, on TypeScript 6 (vue-tsc does not
 //   run on TypeScript 7 yet); Svelte's a Vite + Svelte 5 app whose component svelte-check checks,
-//   on TypeScript 6 too (svelte-check and svelte-package take TypeScript 5 or 6); the Angular Epic
-//   adds its entry and its smoke app, as Splitter's. A consumer's dev server adds the
-//   `development` condition, which once pointed Dockable's published `exports` at sources that
-//   are not in the tarball.
+//   on TypeScript 6 too (svelte-check and svelte-package take TypeScript 5 or 6); Angular's a Vite
+//   app with @analogjs/vite-plugin-angular and a standalone component checked by ngc (strict
+//   templates) on TypeScript 6.0 (the Angular compiler's), Splitter's, at the pins of examples/angular. A consumer's dev server
+//   adds the `development` condition, which once pointed Dockable's published `exports` at
+//   sources that are not in the tarball.
 //
 // A Svelte package publishes its components as `.svelte` files (`@sveltejs/package`), under the
 // `svelte` condition Svelte's tooling reads, beside `types` and `default`; its declarations import
@@ -302,8 +304,9 @@ export interface AdapterCheck {
  * The version of `name` a framework's smoke app installs, so that it installs nothing new: its
  * examples app's pin (examples/<framework>: React's Vite plugin and types, Vue's vue-tsc, its
  * Vite plugin and the TypeScript 6 vue-tsc runs on, Svelte's svelte, its Vite plugin,
- * svelte-check and TypeScript 6), else its package's own (packages/<framework>: an adapter whose
- * examples app does not exist yet, as Svelte's in #12 and Angular's next).
+ * svelte-check and TypeScript 6, Angular's Angular tools, Analog's plugin and TypeScript 6.0),
+ * else its package's own (packages/<framework>: an adapter whose examples app does not exist yet,
+ * as Svelte's in #12 and Angular's in #15; none today).
  */
 export function smokeVersion(framework: Framework, name: string): string {
     const manifests = [
@@ -791,6 +794,195 @@ function writeSvelteSmokeApp(dir: string, core: string, svelte: string): void {
     writeFileSync(join(dir, "src/app.svelte"), SVELTE_SMOKE_APP);
 }
 
+// The Angular package only, the core's names included: an Angular app installs that one only. One
+// standalone component with the directives on its own elements: a typed model from the package's
+// subpaths, a template per node and per edge typed by the model (`[flowNodesItem]="model"`),
+// `[(nodes)]`, a flow ref, a class from a part's state (`#n="flowNode"`), the minimap's and the
+// resizer's own entries, an injection function, bootstrapped zoneless, checked by ngc.
+const ANGULAR_SMOKE_MAIN = `import {
+    Component,
+    provideZonelessChangeDetection,
+    signal,
+} from "@angular/core";
+import { bootstrapApplication } from "@angular/platform-browser";
+import {
+    createFlowModel,
+    createFlowRef,
+    FLOW,
+    type FlowJson,
+    type FlowNode,
+    type FlowTypes,
+    injectViewport,
+} from "@fragiola/flow-angular";
+import { connection } from "@fragiola/flow-angular/connection";
+import { drag } from "@fragiola/flow-angular/drag";
+import { FLOW_MINIMAP, minimap } from "@fragiola/flow-angular/minimap";
+import { FLOW_RESIZE, resize } from "@fragiola/flow-angular/resize";
+import { selection } from "@fragiola/flow-angular/selection";
+
+interface Types extends FlowTypes {
+    readonly nodes: { task: { title: string } };
+}
+
+const features = [selection(), drag(), connection(), resize(), minimap()] as const;
+
+const json: FlowJson<Types> = {
+    version: 1,
+    nodes: [
+        { id: "a", type: "task", position: { x: 0, y: 0 }, data: { title: "A" } },
+        { id: "b", type: "task", position: { x: 0, y: 200 }, data: { title: "B" } },
+    ],
+    edges: [{ id: "ab", source: "a", target: "b" }],
+};
+
+@Component({
+    selector: "app-zoom",
+    template: "{{ viewport().zoom }}",
+})
+class Zoom {
+    readonly viewport = injectViewport();
+}
+
+@Component({
+    selector: "app-root",
+    imports: [FLOW, FLOW_MINIMAP, FLOW_RESIZE, Zoom],
+    template: \`
+        <div flowRoot [model]="model" [flowRef]="flow" [(nodes)]="nodes" panOnScroll style="height: 100vh">
+            <svg flowBackground variant="dots"></svg>
+            <div flowViewport>
+                <div flowEdges>
+                    <ng-template [flowEdgesItem]="model" let-edge>
+                        <svg:g [flowEdge]="edge"><svg:path flowEdgePath /></svg:g>
+                    </ng-template>
+                </div>
+                <div flowNodes>
+                    <ng-template [flowNodesItem]="model" let-node>
+                        <div [flowNode]="node" #n="flowNode" [class.selected]="n.state()?.selected">
+                            {{ node.data.title }}
+                            <div flowHandle type="target" side="top"></div>
+                            <div flowHandle type="source" side="bottom"></div>
+                            <div flowNodeResizer [minWidth]="40"></div>
+                        </div>
+                    </ng-template>
+                </div>
+                <svg flowConnectionLine></svg>
+            </div>
+            <div flowControls>
+                <button flowZoomIn aria-label="Zoom in">+</button>
+                <button flowFitView aria-label="Fit view" (click)="fit()">Fit</button>
+                <app-zoom />
+            </div>
+            <svg flowMiniMap [width]="200" [height]="150"></svg>
+        </div>
+    \`,
+})
+class App {
+    readonly model = createFlowModel<Types, typeof features>(json, { features });
+    readonly flow = createFlowRef<Types, typeof features>();
+    readonly nodes = signal<readonly FlowNode<Types>[]>(this.model.get("all-nodes"));
+
+    fit(): void {
+        console.log(this.flow.current?.engine.get("viewport"), this.nodes().length);
+    }
+}
+
+bootstrapApplication(App, {
+    providers: [provideZonelessChangeDetection()],
+}).catch((error: unknown) => console.error(error));
+`;
+
+/**
+ * A scratch Vite + Angular app in `dir` (@analogjs/vite-plugin-angular) that depends on the
+ * Angular tarball only (the core tarball comes as its dependency), on the Angular tools and the
+ * TypeScript 6.0 its pins name (`smokeVersion`: examples/angular's).
+ */
+function writeAngularSmokeApp(
+    dir: string,
+    core: string,
+    angular: string,
+): void {
+    const version = (name: string) => smokeVersion("angular", name);
+    const manifest = {
+        name: "flow-smoke-angular",
+        private: true,
+        type: "module",
+        dependencies: {
+            "@angular/common": version("@angular/common"),
+            "@angular/compiler": version("@angular/compiler"),
+            "@angular/core": version("@angular/core"),
+            "@angular/platform-browser": version("@angular/platform-browser"),
+            "@fragiola/flow-angular": `file:${angular}`,
+            rxjs: version("rxjs"),
+        },
+        devDependencies: {
+            "@analogjs/vite-plugin-angular": version(
+                "@analogjs/vite-plugin-angular",
+            ),
+            "@angular/build": version("@angular/build"),
+            "@angular/compiler-cli": version("@angular/compiler-cli"),
+            typescript: version("typescript"),
+            vite: version("vite"),
+        },
+    };
+    writeFileSync(
+        join(dir, "package.json"),
+        `${JSON.stringify(manifest, null, 4)}\n`,
+    );
+    // the core tarball for the version the Angular tarball pins; the Analog plugin's TypeScript is
+    // the app's (6.0), and @angular/build's native helpers keep their prebuilt binaries
+    writeFileSync(
+        join(dir, "pnpm-workspace.yaml"),
+        [
+            "overrides:",
+            `  "@fragiola/flow": "file:${core}"`,
+            "packageExtensions:",
+            '  "@analogjs/vite-plugin-angular":',
+            "    peerDependencies:",
+            '      typescript: "*"',
+            "allowBuilds:",
+            "  esbuild: true",
+            '  "@parcel/watcher": false',
+            "  lmdb: false",
+            "  msgpackr-extract: false",
+            "",
+        ].join("\n"),
+    );
+    writeFileSync(
+        join(dir, "vite.config.js"),
+        `import angular from "@analogjs/vite-plugin-angular";\nimport { defineConfig } from "vite";\n\nexport default defineConfig({ plugins: [angular({ tsconfig: "tsconfig.json" })] });\n`,
+    );
+    writeFileSync(
+        join(dir, "index.html"),
+        `<!doctype html>\n<html lang="en">\n<body>\n<app-root></app-root>\n<script type="module" src="/src/main.ts"></script>\n</body>\n</html>\n`,
+    );
+    // strict, strict templates, with the published declarations checked too (no skipLibCheck)
+    const tsconfig = {
+        compilerOptions: {
+            target: "ES2022",
+            lib: ["ES2022", "DOM", "DOM.Iterable"],
+            module: "ESNext",
+            moduleResolution: "bundler",
+            strict: true,
+            noUncheckedIndexedAccess: true,
+            verbatimModuleSyntax: true,
+            useDefineForClassFields: false,
+            types: [],
+        },
+        angularCompilerOptions: {
+            strictTemplates: true,
+            strictInjectionParameters: true,
+            strictInputAccessModifiers: true,
+        },
+        include: ["src"],
+    };
+    writeFileSync(
+        join(dir, "tsconfig.json"),
+        `${JSON.stringify(tsconfig, null, 4)}\n`,
+    );
+    mkdirSync(join(dir, "src"));
+    writeFileSync(join(dir, "src/main.ts"), ANGULAR_SMOKE_MAIN);
+}
+
 function freePort(): Promise<number> {
     return new Promise((resolve, reject) => {
         const server = createServer();
@@ -932,13 +1124,29 @@ async function svelteSmoke(
 }
 
 /**
+ * The Angular smoke test: the scratch Vite + Angular app installs the Angular tarball, typechecks
+ * (ngc, strict templates), builds and loads its dev server.
+ */
+async function angularSmoke(
+    app: string,
+    tarballs: { core: string; adapter: string },
+): Promise<void> {
+    writeAngularSmokeApp(app, tarballs.core, tarballs.adapter);
+    run("pnpm", ["install", "--no-frozen-lockfile"], app);
+    run("pnpm", ["exec", "ngc", "-p", "tsconfig.json", "--noEmit"], app);
+    run("pnpm", ["exec", "vite", "build"], app);
+    await loadThroughDevServer(app, "/src/main.ts");
+}
+
+/**
  * Every adapter, one per package under packages/ but the core (`unlistedPackages` checks it):
- * React, Vue, Svelte; Angular is added by its Epic.
+ * React, Vue, Svelte, Angular.
  */
 export const ADAPTERS: readonly AdapterCheck[] = [
     { dir: "react", framework: "react", smoke: reactSmoke },
     { dir: "vue", framework: "vue", smoke: vueSmoke },
     { dir: "svelte", framework: "svelte", smoke: svelteSmoke },
+    { dir: "angular", framework: "angular", smoke: angularSmoke },
 ];
 
 /** The packages/ directories that are neither the core nor an adapter of `adapters`. */

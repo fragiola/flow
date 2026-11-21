@@ -58,6 +58,26 @@ In Svelte, its `children` snippet (its parts) gets `{ state }`, the `EdgeState` 
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div flowEdges>
+    <ng-template [flowEdgesItem]="model" let-edge>
+        <svg:g [flowEdge]="edge" [attr.aria-label]="edge.source + ' to ' + edge.target">
+            <svg:path flowEdgePath class="stroke-gray-400 stroke-2" />
+            @if (edge.data?.label) {
+                <xhtml:div flowEdgeLabel>{{ edge.data?.label }}</xhtml:div>
+            }
+        </svg:g>
+    </ng-template>
+</div>
+```
+
+In Angular, `flowEdge` goes on your SVG group (`<svg:g>`), with a path when you write none; its
+state is the `state()` signal (`#e="flowEdge"`), the `EdgeState` of the table below.
+
+</Framework>
+
 The path follows the edge's `type`: `bezier` (none is `bezier`), `smoothstep`, `step`,
 `straight`. An app type gets the bezier path and its ends, to draw its own `d` on
 `Flow.EdgePath` (see [Custom edges](/docs/guides/custom-edges)). For an edge drawn by hand,

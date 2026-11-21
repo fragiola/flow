@@ -6,7 +6,7 @@ description: A flow ref gives the model and the engine of a root to code outside
 A flow ref is how code outside `Flow.Root` reaches its model and engine: pass it as the root's
 `flowRef`, and `ref.current` is `{ model, engine }` while the root is mounted, `null` otherwise.
 In Vue it is `:flow-ref`, and `flow.value` holds them; in Svelte, `flowRef={flow}` and
-`flow.current`, as here.
+`flow.current`, as here; in Angular, `[flowRef]="flow"` and `flow.current`, a signal's value.
 Inside the root, [`useFlow`](/docs/api/primitives/hooks) is simpler.
 
 ## `useFlowRef`
@@ -77,6 +77,33 @@ when the root mounts or unmounts.
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="editor.ts"
+import { Component } from "@angular/core";
+import { createFlowRef, FLOW } from "@fragiola/flow-angular";
+
+@Component({
+    selector: "app-editor",
+    imports: [FLOW],
+    template: `
+        <button type="button" [disabled]="!flow.current" (click)="flow.current?.engine.run('fit-view')">Fit</button>
+        <div flowRoot [flowRef]="flow" [features]="features" [defaultNodes]="nodes">…</div>
+    `,
+})
+export class Editor {
+    protected readonly features = features;
+    protected readonly nodes = nodes;
+    protected readonly flow = createFlowRef<Types, typeof features>();
+}
+```
+
+In Angular, the flow ref's `current` is a signal's value: a template, a `computed` or an `effect`
+that reads it follows the root as it attaches and detaches. `injectFlowRef()` is the same, in an
+injection context.
+
+</Framework>
+
 ## `createFlowRef`
 
 `createFlowRef<T, F>()` makes one outside a component (a module, a test). It does not re-render
@@ -107,6 +134,16 @@ flow.value?.model.run("node.add", { type: "step", position: { x: 0, y: 0 }, data
 ```ts
 const flow = createFlowRef<Types, typeof features>();
 // <Flow.Root flowRef={flow} …>
+flow.current?.model.run("node.add", { type: "step", position: { x: 0, y: 0 }, data: { label: "New" } });
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+const flow = createFlowRef<Types, typeof features>();
+// <div flowRoot [flowRef]="flow" …>
 flow.current?.model.run("node.add", { type: "step", position: { x: 0, y: 0 }, data: { label: "New" } });
 ```
 

@@ -218,6 +218,60 @@ function onRestore() {
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="toolbar.ts"
+import { Component } from "@angular/core";
+import { type FlowDocumentJson, injectFlow, validateFlow, type Viewport } from "@fragiola/flow-angular";
+import { load, save } from "./persistence";
+
+const KEY = "my-app:flow";
+
+interface Saved {
+    flow: FlowDocumentJson<Types>;
+    viewport: Viewport;
+}
+
+function isViewport(value: unknown): value is Viewport {
+    const { x, y, zoom } = (value ?? {}) as Partial<Record<string, unknown>>;
+    return [x, y, zoom].every((n) => typeof n === "number" && Number.isFinite(n));
+}
+
+// rendered inside [flowRoot]
+@Component({
+    selector: "app-toolbar",
+    template: `
+        <div role="toolbar" aria-label="Flow file">
+            <button type="button" (click)="save()">Save</button>
+            <button type="button" (click)="restore()">Restore</button>
+        </div>
+    `,
+})
+export class Toolbar {
+    private readonly flow = injectFlow<Types, typeof features>();
+
+    protected save(): void {
+        const saved: Saved = { flow: this.flow.model().get("flow-json"), viewport: this.flow.engine.get("viewport") };
+        save(KEY, saved);
+    }
+
+    protected restore(): void {
+        const model = this.flow.model();
+        const saved = load<Saved>(KEY);
+        if (!saved || !isViewport(saved.viewport)) return;
+        if (validateFlow(saved.flow, { features }).length > 0) return;
+        const commands = model.get("commands-to", {
+            nodes: saved.flow.nodes,
+            edges: saved.flow.edges,
+        });
+        if (commands.length > 0) model.run("batch", { commands: [...commands] });
+        this.flow.engine.run("set-viewport", saved.viewport);
+    }
+}
+```
+
+</Framework>
+
 `validateFlow(json, { features })` returns every problem with its JSON path (an empty list for a
 valid document); pass the features the flow installs, since a field of one that is missing
 (`selected` without `selection()`) is a problem.
@@ -306,6 +360,35 @@ const model = restore();
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="editor.ts"
+import { Component } from "@angular/core";
+import { createFlowModel, FLOW, type FlowJson, validateFlow } from "@fragiola/flow-angular";
+
+const EMPTY: FlowJson<Types> = { version: 1, nodes: [], edges: [] };
+
+function restore() {
+    const saved = load<Saved>(KEY)?.flow;
+    const valid = saved !== undefined && validateFlow(saved, { features }).length === 0;
+    return createFlowModel<Types, typeof features>(valid ? (saved as FlowJson<Types>) : EMPTY, {
+        features,
+    });
+}
+
+@Component({
+    selector: "app-editor",
+    imports: [FLOW],
+    template: `<div flowRoot [model]="model" class="flow"><!-- … --></div>`,
+})
+export class Editor {
+    // once, in a field: another model would get another engine
+    protected readonly model = restore();
+}
+```
+
+</Framework>
+
 ## Save on every change
 
 `model.subscribe` tells every commit. Skip the transient steps of a gesture (a drag moves its nodes
@@ -357,6 +440,22 @@ $effect(() =>
         save(KEY, { flow: model.get("flow-json"), viewport } satisfies Saved);
     }),
 );
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+// in the editor's constructor, after the model is created: the listener stops with the component
+const stop = this.model.subscribe((event) => {
+    if (event.transient) return;
+    // the same record as the toolbar's: the flow changes, the saved viewport stays
+    const viewport = load<Saved>(KEY)?.viewport ?? { x: 0, y: 0, zoom: 1 };
+    const saved: Saved = { flow: this.model.get("flow-json"), viewport };
+    save(KEY, saved);
+});
+inject(DestroyRef).onDestroy(stop);
 ```
 
 </Framework>

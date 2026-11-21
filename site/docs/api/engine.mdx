@@ -69,6 +69,33 @@ is empty.
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="fit-button.ts"
+import { Component } from "@angular/core";
+import { injectFlow } from "@fragiola/flow-angular";
+
+// rendered inside [flowRoot]
+@Component({
+    selector: "app-fit-button",
+    template: `<button type="button" (click)="fit()">Fit</button>`,
+})
+export class FitButton {
+    private readonly flow = injectFlow<Types, typeof features>();
+
+    protected fit(): void {
+        this.flow.engine.run("fit-view", { padding: 0.2 });
+    }
+}
+```
+
+In Angular, `useFlow` is `injectFlow`: call it in a field or a constructor of a component inside
+the root. The root creates its engine after its first render (`afterNextRender`): `engine` is
+there from the start and forwards to it, and before that an action is refused and a read is
+empty.
+
+</Framework>
+
 ## `createFlowEngine`
 
 `createFlowEngine<T, F>(model, options?)` returns a `FlowEngine<T, F>`. Give it the root element
@@ -286,7 +313,7 @@ const stop = engine.subscribe((event) => {
 ## The adapter contract
 
 `engine.adapter` is a `FlowEngineAdapter`: what a framework adapter (`@fragiola/flow-react`,
-`@fragiola/flow-vue`, `@fragiola/flow-svelte`, and the Angular one to come) calls. An app never needs it. The adapter renders and
+`@fragiola/flow-vue`, `@fragiola/flow-svelte`, `@fragiola/flow-angular`) calls. An app never needs it. The adapter renders and
 attaches; the engine listens to the root itself and resolves every press, key and wheel from the
 part attributes, so every adapter behaves the same.
 

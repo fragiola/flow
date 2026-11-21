@@ -1,6 +1,7 @@
 // From Splitter (fragiola/splitter, site/tests/docs-reference.test.ts), itself from Dockable; same
 // author and licence, rewritten for Flow's packages.
 import { readdirSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join } from "node:path";
 import { compile } from "svelte/compiler";
 import { describe, expect, it } from "vitest";
@@ -20,7 +21,9 @@ import { describe, expect, it } from "vitest";
 //   the model's and the engine's verbs and every engine event, and have a row for every member of
 //   the model, the engine and its adapter, every error code, every field of the document, the
 //   command bus types, the engine's payloads and reads, the features' options and the path
-//   helpers' options; every command of the registry has its section on the generated page.
+//   helpers' options; every command of the registry has its section on the generated page;
+// - each other adapter (Vue, Svelte, Angular) has its page mapping React's API, naming every export
+//   and every prop (or input and output) its parts add, and a block beside every React one.
 //
 // Interfaces are read with regular expressions (fields are the 4-space-indented `name?:` lines of
 // an `export interface … {` block), which is enough for this codebase's formatting (Biome).
@@ -29,6 +32,7 @@ const ROOT = join(import.meta.dirname, "../..");
 const REACT_SRC = join(ROOT, "packages/react/src");
 const VUE_SRC = join(ROOT, "packages/vue/src");
 const SVELTE_SRC = join(ROOT, "packages/svelte/src");
+const ANGULAR_SRC = join(ROOT, "packages/angular/src");
 const CORE_SRC = join(ROOT, "packages/core/src");
 const API = join(import.meta.dirname, "../docs/api");
 
@@ -553,8 +557,9 @@ describe("the React reference", () => {
 });
 
 /**
- * The pages with React code, which show it in Vue and in Svelte too (`<Framework name="vue">`,
- * `<Framework name="svelte">`). Every page whose snippets use the React API belongs here.
+ * The pages with React code, which show it in Vue, in Svelte and in Angular too
+ * (`<Framework name="vue">`, `<Framework name="svelte">`, `<Framework name="angular">`). Every page
+ * whose snippets use the React API belongs here.
  */
 const PAGES_IN_EVERY_FRAMEWORK = [
     "index",
@@ -1003,7 +1008,7 @@ describe("the Svelte reference", () => {
                     /^```(\w+)[^\n]*\n([\s\S]*?)^```/gm,
                 ),
             ];
-            for (const framework of ["vue", "svelte"]) {
+            for (const framework of ["vue", "svelte", "angular"]) {
                 if (slug === `api/primitives/${framework}`) continue;
                 for (const [, lang, code] of fences) {
                     expect(
@@ -1017,6 +1022,236 @@ describe("the Svelte reference", () => {
                 }
             }
         }
+    });
+});
+
+// The Angular tools that check the Angular blocks: TypeScript 6 and the template parser of
+// packages/angular (the site runs on TypeScript 7, which has no JavaScript compiler API), loaded
+// from that package's dependencies.
+const angularRequire = createRequire(
+    join(ROOT, "packages/angular/package.json"),
+);
+const ts = angularRequire("typescript") as {
+    ScriptTarget: { Latest: number };
+    createSourceFile(
+        fileName: string,
+        code: string,
+        target: number,
+    ): {
+        // the syntax errors the parser found (not part of TypeScript's typed API)
+        parseDiagnostics?: readonly {
+            messageText: string | { messageText: string };
+        }[];
+    };
+};
+const angularCompiler = (await import(
+    angularRequire.resolve("@angular/compiler")
+)) as {
+    parseTemplate(
+        template: string,
+        url: string,
+    ): { errors: readonly { msg: string }[] | null };
+};
+
+/** Every `.ts` file under `dir`. */
+function angularFiles(dir: string): string[] {
+    return readdirSync(dir, { recursive: true, encoding: "utf-8" })
+        .filter((file) => file.endsWith(".ts"))
+        .map((file) => join(dir, file));
+}
+
+/** An Angular directive's inputs and outputs, as a template binds them (aliases honoured). */
+function directiveBindings(source: string): string[] {
+    const names: string[] = [];
+    // a field's statement ends at its first `;` (an input's transform holds none)
+    for (const match of source.matchAll(
+        /^ {4}readonly (\w+)\s*(?::[^=\n]+)?=\s*(?:input|model|output)\b([^;]*);/gm,
+    )) {
+        const [, name = "", rest = ""] = match;
+        names.push(/alias:\s*"(\w+)"/.exec(rest)?.[1] ?? name);
+    }
+    return names;
+}
+
+/** The fenced code of every `<Framework name="angular">` block of a page. */
+function angularFences(mdx: string): { lang: string; code: string }[][] {
+    return [
+        ...mdx.matchAll(/<Framework name="angular">([\s\S]*?)<\/Framework>/g),
+    ].map((block) =>
+        [...(block[1] ?? "").matchAll(/^```(\w+)[^\n]*\n([\s\S]*?)^```/gm)].map(
+            ([, lang = "", code = ""]) => ({ lang, code }),
+        ),
+    );
+}
+
+/** The template parser's errors for `template` (a component's, or an `html` fence). */
+function templateErrors(template: string, url: string): string[] {
+    return (angularCompiler.parseTemplate(template, url).errors ?? []).map(
+        (error) => error.msg,
+    );
+}
+
+/** TypeScript's syntax errors for `code` (no type check: a snippet reads names of its page). */
+function syntaxErrors(code: string, fileName: string): string[] {
+    const { parseDiagnostics = [] } = ts.createSourceFile(
+        fileName,
+        code,
+        ts.ScriptTarget.Latest,
+    );
+    return parseDiagnostics.map((diagnostic) =>
+        typeof diagnostic.messageText === "string"
+            ? diagnostic.messageText
+            : diagnostic.messageText.messageText,
+    );
+}
+
+describe("the Angular reference", () => {
+    const publicApi = read(join(ANGULAR_SRC, "public-api.ts"));
+    const angularPage = page("primitives/angular");
+    const ANGULAR_FEATURE_ENTRIES = ["minimap", "resize"] as const;
+    const entrySource = (entry: string) =>
+        read(join(ANGULAR_SRC, entry, "index.ts"));
+    /** Every export of an entry: its `export { … } from` names and its `export const`s. */
+    const entryExports = (source: string) => [
+        ...namedExports(source).map((entry) => entry.name),
+        ...[...source.matchAll(/^export const (\w+)/gm)].map(
+            (match) => match[1] ?? "",
+        ),
+    ];
+    /** Every directive file of the package: the main entry's and the feature entries'. */
+    const directiveFiles = [
+        ...angularFiles(join(ANGULAR_SRC, "lib/directives")),
+        ...ANGULAR_FEATURE_ENTRIES.flatMap((entry) =>
+            angularFiles(join(ANGULAR_SRC, entry)),
+        ),
+    ].filter((file) => file.endsWith(".directive.ts"));
+
+    it("re-exports the core, and FLOW lists every directive of the main entry", () => {
+        expect(publicApi).toMatch(/^export \* from "@fragiola\/flow";$/m);
+        const directives = namedExports(publicApi)
+            .map((entry) => entry.name)
+            .filter((name) => /^Flow\w+Directive$/.test(name));
+        const listed = [
+            ...(
+                /export const FLOW = \[([\s\S]*?)\]/.exec(
+                    read(join(ANGULAR_SRC, "lib/flow.ts")),
+                )?.[1] ?? ""
+            ).matchAll(/(Flow\w+Directive)/g),
+        ].map((match) => match[1] ?? "");
+        expect(listed.sort()).toEqual(directives.sort());
+        // every React primitive, the features' included, is an Angular directive
+        const all = [
+            ...directives,
+            ...ANGULAR_FEATURE_ENTRIES.flatMap((entry) =>
+                entryExports(entrySource(entry)),
+            ),
+        ];
+        for (const { name } of primitives) {
+            expect(all, name).toContain(`Flow${name}Directive`);
+        }
+    });
+
+    it("mentions every export of the Angular package and its /minimap and /resize entries on api/primitives/angular.mdx", () => {
+        const exports = [
+            ...entryExports(publicApi),
+            ...ANGULAR_FEATURE_ENTRIES.flatMap((entry) =>
+                entryExports(entrySource(entry)),
+            ),
+        ];
+        expect(exports.length).toBeGreaterThan(90);
+        for (const name of exports) {
+            expect(
+                mentions(angularPage, name),
+                `${name} on api/primitives/angular.mdx`,
+            ).toBe(true);
+        }
+    });
+
+    it("has a row for every input and output of every directive: on api/primitives/angular.mdx, or on the part's React page", () => {
+        // the reader follows aliases and outputs
+        expect(
+            directiveBindings(
+                read(join(ANGULAR_SRC, "lib/directives/root.directive.ts")),
+            ),
+        ).toEqual(
+            expect.arrayContaining(["model", "nodesChange", "panOnScroll"]),
+        );
+        const angularRows = tableRowNames(angularPage);
+        let checked = 0;
+        for (const file of directiveFiles) {
+            const base = file.split("/").pop()?.replace(".directive.ts", "");
+            const reactPage = join(API, `primitives/${base}.mdx`);
+            const rows = new Set([
+                ...angularRows,
+                ...tableRowNames(read(reactPage)),
+            ]);
+            for (const binding of directiveBindings(read(file))) {
+                checked++;
+                expect(rows.has(binding), `${base}: ${binding}`).toBe(true);
+            }
+        }
+        expect(checked).toBeGreaterThan(50);
+    });
+
+    it("is in the sidebar, and the pages with React code show it in Angular too", () => {
+        expect(read(join(API, "../config.json"))).toContain(
+            '"path": "api/primitives/angular"',
+        );
+        for (const slug of [
+            ...PAGES_IN_EVERY_FRAMEWORK,
+            ...primitives.map((part) => `api/${part.slug}`),
+        ]) {
+            const mdx = read(join(API, "..", `${slug}.mdx`));
+            expect(mdx, slug).toContain('<Framework name="angular">');
+            // an Angular block wherever there is a React one
+            expect(mdx.split('<Framework name="angular">').length, slug).toBe(
+                mdx.split('<Framework name="react">').length,
+            );
+        }
+    });
+
+    it("writes every Angular block in Angular: its TypeScript parses, its templates parse", () => {
+        expect(templateErrors('<div [flowNode]="node"', "bad")).not.toEqual([]);
+        expect(syntaxErrors("const = 1;", "bad.ts")).not.toEqual([]);
+        let templates = 0;
+        for (const slug of allPages()) {
+            const mdx = read(join(API, "..", `${slug}.mdx`));
+            for (const [index, fences] of angularFences(mdx).entries()) {
+                const where = `${slug} [${index}]`;
+                expect(
+                    fences.length,
+                    `${where}: an Angular block with no code`,
+                ).toBeGreaterThan(0);
+                for (const { lang, code } of fences) {
+                    expect(
+                        ["ts", "html", "bash"],
+                        `${where}: a ${lang} fence`,
+                    ).toContain(lang);
+                    expect(code, where).not.toMatch(
+                        /@fragiola\/flow-(react|vue|svelte)\b|from "(react|vue|svelte)"|@lucide\/(svelte|vue)|lucide-react/,
+                    );
+                    if (lang === "ts") {
+                        expect(syntaxErrors(code, `${slug}.ts`), where).toEqual(
+                            [],
+                        );
+                        for (const [, template = ""] of code.matchAll(
+                            /\btemplate:\s*`([\s\S]*?)`/g,
+                        )) {
+                            expect(
+                                templateErrors(template, where),
+                                where,
+                            ).toEqual([]);
+                            templates++;
+                        }
+                    }
+                    if (lang === "html") {
+                        expect(templateErrors(code, where), where).toEqual([]);
+                        templates++;
+                    }
+                }
+            }
+        }
+        expect(templates).toBeGreaterThan(100);
     });
 });
 
