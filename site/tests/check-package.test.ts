@@ -147,6 +147,7 @@ describe("the adapters the package check covers", () => {
     it("smoke-test each adapter with its own framework's app", () => {
         expect(ADAPTERS.map(({ dir, framework }) => [dir, framework])).toEqual([
             ["react", "react"],
+            ["vue", "vue"],
         ]);
     });
 
@@ -175,13 +176,32 @@ describe("the adapters the package check covers", () => {
         expect(() => smokeVersion("react", "left-pad")).toThrow(/no pin/);
     });
 
+    it("pin the Vue smoke app at the package's Vue and Vite, with vue-tsc on TypeScript 6", () => {
+        const pkg = JSON.parse(
+            readFileSync(
+                join(import.meta.dirname, "../../packages/vue/package.json"),
+                "utf8",
+            ),
+        ) as { devDependencies: Record<string, string> };
+        expect(smokeVersion("vue", "vue")).toBe(pkg.devDependencies.vue);
+        expect(smokeVersion("vue", "vite")).toBe(pkg.devDependencies.vite);
+        // vue-tsc does not run on TypeScript 7, which the package builds with
+        expect(pkg.devDependencies.typescript).toMatch(/^7\./);
+        expect(smokeVersion("vue", "typescript")).toMatch(/^6\./);
+        expect(smokeVersion("vue", "vue-tsc")).toMatch(/^\d+\.\d+\.\d+$/);
+        expect(smokeVersion("vue", "@vitejs/plugin-vue")).toMatch(
+            /^\d+\.\d+\.\d+$/,
+        );
+        expect(() => smokeVersion("vue", "left-pad")).toThrow(/no pin/);
+    });
+
     it("finds a package that is neither the core nor a listed adapter", () => {
-        const dirs = ["core", "react", "vue", "solid"];
-        expect(unlistedPackages(dirs)).toEqual(["vue", "solid"]);
+        const dirs = ["core", "react", "vue", "svelte", "solid"];
+        expect(unlistedPackages(dirs)).toEqual(["svelte", "solid"]);
         expect(
             unlistedPackages(dirs, [
                 ...ADAPTERS,
-                { dir: "vue", framework: "vue", smoke: async () => {} },
+                { dir: "svelte", framework: "svelte", smoke: async () => {} },
             ]),
         ).toEqual(["solid"]);
     });

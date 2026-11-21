@@ -14,8 +14,10 @@
 // - every adapter (`ADAPTERS`: each package under packages/ but the core) depends on the core at
 //   its exact version, and passes its smoke test: a scratch app outside the workspace installs
 //   that adapter's tarball (the core tarball comes as its dependency), typechecks, builds and
-//   loads its dev server. React's is a Vite + React app at the pins of examples/react; each later adapter Epic (Vue, Svelte,
-//   Angular) adds its entry and its smoke app, as Splitter's. A consumer's dev server adds the
+//   loads its dev server. React's is a Vite + React app at the pins of examples/react; Vue's a
+//   Vite + Vue app whose single-file component vue-tsc checks, on TypeScript 6 (vue-tsc does not
+//   run on TypeScript 7 yet); each later adapter Epic (Svelte, Angular) adds its entry and its
+//   smoke app, as Splitter's. A consumer's dev server adds the
 //   `development` condition, which once pointed Dockable's published `exports` at sources that
 //   are not in the tarball.
 import { execFileSync, spawn } from "node:child_process";
@@ -209,33 +211,48 @@ export interface AdapterCheck {
 }
 
 /**
- * The pins a smoke app installs that no package of the repo pins: none since the React examples
- * app (examples/react) pins the Vite plugin; a later adapter's smoke app may need one before its
- * examples app exists.
+ * The pins a framework's smoke app installs that no package of the repo pins (or pins otherwise):
+ * Vue's vue-tsc, its Vite plugin and the TypeScript 6 vue-tsc runs on (packages/vue builds with
+ * TypeScript 7), until the Vue examples app (examples/vue) pins them, as Splitter's does.
  */
-const SMOKE_PINS: Readonly<Record<string, string>> = {};
+const SMOKE_PINS: Readonly<
+    Partial<Record<Framework, Readonly<Record<string, string>>>>
+> = {
+    vue: {
+        "@vitejs/plugin-vue": "6.0.10",
+        typescript: "6.0.3",
+        "vue-tsc": "3.3.14",
+    },
+};
 
 /**
  * The version of `name` a framework's smoke app installs, so that it installs nothing new: its
- * examples app's pin (examples/<framework>), else its package's own (packages/<framework>), else
- * {@link SMOKE_PINS}.
+ * examples app's pin (examples/<framework>), else {@link SMOKE_PINS}, else its package's own
+ * (packages/<framework>).
  */
 export function smokeVersion(framework: Framework, name: string): string {
-    for (const manifestPath of [
+    const manifests = [
         join(root, "examples", framework, "package.json"),
         join(root, "packages", framework, "package.json"),
-    ]) {
-        if (!existsSync(manifestPath)) continue;
-        const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
-            dependencies?: Record<string, string>;
-            devDependencies?: Record<string, string>;
-        };
+    ].map((manifestPath) =>
+        existsSync(manifestPath)
+            ? (JSON.parse(readFileSync(manifestPath, "utf8")) as {
+                  dependencies?: Record<string, string>;
+                  devDependencies?: Record<string, string>;
+              })
+            : undefined,
+    );
+    const pinOf = (manifest: (typeof manifests)[number]) => {
         const version =
-            manifest.dependencies?.[name] ?? manifest.devDependencies?.[name];
-        if (version !== undefined && !version.startsWith("workspace:"))
-            return version;
-    }
-    const pinned = SMOKE_PINS[name];
+            manifest?.dependencies?.[name] ?? manifest?.devDependencies?.[name];
+        return version === undefined || version.startsWith("workspace:")
+            ? undefined
+            : version;
+    };
+    const pinned =
+        pinOf(manifests[0]) ??
+        SMOKE_PINS[framework]?.[name] ??
+        pinOf(manifests[1]);
     if (pinned === undefined) {
         throw new Error(`no pin of ${name} for the ${framework} smoke app`);
     }
@@ -385,6 +402,161 @@ function writeReactSmokeApp(dir: string, core: string, react: string): void {
     writeFileSync(join(dir, "src/main.tsx"), SMOKE_MAIN);
 }
 
+// The Vue package only, the core's names included: a Vue app installs that one only. Its entry
+// mounts the single-file component with a model made from the package's subpaths; the component
+// renders the typed primitives (`typedFlow`) with a scoped slot per node and per edge, the
+// minimap's and the resizer's own entries, `v-model:nodes` and a flow ref, checked by vue-tsc.
+const VUE_SMOKE_MAIN = `import { createFlowModel, type FlowJson } from "@fragiola/flow-vue";
+import { createApp } from "vue";
+import App, { features, type Types } from "./App.vue";
+
+const json: FlowJson<Types> = {
+    version: 1,
+    nodes: [
+        { id: "a", type: "task", position: { x: 0, y: 0 }, data: { title: "A" } },
+        { id: "b", type: "task", position: { x: 0, y: 200 }, data: { title: "B" } },
+    ],
+    edges: [{ id: "ab", source: "a", target: "b" }],
+};
+
+createApp(App, { model: createFlowModel<Types, typeof features>(json, { features }) }).mount(
+    "#root",
+);
+`;
+
+const VUE_SMOKE_APP = `<script lang="ts">
+import type { FlowTypes } from "@fragiola/flow-vue";
+import { connection } from "@fragiola/flow-vue/connection";
+import { drag } from "@fragiola/flow-vue/drag";
+import { minimap } from "@fragiola/flow-vue/minimap";
+import { resize } from "@fragiola/flow-vue/resize";
+import { selection } from "@fragiola/flow-vue/selection";
+
+export interface Types extends FlowTypes {
+    readonly nodes: { task: { title: string } };
+}
+
+export const features = [selection(), drag(), connection(), resize(), minimap()] as const;
+</script>
+
+<script setup lang="ts">
+import {
+    type FlowModel,
+    type FlowNode,
+    typedFlow,
+    useFlowRef,
+} from "@fragiola/flow-vue";
+import { MiniMap } from "@fragiola/flow-vue/minimap";
+import { NodeResizer } from "@fragiola/flow-vue/resize";
+import { shallowRef } from "vue";
+
+const Flow = typedFlow<Types, typeof features>();
+const props = defineProps<{ model: FlowModel<Types, typeof features> }>();
+const flow = useFlowRef<Types, typeof features>();
+const nodes = shallowRef<readonly FlowNode<Types>[]>(props.model.get("all-nodes"));
+
+function fit(): void {
+    console.log(flow.value?.engine.get("viewport"), nodes.value.length);
+}
+</script>
+
+<template>
+    <Flow.Root
+        v-model:nodes="nodes"
+        :model="model"
+        :flow-ref="flow"
+        :style="{ height: '100vh' }"
+        pan-on-scroll
+    >
+        <Flow.Background variant="dots" />
+        <Flow.Viewport>
+            <Flow.Edges v-slot="{ edge }">
+                <Flow.Edge :edge="edge">
+                    <Flow.EdgePath />
+                </Flow.Edge>
+            </Flow.Edges>
+            <Flow.Nodes v-slot="{ node }">
+                <Flow.Node :node="node" :class="{ task: node.type === 'task' }">
+                    {{ node.data.title }}
+                    <Flow.Handle type="target" side="top" />
+                    <Flow.Handle type="source" side="bottom" />
+                    <NodeResizer :min-width="40" />
+                </Flow.Node>
+            </Flow.Nodes>
+            <Flow.ConnectionLine />
+        </Flow.Viewport>
+        <Flow.Controls>
+            <Flow.ZoomIn aria-label="Zoom in">+</Flow.ZoomIn>
+            <Flow.FitView aria-label="Fit view" @click="fit">Fit</Flow.FitView>
+        </Flow.Controls>
+        <MiniMap :width="200" :height="150" />
+    </Flow.Root>
+</template>
+`;
+
+/**
+ * A scratch Vite + Vue app in `dir` that depends on the Vue tarball only (the core tarball comes
+ * as its dependency). It typechecks with vue-tsc on TypeScript 6 (vue-tsc does not run on
+ * TypeScript 7 yet).
+ */
+function writeVueSmokeApp(dir: string, core: string, vue: string): void {
+    const version = (name: string) => smokeVersion("vue", name);
+    const manifest = {
+        name: "flow-smoke-vue",
+        private: true,
+        type: "module",
+        dependencies: {
+            "@fragiola/flow-vue": `file:${vue}`,
+            vue: version("vue"),
+        },
+        devDependencies: {
+            "@vitejs/plugin-vue": version("@vitejs/plugin-vue"),
+            typescript: version("typescript"),
+            vite: version("vite"),
+            "vue-tsc": version("vue-tsc"),
+        },
+    };
+    writeFileSync(
+        join(dir, "package.json"),
+        `${JSON.stringify(manifest, null, 4)}\n`,
+    );
+    writeFileSync(
+        join(dir, "pnpm-workspace.yaml"),
+        `overrides:\n  "@fragiola/flow": "file:${core}"\n`,
+    );
+    writeFileSync(
+        join(dir, "vite.config.js"),
+        `import vue from "@vitejs/plugin-vue";\nimport { defineConfig } from "vite";\n\nexport default defineConfig({ plugins: [vue()] });\n`,
+    );
+    writeFileSync(
+        join(dir, "index.html"),
+        `<!doctype html>\n<html lang="en">\n<body>\n<div id="root"></div>\n<script type="module" src="/src/main.ts"></script>\n</body>\n</html>\n`,
+    );
+    // strict, with the published declarations checked too (no skipLibCheck)
+    const tsconfig = {
+        compilerOptions: {
+            target: "ES2022",
+            lib: ["ES2022", "DOM", "DOM.Iterable"],
+            module: "ESNext",
+            moduleResolution: "bundler",
+            jsx: "preserve",
+            strict: true,
+            noUncheckedIndexedAccess: true,
+            verbatimModuleSyntax: true,
+            noEmit: true,
+            types: [],
+        },
+        include: ["src/**/*.ts", "src/**/*.vue"],
+    };
+    writeFileSync(
+        join(dir, "tsconfig.json"),
+        `${JSON.stringify(tsconfig, null, 4)}\n`,
+    );
+    mkdirSync(join(dir, "src"));
+    writeFileSync(join(dir, "src/main.ts"), VUE_SMOKE_MAIN);
+    writeFileSync(join(dir, "src/App.vue"), VUE_SMOKE_APP);
+}
+
 function freePort(): Promise<number> {
     return new Promise((resolve, reject) => {
         const server = createServer();
@@ -415,8 +587,8 @@ export function servedImports(code: string): string[] {
 }
 
 /**
- * Starts the app's dev server, loads its entry (`/src/main.tsx`) and every module it imports, then
- * stops it.
+ * Starts the app's dev server, loads its entry (`/src/main.tsx`, `/src/main.ts`) and every module
+ * it imports, then stops it.
  */
 async function loadThroughDevServer(
     dir: string,
@@ -486,11 +658,27 @@ async function reactSmoke(
 }
 
 /**
+ * The Vue smoke test: the scratch Vite + Vue app installs the Vue tarball, typechecks (vue-tsc),
+ * builds and loads its dev server.
+ */
+async function vueSmoke(
+    app: string,
+    tarballs: { core: string; adapter: string },
+): Promise<void> {
+    writeVueSmokeApp(app, tarballs.core, tarballs.adapter);
+    run("pnpm", ["install", "--no-frozen-lockfile"], app);
+    run("pnpm", ["exec", "vue-tsc", "--noEmit"], app);
+    run("pnpm", ["exec", "vite", "build"], app);
+    await loadThroughDevServer(app, "/src/main.ts");
+}
+
+/**
  * Every adapter, one per package under packages/ but the core (`unlistedPackages` checks it):
- * React; Vue, Svelte and Angular are added in that order by their Epics.
+ * React, Vue; Svelte and Angular are added in that order by their Epics.
  */
 export const ADAPTERS: readonly AdapterCheck[] = [
     { dir: "react", framework: "react", smoke: reactSmoke },
+    { dir: "vue", framework: "vue", smoke: vueSmoke },
 ];
 
 /** The packages/ directories that are neither the core nor an adapter of `adapters`. */
