@@ -103,11 +103,16 @@ export function examplesFrameworks(dir = join(root, "examples")): string[] {
         .sort();
 }
 
-function changedPaths(base: string): string[] {
-    return execFileSync("git", ["diff", "--name-only", base, "HEAD"], {
-        cwd: root,
-        encoding: "utf8",
-    })
+/**
+ * The paths a diff against `base` touches. Renames are off: a moved file lists both its old and
+ * its new path, so a file moved out of the core (or into the docs) still runs every suite.
+ */
+export function changedPaths(base: string, cwd = root): string[] {
+    return execFileSync(
+        "git",
+        ["diff", "--name-only", "--no-renames", base, "HEAD"],
+        { cwd, encoding: "utf8" },
+    )
         .split("\n")
         .filter((path) => path !== "");
 }

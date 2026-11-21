@@ -1,8 +1,10 @@
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+    changedPaths,
     e2eSuites,
     examplesFrameworks,
     FRAMEWORKS,
@@ -146,5 +148,45 @@ describe("the examples apps", () => {
             [],
         );
         expect(examplesFrameworks()).toEqual([]);
+    });
+});
+
+describe("the changed paths", () => {
+    it("lists a moved file at both its paths, so moving core code runs every suite", () => {
+        const dir = mkdtempSync(join(tmpdir(), "flow-diff-"));
+        const git = (...args: string[]) =>
+            execFileSync("git", args, { cwd: dir, encoding: "utf8" });
+        try {
+            git("init", "--quiet");
+            git("config", "user.email", "test@example.com");
+            git("config", "user.name", "test");
+            git("config", "commit.gpgsign", "false");
+            mkdirSync(join(dir, "packages", "core", "src"), {
+                recursive: true,
+            });
+            writeFileSync(
+                join(dir, "packages", "core", "src", "moved.ts"),
+                "export const moved = 1;\n",
+            );
+            git("add", ".");
+            git("commit", "--quiet", "-m", "base");
+            mkdirSync(join(dir, "packages", "react", "src"), {
+                recursive: true,
+            });
+            git(
+                "mv",
+                "packages/core/src/moved.ts",
+                "packages/react/src/moved.ts",
+            );
+            git("commit", "--quiet", "-m", "move");
+            const paths = changedPaths("HEAD^1", dir).sort();
+            expect(paths).toEqual([
+                "packages/core/src/moved.ts",
+                "packages/react/src/moved.ts",
+            ]);
+            expect(e2eSuites(paths, EXAMPLES)).toEqual(ALL);
+        } finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
     });
 });

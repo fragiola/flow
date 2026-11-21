@@ -84,6 +84,12 @@ describe("the CI workflow", () => {
         ).toEqual(["pull_request", "push"]);
     });
 
+    it("picks the E2E suites from the merge commit's first parent, everything on a manual run", () => {
+        expect(workflow).toMatch(/fetch-depth:\s*2\b/);
+        expect(workflow).toContain("node scripts/e2e-suites.ts --diff HEAD^1");
+        expect(workflow).toContain("node scripts/e2e-suites.ts --all");
+    });
+
     it("has no release or Changesets job, and no release workflow (AGENTS.md, D15)", () => {
         expect(workflow).not.toMatch(/^\s*(?:-\s*)?run:.*changeset/im);
         expect(workflow).not.toMatch(/^\s+name:\s*(?:Changesets|Release)\b/im);
