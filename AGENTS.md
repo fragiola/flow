@@ -289,22 +289,39 @@ microtask queue. It changes the flow only through `model.run`.
 | --- | --- |
 | `src/geometry/` | the path helpers (`bezierPath`, `smoothStepPath`, `stepPath`, `straightPath`, each with its label point, written from the geometry), rectangles, the viewport's math |
 | `src/attributes/` | the part attribute names and `partAttributes` (D11) |
-| `src/engine/` | `createFlowEngine`, the key registry (`verbs.ts`), the adapter contract (`adapter.ts`), events (`events.ts`), measurement, the press target (`dom.ts`), edge geometry, the background pattern, the toolbar position, node moves shared by drag and keyboard, the one structural style writer |
+| `src/engine/` | `createFlowEngine`, the key registry (`verbs.ts`), the adapter contract (`adapter.ts`), events (`events.ts`), measurement, the press target (`dom.ts`), edge geometry, the background pattern, the toolbar position, node moves shared by drag and keyboard, the one structural style writer, the viewport animation (`viewport-animation.ts`), the auto-pan step (`auto-pan.ts`) |
 | `src/connect-session/` | the connection under way, shared by `connection()` and `reconnection()` through `host.shared` (no entry; the bundle guard counts it as both features' code) |
 | `src/<feature>/<feature>-engine.ts` | each feature's engine side |
 
 **Options** (`FlowEngineOptions`): `root`, `defaultViewport` (`{ x: 0, y: 0, zoom: 1 }`),
-`minZoom` 0.5, `maxZoom` 2, `translateExtent` (a flow `Rect`), `panOnDrag` true, `panOnScroll`
-false, `zoomOnScroll` true, `zoomOnPinch` true, `zoomOnDoubleClick` true, `zoomStep` 1.2, `fitView`
-(true or `fit-view`'s payload: once every visible node is measured), `interactive` true,
-`onlyRenderVisible` false, `pathOptions` (`curvature` 0.5, `borderRadius` 5, `offset` 20).
+`minZoom` 0.5, `maxZoom` 2, `translateExtent` (a flow `Rect`), `panOnDrag` true (`true`: the
+primary button, a touch, a pen; or the mouse buttons that pan the pane, `[0]`, `[1]`, `[2]`),
+`panActivationKey` `" "` (held, a primary drag pans from anywhere, nodes included, and no other
+gesture starts; `null` none), `panOnScroll` false, `panOnScrollMode` `"free"` (`"horizontal"`,
+`"vertical"`: the other axis' deltas are ignored), `panOnScrollSpeed` 1, `zoomActivationKey` (Meta
+on Apple platforms, Control elsewhere, from the root window's `navigator`; with `panOnScroll`, the
+wheel zooms while it is held; `null` none), `zoomOnScroll` true, `zoomOnPinch` true,
+`zoomOnDoubleClick` true, `zoomStep` 1.2, `fitView` (true or `fit-view`'s payload: once every
+visible node is measured), `interactive` true, `onlyRenderVisible` false, `pathOptions`
+(`curvature` 0.5, `borderRadius` 5, `offset` 20), `autoPan` true (`AutoPanOptions` `{ speed: 10,
+margin: 30 }`: pixels a frame at the edge, pixels from the edge it starts at), `easing` (a cubic
+ease in and out; `ViewportEasing`). `adapter.setOptions` takes each of them (the four adapters'
+roots take the new ones in #25).
 
 **Actions** (`engine.run`; `can`/`check` are their dry runs): `set-viewport { x?, y?, zoom? }`,
 `pan-by { x, y }` (pixels), `zoom-in` / `zoom-out { step?, around? }` (refused at the limit: a
 Controls button's disabled state is `!engine.can("zoom-in")`), `zoom-to { zoom, around? }`,
 `fit-view { padding? 0.1, nodeIds?, minZoom?, maxZoom? }` (refused before a size is known),
 `center-on { x, y, zoom? }`, `focus-node { nodeId }`, `set-interactive { interactive }` (the
-Controls' toggle: gestures and keys stop changing the flow, pan and zoom stay), `cancel-gesture`.
+Controls' toggle: gestures and keys stop changing the flow, pan and zoom stay), `cancel-gesture`
+(also stops a viewport animation; refused when neither is under way). `set-viewport`, `zoom-in`,
+`zoom-out`, `zoom-to`, `fit-view` and `center-on` take `duration` (ms, default 0: at once; a
+negative or non-number one is `invalid_payload` at `/duration`): the result is the final viewport
+(zoom limits and extent kept), reached frame by frame on the root window's
+`requestAnimationFrame` with a `viewport-change { gesture: false }` per frame; another viewport
+action (`pan-by` and `focus-node`'s reveal included), a gesture's viewport change (pan, wheel,
+pinch, minimap, auto-pan), a pan press, `cancel-gesture`, `detachRoot` and `destroy` stop it where
+it is (the pending frame cancelled).
 `around` and the selection box are **root-relative** pixels; `screen-to-flow` / `flow-to-screen`
 take and give **client** points (a pointer's `clientX`/`clientY`, a drop's).
 
@@ -332,8 +349,9 @@ offset? }` (a root-relative anchor outside the zoom); features: `selection-box` 
 
 - `attachRoot(element)` / `detachRoot()`: the engine listens to the root itself (`pointerdown`,
   `pointermove`, `pointerup`, `pointercancel`, `lostpointercapture`, `wheel` non-passive,
-  `dblclick`, `keydown`, `focusin`), captures the pointer on the root, and writes its
-  `touch-action: none`. The adapter forwards no event.
+  `dblclick`, `keydown`, `focusin`, `contextmenu`), and to the root's `ownerDocument` (`keydown`,
+  `keyup`: the activation keys held) and `defaultView` (`blur`: they are released), captures the
+  pointer on the root, and writes its `touch-action: none`. The adapter forwards no event.
 - `attachViewport(element | null)`: the engine writes `transform` and `transform-origin` on it; the
   framework never renders a transform there (D4). Nodes render inside it at their absolute
   position: `node-rect-by`'s `x`, `y` as a structural `transform: translate(x, y)`, flat (a
@@ -1369,7 +1387,11 @@ Decisions of the engine (#3):
   `pointercancel`, a lost capture and a missed release for every gesture; `tap` (a press that did
   not become a gesture and moved at most 3 px: selection's click), `wheel`, `keydown(event,
   target)`, `focus`, `attributes`. The host lends the viewport, measured rects, handles, edge
-  paths, `keepInParent`, `interactive`, `partOptions`, `changed`, `emit`.
+  paths, `keepInParent`, `interactive`, `partOptions`, `changed`, `emit`. A gesture with
+  `autoPan: true` (drag, connection, reconnection, selection box, resize; #23) is auto-panned by
+  the engine, which calls its `move` again with the last pointer event after each frame's pan, so
+  its `move` reads the flow point from the client point (`host.toFlow`), never a client delta
+  divided by the zoom.
 - **Clicks are taps the engine detects**, not native `click`s: with the pointer captured on the
   root, a browser's `click` targets the root.
 - **Sizes: the document's where it gives one, the measured one otherwise** (per dimension), so a
@@ -1404,3 +1426,41 @@ Decisions of the engine (#3):
   node presses keep their default (focus), so an app sets `user-select: none` on nodes to avoid
   text selection while dragging. `fit-view`'s own `minZoom`/`maxZoom` narrow the engine's limits,
   never widen them.
+
+Decisions of the animated viewport, auto-pan and pan/zoom options (#23, Epic #26):
+
+- **Animation.** Linear interpolation of `x`, `y` and `zoom` by one eased share (a zoom around a
+  point keeps that point still all the way); the first frame starts the clock (frames are the only
+  clock, no `performance` read); a duration to the viewport it is already at, a root without a
+  window or a window without `requestAnimationFrame` applies at once. Each frame is kept to the
+  zoom limits and the extent (an extent may bend the path). `cancel-gesture` counts a running
+  animation as something to cancel; Escape still cancels only a press or a pinch, so the keyboard
+  feature's Escape (clear the selection) is not lost to an animation.
+- **Auto-pan is a flag on the gesture** (`FeatureGesture.autoPan`), not a host method: the engine
+  owns the one loop (one pending frame per engine), started by a pointer move of an active
+  `autoPan` gesture within `margin` of the root's edge (or past it), run on the root window's
+  frames, stopped by the gesture's end or cancel, the pointer leaving the edge, the extent (a frame
+  whose pan changes nothing ends it; the next move starts it again), `autoPan: false`, a detach and
+  `destroy`. Its viewport changes are `gesture: true`. Speed is per frame (pixels, linear from 0 at
+  `margin` to `speed` at the edge and past it), our own defaults (10, 30). Drag and resize now
+  compute their delta from flow points (`host.toFlow`), so what is dragged stays under a still
+  pointer while the view moves; selection and connections already did. The minimap's drag and a
+  pan do not auto-pan.
+- **`panOnDrag` buttons.** `true` is `[0]` (a touch and a pen press as button 0), `false` none. A
+  non-primary button pans only from the pane (the Issue's "buttons that pan the pane"), and starts
+  no feature gesture and no tap (a right click never clears the selection). The context menu is
+  prevented while a moved non-primary pan is under way and once after its release (Windows opens it
+  on release); a press that did not move keeps it (Linux and macOS open it on press, before any
+  move: it is not suppressed there).
+- **Activation keys.** Held keys are tracked by `key` and `code` from the root's document
+  (`keydown` ignored when its target is in a field: `input`, `textarea`, `select`,
+  contenteditable), released on `keyup` anywhere, on the window's `blur` and on a detach. `Meta`,
+  `Control`, `Alt` and `Shift` are read from the pointer or wheel event's modifier flags instead.
+  The pan key pans even with `panOnDrag: false`, from every target but `other` (fields, controls,
+  panels); a key pan that did not move still taps, as a pane pan does. xyflow's "the pan key also
+  turns scroll panning on" is left out (not in #23). The zoom key zooms whatever `zoomOnScroll`
+  says (it is the explicit request), at the wheel's rate (the pinch's with Ctrl); Apple platforms
+  are told by `navigator.platform` / `userAgent` (`Mac`, `iPhone`, `iPad`, `iPod`).
+- **`panOnScrollMode`.** The mode filters after Shift's sideways mapping (Shift + wheel is a
+  horizontal delta, so `"vertical"` ignores it); `"horizontal"` ignores a plain wheel's vertical
+  delta (symmetric with `"vertical"`). `panOnScrollSpeed` defaults to 1, today's behaviour.
