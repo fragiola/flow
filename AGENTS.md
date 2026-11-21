@@ -16,7 +16,7 @@ Each framework has an adapter, so **every piece of logic that isn't rendering li
 
 | package | name | contains | depends on | status |
 |---|---|---|---|---|
-| `packages/core` | `@fragiola/flow` | the document and its JSON Schemas, the typed model and its commands, the feature registry and the features, the engine that binds a flow to the DOM | DOM only, zero runtime deps | Epic #4: the model (#2); the engine with #3 |
+| `packages/core` | `@fragiola/flow` | the document and its JSON Schemas, the typed model and its commands, the feature registry and the features, the engine that binds a flow to the DOM | DOM only, zero runtime deps | Epic #4: the model (#2) and the engine (#3) |
 | `packages/react` | `@fragiola/flow-react` | the `Flow.*` primitives and hooks over the core | peer `react`, `react-dom` | planned (React Epic) |
 | `packages/vue` | `@fragiola/flow-vue` | the same primitives as Vue components, the hooks as composables | peer `vue` | planned |
 | `packages/svelte` | `@fragiola/flow-svelte` | the same primitives as Svelte components | peer `svelte` | planned |
@@ -229,23 +229,106 @@ and edges), `subflows()` (`node.set-parent`, keys, `parentId` / `extent` / `expa
 of children, extent clamping and parent growth with the document's sizes), `reconnection()`
 (`edge.reconnect`; requires `connection()`). `drag()`, `resize()`, `connection()`, `keyboard()`,
 `minimap()` run the core's commands (`node.move`, `node.resize`, `edge.add`, `selection.remove`)
-and have only options and their reserved engine names in `FEATURE_KEYS` until #3. A command, key
+from their engine sides (see [The engine](#the-engine-issue-3)). A command, key
 or document field of a feature that is not installed is a type error and a runtime refusal
 (`not_found`, `invalid_payload`, a validation issue), naming the feature.
 
-**For the engine (#3).** `featuresOf(model)` gives the composed features; `featureEngine(composed,
+**The engine side.** `featuresOf(model)` gives the composed features; `featureEngine(composed,
 host)` composes their `engine(host)` sides once per engine (keys merged, a key two features add
-throws; `pointerdown`/`keydown` hooks walked in install order, the first `true` taking the event;
-`attached`/`detached`/`destroy`). `FeatureEngineHost` (`model`, `shared(key, create)`) and
-`FeatureEngine` are the contract to extend, and the `engineRun`/`engineGet`/`engineIs` lists of
-`FEATURE_KEYS` are where each feature's engine names go. `FlowReader`, `AllowedKeys` type the
-engine's own key maps by the installed features like the model's.
+throws; the hooks walked in install order). `FeatureEngineHost` and `FeatureEngine`
+(`src/features/types.ts`) are the contract; the `engineRun`/`engineGet`/`engineIs` lists of
+`FEATURE_KEYS` name each feature's engine keys, and `EngineActionKeyOf<F>`, `EngineGetKeyOf<F>`,
+`EngineIsKeyOf<F>` type the engine's verbs by the installed features like the model's.
+
+## The engine (Issue #3)
+
+`createFlowEngine<Types, typeof features>(model, options)` is one flow on screen. Its surface is
+exactly `run`, `can`, `check`, `get`, `is`, `subscribe`, `destroy` and `adapter`, bound and frozen
+(`tests/engine/create-flow-engine.test.ts`, `tests/types/engine.ts`). It never touches the global
+`document`/`window`: the root's `ownerDocument`/`defaultView` give the `ResizeObserver` and the
+microtask queue. It changes the flow only through `model.run`.
+
+| folder | holds |
+| --- | --- |
+| `src/geometry/` | the path helpers (`bezierPath`, `smoothStepPath`, `stepPath`, `straightPath`, each with its label point, written from the geometry), rectangles, the viewport's math |
+| `src/attributes/` | the part attribute names and `partAttributes` (D11) |
+| `src/engine/` | `createFlowEngine`, the key registry (`verbs.ts`), the adapter contract (`adapter.ts`), events (`events.ts`), measurement, the press target (`dom.ts`), edge geometry, the background pattern, the toolbar position, node moves shared by drag and keyboard, the one structural style writer |
+| `src/connect-session/` | the connection under way, shared by `connection()` and `reconnection()` through `host.shared` (no entry; the bundle guard counts it as both features' code) |
+| `src/<feature>/<feature>-engine.ts` | each feature's engine side |
+
+**Options** (`FlowEngineOptions`): `root`, `defaultViewport` (`{ x: 0, y: 0, zoom: 1 }`),
+`minZoom` 0.5, `maxZoom` 2, `translateExtent` (a flow `Rect`), `panOnDrag` true, `panOnScroll`
+false, `zoomOnScroll` true, `zoomOnPinch` true, `zoomOnDoubleClick` true, `zoomStep` 1.2, `fitView`
+(true or `fit-view`'s payload: once every visible node is measured), `interactive` true,
+`onlyRenderVisible` false, `pathOptions` (`curvature` 0.5, `borderRadius` 5, `offset` 20).
+
+**Actions** (`engine.run`; `can`/`check` are their dry runs): `set-viewport { x?, y?, zoom? }`,
+`pan-by { x, y }` (pixels), `zoom-in` / `zoom-out { step?, around? }` (refused at the limit: a
+Controls button's disabled state is `!engine.can("zoom-in")`), `zoom-to { zoom, around? }`,
+`fit-view { padding? 0.1, nodeIds?, minZoom?, maxZoom? }` (refused before a size is known),
+`center-on { x, y, zoom? }`, `focus-node { nodeId }`, `set-interactive { interactive }` (the
+Controls' toggle: gestures and keys stop changing the flow, pan and zoom stay), `cancel-gesture`.
+`around` and the selection box are **root-relative** pixels; `screen-to-flow` / `flow-to-screen`
+take and give **client** points (a pointer's `clientX`/`clientY`, a drop's).
+
+**Reads** (`engine.get`): `viewport`, `root-size`, `edge-path-by { edgeId }` (`{ path, label,
+source, sourceSide, target, targetSide }`, undefined until both nodes have a size; an app type gets
+the bezier), `node-rect-by { nodeId }` (absolute, size 0 until known), `nodes-bounds { nodeIds? }`,
+`screen-to-flow`, `flow-to-screen`, `visible-nodes` (in view, plus the unmeasured),
+`visible-edges`, `handles-by { nodeId }`, `background-pattern { variant?, gap?, size?, offset? }`
+(one SVG pattern tile on the screen: dots, lines, cross), `node-toolbar-by { nodeId, side?, align?,
+offset? }` (a root-relative anchor outside the zoom); features: `selection-box` (selection),
+`dragging-node-ids` (drag), `connection` (connection: `from`, `fromPoint`, `toPoint`, `toSide`,
+`to`, `status` valid/invalid/null, `path`, `reconnecting`), `minimap-view { width, height }`
+(minimap: `viewBox`, `viewBoxAttribute`, `scale`, `nodes`, `view`, `maskPath` for
+`fill-rule="evenodd"`). **Questions** (`engine.is`): `interactive`, `panning`, `node-measured`;
+`box-selecting`; `dragging`, `node-dragging`; `resizing`, `node-resizing`; `connecting`;
+`edge-reconnecting`; `node-focusable`, `edge-focusable` (keyboard: the adapter sets `tabindex="0"`).
+
+**Events** (`engine.subscribe`, D12, for the app's live region or a controlled viewport):
+`viewport-change { viewport, gesture }`, `drag-start`, `nodes-move { nodeIds, source: "pointer" |
+"keyboard" }`, `drag-cancel`, `connect-start`, `connect { edgeId, source, target }`,
+`connect-cancel { refused }`, `reconnect-start`, `reconnect`, `reconnect-cancel { refused }`,
+`resize { nodeId, width, height }`, `box-select`, `remove { nodeIds, edgeIds }`.
+
+**The adapter contract** (`engine.adapter`, what `Flow.*` primitives call; an app never does):
+
+- `attachRoot(element)` / `detachRoot()`: the engine listens to the root itself (`pointerdown`,
+  `pointermove`, `pointerup`, `pointercancel`, `lostpointercapture`, `wheel` non-passive,
+  `dblclick`, `keydown`, `focusin`), captures the pointer on the root, and writes its
+  `touch-action: none`. The adapter forwards no event.
+- `attachViewport(element | null)`: the engine writes `transform` and `transform-origin` on it; the
+  framework never renders a transform there (D4). Nodes render inside it at their absolute
+  position: `node-rect-by`'s `x`, `y` as a structural `transform: translate(x, y)`, flat (a
+  child is not nested in its parent's element), and the document's `width`/`height` when given
+  (a resize writes them).
+- `registerNode(nodeId, element | null)` (observed: its `offsetWidth`/`offsetHeight`),
+  `registerHandle({ nodeId, handleId?, type, side, connectable? }, element | null)` (D8: its centre
+  relative to its node, from the client rects divided by the zoom).
+- `attributes(part, payload)`: the record to spread on each part (`data-flow-part`, `data-flow-id`,
+  the state booleans as `""`/absent). Every press, key and wheel is resolved from these attributes
+  (`dom.ts`), so every part must carry them: `root`, `viewport`, `nodes`, `edges`, `background` are
+  the pane; `node`; `handle`; `edge`/`edge-path`/`edge-label`; `reconnect-anchor { edgeId, end }`
+  (`data-end`: an edge end's grab area, drawn above the handles); `resize-handle { nodeId,
+  position }` (`data-position`: `top-left` … `left`, inside the node's element); `minimap`,
+  `minimap-node`, `minimap-mask`; anything else (`controls`, `toolbar`, `panel`) is left alone.
+  Inside a node, fields, buttons, links and `data-flow-no-gesture` start no gesture;
+  `data-flow-no-wheel` keeps its wheel.
+- `setPartOptions("resizer", nodeId, { minWidth, … } | null)`: a resizer's own limits.
+- `setOptions(partial)`: root props that change (`minZoom`, `panOnDrag`, `pathOptions`,
+  `interactive`, …).
+- `subscribe(listener)` / `getSnapshot()`: the view changed (`{ viewport, measured, gesture }`):
+  edges, the connection line, the selection box, the minimap, toolbars and state attributes
+  re-render from it; node and edge data from `model.subscribe`. Measurements are told once per
+  task (the root window's microtask), so a mount re-renders once.
+- `settings.onlyRenderVisible`: render `visible-nodes` / `visible-edges` instead of every one.
 
 ## Repository layout
 
 ```
 packages/core/      @fragiola/flow       src/<domain>/ (document, state, commands, model, features,
-                                         one folder per feature, engine, geometry, attributes);
+                                         one folder per feature, engine, geometry, attributes,
+                                         connect-session);
                                          entry index.ts; tests/ mirroring src/, tests/types/,
                                          tests/guard.test.ts
                     scripts/             generate-command-docs.ts (site/docs/api/commands.mdx)
@@ -358,4 +441,56 @@ its reason.
   multiple: true })`, `drag({ snapGrid, threshold: 1 })`, `resize({ minWidth: 10, minHeight: 10,
   maxWidth, maxHeight, keepAspectRatio: false })`, `connection({ radius: 20, mode: "strict" })`,
   `reconnection({ radius: 10 })`, `keyboard({ step: 5, fastStep: 20 })`, `minimap({ pannable: true,
-  zoomable: true })`. #3 may extend them.
+  zoomable: true })`. #3 extended them: `selection({ boxOnDrag: false })` (any pane drag draws the
+  box instead of Shift + drag), `minimap({ padding: 0.1 })` (a share of its size).
+
+Decisions of the engine (#3):
+
+- **The engine's surface is the verbs plus `subscribe`, `destroy` and `adapter`** (the tree's
+  engine), not `use`/`dispatch`: middleware and untrusted JSON are the model's. `subscribe` hears
+  the announcement events (D12); the adapters' view changes are `adapter.subscribe`, separate, so
+  an app's listener never runs per measurement.
+- **The engine listens to the root itself** (splitter's engine, not the tree's forwarded
+  handlers) and resolves every target from the part attributes: an adapter only attaches and
+  registers, and the four adapters cannot drift in how they forward events.
+- **One structural style file** (`src/engine/structural-style.ts`, the guard's one exception to
+  "no `.style`"): the viewport's `transform`/`transform-origin` (D4) and the root's
+  `touch-action: none` (without it a browser cancels touch gestures).
+- **Feature hooks** extended from #2: `pointerdown(event, target)` returns a `FeatureGesture`
+  (`move`, `end`, `cancel`, `active`) instead of `true`, so the engine owns capture, Escape,
+  `pointercancel`, a lost capture and a missed release for every gesture; `tap` (a press that did
+  not become a gesture and moved at most 3 px: selection's click), `wheel`, `keydown(event,
+  target)`, `focus`, `attributes`. The host lends the viewport, measured rects, handles, edge
+  paths, `keepInParent`, `interactive`, `partOptions`, `changed`, `emit`.
+- **Clicks are taps the engine detects**, not native `click`s: with the pointer captured on the
+  root, a browser's `click` targets the root.
+- **Sizes: the document's where it gives one, the measured one otherwise** (per dimension), so a
+  resize is drawn at once and a node without a size is measured; a 0 × 0 measurement is no size.
+- **Extent with measured sizes (closes #2's L6).** `host.keepInParent` clamps a drag's and the
+  arrows' positions with the measured sizes before each `node.move`. A resize keeps a child inside
+  its parent (the bound wins over `minWidth`, the ratio kept by shrinking), never shrinks a parent
+  past its `extent: "parent"` children, and moves the children back when the parent's top or left
+  edge moves (one `batch`), so they stay on screen; a parent holding a child that is not draggable
+  keeps its top and left edges (its child cannot be moved back).
+- **Drags.** A press on a selected node drags the selection's draggable nodes (a node whose parent
+  is dragged too is carried by it); on an unselected one, selects it (`selection.set`, refused
+  silently without `selection()`) and drags it alone. Snap moves the pressed node to the grid and
+  the others by the same offset. A cancel (Escape, `pointercancel`, a lost capture) runs a final
+  non-transient step back to the start; a resize's cancel too (writing the start size into the
+  document); a box selection's cancel restores the selection; a pan's the viewport. A press whose
+  release was missed ends at its last move when the next press comes.
+- **Connections.** A connection may start from a target handle (the edge is reversed). `strict`:
+  only the other type; `loose`: any other handle. The radius is in screen pixels. Reconnection
+  grabs an end by a `reconnect-anchor` part, or by a press on the edge within `radius` of an end;
+  the line runs from the fixed end. Handle ends go to the handle's centre (D8 measures centres).
+- **Edges without a handle** leave the source by its bottom and enter the target by its top.
+- **Keyboard.** Delete/Backspace run `selection.remove` with `selection()`, else remove the focused
+  node or edge; Enter/Space select; Escape clears the selection (after a gesture's cancel). Arrows
+  move the selection, or the focused node, as one non-transient step.
+- **Wheel**: `exp(-deltaY / 600)` per wheel, `/ 120` for a trackpad pinch (Ctrl); our own rates,
+  not d3-zoom's. A wheel over `other` parts (controls, a field) is left to the page.
+- **Known limits:** the minimap drag maps through the view box frozen at the press; a smooth step
+  between ends facing each other on one line with the target behind doubles back on itself;
+  node presses keep their default (focus), so an app sets `user-select: none` on nodes to avoid
+  text selection while dragging. `fit-view`'s own `minZoom`/`maxZoom` narrow the engine's limits,
+  never widen them.
