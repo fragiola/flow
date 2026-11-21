@@ -62,10 +62,11 @@ an implementation detail. Where the Epic's decisions say nothing, the Fragiola g
    `model.get("flow-json")` round-trips. Ids are explicit, generated with an injectable `createId`
    when missing (no global `crypto`).
    - A node: `id`, `type` (narrowed by the `Types` registry), `position {x, y}`, `data`, optional
-     `width`/`height`, flags (`draggable`, `selectable`, `connectable`, `deletable`, `hidden`),
-     `parentId`/`extent` only with `subflows()`.
+     `width`/`height`, `zIndex` (#24), flags (`draggable`, `selectable`, `connectable`,
+     `deletable`, `hidden`), `parentId`/`extent` only with `subflows()` (`extent`: `"parent"` or,
+     #24, a flow `Rect` `{ x, y, width, height }`).
    - An edge: `id`, `source`, `target`, `sourceHandle?`, `targetHandle?`, `type` (`bezier` |
-     `smoothstep` | `step` | `straight` | an app type), `data`, flags.
+     `smoothstep` | `step` | `straight` | an app type), `data`, `zIndex` (#24), flags.
    - A field of a feature that is not installed is a validation issue.
 4. **The viewport is view state (D4).** `{ x, y, zoom }` lives in the engine
    (`engine.get("viewport")`; engine actions `set-viewport`, `pan-by`, `zoom-in`, `zoom-out`,
@@ -305,8 +306,11 @@ wheel zooms while it is held; `null` none), `zoomOnScroll` true, `zoomOnPinch` t
 visible node is measured), `interactive` true, `onlyRenderVisible` false, `pathOptions`
 (`curvature` 0.5, `borderRadius` 5, `offset` 20), `autoPan` true (`AutoPanOptions` `{ speed: 10,
 margin: 30 }`: pixels a frame at the edge, pixels from the edge it starts at), `easing` (a cubic
-ease in and out; `ViewportEasing`). `adapter.setOptions` takes each of them (the four adapters'
-roots take the new ones in #25).
+ease in and out; `ViewportEasing`), `nodeOrigin` `{ x: 0, y: 0 }` (#24: the point of a node's box
+its position stands at, as shares of its size, for the nodes on the flow), `nodeExtent` (#24: a
+flow `Rect` every node's box stays inside when dragged, moved by the arrows or resized),
+`elevateNodesOnSelect` true, `elevateEdgesOnSelect` false (#24). `adapter.setOptions` takes each
+of them (the four adapters' roots take the new ones in #25).
 
 **Actions** (`engine.run`; `can`/`check` are their dry runs): `set-viewport { x?, y?, zoom? }`,
 `pan-by { x, y }` (pixels), `zoom-in` / `zoom-out { step?, around? }` (refused at the limit: a
@@ -329,7 +333,9 @@ take and give **client** points (a pointer's `clientX`/`clientY`, a drop's).
 source, sourceSide, target, targetSide }`, undefined until both nodes have a size; an app type gets
 the bezier), `node-rect-by { nodeId }` (absolute, size 0 until known), `nodes-bounds { nodeIds? }`,
 `screen-to-flow`, `flow-to-screen`, `visible-nodes` (in view, plus the unmeasured),
-`visible-edges`, `handles-by { nodeId }`, `background-pattern { variant?, gap?, size?, offset? }`
+`visible-edges`, `drawn-edges` (#24: the edges to draw in drawing order, shown and with measured
+nodes, in view with `onlyRenderVisible`, by z-order), `node-z-index-by { nodeId }` (#24: the node's
+structural `z-index`), `handles-by { nodeId }`, `background-pattern { variant?, gap?, size?, offset? }`
 (one SVG pattern tile on the screen: dots, lines, cross), `node-toolbar-by { nodeId, side?, align?,
 offset? }` (a root-relative anchor outside the zoom); features: `selection-box` (selection),
 `dragging-node-ids` (drag), `connection` (connection: `from`, `fromPoint`, `toPoint`, `toSide`,
@@ -354,9 +360,11 @@ offset? }` (a root-relative anchor outside the zoom); features: `selection-box` 
   pointer on the root, and writes its `touch-action: none`. The adapter forwards no event.
 - `attachViewport(element | null)`: the engine writes `transform` and `transform-origin` on it; the
   framework never renders a transform there (D4). Nodes render inside it at their absolute
-  position: `node-rect-by`'s `x`, `y` as a structural `transform: translate(x, y)`, flat (a
-  child is not nested in its parent's element), and the document's `width`/`height` when given
-  (a resize writes them).
+  position: `node-rect-by`'s `x`, `y` as a structural `transform: translate(x, y)` (its
+  `nodeOrigin` applied: the core is the one source of a node's place), `node-z-index-by` as its
+  structural `z-index` (#24), flat (a child is not nested in its parent's element), and the
+  document's `width`/`height` when given (a resize writes them). Edges are drawn in `drawn-edges`'
+  order (#24): an SVG's order is its drawing order.
 - `registerNode(nodeId, element | null)` (observed: its `offsetWidth`/`offsetHeight`),
   `registerHandle({ nodeId, handleId?, type, side, connectable? }, element | null)` (D8: its centre
   relative to its node, from the client rects divided by the zoom).
@@ -368,7 +376,8 @@ offset? }` (a root-relative anchor outside the zoom); features: `selection-box` 
   position }` (`data-position`: `top-left` … `left`, inside the node's element); `minimap`,
   `minimap-node`, `minimap-mask`; anything else (`controls`, `toolbar`, `panel`) is left alone.
   Inside a node, fields, buttons, links and `data-flow-no-gesture` start no gesture;
-  `data-flow-no-wheel` keeps its wheel.
+  `data-flow-no-wheel` keeps its wheel; a node holding a `data-flow-drag-handle` element
+  (`DRAG_HANDLE_ATTRIBUTE`, #24) drags only from it.
 - `setPartOptions("resizer", nodeId, { minWidth, … } | null)`: a resizer's own limits.
 - `setOptions(partial)`: root props that change (`minZoom`, `panOnDrag`, `pathOptions`,
   `interactive`, …).
@@ -1344,7 +1353,7 @@ its reason.
   handles in the same direction is refused (in a document too). `edge.reconnect` takes the whole
   new connection (a handle left out is none). Edge `type` and `data` are optional (`type` none is
   `"bezier"`); a node's `data` is required, a JSON object.
-- **Sub-flows.** `extent` is `"parent"` only (no coordinate extent in D2). `expandParent` is a
+- **Sub-flows.** `extent` is `"parent"` only (no coordinate extent in D2; #24 added a `Rect`). `expandParent` is a
   subflows field (D2's "expand parent"). The model clamps and grows with the sizes the document
   gives (`width`, `height`): without them it clamps at the parent's origin only, so the engine
   (#3) keeps the rules during a gesture with measured sizes; resizing a parent smaller does not
@@ -1368,7 +1377,10 @@ its reason.
   maxWidth, maxHeight, keepAspectRatio: false })`, `connection({ radius: 20, mode: "strict" })`,
   `reconnection({ radius: 10 })`, `keyboard({ step: 5, fastStep: 20 })`, `minimap({ pannable: true,
   zoomable: true })`. #3 extended them: `selection({ boxOnDrag: false })` (any pane drag draws the
-  box instead of Shift + drag), `minimap({ padding: 0.1 })` (a share of its size).
+  box instead of Shift + drag), `minimap({ padding: 0.1 })` (a share of its size). #24 extended
+  them: `selection({ multiKey: ["Meta", "Control", "Shift"], boxKey: "Shift" })` (`SelectionKey`:
+  a key, several, or `null` for none), `keyboard({ deleteKeys: ["Delete", "Backspace"] })` (`[]`
+  for none), `connection({ clickToConnect: false })`.
 
 Decisions of the engine (#3):
 
@@ -1387,7 +1399,8 @@ Decisions of the engine (#3):
   `pointercancel`, a lost capture and a missed release for every gesture; `tap` (a press that did
   not become a gesture and moved at most 3 px: selection's click), `wheel`, `keydown(event,
   target)`, `focus`, `attributes`. The host lends the viewport, measured rects, handles, edge
-  paths, `keepInParent`, `interactive`, `partOptions`, `changed`, `emit`. A gesture with
+  paths, `keepInParent` (#24: `keepInExtent`, with `absolutePosition`, `positionFor`, `extentOf`,
+  `held`), `interactive`, `partOptions`, `changed`, `emit`. A gesture with
   `autoPan: true` (drag, connection, reconnection, selection box, resize; #23) is auto-panned by
   the engine, which calls its `move` again with the last pointer event after each frame's pan, so
   its `move` reads the flow point from the client point (`host.toFlow`), never a client delta
@@ -1398,12 +1411,13 @@ Decisions of the engine (#3):
   resize is drawn at once and a node without a size is measured; a 0 × 0 measurement is no size.
   A node whose element goes while it stays in the flow (culled, hidden) keeps its last size and
   handle bounds, never offered to a connection; a removed node's are forgotten (#6).
-- **Extent with measured sizes (closes #2's L6).** `host.keepInParent` clamps a drag's and the
-  arrows' positions with the measured sizes before each `node.move`. A resize keeps a child inside
-  its parent (the bound wins over `minWidth`, the ratio kept by shrinking), never shrinks a parent
-  past its `extent: "parent"` children, and moves the children back when the parent's top or left
-  edge moves (one `batch`), so they stay on screen; a parent holding a child that is not draggable
-  keeps its top and left edges (its child cannot be moved back).
+- **Extent with measured sizes (closes #2's L6).** `host.keepInParent` (`keepInExtent` since #24)
+  clamps a drag's and the arrows' positions with the measured sizes before each `node.move`. A
+  resize keeps a child inside its parent (the bound wins over `minWidth`, the ratio kept by
+  shrinking), never shrinks a parent past its `extent: "parent"` children, and moves the children
+  back when the parent's top or left edge moves (one `batch`), so they stay on screen; a parent
+  holding a child that is not draggable keeps its top and left edges (its child cannot be moved
+  back).
 - **Drags.** A press on a selected node drags the selection's draggable nodes (a node whose parent
   is dragged too is carried by it); on an unselected one, selects it (`selection.set`, refused
   silently without `selection()`) and drags it alone. Snap moves the pressed node to the grid and
@@ -1467,3 +1481,67 @@ Decisions of the animated viewport, auto-pan and pan/zoom options (#23, Epic #26
 - **`panOnScrollMode`.** Shift turns a vertical-only wheel sideways except in `"vertical"` mode
   (there Shift + wheel still pans vertically); `"horizontal"` ignores a plain wheel's vertical
   delta (symmetric with `"vertical"` ignoring horizontal ones). `panOnScrollSpeed` defaults to 1, today's behaviour.
+
+Decisions of the configurable keys, click-to-connect, drag handles, node origin and extent, and
+z-order (#24, Epic #26):
+
+- **Keys.** `selection({ multiKey, boxKey })` take a key, several (any held) or `null`, matched by
+  `host.held` (the engine's activation-key tracking: `Meta`, `Control`, `Alt`, `Shift` from the
+  pointer event's flags, any other `key`/`code` from the root's document). `multiKey` defaults to
+  `["Meta", "Control", "Shift"]`, not the Epic's "Meta/Control": a Shift click toggled before #24
+  and its tests stay green; an app that wants Shift for the box only passes `multiKey:
+  ["Meta", "Control"]`. `multiple: false` still turns toggling off. `boxKey: null` leaves the box
+  to `boxOnDrag`. `keyboard({ deleteKeys })` matches `KeyboardEvent.key` or `.code`; Enter/Space's
+  toggle modifiers stay the keyboard's own (features talk only through keys, and the keyboard does
+  not read the selection's options).
+- **Click-to-connect is a gesture that outlives its press.** `FeatureEngine.tap` may return a
+  `FeatureGesture`: the engine keeps it as the gesture under way without a press, moves it on every
+  primary pointer move (the hover), and gives it the next primary press (no other gesture starts,
+  no pan; a press on `other` parts, the controls, leaves it waiting; the pan key still pans); that
+  press's release is its `end`, a drop at that point: within `radius` of an eligible handle it
+  connects through `model.can("edge.add")` (`connect`), a vetoed one `connect-cancel { refused:
+  true }`, anywhere else `connect-cancel { refused: false }`. Escape, `cancel-gesture`,
+  `set-interactive false`, a detach and `destroy` cancel it. So a tap on the pane that cancels it
+  does not also clear the selection (the press is the connection's). The session is the drag's
+  (`connect-session`), started at once (`connect-start`, `connection` non-null, `data-connecting`).
+  Why the engine and not a feature flag: the engine owns Escape, capture and the press routing for
+  every gesture (#3's decision), and the walk order of the features' `tap` hooks would otherwise
+  let `selection()` take the cancelling tap.
+- **Drag handles** are resolved in the press target (`dom.ts`): a press on a node that holds a
+  `data-flow-drag-handle` element (one whose nearest node part is that node) outside it is a
+  `node` target with `outsideDragHandle: true`; `drag()` skips it, so it neither drags nor pans,
+  and its tap still selects. `DRAG_HANDLE_ATTRIBUTE` is the exported name.
+- **`nodeOrigin` applies to the nodes on the flow; a child's position stays its box's top-left
+  corner in its parent's box.** Why: the model's sub-flow rules (`extent: "parent"` clamping with
+  the document's sizes, the resize's children rules) work in the parent's top-left box and know no
+  origin; a child placed from its parent's corner keeps them exact, whatever the origin. xyflow
+  applies the origin to children too; a per-node origin was not needed (the Epic: an engine option
+  only). One helper, `nodeBox(position, size, origin)` (`geometry/rect.ts`), turns a position and
+  a size into a box; the engine's node box (`boxOf`: the parent's corner plus the position, then
+  `nodeBox`) feeds `node-rect-by`, the handles' centres, edge ends, `nodes-bounds`, `fit-view`,
+  `visible-nodes`, `visible-edges`, the minimap, `node-toolbar-by`, `focus-node`'s reveal, the
+  selection box's hit test, drag, the arrows and resize (which works on the absolute box and turns
+  it back into a position once, `host.positionFor`). The model's `absolute-position-by` stays the
+  sum of positions (an adapter without an engine, the server render, uses it). Known limits with an
+  origin other than `{ 0, 0 }`: `node.set-parent` keeps the place on screen as if it were 0, 0, and
+  `expandParent` grows a parent on the flow around its origin (its children shift by the origin's
+  share of the growth).
+- **Extent.** A `Rect` extent stays a `subflows()` field (D3 names `extent` with `parentId`; a
+  rectangle on a node with no parent therefore needs `subflows()` installed); it is in the
+  coordinates of the node's position (relative to its parent's top-left corner for a child). The
+  engine keeps a node's box inside the intersection of its parent's box (`"parent"`, measured),
+  its `Rect` and the engine's `nodeExtent` (`host.extentOf`, `host.keepInExtent`) during drags,
+  the arrows and resizes (a box larger than its bounds keeps to their top-left corner); the model's
+  own clamp stays `"parent"` only, with the document's sizes (a rectangle is kept by the gestures,
+  not by `node.move` from code). `node.set-parent` takes a `Rect` and keeps it without a parent
+  (`"parent"` is dropped there, as before); controlled props compare extents by value.
+- **z-order within each layer** (the Epic's decision: edges never over nodes). A node's
+  structural `z-index` (`node-z-index-by`) is its `zIndex` (0 without), plus 10 000 when it is
+  selected and `elevateNodesOnSelect` is on (our own raise), and always at least its parent's + 1,
+  so a selected node's descendants are raised with it and a child is above its parent. An edge's
+  order (`drawn-edges`) is its `zIndex`, plus 10 000 when selected with `elevateEdgesOnSelect`,
+  stable among equals (the document's order). Why a read and not an attribute: `z-index` is style,
+  not state, and an SVG has no `z-index`; the adapters (#25) apply the number to the node's
+  structural style and render `drawn-edges` instead of their own filter. No command sets `zIndex`:
+  a change through controlled props (`commands-to`) replaces the node or edge, as a type change
+  does; elevation covers the usual raise.
