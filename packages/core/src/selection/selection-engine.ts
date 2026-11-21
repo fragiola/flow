@@ -7,10 +7,13 @@ import { flag } from "../attributes/part-attributes";
 import type { FlowEdge, FlowNode, XY } from "../document/types";
 import type { FeatureEngine, FeatureEngineHost } from "../features/types";
 import { contains, overlaps, rectFromCorners } from "../geometry/rect";
+import { toScreen } from "../geometry/viewport-math";
 import type { SelectionOptions } from "./selection";
 
 interface Box {
+    /** where it started, in client coordinates (its travel) and in flow coordinates (its corner) */
     readonly start: XY;
+    readonly anchor: XY;
     current: XY;
     readonly before: { nodeIds: string[]; edgeIds: string[] };
     nodeIds: string[];
@@ -37,7 +40,7 @@ export function selectionEngine(
 
     /** What the box holds now: its nodes, and the edges between two of them. */
     const inBox = (current: Box) => {
-        const a = host.toFlow(current.start);
+        const a = current.anchor;
         const b = host.toFlow(current.current);
         const area = rectFromCorners(a, b);
         const nodeIds = (model.get("all-nodes") as readonly FlowNode[])
@@ -72,8 +75,9 @@ export function selectionEngine(
         get: {
             "selection-box": () => {
                 if (!box?.active) return null;
+                // the corner stays on its flow point when the view pans or zooms under it
                 return rectFromCorners(
-                    host.toRoot(box.start),
+                    toScreen(host.viewport(), box.anchor),
                     host.toRoot(box.current),
                 );
             },
@@ -93,6 +97,7 @@ export function selectionEngine(
             const before = selected();
             box = {
                 start,
+                anchor: host.toFlow(start),
                 current: start,
                 before,
                 nodeIds: [],

@@ -232,7 +232,6 @@ export function mount<const F extends FlowFeatures = readonly []>(
         group.append(path);
         edgesLayer.append(group);
         edges.set(edge.id, group);
-        engine.adapter.registerEdge(edge.id, group);
     }
 
     const events: FlowEngineEvent[] = [];

@@ -1,5 +1,6 @@
-// The reconnection feature's engine side: a press on an edge within `radius` pixels of one of its
-// ends drags that end; the connection line runs from the edge's other end (the session of
+// The reconnection feature's engine side: a press on an edge's reconnect anchor (the part
+// `reconnect-anchor`, `data-end`), or on the edge within `radius` pixels of one of its ends, drags
+// that end; the connection line runs from the edge's other end (the session of
 // `connection()`, shared through the host), valid when `model.can("edge.reconnect", …)`, and a
 // drop there reconnects the edge.
 import { connectSessionOf } from "../connect-session/connect-session";
@@ -74,10 +75,15 @@ export function reconnectionEngine(
                 const screen = toScreen(host.viewport(), point);
                 return Math.hypot(screen.x - pointer.x, screen.y - pointer.y);
             };
-            const toTarget = near(path.target);
-            const toSource = near(path.source);
-            if (Math.min(toTarget, toSource) > options.radius) return undefined;
-            const end = toTarget <= toSource ? "target" : "source";
+            // a reconnect anchor names its end; a press on the edge itself must be near one
+            let end = target.end;
+            if (end === undefined) {
+                const toTarget = near(path.target);
+                const toSource = near(path.source);
+                if (Math.min(toTarget, toSource) > options.radius)
+                    return undefined;
+                end = toTarget <= toSource ? "target" : "source";
+            }
             const from = fixedEnd(edge, end);
             if (!from) return undefined;
             return session.gesture(

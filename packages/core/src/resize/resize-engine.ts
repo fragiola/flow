@@ -121,7 +121,12 @@ export function resizeEngine(
     };
 
     /** The box kept to the parent's rules (relative to the node's parent). */
-    const kept = (start: Start, rect: Rect, position: ResizePosition): Rect => {
+    const kept = (
+        start: Start,
+        rect: Rect,
+        position: ResizePosition,
+        limits: ResizeOptions,
+    ): Rect => {
         let { x, y, width, height } = rect;
         const left = position.includes("left");
         const top = position.startsWith("top");
@@ -147,6 +152,20 @@ export function resizeEngine(
                 width = Math.min(width, parent.width - x);
             if (parent && parent.height > 0)
                 height = Math.min(height, parent.height - y);
+            // the parent's bound wins over the limits; a kept ratio shrinks the other side to it
+            if (
+                limits.keepAspectRatio &&
+                start.width > 0 &&
+                start.height > 0 &&
+                (width !== rect.width || height !== rect.height)
+            ) {
+                const ratio = start.width / start.height;
+                const fitted = Math.min(width, height * ratio);
+                if (left) x += width - fitted;
+                if (top) y += height - fitted / ratio;
+                width = fitted;
+                height = fitted / ratio;
+            }
         }
         // a parent keeps its children with `extent: "parent"` inside, and its children's places
         const fixed = start.children.some(
@@ -261,6 +280,7 @@ export function resizeEngine(
                         limits,
                     ),
                     position,
+                    limits,
                 );
                 last = { commands: stepOf(start, rect), rect };
                 run(last.commands, true);

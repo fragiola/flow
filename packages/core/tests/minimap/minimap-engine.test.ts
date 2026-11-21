@@ -40,26 +40,27 @@ describe("the minimap", () => {
         const { engine } = mount(json(), { features: [minimap()], sizes });
         expect(engine.get("minimap-view", { width: 200, height: 150 })).toEqual(
             {
-                viewBox: { x: -20, y: -20, width: 840, height: 640 },
-                viewBoxAttribute: "-20 -20 840 640",
-                scale: 4.2,
+                viewBox: { x: -100, y: -75, width: 1000, height: 750 },
+                viewBoxAttribute: "-100 -75 1000 750",
+                scale: 5,
                 nodes: [
                     { nodeId: "a", x: 0, y: 0, width: 100, height: 50 },
                     { nodeId: "b", x: 300, y: 200, width: 100, height: 50 },
                 ],
                 view: { x: 0, y: 0, width: 800, height: 600 },
-                maskPath: "M-20,-20 h840 v640 h-840 z M0,0 h800 v600 h-800 z",
+                maskPath:
+                    "M-100,-75 L900,-75 L900,675 L-100,675 Z M0,0 L800,0 L800,600 L0,600 Z",
             },
         );
         engine.run("set-viewport", { x: -1000, y: 0, zoom: 2 });
         const zoomed = engine.get("minimap-view", { width: 100, height: 100 });
         expect(zoomed.view).toEqual({ x: 500, y: 0, width: 400, height: 300 });
-        // the nodes and the view: (0, 0) to (900, 300), fitted square
+        // the nodes and the view: (0, 0) to (900, 300), in 80% of a square
         expect(zoomed.viewBox).toEqual({
-            x: -45,
-            y: -345,
-            width: 990,
-            height: 990,
+            x: -112.5,
+            y: -412.5,
+            width: 1125,
+            height: 1125,
         });
     });
 
@@ -69,10 +70,10 @@ describe("the minimap", () => {
         const node = element.firstElementChild as Element;
         pointer(node, "pointerdown", { clientX: 650, clientY: 525 });
         expect(flow.root.setPointerCapture).toHaveBeenCalledWith(1);
-        // a quarter across: flow x -20 + 840 / 4 = 190
-        expect(flow.engine.get("viewport")).toEqual({ x: 210, y: 0, zoom: 1 });
+        // a quarter across: flow x -100 + 1000 / 4 = 150
+        expect(flow.engine.get("viewport")).toEqual({ x: 250, y: 0, zoom: 1 });
         pointer(flow.root, "pointermove", { clientX: 670, clientY: 525 });
-        expect(flow.engine.get("viewport")).toEqual({ x: 126, y: 0, zoom: 1 });
+        expect(flow.engine.get("viewport")).toEqual({ x: 150, y: 0, zoom: 1 });
         pointer(flow.root, "pointercancel", { clientX: 670, clientY: 525 });
         expect(flow.engine.get("viewport")).toEqual({ x: 0, y: 0, zoom: 1 });
     });
@@ -87,8 +88,8 @@ describe("the minimap", () => {
         });
         expect(event.defaultPrevented).toBe(true);
         const viewport = flow.engine.get("viewport");
-        expect(viewport.zoom).toBeCloseTo(2 ** 0.2);
-        expect(viewport.x).toBeCloseTo(400 - 400 * 2 ** 0.2);
+        expect(viewport.zoom).toBeCloseTo(Math.exp(100 / 600));
+        expect(viewport.x).toBeCloseTo(400 - 400 * Math.exp(100 / 600));
     });
 
     it("does nothing when neither pannable nor zoomable", () => {

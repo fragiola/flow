@@ -193,7 +193,12 @@ describe("core package guard", () => {
             ).matchAll(/\.style\.(\w+)/g),
         ].map(([, property]) => property);
         expect(new Set(writes)).toEqual(
-            new Set(["transformOrigin", "transform", "removeProperty"]),
+            new Set([
+                "transformOrigin",
+                "transform",
+                "removeProperty",
+                "setProperty",
+            ]),
         );
     });
 

@@ -15,6 +15,9 @@ export const ID_ATTRIBUTE = "data-flow-id";
 /** The attribute a resize handle carries: which corner or side of its node it moves. */
 export const POSITION_ATTRIBUTE = "data-position";
 
+/** The attribute a reconnect anchor carries: which end of its edge it moves (`source`, `target`). */
+export const END_ATTRIBUTE = "data-end";
+
 /** A subtree inside a node that starts no gesture when pressed (a slider, a text field). */
 export const NO_GESTURE_ATTRIBUTE = "data-flow-no-gesture";
 
@@ -31,6 +34,7 @@ export type FlowPart =
     | "edge"
     | "edge-path"
     | "edge-label"
+    | "reconnect-anchor"
     | "handle"
     | "connection-line"
     | "selection-box"

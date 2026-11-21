@@ -259,4 +259,28 @@ describe("resizing in sub-flows", () => {
         });
         expect(box(flow, "c")).toMatchObject({ x: 50, y: 50 });
     });
+
+    it("keeps the ratio when the parent's bound stops a child", () => {
+        const json = flowOf({ p: [0, 0], c: [50, 50] });
+        json.nodes[1] = {
+            ...json.nodes[1],
+            parentId: "p",
+            extent: "parent",
+        } as (typeof json.nodes)[1];
+        const flow = mount(json, {
+            features: [subflows(), resize({ keepAspectRatio: true })],
+            sizes: { p: [200, 100], c: [40, 20] },
+        });
+        dragOn(resizeHandle(flow.node("c"), "bottom-right"), flow.root, [
+            { clientX: 90, clientY: 70 },
+            { clientX: 190, clientY: 70 },
+        ]);
+        // 140 × 70 would leave the parent: 50 tall at most, so 100 wide
+        expect(box(flow, "c")).toEqual({
+            x: 50,
+            y: 50,
+            width: 100,
+            height: 50,
+        });
+    });
 });

@@ -252,7 +252,11 @@ export class ConnectSession {
             into["data-invalid"] = flag(target && state?.status === "invalid");
             return;
         }
-        if (part === "edge" || part === "edge-path") {
+        if (
+            part === "edge" ||
+            part === "edge-path" ||
+            part === "reconnect-anchor"
+        ) {
             into["data-reconnecting"] = flag(
                 state?.reconnecting !== undefined &&
                     state.reconnecting.edgeId === payload.edgeId,

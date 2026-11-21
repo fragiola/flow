@@ -8,6 +8,7 @@ import type { XY } from "../document/types";
 import type { HandleSide, Rect } from "../geometry/types";
 import type { FlowModel } from "../model/create-flow-model";
 import type { HandleType } from "../state/queries";
+import type { FlowEngineOptions } from "./create-flow-engine";
 
 /** A handle as its primitive registers it (D8). */
 export interface HandleRegistration {
@@ -42,6 +43,7 @@ export interface PressTarget {
      * - `pane`: the flow's background (the root, the viewport, the background, the nodes' and
      *   edges' layers);
      * - `node`, `edge`, `handle`, `resize-handle`, `minimap`: that part (or an element inside it);
+     *   a reconnect anchor is its edge's, with its `end`;
      * - `other`: a part with its own behaviour (the controls, a toolbar, a panel) or a control
      *   inside a node (a field, a button, `data-flow-no-gesture`): the flow leaves it alone
      */
@@ -63,6 +65,8 @@ export interface PressTarget {
     readonly handle?: FlowHandle | undefined;
     /** a resize handle's corner or side (`data-position`: `top-left`, `top`, …) */
     readonly position?: string | undefined;
+    /** a reconnect anchor's end of its edge (`data-end`) */
+    readonly end?: "source" | "target" | undefined;
 }
 
 /** What changed in the view, for an adapter to re-render only what depends on it. */
@@ -81,6 +85,7 @@ export interface PartPayloadMap {
     edge: { edgeId: string };
     "edge-path": { edgeId: string };
     "edge-label": { edgeId: string };
+    "reconnect-anchor": { edgeId: string; end: "source" | "target" };
     handle: HandleRegistration;
     "resize-handle": { nodeId: string; position: string };
     resizer: { nodeId: string };
@@ -97,7 +102,16 @@ export interface FlowEngineAdapter {
         /** render only the nodes and edges in view (`visible-nodes`, `visible-edges`) */
         readonly onlyRenderVisible: boolean;
     };
-    /** attaches the root element (`Flow.Root`): the engine listens to its events; another replaces it */
+    /**
+     * the engine's options changed (a root prop: `minZoom`, `panOnDrag`, `translateExtent`,
+     * `pathOptions`, `interactive`, …): they apply from now on, a gesture under way included;
+     * `root`, `defaultViewport` and `fitView` are creation options and are ignored here
+     */
+    setOptions(options: Partial<FlowEngineOptions>): void;
+    /**
+     * attaches the root element (`Flow.Root`): the engine listens to its events and sets its
+     * `touch-action: none`; another replaces it
+     */
     attachRoot(element: HTMLElement): void;
     /** detaches the root, cancelling a gesture under way */
     detachRoot(): void;
@@ -108,8 +122,6 @@ export interface FlowEngineAdapter {
     attachViewport(element: HTMLElement | SVGElement | null): void;
     /** registers (or unregisters) a node's element: the engine measures it (`ResizeObserver`) */
     registerNode(nodeId: string, element: HTMLElement | null): void;
-    /** registers (or unregisters) an edge's element (focus, a press on it) */
-    registerEdge(edgeId: string, element: Element | null): void;
     /** registers (or, with `null`, unregisters) a handle's element (D8): the engine measures its centre */
     registerHandle(handle: HandleRegistration, element: Element | null): void;
     /** options a part's primitive takes (`resizer`: `minWidth`, …); `null` drops them */

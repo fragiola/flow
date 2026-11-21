@@ -2,6 +2,7 @@
 // a popup's own, never the global ones), and what a press, a key or the wheel hit, read from the
 // part attributes (D11).
 import {
+    END_ATTRIBUTE,
     ID_ATTRIBUTE,
     NO_GESTURE_ATTRIBUTE,
     PART_ATTRIBUTE,
@@ -98,6 +99,15 @@ export function pressTargetOf(
             element: part,
             nodeId: nodeIdAround(part, root),
             position: part.getAttribute(POSITION_ATTRIBUTE) ?? undefined,
+        };
+    }
+    if (name === "reconnect-anchor") {
+        const end = part.getAttribute(END_ATTRIBUTE);
+        return {
+            kind: "edge",
+            element: part,
+            edgeId: idOf(part),
+            end: end === "source" || end === "target" ? end : undefined,
         };
     }
     if (EDGE_PARTS.has(name)) {

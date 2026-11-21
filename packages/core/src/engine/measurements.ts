@@ -44,6 +44,8 @@ export class Measurements {
     private readonly sizes = new Map<string, Size>();
     private readonly handles = new Map<string, RegisteredHandle>();
     private readonly handleOfElement = new Map<Element, string>();
+    /** each node's handle keys, in registration order */
+    private readonly handlesByNode = new Map<string, Set<string>>();
     private observer: Observer | undefined;
     private observerView: Window | undefined;
 
@@ -73,7 +75,7 @@ export class Measurements {
             this.nodes.delete(nodeId);
         }
         if (!element) {
-            this.sizes.delete(nodeId);
+            if (this.sizes.delete(nodeId)) this.measured([nodeId]);
             return;
         }
         this.nodes.set(nodeId, element);
@@ -100,6 +102,7 @@ export class Measurements {
             }
             this.handleOfElement.delete(previous.element);
             this.handles.delete(key);
+            this.handlesByNode.get(registration.nodeId)?.delete(key);
         }
         if (!element) {
             this.measured([registration.nodeId]);
@@ -111,6 +114,10 @@ export class Measurements {
             bounds: undefined,
         });
         this.handleOfElement.set(element, key);
+        const own =
+            this.handlesByNode.get(registration.nodeId) ?? new Set<string>();
+        own.add(key);
+        this.handlesByNode.set(registration.nodeId, own);
         if (previous?.element !== element) {
             this.observerFor(element)?.observe(element);
         }
@@ -125,6 +132,16 @@ export class Measurements {
         const key = this.handleOfElement.get(element);
         const entry = key === undefined ? undefined : this.handles.get(key);
         return entry ? center(this.view(entry)) : undefined;
+    }
+
+    /** A node's registered handles (their centres left for the engine to place). */
+    handlesOf(nodeId: string): FlowHandle[] {
+        const keys = this.handlesByNode.get(nodeId);
+        if (!keys) return [];
+        return [...keys].flatMap((key) => {
+            const entry = this.handles.get(key);
+            return entry ? [this.view(entry)] : [];
+        });
     }
 
     /** Every registered handle (its centre left for the engine to place), in registration order. */
@@ -164,8 +181,9 @@ export class Measurements {
             }
             const nodeBox = element.getBoundingClientRect();
             const zoom = this.zoom() || 1;
-            for (const entry of this.handles.values()) {
-                if (entry.registration.nodeId !== nodeId) continue;
+            for (const key of this.handlesByNode.get(nodeId) ?? []) {
+                const entry = this.handles.get(key);
+                if (!entry) continue;
                 const box = entry.element.getBoundingClientRect();
                 const bounds = {
                     x: (box.left - nodeBox.left) / zoom,
@@ -203,6 +221,7 @@ export class Measurements {
         this.sizes.clear();
         this.handles.clear();
         this.handleOfElement.clear();
+        this.handlesByNode.clear();
     }
 
     /** The observer of an element's window, made once (an element of another window gets none). */

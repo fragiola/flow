@@ -31,7 +31,7 @@ export const adapterSurface: Same<
     | "detachRoot"
     | "attachViewport"
     | "registerNode"
-    | "registerEdge"
+    | "setOptions"
     | "registerHandle"
     | "setPartOptions"
     | "attributes"

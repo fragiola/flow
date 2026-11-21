@@ -192,7 +192,7 @@ describe("the feature factories", () => {
         expect(minimap().options).toEqual({
             pannable: true,
             zoomable: true,
-            padding: 5,
+            padding: 0.1,
         });
         expect(selection().options).toEqual({
             boxMode: "full",

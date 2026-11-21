@@ -4,6 +4,7 @@
 // (`pannable`), and the wheel over it that zooms the flow around the root's centre (`zoomable`).
 import type { FlowNode } from "../document/types";
 import type { MinimapView } from "../engine/verbs";
+import { WHEEL_RATE } from "../engine/wheel-rate";
 import type { FeatureEngine, FeatureEngineHost } from "../features/types";
 import { formatNumber } from "../geometry/path-format";
 import { boundsOf } from "../geometry/rect";
@@ -16,12 +17,21 @@ import {
 } from "../geometry/viewport-math";
 import type { MinimapOptions } from "./minimap";
 
-function rectPath(rect: Rect): string {
+/** A rectangle as a closed polygon of absolute points. */
+function polygonOf(rect: Rect): string {
     const f = formatNumber;
-    return `M${f(rect.x)},${f(rect.y)} h${f(rect.width)} v${f(rect.height)} h${f(-rect.width)} z`;
+    const left = f(rect.x);
+    const top = f(rect.y);
+    const right = f(rect.x + rect.width);
+    const bottom = f(rect.y + rect.height);
+    return `M${left},${top} L${right},${top} L${right},${bottom} L${left},${bottom} Z`;
 }
 
-/** The minimap's geometry for one size (in pixels). */
+/**
+ * The minimap's geometry for one size (in pixels): the flow units a pixel stands for are the
+ * fewest that fit the nodes and the view in the minimap less its padding (a share of its size on
+ * every side), and the view box is the whole minimap at that scale, centred on them.
+ */
 export function minimapView(
     host: FeatureEngineHost,
     width: number,
@@ -41,26 +51,32 @@ export function minimapView(
         size.width > 0 && size.height > 0
             ? viewRect(host.viewport(), size)
             : { x: 0, y: 0, width: 0, height: 0 };
-    const bounds = boundsOf([...nodes, view]) ?? view;
-    const room = { width: Math.max(1, width), height: Math.max(1, height) };
-    // flow units per pixel: the larger of the two, so the bounds fit both ways
-    const fit =
-        Math.max(bounds.width / room.width, bounds.height / room.height) || 1;
-    const outer = padding * fit;
+    const shown = boundsOf([...nodes, view]) ?? view;
+    const pixels = { width: Math.max(1, width), height: Math.max(1, height) };
+    const inner = Math.max(0.01, 1 - 2 * Math.min(Math.max(padding, 0), 0.49));
+    const unitsPerPixel =
+        Math.max(
+            shown.width / (pixels.width * inner),
+            shown.height / (pixels.height * inner),
+        ) || 1;
+    const center = {
+        x: shown.x + shown.width / 2,
+        y: shown.y + shown.height / 2,
+    };
     const viewBox = {
-        x: bounds.x + bounds.width / 2 - (room.width * fit) / 2 - outer,
-        y: bounds.y + bounds.height / 2 - (room.height * fit) / 2 - outer,
-        width: room.width * fit + 2 * outer,
-        height: room.height * fit + 2 * outer,
+        x: center.x - (pixels.width * unitsPerPixel) / 2,
+        y: center.y - (pixels.height * unitsPerPixel) / 2,
+        width: pixels.width * unitsPerPixel,
+        height: pixels.height * unitsPerPixel,
     };
     const f = formatNumber;
     return {
         viewBox,
         viewBoxAttribute: `${f(viewBox.x)} ${f(viewBox.y)} ${f(viewBox.width)} ${f(viewBox.height)}`,
-        scale: viewBox.width / room.width,
+        scale: unitsPerPixel,
         nodes,
         view,
-        maskPath: `${rectPath(viewBox)} ${rectPath(view)}`,
+        maskPath: `${polygonOf(viewBox)} ${polygonOf(view)}`,
     };
 }
 
@@ -136,7 +152,8 @@ export function minimapEngine(
             const viewport = host.viewport();
             const size = host.rootSize();
             const scale = event.deltaMode === 1 ? 16 : 1;
-            const zoom = viewport.zoom * 2 ** (-event.deltaY * scale * 0.002);
+            const zoom =
+                viewport.zoom * Math.exp((-event.deltaY * scale) / WHEEL_RATE);
             host.setViewport(
                 zoomAround(
                     viewport,

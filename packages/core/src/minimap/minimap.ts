@@ -11,7 +11,7 @@ export interface MinimapOptions {
     readonly pannable: boolean;
     /** whether the wheel over the minimap zooms the viewport; default true */
     readonly zoomable: boolean;
-    /** the room (in minimap pixels) around the nodes and the view; default 5 */
+    /** the share of the minimap's size kept free around the nodes and the view, on every side; default 0.1 */
     readonly padding: number;
 }
 
@@ -23,7 +23,7 @@ export function minimap(options: Partial<MinimapOptions> = {}): MinimapFeature {
     const resolved: MinimapOptions = Object.freeze({
         pannable: options.pannable ?? true,
         zoomable: options.zoomable ?? true,
-        padding: options.padding ?? 5,
+        padding: options.padding ?? 0.1,
     });
     return Object.freeze({
         name: "minimap",

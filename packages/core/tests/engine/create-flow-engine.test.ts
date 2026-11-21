@@ -28,9 +28,9 @@ describe("createFlowEngine", () => {
             "detachRoot",
             "getSnapshot",
             "model",
-            "registerEdge",
             "registerHandle",
             "registerNode",
+            "setOptions",
             "setPartOptions",
             "settings",
             "subscribe",
@@ -183,11 +183,12 @@ describe("createFlowEngine", () => {
         });
     });
 
-    it("fits the view once every node is measured (the fitView option)", () => {
+    it("fits the view once every node is measured (the fitView option)", async () => {
         const { engine } = mount(flowOf({ a: [0, 0], b: [300, 100] }), {
             sizes: { a: [100, 100], b: [100, 50] },
             engine: { fitView: { padding: 0 }, maxZoom: 4 },
         });
+        await Promise.resolve();
         expect(engine.get("viewport")).toEqual({ x: 0, y: 150, zoom: 2 });
     });
 

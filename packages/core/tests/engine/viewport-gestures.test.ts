@@ -84,7 +84,7 @@ describe("the wheel", () => {
         const event = wheel(root, { deltaY: -100, clientX: 150, clientY: 250 });
         expect(event.defaultPrevented).toBe(true);
         const viewport = engine.get("viewport");
-        expect(viewport.zoom).toBeCloseTo(2 ** 0.2);
+        expect(viewport.zoom).toBeCloseTo(Math.exp(100 / 600));
         // the flow point under the pointer stays under it
         const under = toFlow(viewport, { x: 100, y: 200 });
         expect(under.x).toBeCloseTo(100);
@@ -100,13 +100,15 @@ describe("the wheel", () => {
         wheel(root, { deltaY: 10_000 });
         expect(engine.get("viewport").zoom).toBe(0.25);
         wheel(root, { deltaY: -25, deltaMode: 1 });
-        expect(engine.get("viewport").zoom).toBeCloseTo(0.25 * 2 ** 0.8);
+        expect(engine.get("viewport").zoom).toBeCloseTo(
+            0.25 * Math.exp(400 / 600),
+        );
     });
 
     it("zooms faster for a trackpad pinch (Ctrl + wheel)", () => {
         const { engine, root } = mount(flowOf({}));
         wheel(root, { deltaY: -10, ctrlKey: true });
-        expect(engine.get("viewport").zoom).toBeCloseTo(2 ** 0.1);
+        expect(engine.get("viewport").zoom).toBeCloseTo(Math.exp(10 / 120));
     });
 
     it("pans with panOnScroll, Shift turning it sideways", () => {
@@ -118,7 +120,7 @@ describe("the wheel", () => {
         wheel(root, { deltaY: 30, shiftKey: true });
         expect(engine.get("viewport")).toEqual({ x: -40, y: -20, zoom: 1 });
         wheel(root, { deltaY: -10, ctrlKey: true });
-        expect(engine.get("viewport").zoom).toBeCloseTo(2 ** 0.1);
+        expect(engine.get("viewport").zoom).toBeCloseTo(Math.exp(10 / 120));
     });
 
     it("leaves a no-wheel subtree and zoomOnScroll off alone", () => {

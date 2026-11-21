@@ -133,4 +133,33 @@ describe("reconnecting an edge", () => {
         pointer(fixed.root, "pointermove", at(298, 222));
         expect(fixed.engine.get("connection")).toBeNull();
     });
+
+    it("drags the end a reconnect anchor names, wherever it is pressed", () => {
+        const flow = mount(json(), { features: features(), sizes, handles });
+        const anchor = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "circle",
+        );
+        anchor.setAttribute("data-flow-part", "reconnect-anchor");
+        anchor.setAttribute("data-flow-id", "e");
+        anchor.setAttribute("data-end", "target");
+        flow.edge("e").append(anchor);
+        expect(
+            flow.engine.adapter.attributes("reconnect-anchor", {
+                edgeId: "e",
+                end: "target",
+            }),
+        ).toMatchObject({ "data-flow-id": "e", "data-end": "target" });
+        // far from the end: an anchor needs no radius
+        pointer(anchor, "pointerdown", at(200, 25));
+        pointer(flow.root, "pointermove", at(298, 222));
+        expect(
+            flow.engine.adapter.attributes("reconnect-anchor", {
+                edgeId: "e",
+                end: "target",
+            })["data-reconnecting"],
+        ).toBe("");
+        pointer(flow.root, "pointerup", at(298, 222));
+        expect(flow.model.get("edge-by", { id: "e" })?.target).toBe("c");
+    });
 });

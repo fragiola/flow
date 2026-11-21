@@ -6,6 +6,7 @@
 // a drag, a connection or a key does. It never touches the global `document` or `window`: every
 // DOM access goes through the root element (its `ownerDocument`, its `defaultView`).
 import {
+    END_ATTRIBUTE,
     flag,
     ID_ATTRIBUTE,
     type MutablePartAttributes,
@@ -62,13 +63,15 @@ import type {
     ViewChange,
 } from "./adapter";
 import { backgroundPattern } from "./background-pattern";
-import { pressTargetOf } from "./dom";
+import { pressTargetOf, viewOf } from "./dom";
 import { edgeEnds, type PathOptions, pathOf } from "./edge-geometry";
 import type { FlowEngineEvent } from "./events";
 import { Measurements } from "./measurements";
 import { nodeToolbarPosition } from "./node-toolbar";
 import {
+    clearRootTouchAction,
     clearViewportTransform,
+    writeRootTouchAction,
     writeViewportTransform,
 } from "./structural-style";
 import type {
@@ -85,6 +88,7 @@ import type {
     NodeToolbarPayload,
     ZoomStepPayload,
 } from "./verbs";
+import { WHEEL_PINCH_RATE, WHEEL_RATE } from "./wheel-rate";
 
 /** Options of {@link createFlowEngine}. */
 export interface FlowEngineOptions {
@@ -174,6 +178,8 @@ interface Press {
     readonly gesture: FeatureGesture | undefined;
     readonly pan: boolean;
     travel: number;
+    /** its pointer's last move: a press whose release was missed ends there */
+    last: PointerEvent | undefined;
 }
 
 /** A pinch under way: its two pointers and where they started. */
@@ -217,9 +223,9 @@ function distance(a: XY, b: XY): number {
 class Engine<T extends FlowTypes, F extends FlowFeatures> {
     readonly model: FlowModel;
     readonly adapter: FlowEngineAdapter;
-    private readonly options: FlowEngineOptions;
-    private readonly minZoom: number;
-    private readonly maxZoom: number;
+    private options: FlowEngineOptions;
+    private minZoom: number;
+    private maxZoom: number;
     private readonly measurements: Measurements;
     private readonly features: ComposedFeatureEngine;
     private readonly shared = new Map<string, unknown>();
@@ -227,7 +233,6 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         string,
         Readonly<Record<string, unknown>>
     >();
-    private readonly edges = new Map<string, Element>();
     private readonly listeners = new Set<(event: FlowEngineEvent) => void>();
     private readonly adapterListeners = new Set<(change: ViewChange) => void>();
     private readonly actions: Record<
@@ -427,9 +432,9 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             "visible-edges": () => this.visibleEdges(),
             "handles-by": (p) => {
                 const nodeId = String(payloadRecord(p).nodeId);
-                return this.handles().filter(
-                    (handle) => handle.nodeId === nodeId,
-                );
+                return this.measurements
+                    .handlesOf(nodeId)
+                    .map((handle) => this.placed(handle));
             },
             "background-pattern": (p) =>
                 backgroundPattern(
@@ -491,7 +496,6 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         if (this.viewportElement) clearViewportTransform(this.viewportElement);
         this.viewportElement = undefined;
         this.measurements.destroy();
-        this.edges.clear();
         this.listeners.clear();
         this.adapterListeners.clear();
         this.shared.clear();
@@ -802,9 +806,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         type: HandleType,
         handleId: string | undefined,
     ): FlowHandle | undefined {
-        const own = this.measurements
-            .allHandles()
-            .filter((handle) => handle.nodeId === nodeId);
+        const own = this.measurements.handlesOf(nodeId);
         const found =
             handleId === undefined
                 ? (own.find(
@@ -894,7 +896,28 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         };
     }
 
+    /**
+     * Something was measured: the adapters hear it once per task (a mount registers many nodes and
+     * handles in one commit), through the root window's microtask queue; without a root, now.
+     */
     private measured(): void {
+        if (this.measureQueued) return;
+        const view = viewOf(this.rootElement);
+        if (!view || typeof view.queueMicrotask !== "function") {
+            this.flushMeasured();
+            return;
+        }
+        this.measureQueued = true;
+        view.queueMicrotask(() => {
+            this.measureQueued = false;
+            this.flushMeasured();
+        });
+    }
+
+    private measureQueued = false;
+
+    private flushMeasured(): void {
+        if (this.destroyed) return;
         this.notify({ measured: true });
         const fit = this.pendingFit;
         if (!fit || !this.rootElement) return;
@@ -966,6 +989,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         if (this.rootElement === element) return;
         this.detachRoot();
         this.rootElement = element;
+        // the browser must not take touches for its own scroll or zoom: they would cancel gestures
+        writeRootTouchAction(element);
         const listeners: [string, EventListener, AddEventListenerOptions?][] = [
             ["pointerdown", (event) => this.pointerDown(event as PointerEvent)],
             ["pointermove", (event) => this.pointerMove(event as PointerEvent)],
@@ -1008,6 +1033,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         this.features.detached();
         this.removeRootListeners?.();
         this.removeRootListeners = undefined;
+        clearRootTouchAction(this.rootElement);
         this.rootElement = undefined;
     }
 
@@ -1042,9 +1068,25 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     private pointerDown(event: PointerEvent): void {
         if (this.destroyed) return;
         const client = { x: event.clientX, y: event.clientY };
-        this.pointers.set(event.pointerId, client);
+        // only touch pointers pinch: the others are never tracked
+        if (event.pointerType === "touch") {
+            this.pointers.set(event.pointerId, client);
+        }
         if (this.pinch) return;
-        const press = this.press;
+        let press = this.press;
+        // a press whose release was missed (outside the root, its capture refused) ends where its
+        // pointer was last seen, as if released there
+        if (
+            press &&
+            (press.pointerId === event.pointerId ||
+                event.pointerType !== "touch")
+        ) {
+            this.press = undefined;
+            this.release(press.pointerId);
+            if (press.last) press.gesture?.end(press.last);
+            else press.gesture?.cancel();
+            press = undefined;
+        }
         if (press) {
             // a second finger on a pan (or a press that did nothing yet) pinches
             if (
@@ -1063,7 +1105,10 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         if (event.isPrimary === false) return;
         if (event.pointerType === "mouse" && event.button !== 0) return;
         const target = this.target(event.target);
-        if (target.kind === "other") return;
+        if (target.kind === "other") {
+            this.pointers.delete(event.pointerId);
+            return;
+        }
         let gesture = this.features.pointerdown(event, target);
         let pan = false;
         if (
@@ -1081,6 +1126,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             gesture,
             pan,
             travel: 0,
+            last: undefined,
         };
         this.capture(event.pointerId);
         // the pane's presses select no text; a node's keep their default (focus)
@@ -1093,6 +1139,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         let moved = false;
         return {
             move: (event) => {
+                const first = !moved;
                 moved = true;
                 this.setViewport(
                     {
@@ -1102,7 +1149,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                     },
                     true,
                 );
-                this.notify({ gesture: true });
+                // the panning state changed once, on the first move
+                if (first) this.notify({ gesture: true });
             },
             end: () => {
                 if (moved) this.notify({ gesture: true });
@@ -1127,6 +1175,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         const press = this.press;
         if (!press || press.pointerId !== event.pointerId) return;
         press.travel = Math.max(press.travel, distance(press.start, client));
+        press.last = event;
         press.gesture?.move(event);
     }
 
@@ -1150,8 +1199,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     private pointerLost(event: PointerEvent): void {
         if (this.destroyed) return;
-        if (event.type === "pointercancel")
-            this.pointers.delete(event.pointerId);
+        this.pointers.delete(event.pointerId);
         if (this.pinch?.ids.includes(event.pointerId)) {
             this.endPinch();
             return;
@@ -1228,6 +1276,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             event.preventDefault();
             return;
         }
+        // a control, a toolbar or a panel keeps its wheel (a field scrolls)
+        if (target.kind === "other") return;
         const scale =
             event.deltaMode === 1
                 ? 16
@@ -1247,7 +1297,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             event.preventDefault();
             // a trackpad's pinch sends small deltas: it zooms faster per pixel than a wheel
             const zoom =
-                this.current.zoom * 2 ** (-dy * (pinching ? 0.01 : 0.002));
+                this.current.zoom *
+                Math.exp(-dy / (pinching ? WHEEL_PINCH_RATE : WHEEL_RATE));
             this.setViewport(
                 zoomAround(
                     this.current,
@@ -1369,17 +1420,51 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             case "resize-handle":
                 into[POSITION_ATTRIBUTE] = id("position");
                 break;
+            case "reconnect-anchor":
+                into[ID_ATTRIBUTE] = id("edgeId");
+                into[END_ATTRIBUTE] = id("end");
+                break;
         }
         this.features.attributes(part, payload, into);
         return Object.freeze(into);
     }
 
     private createAdapter(): FlowEngineAdapter {
-        return {
+        const engine = this;
+        return Object.freeze({
             model: this.model,
-            settings: Object.freeze({
-                onlyRenderVisible: this.options.onlyRenderVisible ?? false,
-            }),
+            get settings() {
+                return Object.freeze({
+                    onlyRenderVisible:
+                        engine.options.onlyRenderVisible ?? false,
+                });
+            },
+            setOptions: (options) => {
+                if (this.destroyed) return;
+                const {
+                    root: _root,
+                    defaultViewport: _viewport,
+                    fitView: _fit,
+                    ...rest
+                } = options;
+                this.options = { ...this.options, ...rest };
+                this.minZoom = this.options.minZoom ?? 0.5;
+                this.maxZoom = Math.max(
+                    this.minZoom,
+                    this.options.maxZoom ?? 2,
+                );
+                if (
+                    rest.interactive !== undefined &&
+                    rest.interactive !== this.interactive
+                ) {
+                    this.run("set-interactive", {
+                        interactive: rest.interactive,
+                    });
+                }
+                // the viewport kept to the new limits and extent
+                this.setViewport(this.current, false);
+                this.notify({ viewport: true, measured: true, gesture: true });
+            },
             attachRoot: (element) => {
                 if (!this.destroyed) this.attachRoot(element);
             },
@@ -1394,11 +1479,6 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             registerNode: (nodeId, element) => {
                 if (!this.destroyed)
                     this.measurements.registerNode(nodeId, element);
-            },
-            registerEdge: (edgeId, element) => {
-                if (this.destroyed) return;
-                if (element) this.edges.set(edgeId, element);
-                else this.edges.delete(edgeId);
             },
             registerHandle: (handle: HandleRegistration, element) => {
                 if (!this.destroyed)
@@ -1426,7 +1506,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 };
             },
             getSnapshot: () => this.revision,
-        };
+        } satisfies FlowEngineAdapter);
     }
 }
 

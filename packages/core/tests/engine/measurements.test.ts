@@ -8,7 +8,7 @@ import { FakeResizeObserver, flowOf, mount, unmountAll } from "./harness";
 afterEach(unmountAll);
 
 describe("measurement", () => {
-    it("observes nodes with the ResizeObserver of the root's window", () => {
+    it("observes nodes with the ResizeObserver of the root's window", async () => {
         const { engine, node, sizes, observer } = mount(
             flowOf({ a: [10, 20] }),
             {
@@ -24,19 +24,26 @@ describe("measurement", () => {
             height: 50,
         });
         expect(engine.is("node-measured", { nodeId: "a" })).toBe(true);
+        await Promise.resolve();
         const changes: unknown[] = [];
         engine.adapter.subscribe((change) => changes.push(change));
         sizes.set("a", [120, 60]);
         observer()?.trigger([node("a")]);
+        sizes.set("a", [130, 60]);
+        observer()?.trigger([node("a")]);
+        // the size now; the adapters told once, when the task's measurements are in
         expect(engine.get("node-rect-by", { nodeId: "a" })).toMatchObject({
-            width: 120,
+            width: 130,
             height: 60,
         });
+        expect(changes).toEqual([]);
+        await Promise.resolve();
         expect(changes).toEqual([
             { viewport: false, measured: true, gesture: false },
         ]);
         // the same size again tells nothing
         observer()?.trigger([node("a")]);
+        await Promise.resolve();
         expect(changes).toHaveLength(1);
     });
 
