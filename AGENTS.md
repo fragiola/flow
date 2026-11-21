@@ -24,7 +24,7 @@ Each framework has an adapter, so **every piece of logic that isn't rendering li
 | `apps/playground` | private | the dev app: the examples in place, scenarios, the unstyled fixture Playwright drives, the inspector | the React package | Epic #8 (#6) |
 | `examples/shared` | `examples-shared`, private | what every framework's examples share: metadata, the five themes, the embed protocol, the manifest, every Playwright spec | no framework | Epic #8 (#6) |
 | `examples/react` | `examples-react`, private | the React examples (the site's gallery and its embed app), vendored Fragiola UI | the React package | Epic #8 (#6) |
-| `site` | private | for now only the repository's guard tests (`site/tests/`); the docs and the site export arrive with #7 | | |
+| `site` | private | the fragiola.com/flow site export (`site:export`, `site:dev`, the docs, the landing) and the repository's guard tests (`site/tests/`) | the examples apps (`examples-<framework>`) | Epic #8 (#7) |
 
 Every package stays at `0.0.0`; nothing is published (D15).
 
@@ -147,15 +147,18 @@ examples show them as copyable code.
 | `pnpm e2e` | Playwright: the playground's suite (Chromium and Firefox, its dev server, the sources), then each examples app's (`examples/*/playwright.config.ts`: the shared specs against a production build of its embed, built against the packages' `dist`: run `pnpm build` first) |
 | `pnpm --filter examples-react dev` | the React embed alone, port 5185 (`PORT` moves it; `?id=<id>&theme=<name>`) |
 | `pnpm --filter examples-react vendor` | vendors Fragiola UI (`scripts/vendor-fragiola.ts`; `FRAGIOLA_REGISTRY` points it elsewhere) |
+| `pnpm site:export --base /flow --out <dir>` | the site export (contract v1.7): builds the packages and each framework's embed, writes the pages, `examples.json`, `project.json` and the manifests, then validates the output and exits non-zero on any violation ([The site export](#the-site-export-issue-7)) |
+| `pnpm site:dev --base /flow --port 5185` | every framework's embed with hot reload behind one port (`site/dev-proxy.ts`), for `www`'s dev mode |
 
-`pnpm site:export` and `pnpm site:dev` arrive with #7. There is no `changeset` or
-`release:version` script (D15).
+There is no `changeset` or `release:version` script (D15).
 
 ## CI
 
-`.github/workflows/ci.yml` (its comment header describes every job) runs on pull requests and on a
-manual run (`workflow_dispatch`); **a push to `main` runs no tests**: main is what its pull request
-tested (guidelines `repository.md#ci`). Its jobs today:
+`.github/workflows/ci.yml` (its comment header describes every job) runs on pull requests, on a
+manual run (`workflow_dispatch`) and on a push to `main`; **a push to `main` runs no tests, only the
+www trigger**: main is what its pull request tested (guidelines `repository.md#ci`). Every other job
+is `if: github.event_name != 'push'` or needs one that is (`site/tests/ci-workflow.test.ts`). Its
+jobs:
 
 - **Checks**: `pnpm check`, `typecheck`, `test`, `build`.
 - **Package**: `pnpm check:package`.
@@ -171,12 +174,18 @@ tested (guidelines `repository.md#ci`). Its jobs today:
 - **E2E (examples \<framework\>)**: a matrix over `Changes`' `examples` output (every
   `examples/<framework>` with a `playwright.config.ts`: React today): builds the packages, then
   `pnpm --filter examples-<framework> run e2e`.
+- **Site export**: `pnpm site:export --base /flow --out "$RUNNER_TEMP/site-export"`, self-validated
+  the way www's deploy runs it.
+- **Trigger www build**: on a push to `main` only, a `repository_dispatch` of type
+  `project-updated` (`client_payload` `slug: flow`, `sha`) to `fragiola/www`, with the
+  `WWW_DISPATCH_TOKEN` secret (a fine-grained token with Contents: read & write on
+  `fragiola/www`); without the secret the step is skipped, not failed. The secret is the
+  maintainer's to add.
 
 No Changesets job and no release workflow (D15); `site/tests/ci-workflow.test.ts` checks the
-triggers and that neither exists.
+triggers, the push rule, the two site jobs and that neither exists.
 
-#7 adds the Site export job and the Trigger www build job (the only job a push to `main` will
-run). Every job that runs Playwright runs in `mcr.microsoft.com/playwright:v1.63.0-noble`
+Every job that runs Playwright runs in `mcr.microsoft.com/playwright:v1.63.0-noble`
 (`container.options: --user 1001`), its tag the exact `@playwright/test` the apps pin (1.63.0 in
 the playground, `examples/shared` and `examples/react`), and **never runs `playwright install`**;
 `site/tests/ci-workflow.test.ts` ties the tag to the version, so upgrading Playwright changes both
@@ -535,6 +544,57 @@ Decisions of #6:
   (Chromium's touch adjustment), so on touch an edge's end is grabbed on its stroke near the end:
   give touch apps a wider `reconnection({ radius })` (the fixture uses 30).
 
+## The site export (Issue #7)
+
+fragiola.com/flow is built by `www` from `pnpm site:export --base /flow --out <dir>`
+(`../www/CONTRACT.md` v1.7, the source of truth; guidelines `docs/site.md`). The scripts are
+Splitter's (`site/export.ts`, `contract.ts` with `CONTRACT_VERSION = "1.7"`, `dev.ts`,
+`dev-proxy.ts`, `sources.ts`), unchanged but for the names:
+
+| output | from |
+| --- | --- |
+| `project.json` | `site/project.json`: `contract: 1`, slug `flow`, title "Flow", `frameworks: ["react"]`, `defaultFramework: "react"`, `repository`, keywords |
+| `docs/` | `site/docs`, copied as written: `config.json` (the sidebar), `index.mdx` (the landing), every page |
+| `examples.json` | built by `sources.ts`: `levels` from `LEVELS` / `LEVEL_TITLES`, `themes` from `THEMES` with each theme's CSS (`examples/shared`) |
+| `embed/<framework>/` | `pnpm --filter examples-<framework> build` with `EMBED_BASE=<base>/embed/<framework>/` and `EMBED_OUT_DIR`, against the packages' `dist`, plus `manifest.json` (`buildManifest(examplesApp(framework))`) |
+
+`site:dev` starts each framework's embed dev server (`EMBED_BASE`, a free `PORT`) behind a Node
+proxy on `--port` (5185, Flow's dev port, `www`'s `devUrl`); each serves `<base>manifest.json`.
+
+**The pages.** The sidebar is Dockable's IA: Getting started; Concepts; Guides; API: primitives
+(`@fragiola/flow-react`: one page per primitive under `api/primitives/`, titled by its name
+alone, plus `hooks` and `flow-ref`; the common props on `api/primitives/root#common-props`); API:
+core (`model`, `command-bus`, `commands` (generated), `json-document`, `engine`, `features`,
+`path-helpers`); More (`limitations`, "Found a problem?" to the issues). Every `.mdx` but
+`index.mdx` is in the sidebar exactly once; only the vocabulary of `docs/site.md`; a title is at
+most 60 characters and never contains "Flow" (`www` appends it); a description is 50-160
+characters. Snippets are typed and copied from the real API; a page embeds its examples with
+`<Example id>`, and every example's `docs` link is a page. The landing: the Hero's actions go
+examples, `/ai`, docs (then GitHub), then the `workflow-builder` showcase (`www` puts its agent
+band after it), then Sections.
+
+**Kept honest by tests** (`site/tests/`): `contract.test.ts` (the sources pass the contract checks,
+and each check catches what it should), `docs-reference.test.ts` (every export of the React
+package and of its `/minimap` and `/resize` entries is on its page, every field of every exported
+props, state, options or result interface is a table row, every primitive has its page; every
+core and feature-entry export is mentioned on an API page, every model and engine key and engine
+event is listed, and the members, error codes, document fields, engine payloads, feature options
+and path helper options have rows; every registry command has its section on the generated
+page), `dev-proxy.test.ts`, `noindex.test.ts` (every HTML page of the repository is `noindex`),
+`command-docs.test.ts` (the generated page).
+
+Decisions of #7:
+
+- **`examples.json` is generated, not committed** (every sibling's choice): the levels and themes
+  live once in `examples/shared`, and a committed copy could drift.
+- **No `adapters` in `project.json`**: absent, the landing's adapters row is the `frameworks`
+  (React). Each adapter Epic adds its framework to `frameworks`; list `adapters` only when a
+  package ships before its embed app.
+- **No sidebar icons** (contract v1.4, optional), like Dockable and Splitter: an icon for every
+  section or none, so none until they are decided for every library.
+- **Primitive pages live under `api/primitives/`** (the examples' metadata already linked there),
+  the core's under `api/` (where `api/commands.mdx` is generated).
+
 ## Repository layout
 
 ```
@@ -554,17 +614,20 @@ examples/shared/    examples-shared      src/meta/, src/themes/, src/embed/, scr
 examples/react/     examples-react       src/examples/<id>/, src/examples/_kit/, src/embed/, vendored
                                          Fragiola UI (src/components, src/lib, src/styles),
                                          scripts/vendor-fragiola.ts, tests/
-site/               package.json         the repository's guard tests (tests/): the layout, .d.ts,
-                                         package, E2E selection, CI workflow, features' bundle guard
-                                         and command docs checks; docs/api/commands.mdx (generated)
+site/               package.json         export.ts, contract.ts, dev.ts, dev-proxy.ts, sources.ts,
+                                         project.json; docs/ (config.json, index.mdx, the pages,
+                                         api/commands.mdx generated); tests/: the site checks
+                                         (contract, docs reference, dev proxy, noindex) and the
+                                         repository's guard tests (layout, .d.ts, package, E2E
+                                         selection, CI workflow, bundle guard, command docs)
 scripts/                                 check-layout.ts, check-dts.ts, source-condition.ts,
                                          check-package.ts, e2e-suites.ts, check-features.ts
-.github/workflows/  ci.yml               Checks, Package, Changes, E2E (playground), E2E (examples)
+.github/workflows/  ci.yml               Checks, Package, Changes, E2E (playground), E2E (examples),
+                                         Site export, Trigger www build
 ```
 
-Later Epics add `packages/{vue,svelte,angular}` and their examples apps; #7 adds the site's docs
-and export (`pnpm-workspace.yaml` already lists `apps/*`, `packages/*`, `examples/*`
-and `site`).
+Later Epics add `packages/{vue,svelte,angular}` and their examples apps (`pnpm-workspace.yaml`
+already lists `apps/*`, `packages/*`, `examples/*` and `site`).
 
 ## Provenance: xyflow
 
