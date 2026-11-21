@@ -5,6 +5,9 @@ with its JSON Schema, a typed model whose every change is a command (`run`, `can
 `is`), opt-in features and the engine that binds a flow to the DOM (viewport, measurement, handles,
 edge paths, gestures). Zero runtime dependencies, no CSS.
 
-Not usable yet: version `0.0.0` is the repository's foundation, and nothing is published.
+Not usable yet: version `0.0.0`, nothing is published. The model is in (`createFlowModel`,
+`validateFlow`, the commands, the features on their subpaths: `@fragiola/flow/selection`,
+`/subflows`, `/drag`, `/resize`, `/connection`, `/reconnection`, `/keyboard`, `/minimap`); the
+engine comes next.
 
 Documentation: **<https://fragiola.com/flow>** (coming soon). ESM only.
