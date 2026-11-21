@@ -34,6 +34,22 @@ while an edge's end is moved: a middleware's veto makes it invalid).
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Viewport>
+    <Flow.Edges>
+        {#snippet children(edge)}<MyEdge {edge} />{/snippet}
+    </Flow.Edges>
+    <Flow.Nodes>
+        {#snippet children(node)}<MyNode {node} />{/snippet}
+    </Flow.Nodes>
+    <Flow.ConnectionLine class="stroke-blue-500 data-invalid:stroke-red-500" />
+</Flow.Viewport>
+```
+
+</Framework>
+
 <Framework name="react">
 
 ```tsx
@@ -53,6 +69,20 @@ while an edge's end is moved: a middleware's veto makes it invalid).
 ```
 
 In Vue, the children function is the default scoped slot, `v-slot="{ connection }"`.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.ConnectionLine>
+    {#snippet children(connection)}
+        <path d={connection.path} fill="none" stroke-dasharray="4 4" stroke="currentColor" />
+    {/snippet}
+</Flow.ConnectionLine>
+```
+
+In Svelte, the children function is the `children` snippet, `{#snippet children(connection)}`.
 
 </Framework>
 

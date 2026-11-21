@@ -43,6 +43,26 @@ the `render` slot (`#render="{ props, state }"`) replaces it as React's `render`
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<script lang="ts">
+    import { LockIcon, UnlockIcon } from "@lucide/svelte";
+</script>
+
+<Flow.ToggleInteractive aria-label="Lock the flow">
+    {#snippet children({ state })}
+        {#if state.interactive}<UnlockIcon />{:else}<LockIcon />{/if}
+    {/snippet}
+</Flow.ToggleInteractive>
+```
+
+In Svelte, its `children` snippet gets `{ state }`, so the icon switches without replacing the
+button; the `render` snippet (`{#snippet render({ props, state, children })}`) replaces it as
+React's `render` does.
+
+</Framework>
+
 The root's `interactive` prop sets the same lock from your state; a root whose `interactive` does
 not change leaves the toggle's lock alone.
 

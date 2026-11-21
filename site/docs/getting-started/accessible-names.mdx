@@ -91,6 +91,36 @@ In Vue, every attribute a primitive does not take as a prop falls through to its
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="named-flow.svelte"
+<Flow.Root {features} defaultNodes={nodes} role="group" aria-label="Delivery workflow" class="h-96">
+    <Flow.Viewport>
+        <Flow.Edges>
+            {#snippet children(edge)}
+                <Flow.Edge {edge} role="group" aria-roledescription="edge" aria-label="{edge.source} to {edge.target}">
+                    <Flow.EdgePath />
+                </Flow.Edge>
+            {/snippet}
+        </Flow.Edges>
+        <Flow.Nodes>
+            {#snippet children(node)}
+                <Flow.Node {node} role="group" aria-roledescription="node" aria-label={node.data.label}>
+                    {node.data.label}
+                    <Flow.Handle type="target" side="top" title="Input" />
+                    <Flow.Handle type="source" side="bottom" title="Output" />
+                </Flow.Node>
+            {/snippet}
+        </Flow.Nodes>
+    </Flow.Viewport>
+</Flow.Root>
+```
+
+In Svelte, every attribute a primitive does not take as a prop goes on its element (or into its
+`render` snippet's `props`).
+
+</Framework>
+
 Write the roles and names your app's language and your users need: the nodes' and edges' roles
 are the `announcements` example's choice, the root's name is this page's suggestion, and neither
 is a rule.
@@ -136,6 +166,23 @@ import { LockIcon, MaximizeIcon, MinusIcon, PlusIcon } from "@lucide/vue";
         <Flow.ToggleInteractive aria-label="Lock the flow"><LockIcon /></Flow.ToggleInteractive>
     </Flow.Controls>
 </template>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<script lang="ts">
+    import { LockIcon, MaximizeIcon, MinusIcon, PlusIcon } from "@lucide/svelte";
+</script>
+
+<Flow.Controls role="group" aria-label="Zoom and lock" class="absolute bottom-3 left-3 flex flex-col">
+    <Flow.ZoomIn aria-label="Zoom in"><PlusIcon /></Flow.ZoomIn>
+    <Flow.ZoomOut aria-label="Zoom out"><MinusIcon /></Flow.ZoomOut>
+    <Flow.FitView aria-label="Fit view"><MaximizeIcon /></Flow.FitView>
+    <Flow.ToggleInteractive aria-label="Lock the flow"><LockIcon /></Flow.ToggleInteractive>
+</Flow.Controls>
 ```
 
 </Framework>
@@ -242,7 +289,49 @@ onUnmounted(
 
 </Framework>
 
-Render `LiveRegion` (`live-region.vue`) inside `Flow.Root`: it reads the root's engine with
+<Framework name="svelte">
+
+```svelte title="live-region.svelte"
+<script lang="ts">
+    import { type FlowEngineEvent, type FlowModel, useFlow } from "@fragiola/flow-svelte";
+
+    type Model = FlowModel<Types, typeof features>;
+
+    /** The app's words for an engine event, or nothing for one it keeps quiet about. */
+    function describe(event: FlowEngineEvent, model: Model): string | undefined {
+        const name = (id: string) => model.get("node-by", { id })?.data.label ?? id;
+        switch (event.type) {
+            case "nodes-move":
+                return `Moved ${event.nodeIds.map(name).join(", ")}.`;
+            case "connect":
+                return `Connected ${name(event.source)} to ${name(event.target)}.`;
+            case "connect-cancel":
+                return event.refused ? "That connection is not allowed." : undefined;
+            case "remove":
+                return `Removed ${event.nodeIds.length} node(s) and ${event.edgeIds.length} edge(s).`;
+            default:
+                return undefined;
+        }
+    }
+
+    const flow = useFlow<Types, typeof features>();
+    let message = $state("");
+    // the engine of useFlow is there from the first render: it forwards to the root's once it
+    // mounts. The effect's cleanup is the listener's remover
+    $effect(() =>
+        flow.engine.subscribe((event) => {
+            const text = describe(event, flow.model);
+            if (text) message = text;
+        }),
+    );
+</script>
+
+<p role="status" class="sr-only">{message}</p>
+```
+
+</Framework>
+
+Render `LiveRegion` (`live-region.vue`, `live-region.svelte`) inside `Flow.Root`: it reads the root's engine with
 `useFlow`. The events
 carry ids, so the words can name the nodes the way your app names them, in its language.
 

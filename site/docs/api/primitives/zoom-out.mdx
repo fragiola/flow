@@ -38,6 +38,22 @@ In Vue, its default slot gets `{ state }` (`ControlButtonState`).
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<script lang="ts">
+    import { MinusIcon } from "@lucide/svelte";
+</script>
+
+<Flow.ZoomOut aria-label="Zoom out" class="p-1 data-disabled:opacity-40">
+    <MinusIcon />
+</Flow.ZoomOut>
+```
+
+In Svelte, its `children` snippet gets `{ state }` (`ControlButtonState`).
+
+</Framework>
+
 The same action from code: `engine.run("zoom-out")` ([engine](/docs/api/engine)).
 
 ## Props

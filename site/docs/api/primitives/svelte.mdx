@@ -1,0 +1,272 @@
+---
+title: Svelte components
+description: The same primitives and hooks for Svelte 5, from @fragiola/flow-svelte, and how each React prop maps onto Svelte props, snippets and bindings.
+---
+
+`@fragiola/flow-svelte` has every primitive of the React package as a Svelte 5 component (runes
+mode), and every hook as a rune, over the same core (re-exported whole). The elements, the
+`data-*` attributes, the structural styles, the props and the state of every part are the same,
+so every page of these docs applies: this page says how the React API is written in Svelte.
+
+```ts
+import {
+    createFlowModel,
+    Flow,
+    type FlowTypes,
+    typedFlow,
+    useFlow,
+    useFlowRef,
+    useViewport,
+} from "@fragiola/flow-svelte";
+import { MiniMap, minimap } from "@fragiola/flow-svelte/minimap";
+import { NodeResizer, resize } from "@fragiola/flow-svelte/resize";
+```
+
+The feature entries are React's: `@fragiola/flow-svelte/selection`, `/drag`, `/connection`,
+`/reconnection`, `/resize`, `/subflows`, `/keyboard` and `/minimap`, each re-exporting the core's
+factory, `/minimap` and `/resize` with their components. The package publishes its components as
+`.svelte` files (the `svelte` export condition), compiled with your app; it needs Svelte 5.29 or
+later (runes, snippets, attachments).
+
+## A flow in a template
+
+```svelte title="editor.svelte"
+<script module lang="ts">
+    import type { FlowNode, FlowTypes } from "@fragiola/flow-svelte";
+    import { connection } from "@fragiola/flow-svelte/connection";
+    import { drag } from "@fragiola/flow-svelte/drag";
+    import { selection } from "@fragiola/flow-svelte/selection";
+
+    interface Types extends FlowTypes {
+        readonly nodes: { step: { label: string } };
+    }
+
+    const features = [selection(), drag(), connection()] as const;
+</script>
+
+<script lang="ts">
+    import { typedFlow } from "@fragiola/flow-svelte";
+
+    const Flow = typedFlow<Types, typeof features>();
+
+    // controlled nodes (every one with its id): the root writes the model's frozen list back after
+    // every change, so a $state.raw keeps it as it is
+    let nodes = $state.raw<readonly FlowNode<Types>[]>([
+        { id: "fetch", type: "step", position: { x: 0, y: 0 }, data: { label: "Fetch" } },
+        { id: "save", type: "step", position: { x: 0, y: 140 }, data: { label: "Save" } },
+    ]);
+</script>
+
+<p>{nodes.length} nodes</p>
+<Flow.Root
+    bind:nodes
+    {features}
+    defaultEdges={[{ id: "fetch-save", source: "fetch", target: "save" }]}
+    fitView
+    class="h-96"
+>
+    <Flow.Background variant="dots" class="text-slate-300" />
+    <!-- the edges before the nodes: the nodes are drawn on top -->
+    <Flow.Viewport>
+        <Flow.Edges>
+            {#snippet children(edge)}
+                <Flow.Edge {edge}>
+                    <Flow.EdgePath class="stroke-slate-400 data-selected:stroke-blue-500" />
+                </Flow.Edge>
+            {/snippet}
+        </Flow.Edges>
+        <Flow.Nodes>
+            {#snippet children(node)}
+                <Flow.Node {node} class={(state) => ["rounded border bg-white px-3 py-2", state.selected && "border-blue-500"]}>
+                    {node.data.label}
+                    <Flow.Handle type="target" side="top" class="size-2 rounded-full bg-slate-500" />
+                    <Flow.Handle type="source" side="bottom" class="size-2 rounded-full bg-slate-500" />
+                </Flow.Node>
+            {/snippet}
+        </Flow.Nodes>
+        <Flow.ConnectionLine class="stroke-blue-500" />
+    </Flow.Viewport>
+</Flow.Root>
+```
+
+`bind:nodes` gives you the model's nodes on every change, drag steps included, and a list you
+assign to it is brought into the model with the commands a user would have run (one `batch` with
+`meta: { source: "controlled" }`), so middleware still sees every change. The model's lists are
+frozen: keep them in a `$state.raw`, and assign a new list (`nodes = [...nodes, node]`): a list
+mutated in place (`push`) keeps its identity and is not synced, as in React.
+
+<Example id="basic" />
+
+## How React's props map
+
+| React | Svelte |
+| --- | --- |
+| the parts' props | the same props, with the same names (`defaultNodes`, `fitView`, `handleId`, `minWidth`); a bare boolean attribute is `true` (`panOnScroll`, `fitView`, `open`, `keepAspectRatio`) |
+| `nodes` + `onNodesChange`, `edges` + `onEdgesChange` | `bind:nodes`, `bind:edges`, or `nodes` + `onnodeschange`, `edges` + `onedgeschange` |
+| `viewport` + `onViewportChange(viewport, gesture)` | `bind:viewport`, or `viewport` + `onviewportchange(viewport, gesture)` |
+| `flowRef={flow}`, `flow.current` | the same: `flowRef={flow}`, `flow.current` (see [Flow ref](#flow-ref)) |
+| `render={<section />}`, `render={(props, state) => …}` | the `render` snippet, `{#snippet render({ props, state, children })}`: spread `{...props}` on your element and `{@render children()}` inside it (no element form) |
+| children functions of `Flow.Nodes`, `Flow.Edges`, `Flow.ConnectionLine`, `MiniMap` | their `children` snippet with the entity: `{#snippet children(node)}`, `(edge)`, `(connection)`, `(view)` |
+| `children` of a part | its `children` snippet, given `{ state }` (plain content works too) |
+| `className`, `style` | `class` (any of Svelte's forms: a string, an array, an object) and `style` (a CSS string or a record), under the structural style |
+| `className={(state) => …}`, `style={(state) => …}` | the same function forms: `class={(state) => …}`, `style={(state) => …}` |
+| `onClick`, `onKeyDown`, … on a part | `onclick`, `onkeydown`, …: they run after the part's own, as in React |
+| `ref` on a part | `bind:ref` (the element, `undefined` until mounted, `null` after), or an attachment (`{@attach …}`) on the part, which reaches its element (the `render` snippet's one too) |
+| `<Flow.Nodes<Types>>`, `<Flow.Root<Types, typeof features>>` | `const Flow = typedFlow<Types, typeof features>()`: a template takes no type argument |
+
+## Components
+
+Every part takes the props of its React page (for example [Root](/docs/api/primitives/root#props),
+[Node](/docs/api/primitives/node#props), [Handle](/docs/api/primitives/handle#props)), with
+`class`, `render`, `ref` and `children` in Svelte's form (the table above). Its props extend
+`PrimitiveProps`, through `ElementPrimitiveProps` (`DivPrimitiveProps`, `ButtonPrimitiveProps`,
+`SvgPrimitiveProps` for the element it renders), which add the element's own attributes.
+
+| prop or binding | of | description |
+| --- | --- | --- |
+| `class` | every part (`PrimitiveProps`) | a class in any of Svelte's forms, or a function of the part's state returning one |
+| `style` | every part (`PrimitiveProps`) | a style (`StyleValue`: a CSS string or a record), or a function of the part's state returning one; the part's structural keys win |
+| `render` | every part (`PrimitiveProps`) | a `RenderSnippet`: it replaces the part's element (never `asChild`) |
+| `ref` | every part (`PrimitiveProps`) | the rendered element once mounted, with `bind:ref` |
+| `children` | every part with content | a snippet: of the entity for `Flow.Nodes`, `Flow.Edges`, `Flow.ConnectionLine`, `MiniMap`, of `{ state }` for the others |
+| `bind:nodes` | `Flow.Root` | `nodes`, written back with the model's nodes after every command that changes them (a drag step too) |
+| `bind:edges` | `Flow.Root` | `edges`, written back with the model's edges after every command that changes them |
+| `bind:viewport` | `Flow.Root` | `viewport`, written back (a copy) on every viewport change |
+| `bind:ref` | every part | `ref`: the part's element (`undefined` until mounted, `null` after) |
+| `onnodeschange` | `Flow.Root` | called with the model's nodes after every command that changes them |
+| `onedgeschange` | `Flow.Root` | called with the model's edges after every command that changes them |
+| `onviewportchange` | `Flow.Root` | called on every viewport change, `(viewport, gesture)`, `gesture` true for a pan, a zoom or a pinch |
+
+| snippet | of | receives |
+| --- | --- | --- |
+| `children` | `Flow.Nodes`, `Flow.Edges`, `Flow.ConnectionLine`, `MiniMap` | one entity each time: a `FlowNode<T>`, a `FlowEdge<T>`, a `Connection`, the `MinimapView` |
+| `children` | every other part with content | `{ state }`: the part's state, as on its page (`RootState`, `NodeState<T>`, `EdgeState<T>`, `HandleState`, `ControlButtonState`, …) |
+| `render` | every part (`RenderSnippet`) | `RenderSnippetProps`: `props`, `state` and `children`; it replaces the element |
+
+| field | of | description |
+| --- | --- | --- |
+| `props` | `RenderSnippetProps` | what goes on your element (`{...props}`, `RenderedProps`): the part's `data-*`, handlers, its structural style merged over your `class` and `style`, and the attachment that registers the element |
+| `state` | `RenderSnippetProps` | the part's state |
+| `children` | `RenderSnippetProps` | the part's content: `{@render children()}` inside your element |
+
+The nodes and the edges render in a keyed `{#each}`: a node or an edge renders again only when
+its entity changes (the model shares those a command did not change), or when a value its snippet
+reads does, so a drag step renders the moved nodes only and a pan none. A new `children` snippet
+renders every entity again, as a new children function does in React.
+
+What differs from React, part by part:
+
+- **`Flow.Root`** creates the engine in an `$effect`, once mounted, and destroys it with the root;
+  a server render has no engine. Another `model` gets another engine at the last viewport, as
+  React swaps it in place.
+- **`Flow.EdgeLabel`** mounts its element in `Flow.Edges`' HTML layer, and **`Flow.NodeToolbar`**
+  in the root's element: Svelte has no portal, so each one mounts its content there with every
+  context of its place (`useFlow` works inside) and unmounts it with the part. `bind:ref` and an
+  attachment reach the mounted element.
+- **`MiniMap`** and **`NodeResizer`** come from `@fragiola/flow-svelte/minimap` and
+  `@fragiola/flow-svelte/resize`, with `MiniMapNode`, `MiniMapMask`, `ResizeHandle` and
+  `RESIZE_POSITIONS`.
+
+The props and state of each part are typed by its exports: `RootProps`, `RootEngineProps`,
+`RootState`; `ViewportProps`, `ViewportState`; `BackgroundProps`, `BackgroundState`; `NodesProps`,
+`NodesState`; `NodeProps`; `HandleProps`; `EdgesProps`, `EdgesState`; `EdgeProps`;
+`EdgePathProps`, `EdgePathState`; `EdgeLabelProps`, `EdgeLabelState`; `ReconnectAnchorProps`,
+`ReconnectAnchorState`; `ConnectionLineProps`, `ConnectionLineState`; `SelectionBoxProps`,
+`SelectionBoxState`; `NodeToolbarProps`, `NodeToolbarState`; `ControlsProps`, `ControlsState`;
+`ZoomInProps`; `ZoomOutProps`; `FitViewProps`; `ToggleInteractiveProps`,
+`ToggleInteractiveState`. On the feature entries: `MiniMapProps`, `MiniMapState`,
+`MiniMapNodeProps`, `MiniMapNodeState`, `MiniMapMaskProps`, `MiniMapMaskState`;
+`NodeResizerProps`, `NodeResizerState`, `ResizeHandleProps`, `ResizeHandleState`,
+`ResizePosition`. The shared ones: `PrimitiveProps`, `ElementPrimitiveProps`,
+`DivPrimitiveProps`, `ButtonPrimitiveProps`, `SvgPrimitiveProps`, `RenderSnippet`,
+`RenderSnippetProps`, `RenderedProps` and `StyleValue`.
+
+## Runes
+
+The hooks have the same names and arguments. A rune is called in a component's script, inside
+the root. A value that changes is a `FlowValue` (read `current`, which follows the flow); a part's
+options are a value or a getter of it (`MaybeGetter`). Pass a prop as a getter (`() => node`): read
+once in the script, its value would stay the first one.
+
+| React | Svelte |
+| --- | --- |
+| `useFlow<T, F>()` | `UseFlowResult<T, F>`: `model` and `engine` as getters, which follow another `model` given to the root (read `flow.model`, not destructured once); the engine is there from the first render |
+| `useViewport()` | `FlowValue<Viewport>` |
+| `useConnection()` | `FlowValue<Connection \| null>` |
+| `useSelection<T>()` | `FlowValue<FlowSelection<T>>`: a `FlowSelection<T>`, the selected `nodes` and `edges` |
+| `useNodes<T>()`, `useEdges<T>()` | `FlowValue<readonly FlowNode<T>[]>`, `FlowValue<readonly FlowEdge<T>[]>` (the model's frozen lists) |
+| `useNode(node)` | `useNode(nodeOrGetter)`: `UseNodeResult<T>`, `state` (`NodeState<T>`) and `props` (`NodeElementProps`) as getters |
+| `useEdge(edge)` | `useEdge(edgeOrGetter)`: `UseEdgeResult<T>`, `state` (`EdgeState<T>`) and `props` (`EdgeElementProps`, with `tabindex`) as getters |
+| `useHandle(options)` | `useHandle(optionsOrGetter)`: `UseHandleResult`, `state` (`HandleState`) and `props` (`HandleElementProps`) as getters; `UseHandleOptions` as React's |
+| `useFlowRef()`, `createFlowRef()` | the same names: a `FlowRef<T, F>` whose `current` is reactive |
+| `ControlButtonState` | the same: the state of `Flow.ZoomIn`, `Flow.ZoomOut` and `Flow.FitView` |
+
+```svelte title="selected-count.svelte"
+<script lang="ts">
+    import { type FlowNode, useNode, useSelection } from "@fragiola/flow-svelte";
+
+    let { node }: { node: FlowNode<Types> } = $props();
+    const selection = useSelection<Types>();
+    // a node rendered by hand: spread its props on your element
+    const own = useNode(() => node);
+</script>
+
+<div {...own.props} class={{ "ring-2": own.state.selected }}>
+    {node.data.label} ({selection.current.nodes.length} selected)
+</div>
+```
+
+`{...own.props}` puts the props on the element, the attachment that registers it with the engine
+(which measures it) included. Svelte's attribute names are the DOM's: `tabindex` where React
+writes `tabIndex`.
+
+## Flow ref
+
+`useFlowRef<T, F>()` (in a component's script) and `createFlowRef<T, F>()` (anywhere) make a
+`FlowRef<T, F>`: pass it as the root's `flowRef`, and `flow.current` is a `FlowRefValue<T, F>`
+(`model`, `engine`) while the root is mounted, `null` otherwise.
+
+| field | type | description |
+| --- | --- | --- |
+| `current` | `FlowRefValue<T, F> \| null` | the root's model and engine while it is mounted; a `$state.raw`, so a template that reads it updates when the root mounts or unmounts |
+
+```svelte title="toolbar.svelte"
+<script lang="ts">
+    import { typedFlow, useFlowRef } from "@fragiola/flow-svelte";
+
+    const Flow = typedFlow<Types, typeof features>();
+    const flow = useFlowRef<Types, typeof features>();
+</script>
+
+<button type="button" disabled={!flow.current} onclick={() => flow.current?.engine.run("fit-view")}>Fit</button>
+<Flow.Root flowRef={flow} {features} defaultNodes={nodes}>…</Flow.Root>
+```
+
+## Typed components
+
+A template cannot pass a type argument, so `typedFlow<T, F>()` returns the same components typed
+by your registry and features (`TypedFlow<T, F>`): `Root` (its model, lists, features and
+callbacks), `Nodes`, `Node`, `Edges` and `Edge`; the others are `Flow`'s. A snippet's `node.data`
+is then the registry's, checked in a template by svelte-check. The untyped `Flow.Root` takes any
+registry and any features.
+
+```ts
+import { type FlowTypes, typedFlow } from "@fragiola/flow-svelte";
+import { drag } from "@fragiola/flow-svelte/drag";
+
+interface Types extends FlowTypes {
+    readonly nodes: { task: { title: string; done: boolean } };
+}
+
+const features = [drag()] as const;
+export const Flow = typedFlow<Types, typeof features>();
+```
+
+## Reactivity
+
+The model's state never becomes a deep proxy: the root holds the engine in a `$state.raw` and
+counts the model's commits and the engine's notifications, and each part reads what it shows in a
+`$derived` that keeps its last value while it is equal, so Svelte updates only what changed. What
+you give (`defaultNodes`, `bind:nodes`, `features`) is read as a plain snapshot
+(`$state.snapshot`), so no proxy reaches the model; a parent whose list is a deep `$state` gets a
+copy back, its entries the model's frozen ones. Prefer `$state.raw` for the lists.

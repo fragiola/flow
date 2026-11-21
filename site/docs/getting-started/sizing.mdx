@@ -31,6 +31,16 @@ A fixed height:
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Root defaultNodes={nodes} class="h-[600px] w-full">
+    …
+</Flow.Root>
+```
+
+</Framework>
+
 Or the room a parent leaves, in a flex or grid layout (the `min-h-0` lets a flex child shrink
 below its content):
 
@@ -62,6 +72,19 @@ export function EditorPage() {
         </Flow.Root>
     </div>
 </template>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="editor-page.svelte"
+<div class="flex h-dvh flex-col">
+    <header class="h-12 border-b">Workflow</header>
+    <Flow.Root defaultNodes={nodes} class="min-h-0 flex-1">
+        …
+    </Flow.Root>
+</div>
 ```
 
 </Framework>
@@ -117,6 +140,18 @@ A bare `fit-view` attribute is `fitView={true}`.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Root defaultNodes={nodes} fitView={{ padding: 0.2, maxZoom: 1 }} class="h-96">
+    …
+</Flow.Root>
+```
+
+A bare `fitView` attribute is `fitView={true}`.
+
+</Framework>
+
 Later, fit again from code with `engine.run("fit-view")`, or with a `Flow.FitView` button
 ([The viewport](/docs/concepts/viewport)).
 
@@ -144,6 +179,19 @@ block. A panel of your own marks itself `data-flow-no-gesture` (presses on it st
 
 ```vue
 <Flow.Root :default-nodes="nodes" class="relative h-96">
+    <Flow.Viewport>…</Flow.Viewport>
+    <aside data-flow-no-gesture data-flow-no-wheel class="absolute top-2 right-2 w-56 overflow-auto">
+        …
+    </aside>
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Root defaultNodes={nodes} class="relative h-96">
     <Flow.Viewport>…</Flow.Viewport>
     <aside data-flow-no-gesture data-flow-no-wheel class="absolute top-2 right-2 w-56 overflow-auto">
         …

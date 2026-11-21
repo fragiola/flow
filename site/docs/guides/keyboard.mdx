@@ -34,6 +34,17 @@ const features = [selection(), drag(), keyboard()] as const;
 
 </Framework>
 
+<Framework name="svelte">
+
+```ts
+import { keyboard } from "@fragiola/flow-svelte/keyboard";
+import { selection } from "@fragiola/flow-svelte/selection";
+
+const features = [selection(), drag(), keyboard()] as const;
+```
+
+</Framework>
+
 With it, every node and edge gets `tabIndex={0}` (`engine.is("node-focusable", { nodeId })`), so
 Tab walks them in drawing order, and a node that takes focus is panned into view. On a focused
 node or edge:
@@ -118,6 +129,29 @@ function renderEdge(edge: FlowEdge<Types>) {
         <Flow.Handle type="target" side="left" class="handle" />
         <Flow.Handle type="source" side="right" class="handle" />
     </Flow.Node>
+</Flow.Nodes>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Edges>
+    {#snippet children(edge)}
+        <Flow.Edge {edge} role="group" aria-roledescription="edge" aria-label="{edge.source} to {edge.target}">
+            <Flow.EdgePath class="edge" />
+        </Flow.Edge>
+    {/snippet}
+</Flow.Edges>
+<Flow.Nodes>
+    {#snippet children(node)}
+        <Flow.Node {node} role="group" aria-roledescription="node" aria-label={node.data.label} class="node">
+            {node.data.label}
+            <Flow.Handle type="target" side="left" class="handle" />
+            <Flow.Handle type="source" side="right" class="handle" />
+        </Flow.Node>
+    {/snippet}
 </Flow.Nodes>
 ```
 
@@ -232,6 +266,46 @@ onUnmounted(
 <template>
     <p role="status" class="sr-only">{{ message }}</p>
 </template>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="live-region.svelte"
+<script lang="ts">
+    import { type FlowEngineEvent, type FlowModel, useFlow } from "@fragiola/flow-svelte";
+
+    type Model = FlowModel<Types, typeof features>;
+
+    /** Your words for an event, or nothing for one you keep quiet about. */
+    function describe(event: FlowEngineEvent, model: Model): string | undefined {
+        const name = (id: string) => model.get("node-by", { id })?.data.label ?? id;
+        switch (event.type) {
+            case "nodes-move":
+                return `Moved ${event.nodeIds.map(name).join(", ")}.`;
+            case "connect":
+                return `Connected ${name(event.source)} to ${name(event.target)}.`;
+            case "connect-cancel":
+                return event.refused ? "That connection is not allowed." : undefined;
+            case "remove":
+                return `Removed ${event.nodeIds.length} node(s) and ${event.edgeIds.length} edge(s).`;
+            default:
+                return undefined;
+        }
+    }
+
+    const flow = useFlow<Types, typeof features>();
+    let message = $state("");
+    $effect(() =>
+        flow.engine.subscribe((event) => {
+            const next = describe(event, flow.model);
+            if (next) message = next;
+        }),
+    );
+</script>
+
+<p role="status" class="sr-only">{message}</p>
 ```
 
 </Framework>

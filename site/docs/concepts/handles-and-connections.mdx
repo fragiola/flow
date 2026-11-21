@@ -42,6 +42,21 @@ In a template the props are kebab-case (`handle-id`); a bare `connectable` attri
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Node {node} class="node">
+    {node.data.label}
+    <Flow.Handle type="target" side="left" handleId="in" class="handle" />
+    <Flow.Handle type="source" side="right" handleId="ok" style="top: 30%" class="handle" />
+    <Flow.Handle type="source" side="right" handleId="error" style="top: 70%" class="handle" />
+</Flow.Node>
+```
+
+In Svelte the props are React's (`handleId`, `connectable={false}`), `class` for `className`.
+
+</Framework>
+
 | prop | means |
 | --- | --- |
 | `type` | `"source"`: edges start here; `"target"`: edges end here |
@@ -79,6 +94,22 @@ inside the viewport, draws it while it lasts; `useConnection()` reads it:
 <Flow.Viewport>
     <Flow.Edges v-slot="{ edge }"><MyEdge :edge="edge" /></Flow.Edges>
     <Flow.Nodes v-slot="{ node }"><MyNode :node="node" /></Flow.Nodes>
+    <Flow.ConnectionLine class="stroke-blue-500 data-invalid:stroke-red-500" />
+</Flow.Viewport>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Viewport>
+    <Flow.Edges>
+        {#snippet children(edge)}<MyEdge {edge} />{/snippet}
+    </Flow.Edges>
+    <Flow.Nodes>
+        {#snippet children(node)}<MyNode {node} />{/snippet}
+    </Flow.Nodes>
     <Flow.ConnectionLine class="stroke-blue-500 data-invalid:stroke-red-500" />
 </Flow.Viewport>
 ```

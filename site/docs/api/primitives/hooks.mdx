@@ -17,7 +17,10 @@ From outside the root (a toolbar beside it, a test), use a [flow ref](/docs/api/
 In Vue they are composables of the same names, from `@fragiola/flow-vue`: the values are computed
 refs (`useViewport().value.zoom`, unwrapped in a template), and a part's `state` and `props` are
 computed refs too. Call them in `setup`. [Vue components](/docs/api/primitives/vue) lists their
-types.
+types. In Svelte they are runes of the same names, from `@fragiola/flow-svelte`: the values are a
+`{ current }` that follows the flow (`useViewport().current.zoom`), and a part's `state` and
+`props` are getters. Call them in a component's script, inside the root;
+[Svelte components](/docs/api/primitives/svelte) lists their types.
 
 ## `useFlow`
 
@@ -53,6 +56,23 @@ const { model } = useFlow<Types, typeof features>();
 ```
 
 Call `useFlow` in `setup`: another model remounts the root, so the values never change for a component.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="delete-selected.svelte"
+<script lang="ts">
+    import { useFlow } from "@fragiola/flow-svelte";
+
+    const flow = useFlow<Types, typeof features>();
+</script>
+
+<button type="button" onclick={() => flow.model.run("selection.remove")}>Delete</button>
+```
+
+Call `useFlow` in a component's script, inside the root. `model` and `engine` are getters (another
+model given to the root is followed): read them as `flow.model`, not destructured once.
 
 </Framework>
 
@@ -93,6 +113,23 @@ const viewport = useViewport();
     <output>{{ Math.round(viewport.zoom * 100) }}%</output>
 </template>
 ```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="zoom-level.svelte"
+<script lang="ts">
+    import { useViewport } from "@fragiola/flow-svelte";
+
+    const viewport = useViewport();
+</script>
+
+<output>{Math.round(viewport.current.zoom * 100)}%</output>
+```
+
+In Svelte, the reading runes (`useViewport`, `useConnection`, `useSelection`, `useNodes`,
+`useEdges`) return a `FlowValue` whose `current` follows the flow.
 
 </Framework>
 
@@ -158,6 +195,28 @@ const { state, props: element } = useNode(() => props.node);
 In Vue, `useNode`, `useEdge` and `useHandle` take a getter or a ref (`() => props.node`) and
 return `state` and `props` as computed refs: `v-bind` the props in a template, which unwraps
 them. Vue's attribute names are the DOM's: `tabindex` where React writes `tabIndex`.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="plain-node.svelte"
+<script lang="ts">
+    import { type FlowNode, useNode } from "@fragiola/flow-svelte";
+
+    let { node }: { node: FlowNode<Types> } = $props();
+    const own = useNode(() => node);
+</script>
+
+<section {...own.props} aria-label={node.data.label} class={{ "ring-2": own.state.selected }}>
+    {node.data.label}
+</section>
+```
+
+In Svelte, `useNode`, `useEdge` and `useHandle` take the value or a getter (`() => node`, to
+follow a prop) and return `state` and `props` as getters: spread `{...own.props}` on your element
+(it carries the attachment that registers it with the engine), and do not destructure them.
+Svelte's attribute names are the DOM's: `tabindex` where React writes `tabIndex`.
 
 </Framework>
 

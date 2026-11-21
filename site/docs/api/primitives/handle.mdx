@@ -39,6 +39,22 @@ attribute is `true`; its default slot gets `{ state }`.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Node {node}>
+    {node.data.label}
+    <Flow.Handle type="target" side="left" title="Input" class="size-2 rounded-full bg-gray-500" />
+    <Flow.Handle type="source" side="right" handleId="ok" style="top: 30%" />
+    <Flow.Handle type="source" side="right" handleId="error" style={{ top: "70%" }} />
+</Flow.Node>
+```
+
+In Svelte, the props are React's (`handleId`, `nodeId`, `connectable={false}`); `style` is a CSS
+string or a record; its `children` snippet gets `{ state }`.
+
+</Framework>
+
 It sits at the middle of its side by default (a default your `style` overrides: several handles on
 one side are placed by you). A handle without `handleId` is the node's default handle of its type.
 Sides are physical (`top`, `right`, `bottom`, `left`): a diagram does not flip in right-to-left.

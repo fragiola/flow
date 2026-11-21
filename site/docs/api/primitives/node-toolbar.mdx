@@ -53,6 +53,29 @@ renders elsewhere, so a template `ref` on it reaches no element: use its `render
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="toolbar.svelte"
+<script lang="ts">
+    import { Flow, type FlowNode, useFlow } from "@fragiola/flow-svelte";
+    import { Trash2Icon } from "@lucide/svelte";
+
+    let { node }: { node: FlowNode<Types> } = $props();
+    const flow = useFlow<Types, typeof features>();
+</script>
+
+<Flow.NodeToolbar role="toolbar" aria-label="{node.data.text}: actions" side="top" offset={8}>
+    <button type="button" aria-label="Delete" onclick={() => flow.model.run("node.remove", { nodeId: node.id })}>
+        <Trash2Icon />
+    </button>
+</Flow.NodeToolbar>
+```
+
+In Svelte, its element is mounted in the root's element (Svelte has no portal: it is mounted
+there with every context of its place, and unmounted with it); `bind:ref` reaches it.
+
+</Framework>
+
 A toolbar has no role: give it `role="toolbar"` and a label when it holds several buttons.
 
 ## Props

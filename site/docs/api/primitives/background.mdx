@@ -37,6 +37,21 @@ pattern as `state.pattern`.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Root {features} defaultNodes={nodes} class="bg-gray-50">
+    <Flow.Background variant="dots" gap={20} size={2} class="text-gray-300" />
+    <Flow.Background variant="lines" gap={100} class="text-gray-200" />
+    <Flow.Viewport>…</Flow.Viewport>
+</Flow.Root>
+```
+
+In Svelte, the props are React's (`gap={[20, 40]}`), `class` for `className`; its `render`
+snippet receives the pattern as `state.pattern`.
+
+</Framework>
+
 Several layers combine (a fine grid and a coarse one). Its `variant` is a prop, so a CSS theme
 cannot switch it: the examples render the three variants and let the theme's tokens show one.
 

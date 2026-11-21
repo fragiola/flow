@@ -113,6 +113,25 @@ const issues = validateFlow(json, { features });
 
 </Framework>
 
+<Framework name="svelte">
+
+```ts
+import { createFlowModel, FlowValidationError, validateFlow } from "@fragiola/flow-svelte";
+
+try {
+    const model = createFlowModel<Types, typeof features>(json, { features });
+} catch (error) {
+    if (error instanceof FlowValidationError) {
+        for (const issue of error.issues) console.warn(issue.path, issue.message);
+    }
+}
+
+// or, without throwing: every problem with its JSON path, none for a valid document
+const issues = validateFlow(json, { features });
+```
+
+</Framework>
+
 `model.get("flow-json")` gives the document back as a writable copy, every id present: it loads
 again into `createFlowModel` unchanged. See [Flow JSON](/docs/api/json-document).
 
@@ -128,7 +147,8 @@ model.is("node-deletable", { nodeId: "fetch" });
 ```
 
 In a component under the root, `useNodes()` and `useEdges()` re-render on every change, and
-`useSelection()` when the selection changes (in Vue, computed refs that change then) ([Hooks](/docs/api/primitives/hooks)).
+`useSelection()` when the selection changes (in Vue, computed refs that change then; in Svelte,
+their `current`) ([Hooks](/docs/api/primitives/hooks)).
 
 ## Controlled or not
 
@@ -173,6 +193,26 @@ const nodes = shallowRef<readonly FlowNode<Types>[]>(initialNodes);
 In Vue, `nodes` + `onNodesChange` is `v-model:nodes` (and `v-model:edges`): the root emits
 `update:nodes` with the model's list after every change, and each node's slot is its own
 component, so a new list re-renders the nodes that changed only.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<script lang="ts">
+    import type { FlowNode } from "@fragiola/flow-svelte";
+
+    // the model's lists are frozen: $state.raw keeps them as they are
+    let nodes = $state.raw<readonly FlowNode<Types>[]>(initialNodes);
+</script>
+
+<Flow.Root {features} bind:nodes defaultEdges={edges}>…</Flow.Root>
+```
+
+In Svelte, `nodes` + `onNodesChange` is `bind:nodes` (and `bind:edges`), or `nodes` with
+`onnodeschange`: the root writes the model's list back after every change. Assign a new list
+(`nodes = [...nodes, node]`): a list mutated in place (`push`) keeps its identity and is not
+synced, as in React.
 
 </Framework>
 

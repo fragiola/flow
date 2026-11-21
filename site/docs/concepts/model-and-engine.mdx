@@ -85,6 +85,26 @@ const viewport = useViewport();
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="zoom-readout.svelte"
+<script lang="ts">
+    import { useFlow, useViewport } from "@fragiola/flow-svelte";
+
+    const flow = useFlow();
+    // `current` follows the view: what reads it updates when the zoom changes
+    const viewport = useViewport();
+    // `engine.can` reads no state of its own: derive it from the viewport it depends on
+    const canReset = $derived(viewport.current && flow.engine.can("zoom-to", { zoom: 1 }));
+</script>
+
+<button type="button" disabled={!canReset} onclick={() => flow.engine.run("zoom-to", { zoom: 1 })}>
+    {Math.round(viewport.current.zoom * 100)}%
+</button>
+```
+
+</Framework>
+
 ## Events, not text
 
 `engine.subscribe` hears what happened on screen: `viewport-change`, `drag-start`, `nodes-move`,
@@ -96,10 +116,10 @@ controlled viewport.
 ## The engine's lifetime
 
 The root creates its engine once it is mounted (React: in a layout effect; Vue: in its
-`onMounted`), and destroys it when it unmounts. Before that (the
+`onMounted`; Svelte: in an `$effect`), and destroys it when it unmounts. Before that (the
 first render, a server render) there is no engine: nodes render at their model position, edges
 wait for their nodes' sizes. The `engine` `useFlow()` returns is there from the first render (Vue: from
-`setup`) all the same: before the mount, an action is refused and a read is empty.
+`setup`; Svelte: from the component's script) all the same: before the mount, an action is refused and a read is empty.
 
 The engine never touches the global `document` or `window`: it uses its root element's owner
 document and window (its `ResizeObserver`, its microtasks). The model never touches the DOM at
@@ -127,6 +147,24 @@ it("refuses an edge to the same node", () => {
 
 ```ts title="rules.test.ts"
 import { createFlowModel } from "@fragiola/flow-vue";
+import { expect, it } from "vitest";
+
+it("refuses an edge to the same node", () => {
+    const model = createFlowModel(json);
+    model.use(rules);
+    expect(model.check("edge.add", { source: "a", target: "a" })).toMatchObject({
+        ok: false,
+        error: { code: "vetoed" },
+    });
+});
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```ts title="rules.test.ts"
+import { createFlowModel } from "@fragiola/flow-svelte";
 import { expect, it } from "vitest";
 
 it("refuses an edge to the same node", () => {

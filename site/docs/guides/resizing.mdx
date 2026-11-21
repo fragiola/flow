@@ -64,6 +64,35 @@ const Flow = typedFlow<Types, typeof features>();
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<script module lang="ts">
+    import { drag } from "@fragiola/flow-svelte/drag";
+    import { NodeResizer, resize } from "@fragiola/flow-svelte/resize";
+    import { selection } from "@fragiola/flow-svelte/selection";
+
+    const features = [selection(), drag(), resize({ minWidth: 80, minHeight: 60 })] as const;
+</script>
+
+<script lang="ts">
+    import { typedFlow } from "@fragiola/flow-svelte";
+
+    const Flow = typedFlow<Types, typeof features>();
+</script>
+
+<Flow.Nodes>
+    {#snippet children(node)}
+        <Flow.Node {node} class="node group">
+            {node.data.label}
+            <NodeResizer class="hidden group-data-selected:block" />
+        </Flow.Node>
+    {/snippet}
+</Flow.Nodes>
+```
+
+</Framework>
+
 `NodeResizer` goes inside `Flow.Node`: a box over the node holding a `ResizeHandle` at each corner
 and side by default. Give the handles their size and look; they are placed on their corner or
 along their side, and carry `data-position` (`top-left`, `top`, …, `left`).
@@ -92,6 +121,15 @@ along their side, and carry `data-position` (`top-left`, `top`, …, `left`).
 ```vue
 <NodeResizer :min-width="120" :max-width="360" :min-height="80" :max-height="240" />
 <NodeResizer keep-aspect-ratio />
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<NodeResizer minWidth={120} maxWidth={360} minHeight={80} maxHeight={240} />
+<NodeResizer keepAspectRatio />
 ```
 
 </Framework>
@@ -147,6 +185,29 @@ import { NodeResizer, RESIZE_POSITIONS, ResizeHandle } from "@fragiola/flow-vue/
         <ResizeHandle position="bottom-right" aria-hidden="true" class="size-3 cursor-nwse-resize" />
     </NodeResizer>
 </template>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<script lang="ts">
+    import { NodeResizer, RESIZE_POSITIONS, ResizeHandle } from "@fragiola/flow-svelte/resize";
+</script>
+
+<NodeResizer keepAspectRatio class="resizer">
+    {#each RESIZE_POSITIONS as position (position)}
+        <ResizeHandle
+            {position}
+            class="size-2.5 rounded-sm border border-palette-ring bg-palette-base data-[position=top]:h-1.5 data-[position=bottom]:h-1.5 data-[position=left]:w-1.5 data-[position=right]:w-1.5"
+        />
+    {/each}
+</NodeResizer>
+
+<NodeResizer>
+    <ResizeHandle position="bottom-right" aria-hidden="true" class="size-3 cursor-nwse-resize" />
+</NodeResizer>
 ```
 
 </Framework>

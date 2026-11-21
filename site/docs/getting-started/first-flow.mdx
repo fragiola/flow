@@ -69,6 +69,33 @@ const edges: FlowEdgeInput<Types>[] = [
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<script lang="ts">
+    import type { FlowEdgeInput, FlowNodeInput, FlowTypes } from "@fragiola/flow-svelte";
+
+    interface Types extends FlowTypes {
+        readonly nodes: { step: { label: string } };
+    }
+
+    const nodes: FlowNodeInput<Types>[] = [
+        { id: "start", type: "step", position: { x: 0, y: 0 }, data: { label: "Start" } },
+        { id: "fetch", type: "step", position: { x: -160, y: 140 }, data: { label: "Fetch data" } },
+        { id: "parse", type: "step", position: { x: 160, y: 140 }, data: { label: "Parse file" } },
+        { id: "save", type: "step", position: { x: 0, y: 280 }, data: { label: "Save" } },
+    ];
+
+    const edges: FlowEdgeInput<Types>[] = [
+        { id: "start-fetch", source: "start", target: "fetch" },
+        { id: "start-parse", source: "start", target: "parse" },
+        { id: "fetch-save", source: "fetch", target: "save" },
+    ];
+</script>
+```
+
+</Framework>
+
 Positions are in flow coordinates: x grows to the right, y grows down, and a node's position is
 its top-left corner.
 
@@ -109,6 +136,27 @@ const Flow = typedFlow<Types, typeof features>();
 A template cannot pass type arguments (`<Flow.Root<Types, typeof features>>`), so
 `typedFlow<Types, typeof features>()` gives you the same components, typed: `node.data` in a
 slot is the registry's.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<script lang="ts">
+    import { typedFlow } from "@fragiola/flow-svelte";
+    import { connection } from "@fragiola/flow-svelte/connection";
+    import { drag } from "@fragiola/flow-svelte/drag";
+    import { selection } from "@fragiola/flow-svelte/selection";
+
+    const features = [selection(), drag(), connection()] as const;
+    // the components typed by the registry and the features: a template takes no type argument
+    const Flow = typedFlow<Types, typeof features>();
+</script>
+```
+
+A template cannot pass type arguments (`<Flow.Root<Types, typeof features>>`), so
+`typedFlow<Types, typeof features>()` gives you the same components, typed: `node.data` in a
+snippet is the registry's.
 
 </Framework>
 
@@ -157,12 +205,31 @@ attribute is `true`.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Root
+    {features}
+    defaultNodes={nodes}
+    defaultEdges={edges}
+    fitView={{ padding: 0.2, maxZoom: 1 }}
+    class="h-[480px] w-full bg-slate-50"
+>
+    <!-- the layers below -->
+</Flow.Root>
+```
+
+The props are React's, `class` for `className`; a bare `fitView` attribute is `true`.
+
+</Framework>
+
 </Step>
 <Step>
 
 **Add the layers.** `Flow.Background` sits behind the viewport. Inside `Flow.Viewport`, the edges
 come before the nodes so the nodes are drawn on top, and the connection line comes last. You
-render each node and each edge from a children function (a scoped slot in Vue).
+render each node and each edge from a children function (a scoped slot in Vue, a snippet in
+Svelte).
 
 <Framework name="react">
 
@@ -221,6 +288,40 @@ render each node and each edge from a children function (a scoped slot in Vue).
 
 `Flow.Edges` and `Flow.Nodes` render their default scoped slot once per edge and per node
 (`v-slot="{ edge }"`, `v-slot="{ node }"`), where React takes a children function.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<!-- inside <Flow.Root> -->
+<Flow.Background variant="dots" gap={20} size={2} class="text-slate-300" />
+<Flow.Viewport>
+    <Flow.Edges>
+        {#snippet children(edge)}
+            <Flow.Edge {edge}>
+                <Flow.EdgePath class="stroke-slate-400 stroke-2 data-selected:stroke-blue-500" />
+            </Flow.Edge>
+        {/snippet}
+    </Flow.Edges>
+    <Flow.Nodes>
+        {#snippet children(node)}
+            <Flow.Node
+                {node}
+                class="min-w-28 select-none rounded-lg border bg-white p-3 text-center data-selected:border-blue-500"
+            >
+                {node.data.label}
+                <Flow.Handle type="target" side="top" class="size-2.5 rounded-full border bg-white" />
+                <Flow.Handle type="source" side="bottom" class="size-2.5 rounded-full border bg-white" />
+            </Flow.Node>
+        {/snippet}
+    </Flow.Nodes>
+    <Flow.ConnectionLine class="stroke-blue-500 stroke-2" />
+</Flow.Viewport>
+```
+
+`Flow.Edges` and `Flow.Nodes` render their `children` snippet once per edge and per node
+(`{#snippet children(edge)}`, `{#snippet children(node)}`), where React takes a children function.
 
 </Framework>
 
@@ -369,6 +470,71 @@ const edges: FlowEdgeInput<Types>[] = [
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="basic-flow.svelte"
+<script lang="ts">
+    import { type FlowEdgeInput, type FlowNodeInput, type FlowTypes, typedFlow } from "@fragiola/flow-svelte";
+    import { connection } from "@fragiola/flow-svelte/connection";
+    import { drag } from "@fragiola/flow-svelte/drag";
+    import { selection } from "@fragiola/flow-svelte/selection";
+
+    interface Types extends FlowTypes {
+        readonly nodes: { step: { label: string } };
+    }
+
+    const features = [selection(), drag(), connection()] as const;
+    const Flow = typedFlow<Types, typeof features>();
+
+    const nodes: FlowNodeInput<Types>[] = [
+        { id: "start", type: "step", position: { x: 0, y: 0 }, data: { label: "Start" } },
+        { id: "fetch", type: "step", position: { x: -160, y: 140 }, data: { label: "Fetch data" } },
+        { id: "parse", type: "step", position: { x: 160, y: 140 }, data: { label: "Parse file" } },
+        { id: "save", type: "step", position: { x: 0, y: 280 }, data: { label: "Save" } },
+    ];
+
+    const edges: FlowEdgeInput<Types>[] = [
+        { id: "start-fetch", source: "start", target: "fetch" },
+        { id: "start-parse", source: "start", target: "parse" },
+        { id: "fetch-save", source: "fetch", target: "save" },
+    ];
+</script>
+
+<Flow.Root
+    {features}
+    defaultNodes={nodes}
+    defaultEdges={edges}
+    fitView={{ padding: 0.2, maxZoom: 1 }}
+    class="h-[480px] w-full bg-slate-50"
+>
+    <Flow.Background variant="dots" gap={20} size={2} class="text-slate-300" />
+    <Flow.Viewport>
+        <Flow.Edges>
+            {#snippet children(edge)}
+                <Flow.Edge {edge}>
+                    <Flow.EdgePath class="stroke-slate-400 stroke-2 data-selected:stroke-blue-500" />
+                </Flow.Edge>
+            {/snippet}
+        </Flow.Edges>
+        <Flow.Nodes>
+            {#snippet children(node)}
+                <Flow.Node
+                    {node}
+                    class="min-w-28 select-none rounded-lg border bg-white p-3 text-center data-selected:border-blue-500"
+                >
+                    {node.data.label}
+                    <Flow.Handle type="target" side="top" class="size-2.5 rounded-full border bg-white" />
+                    <Flow.Handle type="source" side="bottom" class="size-2.5 rounded-full border bg-white" />
+                </Flow.Node>
+            {/snippet}
+        </Flow.Nodes>
+        <Flow.ConnectionLine class="stroke-blue-500 stroke-2" />
+    </Flow.Viewport>
+</Flow.Root>
+```
+
+</Framework>
+
 ## What you have
 
 - **Pan** by dragging the pane, **zoom** with the wheel, a pinch or a double click: the core's
@@ -380,7 +546,7 @@ const edges: FlowEdgeInput<Types>[] = [
   the drop runs `edge.add`, and the new edge is drawn.
 
 Every one of those changes is a command on the model. Read it with `useFlow()` inside the root
-(a hook in React, a composable in Vue), or a flow ref outside it ([The model and commands](/docs/concepts/model-and-commands)).
+(a hook in React, a composable in Vue, a rune in Svelte), or a flow ref outside it ([The model and commands](/docs/concepts/model-and-commands)).
 
 ## Next steps
 

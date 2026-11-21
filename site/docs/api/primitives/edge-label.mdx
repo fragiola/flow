@@ -37,6 +37,22 @@ so read the element through its `render` slot.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Edge {edge}>
+    <Flow.EdgePath />
+    <Flow.EdgeLabel class="rounded bg-white px-1 text-xs">{edge.data?.text}</Flow.EdgeLabel>
+</Flow.Edge>
+```
+
+In Svelte, `Flow.EdgeLabel` mounts its element in `Flow.Edges`' HTML layer (Svelte has no
+portal: it is mounted there with every context of its place, and unmounted with it), so HTML
+content works inside an SVG edge. Its `children` snippet gets `{ state }`; `bind:ref` and an
+attachment reach the mounted element.
+
+</Framework>
+
 ## Props
 
 `EdgeLabelProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and

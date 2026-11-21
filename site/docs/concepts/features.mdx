@@ -69,7 +69,35 @@ const Flow = typedFlow<Types, typeof features>();
 
 </Framework>
 
-Make the list once (a module constant, React's `useState`, a Vue component's setup): the features are fixed when the model is
+<Framework name="svelte">
+
+```svelte
+<script lang="ts">
+    import { typedFlow } from "@fragiola/flow-svelte";
+    import { connection } from "@fragiola/flow-svelte/connection";
+    import { drag } from "@fragiola/flow-svelte/drag";
+    import { keyboard } from "@fragiola/flow-svelte/keyboard";
+    import { reconnection } from "@fragiola/flow-svelte/reconnection";
+    import { selection } from "@fragiola/flow-svelte/selection";
+
+    const features = [
+        selection({ boxOnDrag: false }),
+        drag({ snapGrid: [20, 20] }),
+        connection({ mode: "strict", radius: 20 }),
+        reconnection(),
+        keyboard({ step: 5, fastStep: 20 }),
+    ] as const;
+
+    const Flow = typedFlow<Types, typeof features>();
+</script>
+
+<Flow.Root {features} defaultNodes={nodes} class="h-96">…</Flow.Root>
+```
+
+</Framework>
+
+Make the list once (a module constant, React's `useState`, a Vue component's setup, a Svelte
+component's `<script module>`): the features are fixed when the model is
 created, and the root warns if the `features` prop changes later. A model you create yourself takes
 them in `createFlowModel(json, { features })`. A feature installed twice, or one installed without
 a feature it requires (`reconnection()` needs `connection()`), throws when the model is created,
@@ -88,7 +116,8 @@ naming both.
 | `keyboard()` | `/keyboard` | focus on nodes and edges, arrows, Delete, Enter, Escape | `step: 5`, `fastStep: 20` |
 | `minimap()` | `/minimap` | the `MiniMap` view, pan and zoom from it | `pannable: true`, `zoomable: true`, `padding: 0.1` |
 
-Each entry is `@fragiola/flow-react/<feature>` (`@fragiola/flow-vue/<feature>` in Vue), which re-exports the core's
+Each entry is `@fragiola/flow-react/<feature>` (`@fragiola/flow-vue/<feature>` in Vue,
+`@fragiola/flow-svelte/<feature>` in Svelte), which re-exports the core's
 `@fragiola/flow/<feature>`; `/minimap` and `/resize` add their primitives. Every option is on
 [Features](/docs/api/features).
 

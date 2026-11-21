@@ -5,7 +5,7 @@ layout: landing
 ---
 
 <Hero
-    eyebrow="@fragiola/flow · React · Vue"
+    eyebrow="@fragiola/flow · React · Vue · Svelte"
     title="Node-based editors, without a single line of CSS from us."
     description="Workflow builders, pipelines, state machines and mind maps: nodes you drag, edges you draw from handles, a canvas you pan and zoom. It ships the behaviour and the accessibility, on a typed model of commands. Every pixel is yours."
     actions={[
@@ -41,7 +41,8 @@ Focusable nodes and edges, arrow moves, Delete and Escape, and engine events you
 turns into words.
 </Feature>
 <Feature title="Your markup">
-You render every node and edge with a children function (a scoped slot in Vue), and swap any
+You render every node and edge with a children function (a scoped slot in Vue, a snippet in
+Svelte), and swap any
 element with `render`: a `switch` on the node's type is your registry.
 </Feature>
 </Features>
@@ -153,6 +154,55 @@ const nodes: FlowNodeInput<Types>[] = [
         </Flow.Viewport>
     </Flow.Root>
 </template>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="pipeline.svelte"
+<script lang="ts">
+    import { type FlowNodeInput, type FlowTypes, typedFlow } from "@fragiola/flow-svelte";
+    import { connection } from "@fragiola/flow-svelte/connection";
+    import { drag } from "@fragiola/flow-svelte/drag";
+    import { selection } from "@fragiola/flow-svelte/selection";
+
+    interface Types extends FlowTypes {
+        readonly nodes: { step: { label: string } };
+    }
+
+    const features = [selection(), drag(), connection()] as const;
+    const Flow = typedFlow<Types, typeof features>();
+
+    const nodes: FlowNodeInput<Types>[] = [
+        { id: "fetch", type: "step", position: { x: 0, y: 0 }, data: { label: "Fetch" } },
+        { id: "save", type: "step", position: { x: 0, y: 140 }, data: { label: "Save" } },
+    ];
+</script>
+
+<Flow.Root
+    {features}
+    defaultNodes={nodes}
+    defaultEdges={[{ id: "fetch-save", source: "fetch", target: "save" }]}
+    fitView
+    class="h-96"
+>
+    <Flow.Viewport>
+        <Flow.Edges>
+            {#snippet children(edge)}<Flow.Edge {edge} class="stroke-gray-400" />{/snippet}
+        </Flow.Edges>
+        <Flow.Nodes>
+            {#snippet children(node)}
+                <Flow.Node {node} class="rounded border bg-white px-3 py-2">
+                    {node.data.label}
+                    <Flow.Handle type="target" side="top" class="size-2 rounded-full bg-gray-500" />
+                    <Flow.Handle type="source" side="bottom" class="size-2 rounded-full bg-gray-500" />
+                </Flow.Node>
+            {/snippet}
+        </Flow.Nodes>
+        <Flow.ConnectionLine class="stroke-gray-400" />
+    </Flow.Viewport>
+</Flow.Root>
 ```
 
 </Framework>

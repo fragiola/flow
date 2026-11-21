@@ -88,6 +88,33 @@ is a computed ref of the view.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="view-buttons.svelte"
+<script lang="ts">
+    import { Flow, useFlow } from "@fragiola/flow-svelte";
+
+    let { nodeId }: { nodeId: string } = $props();
+    const flow = useFlow();
+</script>
+
+<div data-flow-no-gesture class="absolute top-2 left-2 flex gap-1">
+    <button type="button" onclick={() => flow.engine.run("fit-view", { padding: 0.2 })}>Fit</button>
+    <button type="button" onclick={() => flow.engine.run("fit-view", { nodeIds: [nodeId], maxZoom: 1.5 })}>
+        Show the node
+    </button>
+    <button type="button" onclick={() => flow.engine.run("zoom-to", { zoom: 1 })}>100%</button>
+    <!-- disabled at the limit: `engine.can` read through the part, which follows the view -->
+    <Flow.ZoomIn aria-label="Zoom in">Zoom in</Flow.ZoomIn>
+</div>
+```
+
+`useFlow().engine` holds no state a template follows: an expression that reads `engine.can(…)`
+alone is not evaluated again when the view changes. `Flow.ZoomIn`, `Flow.ZoomOut` and
+`Flow.FitView` are, and `useViewport().current` follows the view.
+
+</Framework>
+
 | action | payload |
 | --- | --- |
 | `set-viewport` | `{ x?, y?, zoom? }` |
@@ -130,11 +157,22 @@ function onDrop(event: DragEvent): void {
 
 </Framework>
 
+<Framework name="svelte">
+
+```ts
+function onDrop(event: DragEvent): void {
+    const point = engine.get("screen-to-flow", { x: event.clientX, y: event.clientY });
+    model.run("node.add", { type: "task", position: point, data: { title: "New task", done: false } });
+}
+```
+
+</Framework>
+
 ## Reading it
 
 `useViewport()` re-renders a component when the viewport changes (a zoom readout);
 `engine.get("viewport")` reads it once. `onViewportChange(viewport, gesture)` on the root (Vue:
-`@update:viewport`) hears every change, with `gesture` true for a pan, a zoom or a pinch by the user.
+`@update:viewport`; Svelte: `onviewportchange`) hears every change, with `gesture` true for a pan, a zoom or a pinch by the user.
 
 ## Controlled or not
 
@@ -174,7 +212,24 @@ gesture) => …"` hears the `gesture` flag too.
 
 </Framework>
 
-Neither React nor Vue renders the viewport's transform: the engine writes it on `Flow.Viewport`'s element
+<Framework name="svelte">
+
+```svelte
+<script lang="ts">
+    import type { Viewport } from "@fragiola/flow-svelte";
+
+    let viewport = $state.raw<Viewport>({ x: 0, y: 0, zoom: 1 });
+</script>
+
+<Flow.Root bind:viewport defaultNodes={nodes} class="h-96">…</Flow.Root>
+```
+
+In Svelte, `viewport` + `onViewportChange` is `bind:viewport`, or `viewport` with
+`onviewportchange={(viewport, gesture) => …}`, which hears the `gesture` flag too.
+
+</Framework>
+
+Neither React, Vue nor Svelte renders the viewport's transform: the engine writes it on `Flow.Viewport`'s element
 itself, so a pan re-renders only what shows the viewport (the background, the minimap, toolbars,
 the zoom buttons), never the nodes.
 

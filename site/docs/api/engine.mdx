@@ -50,6 +50,25 @@ is there from `setup` on; before the root has mounted, an action is refused and 
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="zoom-readout.svelte"
+<script lang="ts">
+    import { useFlow } from "@fragiola/flow-svelte";
+
+    const flow = useFlow<Types, typeof features>();
+</script>
+
+<button type="button" onclick={() => flow.engine.run("fit-view", { padding: 0.2 })}>Fit</button>
+```
+
+In Svelte, `useFlow` is a rune of the same name: call it in a component's script, inside the
+root. The root creates its engine in an `$effect`, once mounted: `flow.engine` is a getter that
+follows it, and before the root has mounted (and on the server) an action is refused and a read
+is empty.
+
+</Framework>
+
 ## `createFlowEngine`
 
 `createFlowEngine<T, F>(model, options?)` returns a `FlowEngine<T, F>`. Give it the root element
@@ -266,8 +285,8 @@ const stop = engine.subscribe((event) => {
 
 ## The adapter contract
 
-`engine.adapter` is a `FlowEngineAdapter`: what a framework adapter (`@fragiola/flow-react`, and
-the Vue, Svelte and Angular ones to come) calls. An app never needs it. The adapter renders and
+`engine.adapter` is a `FlowEngineAdapter`: what a framework adapter (`@fragiola/flow-react`,
+`@fragiola/flow-vue`, `@fragiola/flow-svelte`, and the Angular one to come) calls. An app never needs it. The adapter renders and
 attaches; the engine listens to the root itself and resolves every press, key and wheel from the
 part attributes, so every adapter behaves the same.
 

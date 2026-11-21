@@ -42,6 +42,20 @@ type. Give the path its stroke: it is unfilled, and has no colour of its own.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Edges>
+    {#snippet children(edge)}
+        <Flow.Edge {edge}>
+            <Flow.EdgePath class="edge" />
+        </Flow.Edge>
+    {/snippet}
+</Flow.Edges>
+```
+
+</Framework>
+
 ```ts
 const edges: FlowEdgeInput<Types>[] = [
     { id: "a-b", source: "a", target: "b" }, // bezier
@@ -66,6 +80,14 @@ step corners, default 5) and `offset` (how far a step leaves its node before tur
 
 ```vue
 <Flow.Root :path-options="{ borderRadius: 12, offset: 30 }" … />
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Root pathOptions={{ borderRadius: 12, offset: 30 }} … />
 ```
 
 </Framework>
@@ -187,6 +209,73 @@ In Vue, `useEdge` takes the edge or a getter of it (`() => props.edge`) and retu
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="wave-edge.svelte"
+<script module lang="ts">
+    import type { EdgePath, FlowTypes } from "@fragiola/flow-svelte";
+
+    export interface Types extends FlowTypes {
+        readonly nodes: { point: { label: string } };
+        readonly edges: { wave: { amplitude: number } };
+    }
+
+    /** A sine wave of `amplitude` across the straight line between the two ends. */
+    function wavePath({ source, target }: EdgePath, amplitude: number): string {
+        const dx = target.x - source.x;
+        const dy = target.y - source.y;
+        const length = Math.hypot(dx, dy) || 1;
+        const nx = -dy / length;
+        const ny = dx / length;
+        const waves = Math.max(1, Math.round(length / 60));
+        const steps = waves * 16;
+        const points: string[] = [];
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const offset = Math.sin(t * waves * 2 * Math.PI) * amplitude;
+            points.push(`${source.x + dx * t + nx * offset},${source.y + dy * t + ny * offset}`);
+        }
+        return `M ${points.join(" L ")}`;
+    }
+</script>
+
+<script lang="ts">
+    import { type FlowEdge, typedFlow, useEdge } from "@fragiola/flow-svelte";
+
+    let { edge }: { edge: FlowEdge<Types> } = $props();
+    const Flow = typedFlow<Types>();
+    // a getter: the state follows the edge the snippet gives
+    const own = useEdge<Types>(() => edge);
+</script>
+
+<!-- no path until its nodes have a size -->
+{#if own.state.path}
+    <Flow.Edge {edge}>
+        <Flow.EdgePath d={wavePath(own.state.path, edge.type === "wave" ? (edge.data?.amplitude ?? 8) : 8)} class="edge" />
+    </Flow.Edge>
+{/if}
+```
+
+```svelte
+<Flow.Edges>
+    {#snippet children(edge)}
+        {#if edge.type === "wave"}
+            <WaveEdge {edge} />
+        {:else}
+            <Flow.Edge {edge}>
+                <Flow.EdgePath class="edge" />
+            </Flow.Edge>
+        {/if}
+    {/snippet}
+</Flow.Edges>
+```
+
+In Svelte, `useEdge` takes the edge or a getter of it (`() => edge`) and returns `state` and
+`props` as getters (read `own.state`, never destructured); a `d` you give `Flow.EdgePath` wins
+over the engine's.
+
+</Framework>
+
 The core's own path math is public too: `bezierPath`, `smoothStepPath`, `stepPath` and
 `straightPath` take the ends and return `{ path, label }`, a start for a path of your own. See
 [Path helpers](/docs/api/path-helpers).
@@ -211,6 +300,17 @@ the edge easier to click (to select it) without a thicker line:
 
 ```vue
 <Flow.Edge :edge="edge">
+    <Flow.EdgePath class="stroke-transparent stroke-[14px]" />
+    <Flow.EdgePath class="edge" />
+</Flow.Edge>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Edge {edge}>
     <Flow.EdgePath class="stroke-transparent stroke-[14px]" />
     <Flow.EdgePath class="edge" />
 </Flow.Edge>
@@ -294,6 +394,39 @@ layer, with the edge still provided, so `useFlow` and the label's slot work ther
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="labelled-edge.svelte"
+<script lang="ts">
+    import { type FlowEdge, typedFlow, useFlow } from "@fragiola/flow-svelte";
+
+    let { edge }: { edge: FlowEdge<Types> } = $props();
+    const Flow = typedFlow<Types, typeof features>();
+    const flow = useFlow<Types, typeof features>();
+</script>
+
+<Flow.Edge {edge}>
+    <Flow.EdgePath class="edge" />
+    <Flow.EdgeLabel class="label">
+        {#if edge.type === "text"}<span>{edge.data?.text}</span>{/if}
+        {#if edge.type === "removable"}
+            <button
+                type="button"
+                aria-label="Remove the edge from {edge.source} to {edge.target}"
+                onclick={() => flow.model.run("edge.remove", { edgeId: edge.id })}
+            >
+                ×
+            </button>
+        {/if}
+    </Flow.EdgeLabel>
+</Flow.Edge>
+```
+
+In Svelte, `Flow.EdgeLabel` mounts its content in the edges' HTML layer with every context of
+its place, so `useFlow` and the label's snippet work there as written.
+
+</Framework>
+
 Labels render in an HTML layer of `Flow.Edges` (SVG holds no HTML), so they sit above the edges
 and below the nodes.
 
@@ -321,6 +454,22 @@ Markers are plain SVG: define one in an `svg` of your own and point the path's `
 <Framework name="vue">
 
 ```vue
+<svg width="0" height="0" aria-hidden="true">
+    <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
+        </marker>
+    </defs>
+</svg>
+
+<Flow.EdgePath marker-end="url(#arrow)" class="edge text-palette-line" />
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
 <svg width="0" height="0" aria-hidden="true">
     <defs>
         <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">

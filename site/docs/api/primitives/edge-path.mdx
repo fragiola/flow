@@ -32,6 +32,18 @@ selected look.
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Edge {edge}>
+    <!-- a wide transparent path: a bigger press target -->
+    <Flow.EdgePath class="stroke-transparent stroke-[16]" />
+    <Flow.EdgePath class="stroke-gray-400 stroke-2 data-selected:stroke-blue-500" />
+</Flow.Edge>
+```
+
+</Framework>
+
 A `d` of your own draws an app type: read the ends from `state.path` (`render` gets the state) or
 from [`useEdge`](/docs/api/primitives/hooks).
 
@@ -63,6 +75,22 @@ from [`useEdge`](/docs/api/primitives/hooks).
 ```
 
 In Vue, the render function is the `render` scoped slot: bind `v-bind="props"`, then your own `d`.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.EdgePath>
+    {#snippet render({ props, state })}
+        {@const { source, target } = state.path}
+        <path {...props} d="M{source.x},{source.y} V{(source.y + target.y) / 2} H{target.x} V{target.y}" />
+    {/snippet}
+</Flow.EdgePath>
+```
+
+In Svelte, the render function is the `render` snippet: spread `{...props}`, then your own `d`
+(an attribute after the spread wins).
 
 </Framework>
 

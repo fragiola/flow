@@ -5,7 +5,8 @@ description: A flow ref gives the model and the engine of a root to code outside
 
 A flow ref is how code outside `Flow.Root` reaches its model and engine: pass it as the root's
 `flowRef`, and `ref.current` is `{ model, engine }` while the root is mounted, `null` otherwise.
-In Vue it is `:flow-ref`, and `flow.value` holds them.
+In Vue it is `:flow-ref`, and `flow.value` holds them; in Svelte, `flowRef={flow}` and
+`flow.current`, as here.
 Inside the root, [`useFlow`](/docs/api/primitives/hooks) is simpler.
 
 ## `useFlowRef`
@@ -57,6 +58,25 @@ passes the flow ref itself and the template reads `flow.value`, as a script does
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte title="editor.svelte"
+<script lang="ts">
+    import { typedFlow, useFlowRef } from "@fragiola/flow-svelte";
+
+    const Flow = typedFlow<Types, typeof features>();
+    const flow = useFlowRef<Types, typeof features>();
+</script>
+
+<button type="button" disabled={!flow.current} onclick={() => flow.current?.engine.run("fit-view")}>Fit</button>
+<Flow.Root flowRef={flow} {features} defaultNodes={nodes}>…</Flow.Root>
+```
+
+In Svelte, the flow ref's `current` is reactive (a `$state.raw`): a template that reads it updates
+when the root mounts or unmounts.
+
+</Framework>
+
 ## `createFlowRef`
 
 `createFlowRef<T, F>()` makes one outside a component (a module, a test). It does not re-render
@@ -82,6 +102,16 @@ flow.value?.model.run("node.add", { type: "step", position: { x: 0, y: 0 }, data
 
 </Framework>
 
+<Framework name="svelte">
+
+```ts
+const flow = createFlowRef<Types, typeof features>();
+// <Flow.Root flowRef={flow} …>
+flow.current?.model.run("node.add", { type: "step", position: { x: 0, y: 0 }, data: { label: "New" } });
+```
+
+</Framework>
+
 ## Types
 
 `FlowRef<T, F>`, the ref:
@@ -98,4 +128,5 @@ flow.value?.model.run("node.add", { type: "step", position: { x: 0, y: 0 }, data
 | `engine` | `FlowEngine<T, F>` | the root's engine ([engine](/docs/api/engine)) |
 
 In Vue, a `FlowRef<T, F>` holds the same `FlowRefValue<T, F>` in `value`, not `current`
-([Vue components](/docs/api/primitives/vue#flow-ref)).
+([Vue components](/docs/api/primitives/vue#flow-ref)). In Svelte, a `FlowRef<T, F>` holds it in
+`current`, as React's ([Svelte components](/docs/api/primitives/svelte#flow-ref)).

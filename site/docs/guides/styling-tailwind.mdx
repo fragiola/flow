@@ -50,6 +50,24 @@ Tailwind v4 turns every attribute into a variant. The primitives expose their st
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Node
+    {node}
+    class="min-w-28 select-none rounded-lg border border-palette-line bg-palette-base px-3 py-2 data-dragging:cursor-grabbing data-selected:border-palette-ring data-selected:ring-2 data-selected:ring-palette-ring/30 focus-visible:outline-2"
+>
+    {node.data.label}
+    <Flow.Handle
+        type="source"
+        side="bottom"
+        class="size-2.5 rounded-full border border-palette-line bg-palette-base data-valid:bg-green-500 data-invalid:bg-red-500"
+    />
+</Flow.Node>
+```
+
+</Framework>
+
 Valued attributes take the bracket form: `data-[side=left]:-translate-x-1/2`,
 `data-[handle-type=target]:rounded-none`, `data-[position=top-left]:cursor-nwse-resize`.
 
@@ -78,6 +96,16 @@ Edges, the connection line, the background and the minimap are SVG: use the `str
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.EdgePath class="fill-none stroke-palette-line stroke-[1.5px] data-selected:stroke-palette-ring data-selected:stroke-[2.5px]" />
+<Flow.ConnectionLine class="fill-none stroke-palette-ring [stroke-dasharray:4_3]" />
+<Flow.Background variant="dots" size={2} class="text-palette-line" />
+```
+
+</Framework>
+
 `Flow.Background` draws its marks in `currentColor`: its `text-*` utility is the marks' colour.
 
 ## State of an ancestor: `group` and `in-data-*`
@@ -100,6 +128,17 @@ A part inside a node styles itself from the node's state with a `group` on the n
 ```vue
 <Flow.Node :node="node" class="group node">
     <span class="opacity-60 group-data-selected:opacity-100">{{ node.data.label }}</span>
+    <NodeResizer class="hidden group-data-selected:block" />
+</Flow.Node>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Node {node} class="group node">
+    <span class="opacity-60 group-data-selected:opacity-100">{node.data.label}</span>
     <NodeResizer class="hidden group-data-selected:block" />
 </Flow.Node>
 ```
@@ -149,6 +188,27 @@ const TONE = { draft: "border-dashed", ready: "border-solid" } as const;
 Vue has no class function: `class` takes Vue's forms only (a string, an array, an object). A
 lookup of your own reads the node the slot gives, and the state reads its `data-*` attribute
 (`not-data-measured:invisible`); for anything else, the `render` slot gives the `state`.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<script lang="ts">
+    const TONE = { draft: "border-dashed", ready: "border-solid" } as const;
+</script>
+
+<Flow.Nodes>
+    {#snippet children(node)}
+        <Flow.Node {node} class={(state) => ["node", TONE[state.node.data.status], !state.measured && "invisible"]}>
+            {node.data.label}
+        </Flow.Node>
+    {/snippet}
+</Flow.Nodes>
+```
+
+In Svelte, a class function of the state works as in React, and returns any of Svelte's class
+forms: here an array, whose falsy entries are dropped.
 
 </Framework>
 

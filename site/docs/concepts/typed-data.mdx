@@ -46,6 +46,24 @@ export interface Types extends FlowTypes {
 
 </Framework>
 
+<Framework name="svelte">
+
+```ts title="types.ts"
+import type { FlowTypes } from "@fragiola/flow-svelte";
+
+export interface Types extends FlowTypes {
+    readonly nodes: {
+        task: { title: string; done: boolean };
+        note: { text: string };
+    };
+    readonly edges: {
+        dependency: { weight: number };
+    };
+}
+```
+
+</Framework>
+
 `nodes` names each node type and the shape of its `data`; `edges` names your edge types and
 theirs. The built-in edge types (`bezier`, `smoothstep`, `step`, `straight`) are always allowed,
 with any JSON object as data; an edge with no `type` is a `bezier`. A node's `data` is required
@@ -80,6 +98,24 @@ function renderNode(node: FlowNode<Types>) {
 ```
 
 `Flow` here is `typedFlow<Types>()`, so the slot's `node` is a `FlowNode<Types>`.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Nodes>
+    {#snippet children(node)}
+        {#if node.type === "task"}
+            <Flow.Node {node}>{node.data.done ? "✓ " : ""}{node.data.title}</Flow.Node>
+        {:else}
+            <Flow.Node {node}>{node.data.text}</Flow.Node>
+        {/if}
+    {/snippet}
+</Flow.Nodes>
+```
+
+`Flow` here is `typedFlow<Types>()`, so the snippet's `node` is a `FlowNode<Types>`.
 
 </Framework>
 
@@ -156,6 +192,60 @@ const selected = useSelection<Types>();
         Show the selection
     </button>
 </template>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="editor.svelte"
+<script lang="ts">
+    import { createFlowModel, typedFlow } from "@fragiola/flow-svelte";
+    import StepNode from "./step-node.svelte";
+
+    const features = [selection(), drag(), connection()] as const;
+
+    // a model you create
+    const model = createFlowModel<Types, typeof features>(json, { features });
+
+    // the components: a template takes no type argument, so `typedFlow` types them once
+    const Flow = typedFlow<Types, typeof features>();
+</script>
+
+<Flow.Root {model}>
+    <Flow.Viewport>
+        <Flow.Edges>
+            {#snippet children(edge)}<Flow.Edge {edge} />{/snippet}
+        </Flow.Edges>
+        <Flow.Nodes>
+            {#snippet children(node)}<StepNode {node} />{/snippet}
+        </Flow.Nodes>
+    </Flow.Viewport>
+</Flow.Root>
+```
+
+```svelte title="selection-count.svelte"
+<script lang="ts">
+    import { useFlow, useSelection } from "@fragiola/flow-svelte";
+
+    // a rune in a component under the root: it cannot infer them through context
+    const flow = useFlow<Types, typeof features>();
+    const selected = useSelection<Types>();
+</script>
+
+<button
+    type="button"
+    disabled={selected.current.nodes.length === 0}
+    onclick={() => flow.engine.run("fit-view", { nodeIds: selected.current.nodes.map((node) => node.id) })}
+>
+    Show the selection
+</button>
+```
+
+</Framework>
+
+Commands are checked against it:
+
 ```ts
 model.run("node.add", { type: "task", position: { x: 0, y: 0 }, data: { title: "Ship it", done: false } });
 // @ts-expect-error: a note's data is { text }
@@ -193,5 +283,5 @@ with features is assignable to it, and a key of a feature that is not installed 
 - **Untrusted JSON.** `model.dispatch` and `validateFlow` take `unknown` and check it against the
   JSON Schemas of the commands and the document, which know the shape of a node but not your data:
   validate your own `data` in a middleware if it comes from outside.
-- **Untyped hooks.** `useNodes()` (a hook, or a composable in Vue) without `Types` returns `FlowNode<AnyTypes>`, where `data` is a
+- **Untyped hooks.** `useNodes()` (a hook, a composable in Vue, a rune in Svelte) without `Types` returns `FlowNode<AnyTypes>`, where `data` is a
   record of unknown values.

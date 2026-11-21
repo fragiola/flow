@@ -1,6 +1,6 @@
 ---
 title: Installation
-description: Install the React or the Vue package, which re-exports the whole core, and import each feature from its own entry so a flow ships only what it uses.
+description: Install the React, Vue or Svelte package, which re-exports the whole core, and import each feature from its own entry so a flow ships only what it uses.
 ---
 
 <Framework name="react">
@@ -129,6 +129,72 @@ import { subflows } from "@fragiola/flow-vue/subflows";
 
 </Framework>
 
+<Framework name="svelte">
+
+A Svelte app installs one package, `@fragiola/flow-svelte`: the components, the runes and the
+whole framework-free core, re-exported.
+
+<Tabs items={["pnpm", "npm", "yarn"]}>
+<Tab value="pnpm">
+
+```bash
+pnpm add @fragiola/flow-svelte
+```
+
+</Tab>
+<Tab value="npm">
+
+```bash
+npm install @fragiola/flow-svelte
+```
+
+</Tab>
+<Tab value="yarn">
+
+```bash
+yarn add @fragiola/flow-svelte
+```
+
+</Tab>
+</Tabs>
+
+It needs `svelte` 5.29 or later as a peer (runes, snippets, attachments). Nothing else: the
+package has no runtime dependency but its core, and ships no stylesheet to import. It publishes
+its components as `.svelte` files under the `svelte` export condition, which Svelte's Vite plugin
+compiles with your app.
+
+## Importing
+
+```ts
+import { createFlowModel, Flow, type FlowTypes, typedFlow, useFlow } from "@fragiola/flow-svelte";
+```
+
+`Flow` is the namespace of the components (`<Flow.Root>`, `<Flow.Viewport>`, `<Flow.Nodes>`,
+`<Flow.Node>`, `<Flow.Handle>`, … in a template); `typedFlow<Types, typeof features>()` gives the
+same components typed by your registry. The runes (`useFlow`, `useNode`, `useViewport`,
+`useSelection`, …) and `createFlowRef` / `useFlowRef` are named exports beside it. They are the
+React package's primitives and hooks, written the Svelte way:
+[Svelte components](/docs/api/primitives/svelte) maps each React prop.
+
+## The features' entries
+
+Every feature is a factory on its own entry, the same entries as React's under
+`@fragiola/flow-svelte`. The main entry never imports one, so a feature you never import is not
+in your bundle:
+
+```ts
+import { connection } from "@fragiola/flow-svelte/connection";
+import { drag } from "@fragiola/flow-svelte/drag";
+import { keyboard } from "@fragiola/flow-svelte/keyboard";
+import { MiniMap, minimap } from "@fragiola/flow-svelte/minimap";
+import { reconnection } from "@fragiola/flow-svelte/reconnection";
+import { NodeResizer, resize } from "@fragiola/flow-svelte/resize";
+import { selection } from "@fragiola/flow-svelte/selection";
+import { subflows } from "@fragiola/flow-svelte/subflows";
+```
+
+</Framework>
+
 | entry | factory | brings |
 | --- | --- | --- |
 | `@fragiola/flow-react/selection` | `selection()` | click, multi-select, box select, the `selection.*` commands |
@@ -140,7 +206,8 @@ import { subflows } from "@fragiola/flow-vue/subflows";
 | `@fragiola/flow-react/keyboard` | `keyboard()` | focus, arrow moves, Delete, Escape |
 | `@fragiola/flow-react/minimap` | `minimap()` | the minimap's view, with `MiniMap`, `MiniMapNode`, `MiniMapMask` |
 
-The table names React's entries; Vue's are the same with `@fragiola/flow-vue`. Each entry
+The table names React's entries; Vue's and Svelte's are the same with
+`@fragiola/flow-vue` and `@fragiola/flow-svelte`. Each entry
 re-exports the core's factory (`@fragiola/flow/<feature>`), so an app imports everything from the
 one package it installs. See [Features](/docs/concepts/features).
 

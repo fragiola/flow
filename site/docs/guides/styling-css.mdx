@@ -144,6 +144,19 @@ of the state: Vue normalizes them before the primitive sees them. Read the state
 
 </Framework>
 
+<Framework name="svelte">
+
+```svelte
+<Flow.Node {node} class={(state) => (state.selected ? "node node--selected" : "node")}>
+    {node.data.label}
+</Flow.Node>
+```
+
+In Svelte, `class` and `style` take a value or a function of the state, as in React; the
+function's result may be any of Svelte's class forms (a string, an array, an object).
+
+</Framework>
+
 See the [common props](/docs/api/primitives/root#common-props).
 
 ## What the structural style leaves you
