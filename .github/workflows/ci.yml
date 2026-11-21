@@ -15,12 +15,18 @@
 #                     else (the core, examples/shared, the playground, the lockfile, root configs,
 #                     .github, scripts, site) and a manual run: every suite. It also lists the
 #                     frameworks with an examples app (every `examples/<framework>` with a
-#                     playwright.config.ts). No job reads its outputs yet: there is no suite.
+#                     playwright.config.ts).
+#   E2E (examples)    a matrix over those frameworks, from the Changes outputs: the shared specs
+#                     (examples/shared/e2e) against a production build of that framework's embed,
+#                     served under /flow/embed/<framework>/ with a host page that frames it.
 #
-# Arriving with the apps in the React Epic: the E2E jobs (the playground and a matrix over the
-# examples apps, in Playwright's image mcr.microsoft.com/playwright:v<version>-noble, its tag the
-# pinned @playwright/test, with no browser install: site/tests/ci-workflow.test.ts checks
-# both), the Site export job, and the Trigger www build job, the only one a push to main runs.
+# Every Playwright job runs in Playwright's image mcr.microsoft.com/playwright:v<version>-noble
+# (`--user 1001`), its tag the pinned @playwright/test, and installs no browser
+# (site/tests/ci-workflow.test.ts checks both). A suite is sharded only when its test step alone
+# passes about 3 minutes (AGENTS.md, CI).
+#
+# Arriving with the site export (#7): the Site export job, and the Trigger www build job, the only
+# one a push to main runs.
 # No release workflow and no Changesets job (AGENTS.md, D15).
 
 name: CI
@@ -102,3 +108,44 @@ jobs:
           else
             node scripts/e2e-suites.ts --all
           fi
+
+  e2e-examples:
+    name: E2E (examples ${{ matrix.framework }})
+    needs: changes
+    if: needs.changes.outputs.examples != '[]' && needs.changes.outputs.examples != ''
+    runs-on: ubuntu-latest
+    # Playwright's image: its browsers and their system packages, at the pinned @playwright/test
+    # (site/tests/ci-workflow.test.ts); no browser install
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --user 1001
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: ${{ fromJson(needs.changes.outputs.examples) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The examples suite builds the embed against the packages' dist (examplesE2eConfig).
+      - name: Build the packages
+        run: pnpm --filter "./packages/*" build
+
+      - name: Run Playwright
+        run: pnpm --filter examples-${{ matrix.framework }} run e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-examples-${{ matrix.framework }}
+          path: examples/${{ matrix.framework }}/playwright-report/
+          retention-days: 14

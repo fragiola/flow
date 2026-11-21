@@ -1,0 +1,144 @@
+/* From Splitter (fragiola/splitter, examples/shared/src/themes/light.css), same author and licence:
+   the palettes. The --fl-* tokens are Flow's. */
+
+/* Theme "light" — Neutral and quiet: rounded nodes, round handles, smooth edges on a dot grid.
+
+   One file per theme, selected by data-example-theme="light" on any element (the embed puts it
+   on <body>, as an app would). A theme only sets values; it styles no markup. It declares:
+     1. shape tokens (--fl-*) that the examples' class names read: the type (--fl-font,
+        --fl-font-size, --fl-title-weight), a node's box (--fl-node-padding, --fl-node-radius,
+        --fl-node-border, --fl-node-shadow), a handle's size and shape (--fl-handle-size,
+        --fl-handle-radius: 50% is a dot, 0 a square; --fl-handle-border), an edge's stroke
+        (--fl-edge-width, --fl-edge-selected-width, --fl-edge-dash, a stroke-dasharray), the grid
+        pattern (--fl-grid-dots, --fl-grid-lines, --fl-grid-cross: the display of each variant's
+        layer, one of them `block`), the
+        controls' and minimap's corners (--fl-control-radius), the focus ring (--fl-focus-width)
+        and motion (--fl-motion);
+     2. the Fragiola palettes the examples use, each with all SIX roles (base, soft, line,
+        contrast, accent, ring). A palette that omitted one would inherit it from the page and
+        leak across the theme boundary;
+     3. on every palette, the colour tokens that depend on it: the canvas and its grid
+        (--fl-canvas-bg, --fl-grid-color), a node (--fl-node-bg, --fl-node-line), an edge at rest
+        and selected (--fl-edge-color, --fl-edge-selected), a handle (--fl-handle-bg,
+        --fl-handle-line), a connection's verdict (--fl-valid, --fl-invalid), the selection box
+        (--fl-selection-bg, --fl-selection-line), the minimap's mask (--fl-minimap-mask) and the
+        focus ring (--fl-focus-line). They are declared per palette so that var(--palette-…)
+        resolves against the palette the element sits in.
+
+   Geometry is not a token: positions and sizes are the flow's document, never CSS.
+
+   Specificity: the palette rules are ":root [data-example-theme="light"] .palette-x", which ties
+   with Fragiola's own ":root[data-theme] .palette-x" and wins by coming later in the cascade, so
+   a theme overrides the page's light/dark. */
+
+[data-example-theme="light"] {
+    color-scheme: light;
+    --palette-state-shift: -0.1;
+    --fl-font: var(--font-sans);
+    --fl-font-size: 0.8125rem;
+    --fl-title-weight: 600;
+    --fl-node-padding: 0.625rem 0.75rem;
+    --fl-node-radius: 8px;
+    --fl-node-border: 1px;
+    --fl-node-shadow: 0 1px 2px oklch(0 0 0 / 0.08);
+    --fl-handle-size: 10px;
+    --fl-handle-radius: 50%;
+    --fl-handle-border: 1.5px;
+    --fl-edge-width: 1.5px;
+    --fl-edge-selected-width: 2.5px;
+    --fl-edge-dash: none;
+    --fl-grid-dots: block;
+    --fl-grid-lines: none;
+    --fl-grid-cross: none;
+    --fl-control-radius: 6px;
+    --fl-focus-width: 2px;
+    --fl-motion: 120ms;
+}
+
+:root [data-example-theme="light"] .palette-surface,
+:root [data-example-theme="light"].palette-surface {
+    --palette-base: oklch(0.96 0.003 250);
+    --palette-soft: oklch(0.93 0.004 250);
+    --palette-line: oklch(0.86 0.004 250);
+    --palette-contrast: oklch(0.15 0.01 250);
+    --palette-accent: oklch(0.3 0.01 250);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="light"] .palette-raised,
+:root [data-example-theme="light"].palette-raised {
+    --palette-base: oklch(1 0 0);
+    --palette-soft: oklch(0.955 0.004 250);
+    --palette-line: oklch(0.87 0.005 250);
+    --palette-contrast: oklch(0.15 0.01 250);
+    --palette-accent: oklch(0.28 0.01 250);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="light"] .palette-blue,
+:root [data-example-theme="light"].palette-blue {
+    --palette-base: oklch(0.55 0.2 250);
+    --palette-soft: oklch(0.94 0.06 250);
+    --palette-line: oklch(0.85 0.08 250);
+    --palette-contrast: oklch(1 0 0);
+    --palette-accent: oklch(0.45 0.18 250);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="light"] .palette-orange,
+:root [data-example-theme="light"].palette-orange {
+    --palette-base: oklch(0.68 0.17 55);
+    --palette-soft: oklch(0.94 0.08 70);
+    --palette-line: oklch(0.85 0.12 70);
+    --palette-contrast: oklch(0.2 0.05 55);
+    --palette-accent: oklch(0.45 0.15 55);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="light"] .palette-green,
+:root [data-example-theme="light"].palette-green {
+    --palette-base: oklch(0.52 0.16 150);
+    --palette-soft: oklch(0.94 0.07 150);
+    --palette-line: oklch(0.85 0.1 150);
+    --palette-contrast: oklch(1 0 0);
+    --palette-accent: oklch(0.42 0.14 150);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="light"] .palette-danger,
+:root [data-example-theme="light"].palette-danger {
+    --palette-base: oklch(0.55 0.2 25);
+    --palette-soft: oklch(0.94 0.07 25);
+    --palette-line: oklch(0.85 0.1 25);
+    --palette-contrast: oklch(1 0 0);
+    --palette-accent: oklch(0.45 0.18 25);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="light"] .palette-purple,
+:root [data-example-theme="light"].palette-purple {
+    --palette-base: oklch(0.55 0.2 300);
+    --palette-soft: oklch(0.94 0.06 300);
+    --palette-line: oklch(0.85 0.08 300);
+    --palette-contrast: oklch(1 0 0);
+    --palette-accent: oklch(0.45 0.18 300);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="light"] [class*="palette-"],
+:root [data-example-theme="light"][class*="palette-"] {
+    --fl-canvas-bg: var(--palette-soft);
+    --fl-grid-color: oklch(from var(--palette-contrast) l c h / 0.22);
+    --fl-node-bg: var(--palette-base);
+    --fl-node-line: var(--palette-line);
+    --fl-edge-color: oklch(0.62 0.01 250);
+    --fl-edge-selected: oklch(0.55 0.2 250);
+    --fl-handle-bg: var(--palette-base);
+    --fl-handle-line: var(--palette-accent);
+    --fl-valid: oklch(0.55 0.16 150);
+    --fl-invalid: oklch(0.58 0.21 25);
+    --fl-selection-bg: oklch(from oklch(0.55 0.2 250) l c h / 0.12);
+    --fl-selection-line: oklch(0.55 0.2 250);
+    --fl-minimap-mask: oklch(from var(--palette-contrast) l c h / 0.12);
+    --fl-focus-line: oklch(0.55 0.2 250);
+}
