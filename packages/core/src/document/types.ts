@@ -3,6 +3,7 @@
 // registry narrows each type's `data`. A feature's fields (`selected`, `parentId`, …) are declared
 // here, optional: the document format stays whole, and a field of a feature that is not installed
 // is a validation issue (never dropped silently).
+import type { Rect } from "../geometry/types";
 
 /** A point or an offset in flow coordinates: x grows to the right, y grows down. */
 export interface XY {
@@ -103,8 +104,12 @@ export interface SelectionFields {
 export interface SubflowFields {
     /** the node it lives in (`@fragiola/flow/subflows`): its `position` is relative to it */
     readonly parentId?: string;
-    /** `"parent"`: it stays inside its parent's box (`@fragiola/flow/subflows`) */
-    readonly extent?: "parent";
+    /**
+     * where it stays (`@fragiola/flow/subflows`): `"parent"`, inside its parent's box; a `Rect`,
+     * inside that rectangle, in the coordinates of its `position` (relative to its parent for a
+     * child)
+     */
+    readonly extent?: "parent" | Rect;
     /** its parent grows to keep it inside when it moves or grows past it (`@fragiola/flow/subflows`) */
     readonly expandParent?: boolean;
 }
@@ -117,6 +122,8 @@ export interface NodeFields extends NodeFlags, SelectionFields, SubflowFields {
     readonly width?: number;
     /** its height, when the document gives one (the engine measures the rendered one) */
     readonly height?: number;
+    /** its place in the nodes' stacking order: a greater one is drawn above; default 0 */
+    readonly zIndex?: number;
 }
 
 /** A node of type `K` and data `D`. */
@@ -141,6 +148,8 @@ export interface EdgeFields extends EdgeFlags, SelectionFields {
     readonly sourceHandle?: string;
     /** the target node's handle it ends at (none: the node's only, or default, target handle) */
     readonly targetHandle?: string;
+    /** its place in the edges' drawing order: a greater one is drawn above; default 0 */
+    readonly zIndex?: number;
 }
 
 /** An edge of type `K` and data `D`. */

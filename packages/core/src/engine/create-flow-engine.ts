@@ -40,7 +40,13 @@ import type {
     FeatureModel,
     FlowFeatures,
 } from "../features/types";
-import { boundsOf, overlaps } from "../geometry/rect";
+import {
+    boundsOf,
+    cornerInside,
+    intersectionOf,
+    nodeBox,
+    overlaps,
+} from "../geometry/rect";
 import type { EdgePath, Rect, Viewport } from "../geometry/types";
 import {
     centeredOn,
@@ -152,6 +158,18 @@ export interface FlowEngineOptions {
     autoPan?: boolean | AutoPanOptions | undefined;
     /** how an animated viewport action (its `duration`) eases; default a smooth ease in and out */
     easing?: ViewportEasing | undefined;
+    /**
+     * the point of a node's box its `position` stands at, as shares of its size (`{ x: 0.5, y: 0.5 }`:
+     * its centre), for the nodes on the flow (a child's position is its box's top-left corner in its
+     * parent's); default `{ x: 0, y: 0 }`: the top-left corner
+     */
+    nodeOrigin?: XY | undefined;
+    /** the flow rectangle every node's box stays inside when dragged, moved by keys or resized */
+    nodeExtent?: Rect | undefined;
+    /** a selected node, and its children with it, is drawn above the others; default true */
+    elevateNodesOnSelect?: boolean | undefined;
+    /** a selected edge is drawn above the other edges; default false */
+    elevateEdgesOnSelect?: boolean | undefined;
 }
 
 /**
@@ -211,6 +229,8 @@ interface Press {
     readonly button: number;
     /** started by the pan activation key: it pans and never taps */
     readonly keyPan: boolean;
+    /** its gesture is the one a tap started (click-to-connect): its release is the gesture's end */
+    readonly follows: boolean;
     travel: number;
     /** its pointer's last move: a press whose release was missed ends there */
     last: PointerEvent | undefined;
@@ -228,6 +248,16 @@ interface Pinch {
 }
 
 const ZERO_SIZE: Size = { width: 0, height: 0 };
+
+const TOP_LEFT: XY = { x: 0, y: 0 };
+
+/** What a selected node (with `elevateNodesOnSelect`) or edge (`elevateEdgesOnSelect`) is raised by. */
+const SELECTED_RAISE = 10_000;
+
+/** A `zIndex` as a number (none, or not a finite number: 0). */
+function zOf(value: unknown): number {
+    return finite(value) ? value : 0;
+}
 
 function finite(value: unknown): value is number {
     return typeof value === "number" && Number.isFinite(value);
@@ -302,6 +332,11 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     private viewportElement: HTMLElement | SVGElement | undefined;
     private removeRootListeners: (() => void) | undefined;
     private press: Press | undefined;
+    /**
+     * a gesture a tap started that goes on without a press (click-to-connect): the pointer's moves
+     * move it, and the next primary press is its own
+     */
+    private following: FeatureGesture | undefined;
     private pinch: Pinch | undefined;
     private readonly pointers = new Map<number, XY>();
     private pendingFit: FitViewPayload | undefined;
@@ -422,14 +457,22 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                     );
                 }
                 if (!dryRun && interactive !== this.interactive) {
-                    if (!interactive) this.cancelPress();
+                    if (!interactive) {
+                        this.cancelPress();
+                        this.cancelFollowing();
+                    }
                     this.interactive = interactive;
                     this.notify({ gesture: true });
                 }
                 return ok({ interactive });
             },
             "cancel-gesture": (_payload, dryRun) => {
-                if (!this.press && !this.pinch && !this.stopAnimation) {
+                if (
+                    !this.press &&
+                    !this.pinch &&
+                    !this.following &&
+                    !this.stopAnimation
+                ) {
                     return fail(
                         "refused",
                         "no gesture nor viewport animation is under way",
@@ -437,6 +480,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 }
                 if (!dryRun) {
                     this.cancelPress();
+                    this.cancelFollowing();
                     this.endPinch();
                     this.stopViewportAnimation();
                 }
@@ -508,6 +552,9 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             },
             "visible-nodes": () => this.visibleNodes(),
             "visible-edges": () => this.visibleEdges(),
+            "drawn-edges": () => this.drawnEdges(),
+            "node-z-index-by": (p) =>
+                this.nodeZ(String(payloadRecord(p).nodeId)),
             "handles-by": (p) => {
                 const nodeId = String(payloadRecord(p).nodeId);
                 return this.measurements
@@ -861,37 +908,178 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             : { width, height };
     }
 
-    private positionOf(nodeId: string): XY | undefined {
-        return this.model.get("absolute-position-by", { nodeId });
+    /**
+     * The share of a node's size its position stands at: the engine's `nodeOrigin` for a node on
+     * the flow, the top-left corner for a child (its position is relative to its parent's
+     * top-left corner, so the model's sub-flow rules hold as they are).
+     */
+    private originOf(node: FlowNode): XY {
+        if (node.parentId !== undefined && this.node(node.parentId)) {
+            return TOP_LEFT;
+        }
+        return this.options.nodeOrigin ?? TOP_LEFT;
+    }
+
+    /** A node's position in absolute flow coordinates: its parent's top-left corner plus its own. */
+    private absolutePosition(node: FlowNode, seen = new Set<string>()): XY {
+        seen.add(node.id);
+        const parent =
+            node.parentId === undefined || seen.has(node.parentId)
+                ? undefined
+                : this.node(node.parentId);
+        if (!parent) return node.position;
+        const corner = this.boxOf(parent, seen);
+        return {
+            x: corner.x + node.position.x,
+            y: corner.y + node.position.y,
+        };
+    }
+
+    /** A node's absolute box (`nodeBox`: its position at its origin), its size zero until known. */
+    private boxOf(node: FlowNode, seen = new Set<string>()): Rect {
+        return nodeBox(
+            this.absolutePosition(node, seen),
+            this.sizeOf(node) ?? ZERO_SIZE,
+            this.originOf(node),
+        );
+    }
+
+    /** The top-left corner of a node's parent's box (0, 0 without one). */
+    private parentCorner(node: FlowNode): XY {
+        const parent =
+            node.parentId === undefined ? undefined : this.node(node.parentId);
+        return parent ? this.boxOf(parent) : TOP_LEFT;
     }
 
     /** A node's absolute box, its size zero until known. */
     private nodeRect(nodeId: string): Rect | undefined {
         const node = this.node(nodeId);
-        const position = node && this.positionOf(nodeId);
-        if (!node || !position) return undefined;
-        const size = this.sizeOf(node) ?? ZERO_SIZE;
-        return {
-            x: position.x,
-            y: position.y,
-            width: size.width,
-            height: size.height,
-        };
+        return node ? this.boxOf(node) : undefined;
     }
 
     /** A node's absolute box, once its size is known. */
     private knownRect(nodeId: string): Rect | undefined {
         const node = this.node(nodeId);
-        const size = node && this.sizeOf(node);
-        const position = size && this.positionOf(nodeId);
-        return size && position
-            ? {
-                  x: position.x,
-                  y: position.y,
-                  width: size.width,
-                  height: size.height,
-              }
-            : undefined;
+        return node && this.sizeOf(node) ? this.boxOf(node) : undefined;
+    }
+
+    /**
+     * The position (relative to its parent) that puts a node's box of `size` with its top-left
+     * corner at the absolute flow point `corner`.
+     */
+    private positionFor(nodeId: string, corner: XY, size: Size): XY {
+        const node = this.node(nodeId);
+        if (!node) return corner;
+        const parent = this.parentCorner(node);
+        const origin = this.originOf(node);
+        return {
+            x: corner.x + origin.x * size.width - parent.x,
+            y: corner.y + origin.y * size.height - parent.y,
+        };
+    }
+
+    /**
+     * The absolute rectangle a node's box stays inside: its parent's box (`extent: "parent"`,
+     * with the measured sizes), its own rectangle `extent` (relative to its parent's top-left
+     * corner for a child) and the engine's `nodeExtent`, together; none when nothing bounds it.
+     */
+    private extentOf(nodeId: string): Rect | undefined {
+        const node = this.node(nodeId);
+        if (!node) return undefined;
+        const bounds: Rect[] = [];
+        const parent =
+            node.parentId === undefined ? undefined : this.node(node.parentId);
+        const corner = parent ? this.boxOf(parent) : TOP_LEFT;
+        if (parent && node.extent === "parent" && node.expandParent !== true) {
+            const room = this.sizeOf(parent);
+            bounds.push({
+                x: corner.x,
+                y: corner.y,
+                width: room?.width ?? Number.POSITIVE_INFINITY,
+                height: room?.height ?? Number.POSITIVE_INFINITY,
+            });
+        }
+        const own = node.extent;
+        if (typeof own === "object" && own !== null) {
+            bounds.push({
+                x: corner.x + own.x,
+                y: corner.y + own.y,
+                width: own.width,
+                height: own.height,
+            });
+        }
+        if (this.options.nodeExtent) bounds.push(this.options.nodeExtent);
+        return intersectionOf(bounds);
+    }
+
+    /**
+     * A node's position (relative to its parent) kept inside its extent (`extentOf`) with its
+     * measured size; `size` overrides it (a resize under way).
+     */
+    private keepInExtent(nodeId: string, position: XY, size?: Size): XY {
+        const node = this.node(nodeId);
+        const bounds = this.extentOf(nodeId);
+        if (!node || !bounds) return position;
+        const own = size ?? this.sizeOf(node) ?? ZERO_SIZE;
+        const parent = this.parentCorner(node);
+        const origin = this.originOf(node);
+        const corner = {
+            x: parent.x + position.x - origin.x * own.width,
+            y: parent.y + position.y - origin.y * own.height,
+        };
+        const kept = cornerInside(corner, own, bounds);
+        return {
+            x:
+                kept.x === corner.x
+                    ? position.x
+                    : kept.x + origin.x * own.width - parent.x,
+            y:
+                kept.y === corner.y
+                    ? position.y
+                    : kept.y + origin.y * own.height - parent.y,
+        };
+    }
+
+    /**
+     * A node's own stacking value: its `zIndex`, raised when it is selected and
+     * `elevateNodesOnSelect` is on.
+     */
+    private ownZ(node: FlowNode): number {
+        const raised =
+            node.selected === true &&
+            (this.options.elevateNodesOnSelect ?? true);
+        return zOf(node.zIndex) + (raised ? SELECTED_RAISE : 0);
+    }
+
+    /** A node's structural `z-index`: its own, and always above its parent's (0 for none). */
+    private nodeZ(nodeId: string): number {
+        const chain: FlowNode[] = [];
+        const seen = new Set<string>();
+        for (
+            let node = this.node(nodeId);
+            node !== undefined && !seen.has(node.id);
+            node =
+                node.parentId === undefined
+                    ? undefined
+                    : this.node(node.parentId)
+        ) {
+            seen.add(node.id);
+            chain.push(node);
+        }
+        let z: number | undefined;
+        for (const node of chain.reverse()) {
+            const own = this.ownZ(node);
+            z = z === undefined ? own : Math.max(own, z + 1);
+        }
+        return z ?? 0;
+    }
+
+    /** An edge's stacking value: its `zIndex`, raised when selected with `elevateEdgesOnSelect`. */
+    private edgeZ(edge: FlowEdge): number {
+        const raised =
+            edge.selected === true &&
+            (this.options.elevateEdgesOnSelect ?? false);
+        return zOf(edge.zIndex) + (raised ? SELECTED_RAISE : 0);
     }
 
     private boundsOf(
@@ -914,13 +1102,13 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     /** A handle with its absolute centre (once it and its node are measured). */
     private placed(handle: FlowHandle): FlowHandle {
         if (!handle.bounds) return handle;
-        const position = this.positionOf(handle.nodeId);
-        if (!position) return handle;
+        const rect = this.nodeRect(handle.nodeId);
+        if (!rect) return handle;
         return {
             ...handle,
             center: {
-                x: position.x + handle.bounds.x + handle.bounds.width / 2,
-                y: position.y + handle.bounds.y + handle.bounds.height / 2,
+                x: rect.x + handle.bounds.x + handle.bounds.width / 2,
+                y: rect.y + handle.bounds.y + handle.bounds.height / 2,
             },
         };
     }
@@ -998,33 +1186,28 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         });
     }
 
-    /** A node's position kept inside its parent's measured box (`extent: "parent"`). */
-    private keepInParent(nodeId: string, position: XY, size?: Size): XY {
-        const node = this.node(nodeId);
-        if (
-            !node ||
-            node.parentId === undefined ||
-            node.extent !== "parent" ||
-            node.expandParent === true
-        ) {
-            return position;
-        }
-        const parent = this.node(node.parentId);
-        if (!parent) return position;
-        const room = this.sizeOf(parent);
-        const own = size ?? this.sizeOf(node) ?? ZERO_SIZE;
-        const clamp = (value: number, max: number) =>
-            Math.min(Math.max(value, 0), Math.max(0, max));
-        return {
-            x: clamp(
-                position.x,
-                (room?.width ?? Number.POSITIVE_INFINITY) - own.width,
-            ),
-            y: clamp(
-                position.y,
-                (room?.height ?? Number.POSITIVE_INFINITY) - own.height,
-            ),
-        };
+    /**
+     * The edges an adapter draws, in drawing order: those shown whose nodes are measured (with
+     * `onlyRenderVisible`, those in view), by their stacking value, the document's order among
+     * equals.
+     */
+    private drawnEdges(): readonly FlowEdge[] {
+        const shown =
+            (this.options.onlyRenderVisible ?? false)
+                ? this.visibleEdges()
+                : this.model
+                      .get("all-edges")
+                      .filter(
+                          (edge) =>
+                              edge.hidden !== true &&
+                              this.node(edge.source)?.hidden !== true &&
+                              this.node(edge.target)?.hidden !== true &&
+                              this.edgePath(edge.id) !== undefined,
+                      );
+        return shown
+            .map((edge, i) => ({ edge, i, z: this.edgeZ(edge) }))
+            .sort((a, b) => a.z - b.z || a.i - b.i)
+            .map(({ edge }) => edge);
     }
 
     /**
@@ -1103,8 +1286,16 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             measured: (nodeId) => this.knownRect(nodeId) !== undefined,
             handles: () => this.handles(),
             edgePath: (edgeId) => this.edgePath(edgeId),
-            keepInParent: (nodeId, position, size) =>
-                this.keepInParent(nodeId, position, size),
+            absolutePosition: (nodeId) => {
+                const node = this.node(nodeId);
+                return node ? this.absolutePosition(node) : undefined;
+            },
+            positionFor: (nodeId, corner, size) =>
+                this.positionFor(nodeId, corner, size),
+            extentOf: (nodeId) => this.extentOf(nodeId),
+            keepInExtent: (nodeId, position, size) =>
+                this.keepInExtent(nodeId, position, size),
+            held: (key, event) => this.held(key, event),
             nodeElement: (nodeId) => this.measurements.nodeElement(nodeId),
             interactive: () => this.interactive,
             partOptions: (part, id) =>
@@ -1185,6 +1376,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     private detachRoot(): void {
         if (!this.rootElement) return;
         this.cancelPress();
+        this.cancelFollowing();
         this.endPinch();
         // the frames are the root window's: another root may be in another window
         this.stopViewportAnimation();
@@ -1279,7 +1471,12 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         let gesture: FeatureGesture | undefined;
         let pan = false;
         const keyPan = button === 0 && this.panKeyHeld(event);
-        if (keyPan) {
+        const following = button === 0 && !keyPan ? this.following : undefined;
+        if (following) {
+            // the gesture a tap started takes the next press: its release is the gesture's end
+            this.following = undefined;
+            gesture = following;
+        } else if (keyPan) {
             // the pan activation key: a pan from anywhere, and no other gesture
             gesture = this.panGesture(client);
             pan = true;
@@ -1302,6 +1499,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             pan,
             button,
             keyPan,
+            follows: following !== undefined,
             travel: 0,
             last: undefined,
         };
@@ -1320,7 +1518,10 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     }
 
     /** Whether `key` is held now: a modifier as `event` tells it, any other from the document's keys. */
-    private held(key: string | null, event: MouseEvent): boolean {
+    private held(
+        key: string | null,
+        event: MouseEvent | KeyboardEvent,
+    ): boolean {
         if (key === null || key === "") return false;
         const modifier = MODIFIERS[key];
         return modifier !== undefined
@@ -1410,7 +1611,12 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             return;
         }
         const press = this.press;
-        if (!press || press.pointerId !== event.pointerId) return;
+        if (!press) {
+            // a gesture a tap started follows the pointer without a press
+            if (event.isPrimary !== false) this.following?.move(event);
+            return;
+        }
+        if (press.pointerId !== event.pointerId) return;
         press.travel = Math.max(press.travel, distance(press.start, client));
         press.last = event;
         press.gesture?.move(event);
@@ -1501,11 +1707,16 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         }
         if (
             !press.keyPan &&
+            !press.follows &&
             !active &&
             press.travel <= TAP_TOLERANCE &&
             this.interactive
         ) {
-            this.features.tap(event, press.target);
+            const taken = this.features.tap(event, press.target);
+            if (typeof taken === "object") {
+                this.cancelFollowing();
+                this.following = taken;
+            }
         }
     }
 
@@ -1517,6 +1728,13 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             return;
         }
         if (this.press?.pointerId === event.pointerId) this.cancelPress();
+    }
+
+    /** Ends the gesture a tap started without committing. */
+    private cancelFollowing(): void {
+        const following = this.following;
+        this.following = undefined;
+        following?.cancel();
     }
 
     /** Ends the press under way without committing (its gesture cancelled). */
@@ -1660,8 +1878,12 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     private keyDown(event: KeyboardEvent): void {
         if (this.destroyed) return;
-        if (event.key === "Escape" && (this.press || this.pinch)) {
+        if (
+            event.key === "Escape" &&
+            (this.press || this.pinch || this.following)
+        ) {
             this.cancelPress();
+            this.cancelFollowing();
             this.endPinch();
             event.preventDefault();
             return;

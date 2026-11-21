@@ -1,5 +1,6 @@
 // The connection feature (D2, `@fragiola/flow/connection`): dragging from a handle draws a
-// connection line, and dropping it on another handle adds an edge. Its validity is the core's
+// connection line, and dropping it on another handle adds an edge (with `clickToConnect`, a tap on
+// a handle and a tap on another do too). Its validity is the core's
 // `model.can("edge.add", …)` (D7: a middleware's veto marks the target invalid and refuses the
 // drop). Its engine side (`connection-engine.ts`: the gesture, the line's points, the nearest
 // handle within `radius`, the `connection` engine key) reads `options`.
@@ -18,6 +19,11 @@ export interface ConnectionOptions {
     readonly radius: number;
     /** which handles a connection may end at; default `"strict"` */
     readonly mode: ConnectionMode;
+    /**
+     * a tap on a handle starts a connection that follows the pointer, and a tap on another handle
+     * ends it (elsewhere, or Escape, cancels it); default false
+     */
+    readonly clickToConnect: boolean;
 }
 
 /** The connection feature, as `connection()` makes it. */
@@ -30,6 +36,7 @@ export function connection(
     const resolved: ConnectionOptions = Object.freeze({
         radius: options.radius ?? 20,
         mode: options.mode ?? "strict",
+        clickToConnect: options.clickToConnect ?? false,
     });
     return Object.freeze({
         name: "connection",

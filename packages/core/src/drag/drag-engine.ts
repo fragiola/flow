@@ -2,11 +2,12 @@
 // it, with the selection when it is selected (and selects it first when it is not); every pointer
 // move is a transient step (`node.move`, a `batch` for several), the drop the final one. Positions
 // snap to the grid (the pressed node snaps, the others keep their offsets), and a node with
-// `extent: "parent"` stays inside its parent with the measured sizes. Escape, `pointercancel` or a
-// lost capture puts the nodes back.
+// an extent (`extent: "parent"`, a rectangle `extent`, the engine's `nodeExtent`) stays inside it
+// with the measured sizes. A node holding a drag handle drags only from it. Escape,
+// `pointercancel` or a lost capture puts the nodes back.
 import { flag } from "../attributes/part-attributes";
 import type { XY } from "../document/types";
-import { carriedBy, parentOrigin, runMoves } from "../engine/node-moves";
+import { carriedBy, runMoves } from "../engine/node-moves";
 import type {
     FeatureEngine,
     FeatureEngineHost,
@@ -16,7 +17,7 @@ import type { DragOptions } from "./drag";
 
 interface Drag {
     readonly nodeIds: readonly string[];
-    /** each node's absolute position at the start */
+    /** each node's absolute position at the start (the snap's reference) */
     readonly starts: ReadonlyMap<string, XY>;
     /** each node's relative position at the start (a cancel puts it back) */
     readonly relatives: ReadonlyMap<string, XY>;
@@ -43,9 +44,7 @@ export function dragEngine(
         const starts = new Map<string, XY>();
         const relatives = new Map<string, XY>();
         for (const id of nodeIds) {
-            const absolute = model.get("absolute-position-by", {
-                nodeId: id,
-            }) as XY | undefined;
+            const absolute = host.absolutePosition(id);
             const node = model.get("node-by", { id }) as
                 | { position: XY }
                 | undefined;
@@ -92,13 +91,12 @@ export function dragEngine(
                     delta.y = snap(lead.y + delta.y, gridY) - lead.y;
                 }
                 current.moves = current.nodeIds.map((id) => {
-                    const from = current.starts.get(id) as XY;
-                    const origin = parentOrigin(model, id);
+                    const from = current.relatives.get(id) as XY;
                     return {
                         nodeId: id,
-                        position: host.keepInParent(id, {
-                            x: from.x + delta.x - origin.x,
-                            y: from.y + delta.y - origin.y,
+                        position: host.keepInExtent(id, {
+                            x: from.x + delta.x,
+                            y: from.y + delta.y,
                         }),
                     };
                 });
@@ -151,6 +149,7 @@ export function dragEngine(
             if (
                 target.kind !== "node" ||
                 target.nodeId === undefined ||
+                target.outsideDragHandle === true ||
                 drag !== undefined ||
                 !host.interactive() ||
                 !model.is("node-draggable", { nodeId: target.nodeId })

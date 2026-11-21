@@ -15,6 +15,7 @@ import type {
 } from "../document/types";
 import type { FeatureName } from "../features/keys";
 import type { CommandNameOf, FlowFeatures } from "../features/types";
+import type { Rect } from "../geometry/types";
 import type { JsonSchema, ValidationIssue } from "../schema/types";
 
 /** A shallow patch of data `D`: some of its top-level keys (any keys when `D` is not typed). */
@@ -107,7 +108,7 @@ export interface CommandMap<T extends FlowTypes = AnyTypes> {
         payload: {
             nodeId: string;
             parentId: string | null;
-            extent?: "parent" | null;
+            extent?: "parent" | Rect | null;
             expandParent?: boolean;
         };
         result: { nodeId: string; position: XY };

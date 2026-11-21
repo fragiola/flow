@@ -182,12 +182,17 @@ describe("the feature factories", () => {
             maxHeight: Number.POSITIVE_INFINITY,
             keepAspectRatio: false,
         });
-        expect(connection().options).toEqual({ radius: 20, mode: "strict" });
+        expect(connection().options).toEqual({
+            radius: 20,
+            mode: "strict",
+            clickToConnect: false,
+        });
         expect(reconnection().options).toEqual({ radius: 10 });
         expect(reconnection().requires).toEqual(["connection"]);
         expect(keyboard({ step: 1 }).options).toEqual({
             step: 1,
             fastStep: 20,
+            deleteKeys: ["Delete", "Backspace"],
         });
         expect(minimap().options).toEqual({
             pannable: true,
@@ -198,6 +203,8 @@ describe("the feature factories", () => {
             boxMode: "full",
             multiple: true,
             boxOnDrag: false,
+            multiKey: ["Meta", "Control", "Shift"],
+            boxKey: "Shift",
         });
         expect(subflows().options).toEqual({});
         for (const feature of ALL()) {

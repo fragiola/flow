@@ -5,6 +5,7 @@
 // `/keyboard`, `/minimap`), which this one never imports (`scripts/check-features.ts`).
 
 export {
+    DRAG_HANDLE_ATTRIBUTE,
     END_ATTRIBUTE,
     type FlowPart,
     flag,

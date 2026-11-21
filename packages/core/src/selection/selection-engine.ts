@@ -1,14 +1,15 @@
-// The selection feature's engine side: a tap on a node or an edge selects it (with Ctrl, ⌘ or
-// Shift it toggles, when `multiple`), a tap on the pane clears the selection, and a drag on the
-// pane with Shift (or any drag with `boxOnDrag`) draws a selection box that selects the nodes it
-// holds (`"full"`) or touches (`"partial"`), with the edges between them. Each box step is a
+// The selection feature's engine side: a tap on a node or an edge selects it (with the
+// multi-selection key, Ctrl, ⌘ or Shift by default, it toggles, when `multiple`), a tap on the pane
+// clears the selection, and a drag on the pane with the box key (Shift by default; any drag with
+// `boxOnDrag`) draws a selection box that selects the nodes it holds (`"full"`) or touches
+// (`"partial"`), with the edges between them. Each box step is a
 // transient `selection.set`, the release the final one; a cancel puts the selection back.
 import { flag } from "../attributes/part-attributes";
 import type { FlowEdge, FlowNode, XY } from "../document/types";
 import type { FeatureEngine, FeatureEngineHost } from "../features/types";
 import { contains, overlaps, rectFromCorners } from "../geometry/rect";
 import { toScreen } from "../geometry/viewport-math";
-import type { SelectionOptions } from "./selection";
+import type { SelectionKey, SelectionOptions } from "./selection";
 
 interface Box {
     /** where it started, in client coordinates (its travel) and in flow coordinates (its corner) */
@@ -28,6 +29,14 @@ export function selectionEngine(
 ): FeatureEngine {
     const { model } = host;
     let box: Box | undefined;
+
+    /** Whether one of `keys` is held during `event`. */
+    const holds = (keys: SelectionKey, event: MouseEvent): boolean =>
+        keys === null
+            ? false
+            : typeof keys === "string"
+              ? host.held(keys, event)
+              : keys.some((key) => host.held(key, event));
 
     const selected = () => ({
         nodeIds: (model.get("selected-nodes") as readonly FlowNode[]).map(
@@ -89,7 +98,7 @@ export function selectionEngine(
             if (
                 target.kind !== "pane" ||
                 !host.interactive() ||
-                !(options.boxOnDrag || event.shiftKey)
+                !(options.boxOnDrag || holds(options.boxKey, event))
             ) {
                 return undefined;
             }
@@ -163,9 +172,7 @@ export function selectionEngine(
             };
         },
         tap: (event, target) => {
-            const toggle =
-                options.multiple &&
-                (event.shiftKey || event.ctrlKey || event.metaKey);
+            const toggle = options.multiple && holds(options.multiKey, event);
             const mode = toggle ? "toggle" : "replace";
             if (target.kind === "node" && target.nodeId !== undefined) {
                 if (!model.is("node-selectable", { nodeId: target.nodeId }))

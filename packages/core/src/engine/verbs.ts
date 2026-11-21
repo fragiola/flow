@@ -246,6 +246,17 @@ export interface EngineGetMap<T extends FlowTypes = AnyTypes> {
     "visible-nodes": { payload: NoPayload; result: readonly FlowNode<T>[] };
     /** the edges whose ends' box is in view */
     "visible-edges": { payload: NoPayload; result: readonly FlowEdge<T>[] };
+    /**
+     * the edges to draw, in drawing order: those shown whose nodes are measured (with
+     * `onlyRenderVisible`, those in view), by `zIndex` (a selected one raised with
+     * `elevateEdgesOnSelect`), the document's order among equals
+     */
+    "drawn-edges": { payload: NoPayload; result: readonly FlowEdge<T>[] };
+    /**
+     * a node's structural `z-index` among the nodes: its `zIndex` (a selected one raised with
+     * `elevateNodesOnSelect`), always above its parent's
+     */
+    "node-z-index-by": { payload: { nodeId: string }; result: number };
     /** a node's registered handles, with their centres */
     "handles-by": {
         payload: { nodeId: string };

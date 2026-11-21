@@ -128,9 +128,14 @@ flow), each with its own viewport.
 | `pathOptions` | `PathOptions` | see [Path helpers](/docs/api/path-helpers) | the shape of the built-in edge paths |
 | `autoPan` | `boolean \| AutoPanOptions` | `true` | the viewport pans while a node drag, a connection, a reconnection, a selection box or a resize has its pointer near the root's edge, and the gesture follows the pointer; `AutoPanOptions` `{ speed, margin }`: the pixels a frame at the edge (default `10`) and how near it starts (default `30` pixels) |
 | `easing` | `(t: number) => number` | a smooth ease in and out | how an animated viewport action (`duration`) eases (`ViewportEasing`) |
+| `nodeOrigin` | `XY` | `{ x: 0, y: 0 }` | the point of a node's box its `position` stands at, as shares of its size (`{ x: 0.5, y: 0.5 }`: its centre); every box the engine derives uses it (rects, handles, edge ends, bounds, `fit-view`, `visible-nodes`, the minimap, toolbars, the selection box, drag and resize); a child's position stays its box's top-left corner inside its parent's |
+| `nodeExtent` | `Rect` | none | the flow rectangle every node's box stays inside when dragged, moved by the arrows or resized |
+| `elevateNodesOnSelect` | `boolean` | `true` | a selected node, and its descendants with it, is drawn above the other nodes (`node-z-index-by`) |
+| `elevateEdgesOnSelect` | `boolean` | `false` | a selected edge is drawn above the other edges (`drawn-edges`) |
 
 `panActivationKey`, `panOnScrollMode`, `panOnScrollSpeed`, `zoomActivationKey`, `autoPan`,
-`easing` and the buttons of `panOnDrag` are engine options today (`createFlowEngine`,
+`easing`, `nodeOrigin`, `nodeExtent`, `elevateNodesOnSelect`, `elevateEdgesOnSelect` and the
+buttons of `panOnDrag` are engine options today (`createFlowEngine`,
 `engine.adapter.setOptions`); the roots of the four adapters take them as props next.
 
 ## The members
@@ -209,6 +214,8 @@ the result is the viewport it ends at (zoom limits and extent kept), and every f
 | `"flow-to-screen"` | `XY` | a flow point as a client point |
 | `"visible-nodes"` | none | the nodes in view, plus those not measured yet |
 | `"visible-edges"` | none | the edges whose ends' box is in view |
+| `"drawn-edges"` | none | the edges to draw, in drawing order: those shown whose nodes are measured (with `onlyRenderVisible`, those in view), by `zIndex` (a selected one raised with `elevateEdgesOnSelect`), the document's order among equals |
+| `"node-z-index-by"` | `{ nodeId }` | a node's structural `z-index` among the nodes: its `zIndex` (a selected node and its descendants raised with `elevateNodesOnSelect`), always above its parent's |
 | `"handles-by"` | `{ nodeId }` | a node's registered handles (`FlowHandle[]`), with their centres |
 | `"background-pattern"` | `BackgroundPatternPayload` | one tile of a background pattern at the current viewport |
 | `"node-toolbar-by"` | `NodeToolbarPayload` | where a node's toolbar goes, outside the zoom |
@@ -383,7 +390,8 @@ part attributes, so every adapter behaves the same.
 `PartPayloadMap` types the payload of each part's `attributes` (`node` takes `{ nodeId }`,
 `handle` a `HandleRegistration`, `reconnect-anchor` `{ edgeId, end }`, …). `PressTarget` is what
 the engine resolved a press to (`kind`: `pane`, `node`, `edge`, `handle`, `resize-handle`,
-`minimap` or `other`, with the ids), handed to the features' hooks.
+`minimap` or `other`, with the ids; `outsideDragHandle` on a press on a node that holds a drag
+handle, outside it), handed to the features' hooks.
 
 ## Part attributes
 
@@ -398,6 +406,7 @@ The attribute names are constants, and the helpers give the static attributes wi
 | `END_ATTRIBUTE` | `"data-end"`: a reconnect anchor's end of its edge |
 | `NO_GESTURE_ATTRIBUTE` | `"data-flow-no-gesture"`: a subtree inside a node that starts no gesture (a slider, a field) |
 | `NO_WHEEL_ATTRIBUTE` | `"data-flow-no-wheel"`: a subtree where the wheel scrolls its content instead of zooming |
+| `DRAG_HANDLE_ATTRIBUTE` | `"data-flow-drag-handle"`: an element inside a node that is its drag handle; a node holding one drags only from it (a press elsewhere on it still selects it) |
 | `partAttributes(part, id?)` | `{ "data-flow-part": part, "data-flow-id": id }` |
 | `flag(on)` | a boolean state attribute's value: `""` when on, `undefined` when off |
 

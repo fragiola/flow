@@ -67,6 +67,11 @@ export interface PressTarget {
     readonly position?: string | undefined;
     /** a reconnect anchor's end of its edge (`data-end`) */
     readonly end?: "source" | "target" | undefined;
+    /**
+     * a press on a node that holds a drag handle (`data-flow-drag-handle`), outside it: the node
+     * is not dragged from there
+     */
+    readonly outsideDragHandle?: boolean | undefined;
 }
 
 /** What changed in the view, for an adapter to re-render only what depends on it. */

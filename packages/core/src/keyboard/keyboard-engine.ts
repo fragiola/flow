@@ -2,13 +2,13 @@
 // `edge-focusable`: the adapter sets `tabindex="0"`, so Tab walks them in drawing order) and a node
 // that takes focus is panned into view. On a focused node or edge:
 // - the arrows move the selected nodes (or the focused node) by `step` flow units, `fastStep`
-//   with Shift, kept inside their parents (`node.move`, a `batch` for several: one step);
+//   with Shift, kept inside their extents (`node.move`, a `batch` for several: one step);
 // - Enter and Space select it (with Ctrl, ⌘ or Shift they toggle it);
-// - Delete and Backspace remove the selection (`selection.remove`), or without `selection()` the
-//   focused node or edge;
+// - the delete keys (`deleteKeys`: Delete and Backspace by default) remove the selection
+//   (`selection.remove`), or without `selection()` the focused node or edge;
 // - Escape clears the selection (a gesture under way is cancelled by the engine first).
 import type { FlowEdge, FlowNode, XY } from "../document/types";
-import { movedRoots, parentOrigin, runMoves } from "../engine/node-moves";
+import { movedRoots, runMoves } from "../engine/node-moves";
 import type { FeatureEngine, FeatureEngineHost } from "../features/types";
 import { centeredOn, viewRect } from "../geometry/viewport-math";
 import type { KeyboardOptions } from "./keyboard";
@@ -49,17 +49,16 @@ export function keyboardEngine(
         if (nodeIds.length === 0) return false;
         const distance = fast ? options.fastStep : options.step;
         const moves = nodeIds.flatMap((nodeId) => {
-            const absolute = model.get("absolute-position-by", { nodeId }) as
-                | XY
+            const node = model.get("node-by", { id: nodeId }) as
+                | FlowNode
                 | undefined;
-            if (!absolute) return [];
-            const origin = parentOrigin(model, nodeId);
+            if (!node) return [];
             return [
                 {
                     nodeId,
-                    position: host.keepInParent(nodeId, {
-                        x: absolute.x + direction.x * distance - origin.x,
-                        y: absolute.y + direction.y * distance - origin.y,
+                    position: host.keepInExtent(nodeId, {
+                        x: node.position.x + direction.x * distance,
+                        y: node.position.y + direction.y * distance,
                     }),
                 },
             ];
@@ -136,7 +135,11 @@ export function keyboardEngine(
                     return false;
                 return move(direction, event.shiftKey, nodeId);
             }
-            if (event.key === "Delete" || event.key === "Backspace") {
+            if (
+                options.deleteKeys.some(
+                    (name) => name === event.key || name === event.code,
+                )
+            ) {
                 return remove(nodeId, edgeId);
             }
             if ((event.key === "Enter" || event.key === " ") && onEntity) {

@@ -2,6 +2,7 @@
 // a popup's own, never the global ones), and what a press, a key or the wheel hit, read from the
 // part attributes (D11).
 import {
+    DRAG_HANDLE_ATTRIBUTE,
     END_ATTRIBUTE,
     ID_ATTRIBUTE,
     NO_GESTURE_ATTRIBUTE,
@@ -67,6 +68,19 @@ function nodeIdAround(element: Element, root: Element): string | undefined {
     return node && root.contains(node) ? idOf(node) : undefined;
 }
 
+/**
+ * Whether a press at `element` on a node (`node`, its part) is outside the node's drag handle: the
+ * node holds one (`data-flow-drag-handle`, not inside another node's part) and the press is not in
+ * it.
+ */
+function outsideDragHandle(element: Element, node: Element): boolean {
+    const own = (handle: Element) =>
+        handle.closest(`[${PART_ATTRIBUTE}="node"]`) === node;
+    const pressed = element.closest(`[${DRAG_HANDLE_ATTRIBUTE}]`);
+    if (pressed && node.contains(pressed) && own(pressed)) return false;
+    return [...node.querySelectorAll(`[${DRAG_HANDLE_ATTRIBUTE}]`)].some(own);
+}
+
 /** What `target` (an event's) is in the flow under `root`. */
 export function pressTargetOf(
     root: Element,
@@ -85,7 +99,14 @@ export function pressTargetOf(
     const name = part.getAttribute(PART_ATTRIBUTE) ?? "";
     if (PANE_PARTS.has(name)) return { kind: "pane", element: part };
     if (name === "node") {
-        return { kind: "node", element: part, nodeId: idOf(part) };
+        return outsideDragHandle(element, part)
+            ? {
+                  kind: "node",
+                  element: part,
+                  nodeId: idOf(part),
+                  outsideDragHandle: true,
+              }
+            : { kind: "node", element: part, nodeId: idOf(part) };
     }
     if (name === "handle") {
         const handle = handleOf(part);

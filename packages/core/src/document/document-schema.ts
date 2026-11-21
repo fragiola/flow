@@ -16,6 +16,35 @@ export const xySchema = {
     additionalProperties: false,
 } as const;
 
+/** A rectangle in flow coordinates: a node's `extent`. */
+export const rectSchema = {
+    type: "object",
+    description:
+        "a rectangle in flow coordinates: its top-left corner and its size",
+    properties: {
+        x: { type: "number", description: "its left edge" },
+        y: { type: "number", description: "its top edge" },
+        width: { type: "number", minimum: 0, description: "its width" },
+        height: { type: "number", minimum: 0, description: "its height" },
+    },
+    required: ["x", "y", "width", "height"],
+    additionalProperties: false,
+} as const;
+
+/** A node's `extent`: its parent's box, or a rectangle. */
+export const extentSchema = {
+    anyOf: [{ const: "parent" }, rectSchema],
+    description:
+        '"parent": it stays inside its parent\'s box; a rectangle (x, y, width, height): it stays inside it, in the coordinates of its position (requires the subflows feature)',
+} as const;
+
+/** A node's or an edge's place in its layer's stacking order. */
+export const zIndexSchema = {
+    type: "number",
+    description:
+        "its place in the stacking order of its layer (nodes among nodes, edges among edges): a greater one is drawn above; default 0",
+} as const;
+
 /** A JSON object: a node's or an edge's data. */
 export const dataSchema = {
     type: "object",
@@ -100,6 +129,7 @@ export const nodeSchema = {
             minimum: 0,
             description: "its height, when the document gives one",
         },
+        zIndex: zIndexSchema,
         ...nodeFlagProperties,
         selected,
         parentId: {
@@ -108,11 +138,7 @@ export const nodeSchema = {
             description:
                 "the node it lives in, its position relative to it (requires the subflows feature)",
         },
-        extent: {
-            const: "parent",
-            description:
-                '"parent": it stays inside its parent\'s box (requires the subflows feature)',
-        },
+        extent: extentSchema,
         expandParent: {
             type: "boolean",
             description:
@@ -162,6 +188,7 @@ export const edgeSchema = {
                 'how it is drawn: "bezier" (the default), "smoothstep", "step", "straight" or an app type',
         },
         data: dataSchema,
+        zIndex: zIndexSchema,
         ...edgeFlagProperties,
         selected,
     },

@@ -131,13 +131,42 @@ export class ConnectSession {
         this.host.changed();
     }
 
-    /** A gesture drawing a connection from `start`, pressed at `client`. */
-    gesture(start: ConnectStart, client: XY): FeatureGesture {
-        let active = false;
+    private started(start: ConnectStart): void {
+        if (start.reconnecting) {
+            this.host.emit({
+                type: "reconnect-start",
+                edgeId: start.reconnecting.edgeId,
+                end: start.reconnecting.end,
+            });
+        } else {
+            this.host.emit({
+                type: "connect-start",
+                nodeId: start.from.nodeId,
+                handleId: start.from.handleId,
+                handleType: start.from.type,
+            });
+        }
+    }
+
+    /**
+     * A gesture drawing a connection from `start`, pressed at `client`: it starts once the pointer
+     * moves; `following`, it has started (a tap began it: it follows the pointer until the next
+     * press's release, its drop).
+     */
+    gesture(
+        start: ConnectStart,
+        client: XY,
+        following = false,
+    ): FeatureGesture {
+        let active = following;
         const finish = () => {
             this.state = null;
             this.host.changed();
         };
+        if (following) {
+            this.started(start);
+            this.update(start, client);
+        }
         return {
             autoPan: true,
             move: (event) => {
@@ -146,20 +175,7 @@ export class ConnectSession {
                     if (Math.hypot(point.x - client.x, point.y - client.y) < 1)
                         return;
                     active = true;
-                    if (start.reconnecting) {
-                        this.host.emit({
-                            type: "reconnect-start",
-                            edgeId: start.reconnecting.edgeId,
-                            end: start.reconnecting.end,
-                        });
-                    } else {
-                        this.host.emit({
-                            type: "connect-start",
-                            nodeId: start.from.nodeId,
-                            handleId: start.from.handleId,
-                            handleType: start.from.type,
-                        });
-                    }
+                    this.started(start);
                 }
                 this.update(start, point);
             },

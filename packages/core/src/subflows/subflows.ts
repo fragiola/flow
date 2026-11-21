@@ -2,7 +2,8 @@
 // its position relative to its parent; with `extent: "parent"` it stays inside its parent's box,
 // and with `expandParent` its parent grows to keep it inside. Removing a parent removes its
 // children. The model keeps these rules with the sizes the document gives (`width`, `height`); the
-// engine (fragiola/flow#3) keeps them during a drag with the measured ones.
+// engine (fragiola/flow#3) keeps them during a drag with the measured ones. A rectangle `extent`
+// (a field of this feature too, D3) is kept by the engine only, during drags, arrows and resizes.
 import { fail } from "../commands/define";
 import type { FlowNode, XY } from "../document/types";
 import type { FlowFeature, FlowReader } from "../features/types";

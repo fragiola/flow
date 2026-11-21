@@ -2,11 +2,13 @@
 // handles (`data-position`: `top-left`, `top`, `top-right`, `right`, `bottom-right`, `bottom`,
 // `bottom-left`, `left`) resizes it from that corner or side, the opposite one staying put. Its
 // limits are the feature's options, over which a resizer's own (`engine.adapter.setPartOptions(
-// "resizer", nodeId, …)`) win; with `keepAspectRatio` the width-to-height ratio stays. A child with
-// `extent: "parent"` stays inside its parent, and a parent never shrinks past its children with
-// `extent: "parent"`; resizing from a top or left edge moves the parent's origin, so its children
-// move back by as much and stay where they are on screen (a parent holding a child that is not
-// draggable keeps its top and left edges). Each step is transient, the release the final one.
+// "resizer", nodeId, …)`) win; with `keepAspectRatio` the width-to-height ratio stays. A node stays
+// inside its extent (its parent's box with `extent: "parent"`, its rectangle `extent`, the engine's
+// `nodeExtent`), and a parent never shrinks past its children with `extent: "parent"`; resizing
+// from a top or left edge moves the parent's top-left corner, so its children move back by as much
+// and stay where they are on screen (a parent holding a child that is not draggable keeps its top
+// and left edges). It works on the node's absolute box, so the `nodeOrigin` is applied once, when
+// the box becomes a position. Each step is transient, the release the final one.
 import { flag } from "../attributes/part-attributes";
 import type { BatchEntry } from "../commands/types";
 import type { FlowNode, XY } from "../document/types";
@@ -35,9 +37,10 @@ export type ResizePosition = (typeof RESIZE_POSITIONS)[number];
 
 interface Start {
     readonly nodeId: string;
+    /** its position at the start (a cancel puts it back) */
     readonly position: XY;
-    readonly width: number;
-    readonly height: number;
+    /** its absolute box at the start */
+    readonly rect: Rect;
     readonly children: readonly FlowNode[];
 }
 
@@ -120,7 +123,7 @@ export function resizeEngine(
         };
     };
 
-    /** The box kept to the parent's rules (relative to the node's parent). */
+    /** The box (absolute) kept to its extent and to its children's rules. */
     const kept = (
         start: Start,
         rect: Rect,
@@ -130,36 +133,28 @@ export function resizeEngine(
         let { x, y, width, height } = rect;
         const left = position.includes("left");
         const top = position.startsWith("top");
-        const node = model.get("node-by", { id: start.nodeId }) as
-            | FlowNode
-            | undefined;
-        // a child with `extent: "parent"` stays inside its parent
-        if (
-            node?.parentId !== undefined &&
-            node.extent === "parent" &&
-            node.expandParent !== true
-        ) {
-            const parent = host.nodeRect(node.parentId);
-            if (left && x < 0) {
-                width += x;
-                x = 0;
+        const from = start.rect;
+        // the node stays inside its extent
+        const bounds = host.extentOf(start.nodeId);
+        if (bounds) {
+            if (left && x < bounds.x) {
+                width -= bounds.x - x;
+                x = bounds.x;
             }
-            if (top && y < 0) {
-                height += y;
-                y = 0;
+            if (top && y < bounds.y) {
+                height -= bounds.y - y;
+                y = bounds.y;
             }
-            if (parent && parent.width > 0)
-                width = Math.min(width, parent.width - x);
-            if (parent && parent.height > 0)
-                height = Math.min(height, parent.height - y);
-            // the parent's bound wins over the limits; a kept ratio shrinks the other side to it
+            width = Math.min(width, bounds.x + bounds.width - x);
+            height = Math.min(height, bounds.y + bounds.height - y);
+            // the bound wins over the limits; a kept ratio shrinks the other side to it
             if (
                 limits.keepAspectRatio &&
-                start.width > 0 &&
-                start.height > 0 &&
+                from.width > 0 &&
+                from.height > 0 &&
                 (width !== rect.width || height !== rect.height)
             ) {
-                const ratio = start.width / start.height;
+                const ratio = from.width / from.height;
                 const fitted = Math.min(width, height * ratio);
                 if (left) x += width - fitted;
                 if (top) y += height - fitted / ratio;
@@ -171,16 +166,16 @@ export function resizeEngine(
         const fixed = start.children.some(
             (child) => !model.is("node-draggable", { nodeId: child.id }),
         );
-        const right = start.position.x + start.width;
-        const bottom = start.position.y + start.height;
+        const right = from.x + from.width;
+        const bottom = from.y + from.height;
         if (fixed) {
             if (left) {
-                x = start.position.x;
-                width = start.width;
+                x = from.x;
+                width = from.width;
             }
             if (top) {
-                y = start.position.y;
-                height = start.height;
+                y = from.y;
+                height = from.height;
             }
         }
         const held = start.children.filter(
@@ -189,8 +184,9 @@ export function resizeEngine(
         for (const child of held) {
             const box = host.nodeRect(child.id);
             if (!box) continue;
-            const childLeft = start.position.x + child.position.x;
-            const childTop = start.position.y + child.position.y;
+            // a child's position is relative to its parent's top-left corner
+            const childLeft = from.x + child.position.x;
+            const childTop = from.y + child.position.y;
             if (left && x > childLeft) {
                 x = childLeft;
                 width = right - x;
@@ -206,8 +202,13 @@ export function resizeEngine(
     };
 
     const stepOf = (start: Start, rect: Rect): BatchEntry[] => {
-        const dx = rect.x - start.position.x;
-        const dy = rect.y - start.position.y;
+        const dx = rect.x - start.rect.x;
+        const dy = rect.y - start.rect.y;
+        const back =
+            dx === 0 &&
+            dy === 0 &&
+            rect.width === start.rect.width &&
+            rect.height === start.rect.height;
         const commands: BatchEntry[] = [
             {
                 command: "node.resize",
@@ -215,7 +216,13 @@ export function resizeEngine(
                     nodeId: start.nodeId,
                     width: rect.width,
                     height: rect.height,
-                    position: { x: rect.x, y: rect.y },
+                    position: back
+                        ? start.position
+                        : host.positionFor(
+                              start.nodeId,
+                              { x: rect.x, y: rect.y },
+                              rect,
+                          ),
                 },
             },
         ];
@@ -275,16 +282,7 @@ export function resizeEngine(
                 }
                 const rect = kept(
                     start,
-                    resizedRect(
-                        {
-                            ...start.position,
-                            width: start.width,
-                            height: start.height,
-                        },
-                        position,
-                        delta,
-                        limits,
-                    ),
+                    resizedRect(start.rect, position, delta, limits),
                     position,
                     limits,
                 );
@@ -307,14 +305,7 @@ export function resizeEngine(
             cancel: () => {
                 resizing = undefined;
                 if (!active) return;
-                run(
-                    stepOf(start, {
-                        ...start.position,
-                        width: start.width,
-                        height: start.height,
-                    }),
-                    false,
-                );
+                run(stepOf(start, start.rect), false);
                 // the children go back to where they were
                 host.changed();
             },
@@ -348,13 +339,7 @@ export function resizeEngine(
                 model.get("all-nodes") as readonly FlowNode[]
             ).filter((child) => child.parentId === nodeId);
             return gestureFor(
-                {
-                    nodeId,
-                    position: node.position,
-                    width: rect.width,
-                    height: rect.height,
-                    children,
-                },
+                { nodeId, position: node.position, rect, children },
                 position as ResizePosition,
                 { x: event.clientX, y: event.clientY },
             );

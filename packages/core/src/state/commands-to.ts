@@ -5,8 +5,9 @@
 // app's document, so a flag that stops a user (`draggable`, `deletable`, `connectable`) does not
 // stop them: the step is unlocked and locked again in the same batch; a middleware still vetoes.
 // Every adapter asks the core, so none re-implements the diff. What no command can express (a
-// node's type, a removed data key, a size given back to measurement) replaces the entity: removed
-// and added again with the same id, its edges with it. The drawing order is not synced.
+// node's type, a removed data key, a size given back to measurement, a `zIndex`) replaces the
+// entity: removed and added again with the same id, its edges with it. The drawing order is not
+// synced.
 import type { BatchEntry } from "../commands/types";
 import { edgeFlag, nodeFlag } from "../document/flags";
 import type {
@@ -145,6 +146,7 @@ export function commandsTo(
                 next.width !== node.width || next.height !== node.height;
             if (
                 next.type !== node.type ||
+                next.zIndex !== node.zIndex ||
                 dataPatch(node.data as Json, next.data as Json) === undefined ||
                 (resized &&
                     (next.width === undefined || next.height === undefined))
@@ -218,6 +220,7 @@ export function commandsTo(
             next.targetHandle !== edge.targetHandle;
         const replaced =
             (next.type ?? "bezier") !== (edge.type ?? "bezier") ||
+            next.zIndex !== edge.zIndex ||
             dataPatch(edge.data as Json, next.data as Json) === undefined ||
             (moved &&
                 (!installed.has("edge.reconnect") ||
@@ -312,7 +315,7 @@ export function commandsTo(
             const reparented =
                 subflows &&
                 (next.parentId !== node.parentId ||
-                    next.extent !== node.extent ||
+                    !sameJson(next.extent, node.extent) ||
                     (next.expandParent ?? false) !==
                         (node.expandParent ?? false));
             if (reparented) {

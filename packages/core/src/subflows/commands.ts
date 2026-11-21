@@ -4,7 +4,7 @@
 // or one of its own descendants.
 import { defineCommand, fail, ok } from "../commands/define";
 import { findNode, isFailure } from "../commands/rules";
-import { xySchema } from "../document/document-schema";
+import { rectSchema, xySchema } from "../document/document-schema";
 import type { FlowNode } from "../document/types";
 import { absolutePositionOf, descendantsOf } from "./hierarchy";
 
@@ -27,9 +27,9 @@ export const nodeSetParent = defineCommand({
                 description: "the new parent's id, or null for none",
             },
             extent: {
-                anyOf: [{ const: "parent" }, { type: "null" }],
+                anyOf: [{ const: "parent" }, rectSchema, { type: "null" }],
                 description:
-                    '"parent": it stays inside its parent; null: it may leave it; none: as it was',
+                    '"parent": it stays inside its parent; a rectangle: it stays inside it (in the coordinates of its position); null: no extent; none: as it was',
             },
             expandParent: {
                 type: "boolean",
@@ -96,7 +96,8 @@ export const nodeSetParent = defineCommand({
             ...rest,
             position: { x: absolute.x - origin.x, y: absolute.y - origin.y },
             ...(parent ? { parentId: parent.id } : {}),
-            ...(parent && keptExtent !== undefined
+            // `"parent"` only means something with a parent; a rectangle stays
+            ...(keptExtent !== undefined && (parent || keptExtent !== "parent")
                 ? { extent: keptExtent }
                 : {}),
             ...(parent && keptExpand !== undefined
