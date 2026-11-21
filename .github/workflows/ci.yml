@@ -5,7 +5,7 @@
 #   Checks            Biome and the source layout check, TypeScript, the unit tests and the build
 #                     (with the .d.ts check).
 #   Package           `pnpm check:package`: builds and packs every package with pnpm, lints the
-#                     tarballs (dist-only exports, publint, attw). Each adapter (none yet; one per
+#                     tarballs (dist-only exports, publint, attw). Each adapter (React's today; one per
 #                     adapter Epic) also gets its exact core pin checked and its own smoke app. A
 #                     packaging check only: nothing is published (AGENTS.md, D15).
 #   Changes           the E2E suites the change can affect (scripts/e2e-suites.ts, a `git diff`
