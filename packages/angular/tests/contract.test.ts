@@ -267,4 +267,24 @@ describe("the control buttons", () => {
         expect(lock).not.toHaveAttribute("data-interactive");
         await settle();
     });
+
+    it("are disabled as soon as their own click reaches the limit, before the next render", async () => {
+        const { container } = await render(TestFlow, {
+            controls: true,
+            maxZoom: 1.2,
+        });
+        const zoomIn = find(container, "in");
+        expect(zoomIn).not.toBeDisabled();
+        zoomIn.dispatchEvent(
+            new MouseEvent("click", { bubbles: true, cancelable: true }),
+        );
+        expect(zoomIn).toBeDisabled();
+        expect(zoomIn).toHaveAttribute("data-disabled", "");
+        await settle();
+        expect(zoomIn).toBeDisabled();
+        const zoomOut = find(container, "out");
+        await click(zoomOut);
+        expect(zoomIn).not.toBeDisabled();
+        expect(zoomIn).not.toHaveAttribute("data-disabled");
+    });
 });
