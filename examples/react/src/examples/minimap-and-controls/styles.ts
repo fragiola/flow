@@ -10,10 +10,10 @@ export const styles = {
     edge: "fill-none stroke-(--fl-edge-color) stroke-(length:--fl-edge-width) [stroke-dasharray:var(--fl-edge-dash)] data-selected:stroke-(--fl-edge-selected) data-selected:stroke-(length:--fl-edge-selected-width)",
     node: "palette-raised min-w-28 select-none rounded-(--fl-node-radius) border-(length:--fl-node-border) border-(--fl-node-line) bg-(--fl-node-bg) p-(--fl-node-padding) text-center font-(--fl-title-weight) shadow-(--fl-node-shadow) transition-[border-color,box-shadow] duration-(--fl-motion) data-dragging:cursor-grabbing data-selected:border-(--fl-edge-selected) data-selected:ring-(length:--fl-focus-width) data-selected:ring-(--fl-edge-selected)/30 focus-visible:outline-(length:--fl-focus-width) focus-visible:outline-offset-2 focus-visible:outline-(--fl-focus-line)",
     anchor: "size-px opacity-0",
-    control:
-        "grid size-8 place-items-center text-palette-accent not-last:border-b not-last:border-palette-line hover:bg-palette-soft focus-visible:outline-(length:--fl-focus-width) focus-visible:-outline-offset-2 focus-visible:outline-(--fl-focus-line) disabled:opacity-40 aria-pressed:text-(--fl-edge-selected) [&_svg]:size-4",
     controls:
         "palette-raised absolute bottom-3 start-3 flex flex-col overflow-hidden rounded-(--fl-control-radius) border border-palette-line bg-palette-base shadow-(--fl-node-shadow)",
+    control:
+        "grid size-8 place-items-center text-palette-accent not-last:border-b not-last:border-palette-line hover:bg-palette-soft focus-visible:outline-(length:--fl-focus-width) focus-visible:-outline-offset-2 focus-visible:outline-(--fl-focus-line) disabled:opacity-40 aria-pressed:text-(--fl-edge-selected) [&_svg]:size-4",
     minimap:
         "palette-raised absolute end-3 bottom-3 overflow-hidden rounded-(--fl-control-radius) border border-palette-line bg-palette-base shadow-(--fl-node-shadow)",
     minimapNode: "fill-palette-line data-selected:fill-(--fl-edge-selected)",

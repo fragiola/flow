@@ -11,8 +11,8 @@ export const styles = {
     iconButton:
         "palette-danger grid size-7 place-items-center rounded-(--fl-control-radius) text-palette-accent hover:bg-palette-soft focus-visible:outline-2 focus-visible:outline-palette-ring [&_svg]:size-4",
     muted: "text-xs text-palette-accent/85",
-    issues: "border-t border-palette-line pt-3 text-xs",
     issue: "palette-orange flex items-start gap-1.5 text-palette-accent [&_svg]:mt-px [&_svg]:size-3.5 [&_svg]:shrink-0",
+    issues: "border-t border-palette-line pt-3 text-xs",
     ok: "palette-green flex items-center gap-1.5 text-palette-accent [&_svg]:size-4",
     issueList: "flex flex-col gap-1.5",
     issueMark:
@@ -45,7 +45,7 @@ export const styles = {
         "cursor-pointer outline-none focus-visible:[&>[data-flow-part=edge-path]:last-child]:stroke-(--fl-focus-line)",
     edgeHit: "fill-none stroke-transparent stroke-[16px]",
     /** a branch's label on its edge */
-    branchLabel: (branch: "yes" | "no" | undefined) =>
+    branchLabel: (branch: "yes" | "no") =>
         `${branch === "no" ? "palette-danger" : "palette-green"} rounded-full bg-palette-base px-2 py-0.5 text-[0.6875rem] font-semibold text-palette-contrast`,
     /** the header's status: green when ready, orange while issues are left */
     statusBadge: (ready: boolean) =>
@@ -65,10 +65,10 @@ export const styles = {
     connection:
         "fill-none stroke-(--fl-edge-selected) stroke-(length:--fl-edge-width) [stroke-dasharray:var(--fl-edge-dash)]",
     box: "border border-(--fl-selection-line) bg-(--fl-selection-bg)",
-    control:
-        "grid size-8 place-items-center text-palette-accent not-last:border-e not-last:border-palette-line hover:bg-palette-soft focus-visible:outline-(length:--fl-focus-width) focus-visible:-outline-offset-2 focus-visible:outline-(--fl-focus-line) disabled:opacity-40 [&_svg]:size-4",
     controls:
         "palette-raised absolute bottom-3 start-3 flex overflow-hidden rounded-(--fl-control-radius) border border-palette-line bg-palette-base shadow-(--fl-node-shadow)",
+    control:
+        "grid size-8 place-items-center text-palette-accent not-last:border-e not-last:border-palette-line hover:bg-palette-soft focus-visible:outline-(length:--fl-focus-width) focus-visible:-outline-offset-2 focus-visible:outline-(--fl-focus-line) disabled:opacity-40 [&_svg]:size-4",
     minimap:
         "palette-raised absolute end-3 bottom-3 overflow-hidden rounded-(--fl-control-radius) border border-palette-line bg-palette-base shadow-(--fl-node-shadow)",
     minimapNode: "fill-palette-line data-selected:fill-(--fl-edge-selected)",

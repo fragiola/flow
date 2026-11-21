@@ -99,15 +99,21 @@ export default function UndoRedo() {
             { features },
         ),
     );
-    const [history] = useState(() => createUndoHistory(model));
-    useEffect(() => () => history.dispose(), [history]);
-    // the shortcuts, on the window: a Delete leaves the focus on the page, not in the flow
+    // made in an effect, so that StrictMode's second mount gets a history that listens again
+    const [history, setHistory] = useState<UndoHistory | null>(null);
     useEffect(() => {
+        const created = createUndoHistory(model);
+        setHistory(created);
+        // the shortcuts, on the window: a Delete leaves the focus on the page, not in the flow
+        // (an app with other editable content would scope them to its editor)
         const onKeyDown = (event: KeyboardEvent) =>
-            handleUndoKeys(history, event);
+            handleUndoKeys(created, event);
         window.addEventListener("keydown", onKeyDown);
-        return () => window.removeEventListener("keydown", onKeyDown);
-    }, [history]);
+        return () => {
+            window.removeEventListener("keydown", onKeyDown);
+            created.dispose();
+        };
+    }, [model]);
     return (
         <Flow.Root<Types, typeof features>
             model={model}
@@ -156,7 +162,7 @@ export default function UndoRedo() {
                 </Flow.Nodes>
                 <Flow.ConnectionLine className={styles.connection} />
             </Flow.Viewport>
-            <History history={history} />
+            {history && <History history={history} />}
         </Flow.Root>
     );
 }

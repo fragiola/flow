@@ -13,9 +13,6 @@ export interface Types extends FlowTypes {
         condition: { title: string; expression: string };
         delay: { title: string; minutes: number };
     };
-    readonly edges: {
-        branch: { branch: "yes" | "no" };
-    };
 }
 
 export type Step = FlowNode<Types>;

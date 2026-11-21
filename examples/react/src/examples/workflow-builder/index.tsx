@@ -59,11 +59,12 @@ function renderEdge(edge: FlowEdge<Types>) {
         >
             <Flow.EdgePath className={styles.edgeHit} />
             <Flow.EdgePath className={styles.edge} />
-            {edge.type === "branch" && (
+            {/* a condition's outputs are its branches: the edge says which it leaves by */}
+            {(edge.sourceHandle === "yes" || edge.sourceHandle === "no") && (
                 <Flow.EdgeLabel
-                    className={styles.branchLabel(edge.data?.branch)}
+                    className={styles.branchLabel(edge.sourceHandle)}
                 >
-                    {edge.data?.branch}
+                    {edge.sourceHandle}
                 </Flow.EdgeLabel>
             )}
         </Flow.Edge>
@@ -105,16 +106,10 @@ export default function WorkflowBuilder() {
             features,
         });
         created.use(workflowRules);
-        // a branch of a condition is labelled with its branch
+        // every connection is drawn as a smooth step, like the workflow's own
         created.use((ctx, next) => {
             if (ctx.command === "edge.add") {
-                const source = ctx.get("node-by", { id: ctx.payload.source });
-                const branch = ctx.payload.sourceHandle;
-                ctx.payload =
-                    source?.type === "condition" &&
-                    (branch === "yes" || branch === "no")
-                        ? { ...ctx.payload, type: "branch", data: { branch } }
-                        : { ...ctx.payload, type: "smoothstep" };
+                ctx.payload = { ...ctx.payload, type: "smoothstep" };
             }
             return next();
         });

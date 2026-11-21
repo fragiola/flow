@@ -161,8 +161,10 @@ export function Inspector({ model }: { model: FlowModel<Types> }) {
                     </p>
                 ) : (
                     <ul className={styles.issueList}>
-                        {issues.map((issue) => (
-                            <li key={issue} className={styles.issue}>
+                        {issues.map((issue, index) => (
+                            // two steps may have the same title and issue
+                            // biome-ignore lint/suspicious/noArrayIndexKey: derived, never reordered
+                            <li key={index} className={styles.issue}>
                                 <CircleAlertIcon />
                                 {issue}
                             </li>

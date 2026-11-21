@@ -34,3 +34,19 @@ test("the saved flow survives a reload", async ({ page }) => {
     await page.getByRole("button", { name: "Restore" }).click();
     await expect(part(page, "node")).toHaveCount(3);
 });
+
+test("a saved flow that is not a flow is refused, with a message", async ({
+    page,
+}) => {
+    await page.evaluate(() =>
+        localStorage.setItem(
+            "fragiola-flow-example:save-and-restore",
+            JSON.stringify({ flow: { version: 7 }, viewport: { x: 0 } }),
+        ),
+    );
+    await page.getByRole("button", { name: "Restore" }).click();
+    await expect(page.getByTestId("message")).toHaveText(
+        "The saved flow is unreadable.",
+    );
+    await expect(part(page, "node")).toHaveCount(2);
+});

@@ -85,8 +85,7 @@ export const initialWorkflow: FlowJson<Types> = {
             target: "alert",
             sourceHandle: "yes",
             targetHandle: "in",
-            type: "branch",
-            data: { branch: "yes" },
+            type: "smoothstep",
         },
         {
             id: "big-confirm",
@@ -94,8 +93,7 @@ export const initialWorkflow: FlowJson<Types> = {
             target: "confirm",
             sourceHandle: "no",
             targetHandle: "in",
-            type: "branch",
-            data: { branch: "no" },
+            type: "smoothstep",
         },
         {
             id: "alert-record",

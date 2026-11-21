@@ -6,6 +6,7 @@ import {
     useFlow,
     useNodes,
     type Viewport,
+    validateFlow,
 } from "@fragiola/flow-react";
 import { connection } from "@fragiola/flow-react/connection";
 import { drag } from "@fragiola/flow-react/drag";
@@ -48,10 +49,18 @@ const nodes: FlowNodeInput<Types>[] = [
     },
 ];
 
+/** A viewport read back from storage: three numbers. */
+function isViewport(value: unknown): value is Viewport {
+    const { x, y, zoom } = (value ?? {}) as Partial<Record<string, unknown>>;
+    return [x, y, zoom].every(
+        (n) => typeof n === "number" && Number.isFinite(n),
+    );
+}
+
 function Toolbar() {
     const { model, engine } = useFlow<Types, typeof features>();
     const count = useNodes<Types>().length;
-    const [message, setMessage] = useState(
+    const [message, setMessage] = useState(() =>
         load<Saved>(KEY) ? "A saved flow is waiting." : "Nothing saved yet.",
     );
 
@@ -71,6 +80,14 @@ function Toolbar() {
         const saved = load<Saved>(KEY);
         if (!saved) {
             setMessage("Nothing saved yet.");
+            return;
+        }
+        // storage is outside the app: check what comes back before loading it
+        if (
+            !isViewport(saved.viewport) ||
+            validateFlow(saved.flow, { features }).length > 0
+        ) {
+            setMessage("The saved flow is unreadable.");
             return;
         }
         const commands = model.get("commands-to", {

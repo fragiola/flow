@@ -13,8 +13,8 @@ export const styles = {
         `${kind === "client" ? "palette-blue" : kind === "store" ? "palette-orange" : "palette-raised"} min-w-28 select-none rounded-(--fl-node-radius) border-(length:--fl-node-border) border-(--fl-node-line) bg-palette-base p-(--fl-node-padding) text-center font-(--fl-title-weight) text-palette-contrast shadow-(--fl-node-shadow)`,
     anchor: "size-px opacity-0",
     badge: "absolute top-3 end-3",
-    control:
-        "grid size-8 place-items-center text-palette-accent not-last:border-b not-last:border-palette-line hover:bg-palette-soft focus-visible:outline-(length:--fl-focus-width) focus-visible:-outline-offset-2 focus-visible:outline-(--fl-focus-line) disabled:opacity-40 aria-pressed:text-(--fl-edge-selected) [&_svg]:size-4",
     controls:
         "palette-raised absolute bottom-3 start-3 flex flex-col overflow-hidden rounded-(--fl-control-radius) border border-palette-line bg-palette-base shadow-(--fl-node-shadow)",
+    control:
+        "grid size-8 place-items-center text-palette-accent not-last:border-b not-last:border-palette-line hover:bg-palette-soft focus-visible:outline-(length:--fl-focus-width) focus-visible:-outline-offset-2 focus-visible:outline-(--fl-focus-line) disabled:opacity-40 aria-pressed:text-(--fl-edge-selected) [&_svg]:size-4",
 };
