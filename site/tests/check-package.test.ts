@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -293,7 +293,7 @@ describe("the adapters the package check covers", () => {
         expect(() => smokeVersion("svelte", "left-pad")).toThrow(/no pin/);
     });
 
-    it("pin the Angular smoke app at packages/angular's pins until examples/angular exists: ngc on TypeScript 6.0", () => {
+    it("pin the Angular smoke app at examples/angular's pins: ngc on TypeScript 6.0", () => {
         const read = (path: string) =>
             JSON.parse(
                 readFileSync(join(import.meta.dirname, "../..", path), "utf8"),
@@ -301,12 +301,8 @@ describe("the adapters the package check covers", () => {
                 dependencies?: Record<string, string>;
                 devDependencies?: Record<string, string>;
             };
-        const examples = existsSync(
-            join(import.meta.dirname, "../../examples/angular/package.json"),
-        )
-            ? read("examples/angular/package.json")
-            : {};
-        const pkg = read("packages/angular/package.json");
+        const examples = read("examples/angular/package.json");
+        const pins = { ...examples.dependencies, ...examples.devDependencies };
         for (const name of [
             "@angular/common",
             "@angular/compiler",
@@ -319,15 +315,14 @@ describe("the adapters the package check covers", () => {
             "typescript",
             "vite",
         ]) {
-            const pinned =
-                examples.dependencies?.[name] ??
-                examples.devDependencies?.[name] ??
-                pkg.devDependencies?.[name];
-            expect(pinned, name).toBeDefined();
-            expect(smokeVersion("angular", name), name).toBe(pinned);
+            expect(pins[name], name).toBeDefined();
+            expect(smokeVersion("angular", name), name).toBe(pins[name]);
         }
-        // the Angular compiler takes TypeScript `>=6.0 <6.1`
+        // the Angular compiler takes TypeScript `>=6.0 <6.1`: the app and the package pin 6.0
         expect(smokeVersion("angular", "typescript")).toMatch(/^6\.0\./);
+        const pkg = read("packages/angular/package.json").devDependencies;
+        expect(pkg?.typescript).toBe(pins.typescript);
+        expect(pkg?.["@angular/core"]).toBe(pins["@angular/core"]);
         expect(() => smokeVersion("angular", "left-pad")).toThrow(/no pin/);
     });
 

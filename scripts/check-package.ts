@@ -20,7 +20,7 @@
 //   run on TypeScript 7 yet); Svelte's a Vite + Svelte 5 app whose component svelte-check checks,
 //   on TypeScript 6 too (svelte-check and svelte-package take TypeScript 5 or 6); Angular's a Vite
 //   app with @analogjs/vite-plugin-angular and a standalone component checked by ngc (strict
-//   templates) on TypeScript 6.0 (the Angular compiler's), Splitter's. A consumer's dev server
+//   templates) on TypeScript 6.0 (the Angular compiler's), Splitter's, at the pins of examples/angular. A consumer's dev server
 //   adds the `development` condition, which once pointed Dockable's published `exports` at
 //   sources that are not in the tarball.
 //
@@ -304,9 +304,9 @@ export interface AdapterCheck {
  * The version of `name` a framework's smoke app installs, so that it installs nothing new: its
  * examples app's pin (examples/<framework>: React's Vite plugin and types, Vue's vue-tsc, its
  * Vite plugin and the TypeScript 6 vue-tsc runs on, Svelte's svelte, its Vite plugin,
- * svelte-check and TypeScript 6), else its package's own (packages/<framework>: an adapter whose
- * examples app does not exist yet, as Svelte's in #12 and Angular's in #15: packages/angular's
- * Angular tools and TypeScript 6.0).
+ * svelte-check and TypeScript 6, Angular's Angular tools, Analog's plugin and TypeScript 6.0),
+ * else its package's own (packages/<framework>: an adapter whose examples app does not exist yet,
+ * as Svelte's in #12 and Angular's in #15; none today).
  */
 export function smokeVersion(framework: Framework, name: string): string {
     const manifests = [
@@ -894,7 +894,7 @@ bootstrapApplication(App, {
 /**
  * A scratch Vite + Angular app in `dir` (@analogjs/vite-plugin-angular) that depends on the
  * Angular tarball only (the core tarball comes as its dependency), on the Angular tools and the
- * TypeScript 6.0 its pins name (`smokeVersion`: packages/angular's until examples/angular exists).
+ * TypeScript 6.0 its pins name (`smokeVersion`: examples/angular's).
  */
 function writeAngularSmokeApp(
     dir: string,
