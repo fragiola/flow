@@ -1,0 +1,54 @@
+---
+title: Limitations
+description: What xyflow has that this package does not, why, and what to do instead, plus the known gaps of the current release.
+---
+
+The behaviour reference of this package is [xyflow](https://github.com/xyflow/xyflow) (React
+Flow): its gestures, its edge cases and its tests were studied, and none of its code was copied.
+This page lists, honestly, what it has that this package does not: some on purpose (app policy,
+cosmetics, or a choice of the model), some not yet. Each comes with what to do instead. Found
+something missing from this page? [Open an issue](https://github.com/fragiola/flow/issues).
+
+## Not yet
+
+| xyflow | here | what to do instead |
+| --- | --- | --- |
+| **Auto-pan**: the viewport scrolls while a node or a connection is dragged near the root's edge. | The viewport stays still during a gesture. | Zoom out first, or pan with the wheel or the minimap while you work. |
+| **Animated viewport changes** (`duration` on `fitView`, `setCenter`, `zoomIn`). | Every viewport action applies at once. | Animate it yourself: run `set-viewport` from `requestAnimationFrame` steps between two viewports. |
+| **Raising nodes and edges** (`zIndex`, `elevateNodesOnSelect`, `elevateEdgesOnSelect`). | Nodes are drawn in document order, edges below every node. | Order `nodes` in the document, or set `z-index` on a node in your style (from `data-selected`). |
+| **A toolbar for several nodes** (`NodeToolbar` with a list of node ids). | `Flow.NodeToolbar` stands next to one node. | Render one per node, or place your own panel at `engine.get("nodes-bounds", { nodeIds })` through `flow-to-screen`. |
+| **Keyboard connections and resizing.** | Drawing an edge and resizing a node are pointer gestures. | Offer commands: a menu that runs `edge.add` between two chosen nodes, fields that run `node.resize` (see [Keyboard and accessibility](/docs/guides/keyboard)). |
+| Vue, Svelte and Angular adapters. | React only. | They come with their own releases, over the same core and the same examples. |
+
+## On purpose
+
+| xyflow | here | why, and what to do instead |
+| --- | --- | --- |
+| **`nodeTypes` and `edgeTypes`** maps of components. | A children function on `Flow.Nodes` and `Flow.Edges`. | You render every node and edge, so a `switch` on `node.type` is your registry, typed by your own `Types` (see [Custom nodes](/docs/guides/custom-nodes)). |
+| **`isValidConnection`** and `onConnect` callbacks. | Connection rules are middleware on the model. | One rule for every edge, from a drag or from code: `model.use` vetoes `edge.add`, and the drag shows `data-invalid` before the drop (see [Connection rules](/docs/guides/connection-rules)). |
+| **`applyNodeChanges`**, change objects and `onNodesChange(changes)`. | Commands, and the model's lists. | `onNodesChange` receives the nodes; a middleware or `model.subscribe` sees every command with its payload. |
+| **Edge markers** (`markerEnd`, `MarkerType`). | No marker is built in. | Markers are plain SVG: define a `marker` and point `markerEnd` at it (see [Custom edges](/docs/guides/custom-edges)). |
+| Default styles (`@xyflow/react/dist/style.css`), the default node and its label. | Structural style only, and no text at all. | Style every part from `data-flow-part` and its state attributes (see [Styling with plain CSS](/docs/guides/styling-css)). |
+| `Panel`, `ViewportPortal`, `EdgeLabelRenderer`. | Put your own elements inside `Flow.Root` (screen pixels) or `Flow.Viewport` (flow coordinates); `Flow.EdgeLabel` portals into the edges' HTML layer. | Mark a panel over the canvas `data-flow-no-gesture` (and `data-flow-no-wheel`). |
+| Undo, copy and paste, helper lines, auto layout. | None in the package. | App policy: the [undo and redo](/docs/guides/undo-redo) guide has a copyable history; the rest is commands you run. |
+| `useNodesInitialized`, `useUpdateNodeInternals`. | The engine measures every node and handle with a `ResizeObserver`. | `engine.is("node-measured", { nodeId })`; nothing to refresh by hand. |
+
+## Other things to know
+
+- **The first render draws no edge.** The engine is created once the root is mounted, and an edge
+  is drawn once both its nodes have a size. On the server and in the first client render, nodes
+  stand at their model position and edges come in the next frame.
+- **A reconnect anchor is drawn under its node's handle** (edges come before nodes), so the mouse
+  grabs it beside the handle.
+- **On touch, a finger beside a handle lands on the handle** (Chromium's touch adjustment), so an
+  edge's end is grabbed on its stroke near the end: give touch apps a wider
+  `reconnection({ radius })`.
+- **The minimap drag maps through the view box frozen at the press**: a drag that changes the
+  flow's bounds does not rescale under the pointer.
+- **A smooth step edge between ends facing each other on one line**, with the target behind the
+  source, doubles back on itself.
+- **Presses on a node keep their default (focus)**: give nodes `user-select: none`, or a drag
+  selects their text.
+- **`fit-view`'s own `minZoom` and `maxZoom` narrow the engine's limits**, never widen them.
+- **jsdom lays nothing out**: in unit tests, stub the sizes (see [Testing your flow](/docs/guides/testing));
+  the gestures are tested in a real browser.

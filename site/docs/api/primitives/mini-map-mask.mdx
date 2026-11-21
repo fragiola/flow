@@ -1,0 +1,31 @@
+---
+title: MiniMapMask
+description: MiniMapMask covers the MiniMap everywhere but what the root shows, an evenodd SVG path you fill to dim what is off screen.
+---
+
+`MiniMapMask` comes from `@fragiola/flow-react/minimap` and goes inside `MiniMap`, after its
+nodes. It renders an SVG `path` (the view's `maskPath`, `fill-rule="evenodd"`) covering the map
+but the rectangle the root shows. Give it its fill.
+
+```tsx
+<MiniMapMask className="fill-black/10 stroke-blue-500" />
+```
+
+## Props
+
+`MiniMapMaskProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and
+every SVG attribute of a `path`; it has no props of its own.
+
+## State
+
+`MiniMapMaskState`, what `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `view` | `Rect` | the root's view, in flow coordinates |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"minimap-mask"` |

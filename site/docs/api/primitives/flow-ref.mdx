@@ -1,0 +1,57 @@
+---
+title: The flow ref
+description: A flow ref gives the model and the engine of a root to code outside it, such as a toolbar beside the flow, a menu or a test.
+---
+
+A flow ref is how code outside `Flow.Root` reaches its model and engine: pass it as the root's
+`flowRef`, and `ref.current` is `{ model, engine }` while the root is mounted, `null` otherwise.
+Inside the root, [`useFlow`](/docs/api/primitives/hooks) is simpler.
+
+## `useFlowRef`
+
+`useFlowRef<T, F>()` keeps a ref in the component and re-renders it when the root mounts or
+unmounts, so `flow.current` may be read in render (a toolbar next to the flow) or in handlers.
+
+```tsx
+import { Flow, useFlowRef } from "@fragiola/flow-react";
+
+export function Editor() {
+    const flow = useFlowRef<Types, typeof features>();
+    return (
+        <>
+            <button type="button" disabled={!flow.current} onClick={() => flow.current?.engine.run("fit-view")}>
+                Fit
+            </button>
+            <Flow.Root<Types, typeof features> flowRef={flow} features={features} defaultNodes={nodes}>
+                …
+            </Flow.Root>
+        </>
+    );
+}
+```
+
+## `createFlowRef`
+
+`createFlowRef<T, F>()` makes one outside React (a module, a test). It does not re-render
+anything when it attaches.
+
+```ts
+const flow = createFlowRef<Types, typeof features>();
+// <Flow.Root flowRef={flow} …>
+flow.current?.model.run("node.add", { type: "step", position: { x: 0, y: 0 }, data: { label: "New" } });
+```
+
+## Types
+
+`FlowRef<T, F>`, the ref:
+
+| field | type | description |
+| --- | --- | --- |
+| `current` | `FlowRefValue<T, F> \| null` | the root's model and engine while it is mounted |
+
+`FlowRefValue<T, F>`, what `current` holds:
+
+| field | type | description |
+| --- | --- | --- |
+| `model` | `FlowModel<T, F>` | the root's model ([model](/docs/api/model)) |
+| `engine` | `FlowEngine<T, F>` | the root's engine ([engine](/docs/api/engine)) |

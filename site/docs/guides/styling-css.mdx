@@ -1,0 +1,141 @@
+---
+title: Styling with plain CSS
+description: Style every part of a flow from a stylesheet, through its part attribute and its state attributes, with no class names and no framework.
+---
+
+The package ships no CSS and no class names. Every element it renders carries
+`data-flow-part` (what it is) and its state as `data-*` attributes (present or absent), so a plain
+stylesheet styles a whole flow without touching the markup. What the primitives set themselves is
+only **structural**: what places an element (absolute positions, the node's transform, the
+viewport's transform the engine writes), never a colour, a border or a size of a visible element.
+
+## Select the parts
+
+```css title="flow.css"
+[data-flow-part="root"] {
+    background: #f6f7f9;
+    font: 13px/1.4 system-ui, sans-serif;
+}
+
+[data-flow-part="node"] {
+    min-width: 7rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d5d8de;
+    border-radius: 8px;
+    background: white;
+    user-select: none; /* a drag must not select the node's text */
+}
+
+[data-flow-part="handle"] {
+    width: 10px;
+    height: 10px;
+    border: 1.5px solid #8a93a3;
+    border-radius: 50%;
+    background: white;
+}
+
+[data-flow-part="edge-path"] {
+    stroke: #8a93a3;
+    stroke-width: 1.5px;
+}
+
+[data-flow-part="connection-path"] {
+    stroke: #3b82f6;
+    stroke-dasharray: 4 3;
+}
+
+[data-flow-part="selection-box"] {
+    border: 1px solid #3b82f6;
+    background: rgb(59 130 246 / 0.1);
+}
+
+[data-flow-part="background"] {
+    color: #c8ccd4; /* the marks are drawn in currentColor */
+}
+```
+
+Every part's name is on its API page; the most used are `root`, `viewport`, `nodes`, `node`,
+`handle`, `edges`, `edge`, `edge-path`, `edge-label`, `connection-line`, `connection-path`,
+`selection-box`, `background`, `controls`, `minimap`, `minimap-node`, `minimap-mask`, `resizer`,
+`resize-handle` and `toolbar`. An entity's element also carries `data-flow-id`, its id:
+`[data-flow-id="start"]` styles one node.
+
+## Style the state
+
+| attribute | on | while |
+| --- | --- | --- |
+| `data-selected` | node, edge, edge path, edge label, minimap node | it is selected (`selection()`) |
+| `data-dragging` | node, root | it is dragged (`drag()`) |
+| `data-resizing` | node, resizer | it is resized (`resize()`) |
+| `data-measured` | node | its size is known |
+| `data-connecting` | handle, root | a connection is drawn from it |
+| `data-valid`, `data-invalid` | handle, connection line | the connection under way would be accepted or refused there |
+| `data-connectable` | handle | a connection may start or end here |
+| `data-handle-type`, `data-side` | handle | `source` / `target`; `top`, `right`, `bottom`, `left` |
+| `data-reconnecting` | edge, edge path, reconnect anchor | one of its ends is being moved (`reconnection()`) |
+| `data-panning`, `data-selecting` | root | a pan, a box selection is under way |
+| `data-interactive` | root, toggle | the flow may be changed (absent while locked) |
+| `data-disabled` | zoom and fit buttons | the engine refuses the action now |
+| `data-position`, `data-end` | resize handle, reconnect anchor | which corner or side, which end |
+
+```css
+[data-flow-part="node"][data-selected] {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgb(59 130 246 / 0.25);
+}
+
+[data-flow-part="node"][data-dragging] {
+    cursor: grabbing;
+}
+
+[data-flow-part="handle"][data-valid] {
+    background: #16a34a;
+}
+
+[data-flow-part="handle"][data-invalid] {
+    background: #dc2626;
+}
+
+[data-flow-part="edge-path"][data-selected] {
+    stroke: #3b82f6;
+    stroke-width: 2.5px;
+}
+
+[data-flow-part="root"]:not([data-interactive]) [data-flow-part="node"] {
+    cursor: default;
+}
+```
+
+See [State attributes](/docs/concepts/state-attributes) for the full list.
+
+## Class names, when you prefer them
+
+Every primitive takes `className` (and `style`), as a value or as a function of its state:
+
+```tsx
+<Flow.Node<Types>
+    node={node}
+    className={(state) => (state.selected ? "node node--selected" : "node")}
+>
+    {node.data.label}
+</Flow.Node>
+```
+
+See the [common props](/docs/api/primitives/root#common-props).
+
+## What the structural style leaves you
+
+- **The root** is `position: relative; overflow: hidden` and fills nothing by itself: give it a
+  size (`height: 480px`, or a flex child that grows). See [Sizing the root](/docs/getting-started/sizing).
+- **A node** is `position: absolute` at its place; its size is its content's, or the document's
+  `width` and `height` when given. Never set `transform` or `top` / `left` on a node: they are its
+  position.
+- **A handle** is `position: absolute`, centred on its side by default. Your `top`, `left` or
+  `transform` move it: `style={{ top: "30%" }}` puts a left handle higher.
+- **Edges** are SVG: style `stroke`, `stroke-width`, `stroke-dasharray`, markers. They are
+  unfilled (`fill="none"`).
+- **Controls and the minimap** are not placed: put them where you want inside the root, with
+  `position: absolute`. A node toolbar is placed next to its node; style its look only.
+
+Your style overrides the primitives' defaults (an SVG attribute, a handle's place), but never their
+structural keys.

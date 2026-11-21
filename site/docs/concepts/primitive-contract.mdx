@@ -1,0 +1,82 @@
+---
+title: The primitive contract
+description: The rules every Flow part follows, from render instead of asChild to className and style as functions of the state, merged refs, forwarded props and no text.
+---
+
+Every primitive of `@fragiola/flow-react` follows the same rules, shared with every Fragiola
+library, so learning one part teaches the others. The adapter's tests enforce each one.
+
+## `render`, never `asChild`
+
+A part renders one element by default. `render` replaces it: an element, whose props are merged
+with the part's, or a function of the props and the part's state, which must spread the props.
+
+```tsx
+<Flow.Node<Types> node={node} render={<li />} />
+
+<Flow.Edge<Types> edge={edge} render={(props, state) => <g {...props} opacity={state.reconnecting ? 0.4 : 1} />} />
+```
+
+`props.ref` is a callback ref, so it fits any element: `render={(props) => <section {...props} />}`
+needs no cast. The props carry what the engine depends on: the ref that registers a node or a
+handle, `data-flow-part` and `data-flow-id`, the state attributes and the structural style.
+
+## `className` and `style`: a value or a function
+
+Both take a value, or a function of the part's state:
+
+```tsx
+<Flow.Node<Types>
+    node={node}
+    className={(state) => (state.selected ? "node node-selected" : "node")}
+    style={(state) => ({ opacity: state.dragging ? 0.8 : 1 })}
+/>
+```
+
+Each part's state is listed on its API page (`NodeState`, `HandleState`, `EdgeState`, …). For a
+style that only follows state, prefer the `data-*` attributes from a stylesheet: the same CSS then
+works for every framework's adapter ([State attributes](/docs/concepts/state-attributes)).
+
+## Inline style is structural only
+
+A part writes only what places it: a node's `position: absolute` and `transform: translate(x, y)`
+(with the document's `width` and `height` when given), the layers' absolute boxes, a label's or a
+toolbar's anchor, the root's `position: relative; overflow: hidden`. The engine writes the
+viewport's `transform` itself, never React. Your `style` is merged under the structural keys, so
+they always keep the part's value.
+
+Two placements are defaults your style may override: where a `Flow.Handle` sits on its side
+(centred), so several handles can share one side, and an SVG part's presentation defaults
+(`fill="none"` on paths, `currentColor` for the background's marks).
+
+```tsx
+<Flow.Handle type="source" side="right" handleId="yes" style={{ top: "30%" }} />
+<Flow.Handle type="source" side="right" handleId="no" style={{ top: "70%" }} />
+```
+
+## `ref` is a plain prop
+
+`ref` is merged with the part's own callback ref, so yours receives the element too:
+
+```tsx
+const nodeRef = useRef<HTMLDivElement>(null);
+<Flow.Node<Types> node={node} ref={nodeRef} />;
+```
+
+## Props are forwarded, handlers composed
+
+Every prop a part does not know goes to its element: `aria-*`, `data-*`, `title`, `role`,
+`tabIndex`, event handlers. A handler you pass runs after the part's own. Gestures are not React
+handlers: the engine listens on the root and resolves every press from the part attributes, so a
+field, a button or a link inside a node starts no drag, and neither does an element marked
+`data-flow-no-gesture`.
+
+## State through `data-*` only
+
+A part never adds a class name. Its state is `data-*` (present as `""` or absent, never
+`"false"`), plus `aria-pressed` and `disabled` on the buttons that have them.
+
+## No text, no names
+
+The parts render only your children and set no `aria-label` and no role. Every name and every
+announcement comes from you: see [Accessible names](/docs/getting-started/accessible-names).

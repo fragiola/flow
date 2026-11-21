@@ -1,0 +1,65 @@
+---
+title: Edge
+description: Flow.Edge is one edge, an SVG group drawn once both nodes have a size, holding its path, its label and its reconnect anchors.
+---
+
+`Flow.Edge` draws the edge `Flow.Edges` gives its children function, as an SVG `g`. It renders
+nothing until the edge has a path (both nodes measured). Its children are its parts:
+`Flow.EdgePath` by default, `Flow.EdgeLabel`, `Flow.ReconnectAnchor`s, or several paths (a wide
+transparent one as a bigger press target). A press on its stroke selects it (`selection()`); with
+`keyboard()` it takes `tabIndex={0}`.
+
+```tsx
+<Flow.Edges<Types>>
+    {(edge) => (
+        <Flow.Edge<Types> edge={edge} aria-label={`${edge.source} to ${edge.target}`}>
+            <Flow.EdgePath className="stroke-gray-400 stroke-2" />
+            {edge.data?.label && <Flow.EdgeLabel>{edge.data.label}</Flow.EdgeLabel>}
+        </Flow.Edge>
+    )}
+</Flow.Edges>
+```
+
+The path follows the edge's `type`: `bezier` (none is `bezier`), `smoothstep`, `step`,
+`straight`. An app type gets the bezier path and its ends, to draw its own `d` on
+`Flow.EdgePath` (see [Custom edges](/docs/guides/custom-edges)). For an edge drawn by hand,
+[`useEdge`](/docs/api/primitives/hooks) gives the same state and props.
+
+## Props
+
+`EdgeProps<T>` extends the [common primitive props](/docs/api/primitives/root#common-props) and
+every SVG attribute of a `g`.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `edge` | `FlowEdge<T>` | required | the edge it draws: the one `Flow.Edges` gives |
+| `children` | `ReactNode` | a `Flow.EdgePath` | its parts |
+
+## State
+
+`EdgeState<T>`, what `className`, `style` and `render` receive (also
+[`useEdge`](/docs/api/primitives/hooks)'s `state`):
+
+| field | type | description |
+| --- | --- | --- |
+| `edgeId` | `string` | its id |
+| `edge` | `FlowEdge<T>` | the edge, as the model holds it |
+| `path` | `EdgePath \| undefined` | its path, label point and ends (`edge-path-by`) |
+| `selected` | `boolean` | it is selected (`selection()`) |
+| `reconnecting` | `boolean` | one of its ends is being moved (`reconnection()`) |
+| `focusable` | `boolean` | it takes DOM focus (`keyboard()`) |
+| `attributes` | `PartAttributes` | the attributes its element carries |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"edge"` |
+| `data-flow-id` | its id |
+| `data-selected` | present while selected |
+| `data-reconnecting` | present while one of its ends is moved |
+| `tabindex` | `0` with `keyboard()` |
+
+## Structural style
+
+`pointer-events: visibleStroke`: a press on its stroke reaches it, one beside it reaches the pane.

@@ -1,0 +1,166 @@
+---
+title: Saving and restoring flows
+description: Save a flow's JSON document and its viewport, validate what comes back from storage, and restore it into the live flow without remounting.
+---
+
+A flow's whole state is one JSON document: its nodes and edges (and, with `selection()`, what is
+selected). The package gives you the document, its JSON Schema and a validator; where it is
+stored, when, and under which key is yours. The viewport is view state, kept by the engine: save it
+too if your app should reopen where the user left it.
+
+<Example id="save-and-restore" />
+
+## The document
+
+```ts
+model.get("flow-json");
+// {
+//     version: 1,
+//     nodes: [
+//         { id: "plan", type: "topic", position: { x: 0, y: 0 }, data: { label: "Plan" } },
+//         { id: "write", type: "topic", position: { x: 200, y: 100 }, data: { label: "Write" } },
+//     ],
+//     edges: [{ id: "plan-write", source: "plan", target: "write" }],
+// }
+```
+
+It is a writable copy with every id present: exactly what `createFlowModel` and `Flow.Root`'s
+`defaultNodes` / `defaultEdges` take back. Measured sizes are not in it (only a `width` and
+`height` the document gives). See [The flow JSON](/docs/api/json-document).
+
+## Save and restore with the storage helpers
+
+The examples keep storage behind three guarded helpers (`_kit/persistence.ts`): storage may be
+blocked, full or private, so every access is in a `try`.
+
+```ts title="persistence.ts"
+/** The value saved under `key`, or `undefined` (nothing saved, unreadable, or not JSON). */
+export function load<T>(key: string): T | undefined {
+    try {
+        const raw = localStorage.getItem(key);
+        return raw === null ? undefined : (JSON.parse(raw) as T);
+    } catch {
+        return undefined;
+    }
+}
+
+/** Saves `value` under `key` as JSON; says whether it could. */
+export function save(key: string, value: unknown): boolean {
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+        return true;
+    } catch {
+        return false;
+    }
+}
+```
+
+## Restore into the live flow
+
+Restoring does not remount anything: `model.get("commands-to", { nodes, edges })` gives the
+commands a user would have run to bring the model to the saved document, and one `batch` runs them
+as a single step (so an undo history sees one step, and a middleware sees every command). Validate
+what comes back first: storage is outside your app.
+
+```tsx title="toolbar.tsx"
+import {
+    type FlowDocumentJson,
+    useFlow,
+    validateFlow,
+    type Viewport,
+} from "@fragiola/flow-react";
+import { load, save } from "./persistence";
+
+const KEY = "my-app:flow";
+
+interface Saved {
+    flow: FlowDocumentJson<Types>;
+    viewport: Viewport;
+}
+
+function isViewport(value: unknown): value is Viewport {
+    const { x, y, zoom } = (value ?? {}) as Partial<Record<string, unknown>>;
+    return [x, y, zoom].every((n) => typeof n === "number" && Number.isFinite(n));
+}
+
+export function Toolbar() {
+    const { model, engine } = useFlow<Types, typeof features>();
+
+    function onSave() {
+        save(KEY, { flow: model.get("flow-json"), viewport: engine.get("viewport") } satisfies Saved);
+    }
+
+    function onRestore() {
+        const saved = load<Saved>(KEY);
+        if (!saved || !isViewport(saved.viewport)) return;
+        if (validateFlow(saved.flow, { features }).length > 0) return;
+        const commands = model.get("commands-to", {
+            nodes: saved.flow.nodes,
+            edges: saved.flow.edges,
+        });
+        if (commands.length > 0) model.run("batch", { commands: [...commands] });
+        engine.run("set-viewport", saved.viewport);
+    }
+
+    return (
+        <div role="toolbar" aria-label="Flow file">
+            <button type="button" onClick={onSave}>Save</button>
+            <button type="button" onClick={onRestore}>Restore</button>
+        </div>
+    );
+}
+```
+
+`validateFlow(json, { features })` returns every problem with its JSON path (an empty list for a
+valid document); pass the features the flow installs, since a field of one that is missing
+(`selected` without `selection()`) is a problem.
+
+## Load before the first render
+
+To open a saved flow, build the model from it once, and hand it to the root. An invalid document
+makes `createFlowModel` throw a `FlowValidationError` with its `issues`; validate first and fall
+back to a default:
+
+```tsx
+import { createFlowModel, Flow, type FlowJson, validateFlow } from "@fragiola/flow-react";
+import { useState } from "react";
+
+const EMPTY: FlowJson<Types> = { version: 1, nodes: [], edges: [] };
+
+function restore() {
+    const saved = load<FlowJson<Types>>(KEY);
+    const valid = saved !== undefined && validateFlow(saved, { features }).length === 0;
+    return createFlowModel<Types, typeof features>(valid ? saved : EMPTY, { features });
+}
+
+export function Editor() {
+    const [model] = useState(restore);
+    return <Flow.Root<Types, typeof features> model={model} className="flow">{/* … */}</Flow.Root>;
+}
+```
+
+## Save on every change
+
+`model.subscribe` tells every commit. Skip the transient steps of a gesture (a drag moves a node
+with transient commands and ends with a final one) to write once per drag:
+
+```ts
+useEffect(
+    () =>
+        model.subscribe((event) => {
+            if (event.transient) return;
+            save(KEY, model.get("flow-json"));
+        }),
+    [model],
+);
+```
+
+The viewport changes without a commit: save it from the engine's `viewport-change` event, or from
+the root's `onViewportChange`, preferably debounced.
+
+## Controlled instead
+
+If the document lives in your own state (a store, a server cache), pass `nodes` and `edges` with
+`onNodesChange` and `onEdgesChange` instead: the root brings the model to them with the same
+`commands-to` batch on every render. Keep the children functions stable then. See
+[`Flow.Root`](/docs/api/primitives/root).

@@ -1,0 +1,209 @@
+---
+title: Your first flow
+description: From a list of typed nodes and edges to a flow you pan, zoom, drag and connect, one primitive at a time, styled with your own classes.
+---
+
+This page builds the smallest useful flow: four nodes, three edges, a background, and the three
+gestures most editors start with (select, drag, connect). It is the `basic` example of the
+gallery, step by step.
+
+<Example id="basic" />
+
+## Build it
+
+<Steps>
+<Step>
+
+**Name your node types.** A `Types` registry says which node types exist and what data each one
+holds, so `node.data` is typed wherever you render a node ([Typed data](/docs/concepts/typed-data)).
+
+```tsx
+import type { FlowEdgeInput, FlowNodeInput, FlowTypes } from "@fragiola/flow-react";
+
+interface Types extends FlowTypes {
+    readonly nodes: { step: { label: string } };
+}
+
+const nodes: FlowNodeInput<Types>[] = [
+    { id: "start", type: "step", position: { x: 0, y: 0 }, data: { label: "Start" } },
+    { id: "fetch", type: "step", position: { x: -160, y: 140 }, data: { label: "Fetch data" } },
+    { id: "parse", type: "step", position: { x: 160, y: 140 }, data: { label: "Parse file" } },
+    { id: "save", type: "step", position: { x: 0, y: 280 }, data: { label: "Save" } },
+];
+
+const edges: FlowEdgeInput<Types>[] = [
+    { id: "start-fetch", source: "start", target: "fetch" },
+    { id: "start-parse", source: "start", target: "parse" },
+    { id: "fetch-save", source: "fetch", target: "save" },
+];
+```
+
+Positions are in flow coordinates: x grows to the right, y grows down, and a node's position is
+its top-left corner.
+
+</Step>
+<Step>
+
+**Pick the features.** A flow without features draws, pans and zooms, and that is all. Each
+gesture is a feature you opt into, from its own entry. Make the list once, outside the component:
+the root reads it once.
+
+```tsx
+import { connection } from "@fragiola/flow-react/connection";
+import { drag } from "@fragiola/flow-react/drag";
+import { selection } from "@fragiola/flow-react/selection";
+
+const features = [selection(), drag(), connection()] as const;
+```
+
+</Step>
+<Step>
+
+**Render the root and give it a size.** `Flow.Root` creates the model from `defaultNodes` and
+`defaultEdges` (read once) and fills its own box, so it needs a size from your layout
+([Sizing the root](/docs/getting-started/sizing)). `fitView` fits the nodes once they are
+measured.
+
+```tsx
+<Flow.Root<Types, typeof features>
+    features={features}
+    defaultNodes={nodes}
+    defaultEdges={edges}
+    fitView={{ padding: 0.2, maxZoom: 1 }}
+    className="h-[480px] w-full bg-slate-50"
+>
+    {/* the layers below */}
+</Flow.Root>
+```
+
+</Step>
+<Step>
+
+**Add the layers.** `Flow.Background` sits behind the viewport. Inside `Flow.Viewport`, the edges
+come before the nodes so the nodes are drawn on top, and the connection line comes last. You
+render each node and each edge from a children function.
+
+```tsx
+<Flow.Background variant="dots" gap={20} size={2} className="text-slate-300" />
+<Flow.Viewport>
+    <Flow.Edges<Types>>
+        {(edge) => (
+            <Flow.Edge<Types> edge={edge}>
+                <Flow.EdgePath className="stroke-slate-400 stroke-2 data-selected:stroke-blue-500" />
+            </Flow.Edge>
+        )}
+    </Flow.Edges>
+    <Flow.Nodes<Types>>
+        {(node) => (
+            <Flow.Node<Types>
+                node={node}
+                className="min-w-28 select-none rounded-lg border bg-white p-3 text-center data-selected:border-blue-500"
+            >
+                {node.data.label}
+                <Flow.Handle type="target" side="top" className="size-2.5 rounded-full border bg-white" />
+                <Flow.Handle type="source" side="bottom" className="size-2.5 rounded-full border bg-white" />
+            </Flow.Node>
+        )}
+    </Flow.Nodes>
+    <Flow.ConnectionLine className="stroke-blue-500 stroke-2" />
+</Flow.Viewport>
+```
+
+`Flow.Node` positions its element at the node's place in the viewport; `Flow.Handle` sits at the
+middle of its `side`. Give nodes `user-select: none` (`select-none`), or a drag selects their text.
+
+</Step>
+<Step>
+
+**Style the state.** Every part carries `data-flow-part` and its state as attributes:
+`data-selected` on a selected node or edge, `data-dragging` while a node is dragged,
+`data-valid` / `data-invalid` on the handle a connection would end at. The classes above use
+them through Tailwind's `data-*` variants ([State attributes](/docs/concepts/state-attributes)).
+
+</Step>
+</Steps>
+
+## The whole file
+
+```tsx title="basic-flow.tsx"
+import { Flow, type FlowEdgeInput, type FlowNodeInput, type FlowTypes } from "@fragiola/flow-react";
+import { connection } from "@fragiola/flow-react/connection";
+import { drag } from "@fragiola/flow-react/drag";
+import { selection } from "@fragiola/flow-react/selection";
+
+interface Types extends FlowTypes {
+    readonly nodes: { step: { label: string } };
+}
+
+const features = [selection(), drag(), connection()] as const;
+
+const nodes: FlowNodeInput<Types>[] = [
+    { id: "start", type: "step", position: { x: 0, y: 0 }, data: { label: "Start" } },
+    { id: "fetch", type: "step", position: { x: -160, y: 140 }, data: { label: "Fetch data" } },
+    { id: "parse", type: "step", position: { x: 160, y: 140 }, data: { label: "Parse file" } },
+    { id: "save", type: "step", position: { x: 0, y: 280 }, data: { label: "Save" } },
+];
+
+const edges: FlowEdgeInput<Types>[] = [
+    { id: "start-fetch", source: "start", target: "fetch" },
+    { id: "start-parse", source: "start", target: "parse" },
+    { id: "fetch-save", source: "fetch", target: "save" },
+];
+
+export default function BasicFlow() {
+    return (
+        <Flow.Root<Types, typeof features>
+            features={features}
+            defaultNodes={nodes}
+            defaultEdges={edges}
+            fitView={{ padding: 0.2, maxZoom: 1 }}
+            className="h-[480px] w-full bg-slate-50"
+        >
+            <Flow.Background variant="dots" gap={20} size={2} className="text-slate-300" />
+            <Flow.Viewport>
+                <Flow.Edges<Types>>
+                    {(edge) => (
+                        <Flow.Edge<Types> edge={edge}>
+                            <Flow.EdgePath className="stroke-slate-400 stroke-2 data-selected:stroke-blue-500" />
+                        </Flow.Edge>
+                    )}
+                </Flow.Edges>
+                <Flow.Nodes<Types>>
+                    {(node) => (
+                        <Flow.Node<Types>
+                            node={node}
+                            className="min-w-28 select-none rounded-lg border bg-white p-3 text-center data-selected:border-blue-500"
+                        >
+                            {node.data.label}
+                            <Flow.Handle type="target" side="top" className="size-2.5 rounded-full border bg-white" />
+                            <Flow.Handle type="source" side="bottom" className="size-2.5 rounded-full border bg-white" />
+                        </Flow.Node>
+                    )}
+                </Flow.Nodes>
+                <Flow.ConnectionLine className="stroke-blue-500 stroke-2" />
+            </Flow.Viewport>
+        </Flow.Root>
+    );
+}
+```
+
+## What you have
+
+- **Pan** by dragging the pane, **zoom** with the wheel, a pinch or a double click: the core's
+  viewport, no feature needed.
+- **Select** a node or an edge with a click, add to the selection with Ctrl, ⌘ or Shift, draw a
+  selection box with Shift and a drag (`selection()`).
+- **Drag** a node, or the whole selection (`drag()`).
+- **Connect** by dragging from a bottom handle to another node's top handle (`connection()`):
+  the drop runs `edge.add`, and the new edge is drawn.
+
+Every one of those changes is a command on the model. Read it with `useFlow()` inside the root, or
+a flow ref outside it ([The model and commands](/docs/concepts/model-and-commands)).
+
+## Next steps
+
+<Cards>
+    <Card title="Custom nodes" href="/docs/guides/custom-nodes" description="A node type per component, with typed data and several handles." />
+    <Card title="Connection rules" href="/docs/guides/connection-rules" description="Refuse an edge with a middleware, and show it while dragging." />
+    <Card title="Accessible names" href="/docs/getting-started/accessible-names" description="Name the flow, its nodes and edges, and announce what happens." />
+</Cards>

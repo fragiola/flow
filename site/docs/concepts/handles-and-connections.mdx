@@ -1,0 +1,95 @@
+---
+title: Handles and connections
+description: A handle is a node's connection point on one of its sides, and a connection is an edge being drawn between two handles, checked before the drop.
+---
+
+A **handle** is where an edge starts or ends on a node: a `source` handle or a `target` handle,
+on one of the node's sides. A **connection** is an edge being drawn: with `connection()`, a press
+on a handle starts one, the connection line follows the pointer, and a drop near another handle
+adds the edge. The model decides whether that edge may exist, so the same rules hold for a drag
+and for your code.
+
+## Handles
+
+Render a `Flow.Handle` inside `Flow.Node` for each connection point. It registers with the engine,
+which measures its centre relative to its node, and it sits at the middle of its `side` by default:
+
+```tsx
+<Flow.Node<Types> node={node} className="node">
+    {node.data.label}
+    <Flow.Handle type="target" side="left" handleId="in" className="handle" />
+    <Flow.Handle type="source" side="right" handleId="ok" style={{ top: "30%" }} className="handle" />
+    <Flow.Handle type="source" side="right" handleId="error" style={{ top: "70%" }} className="handle" />
+</Flow.Node>
+```
+
+| prop | means |
+| --- | --- |
+| `type` | `"source"`: edges start here; `"target"`: edges end here |
+| `side` | `"top"`, `"right"`, `"bottom"` or `"left"`: the direction its edges leave or enter by |
+| `handleId` | its id among the node's handles of its type; none is the node's default handle |
+| `connectable` | `false`: no connection starts or ends here (default true) |
+
+An edge names its handles with `sourceHandle` and `targetHandle`; one it leaves out uses the node's
+first handle of that type. A handle has no size and no look: give it both, and a hit area big enough
+for a finger.
+
+Sides are physical, not logical: a diagram's right stays right in a right-to-left page, so
+`side` never flips with the text direction.
+
+## A connection
+
+With `connection()` installed, dragging from a handle draws a connection. `Flow.ConnectionLine`,
+inside the viewport, draws it while it lasts; `useConnection()` reads it:
+
+```tsx
+<Flow.Viewport>
+    <Flow.Edges<Types>>{renderEdge}</Flow.Edges>
+    <Flow.Nodes<Types>>{renderNode}</Flow.Nodes>
+    <Flow.ConnectionLine className="stroke-blue-500 data-invalid:stroke-red-500" />
+</Flow.Viewport>
+```
+
+While it is drawn, the engine looks for the nearest handle within `radius` screen pixels of the
+pointer (`connection({ radius: 20 })`), and asks the model whether the edge would be accepted:
+`model.can("edge.add", …)`. The handle it would end at gets `data-valid` or `data-invalid`, and so
+does the connection line. Dropping on a valid handle runs `edge.add`; anywhere else, nothing
+changes and the engine tells `connect-cancel` (with `refused: true` when the handle was refused).
+
+- **`mode: "strict"`** (the default): a connection ends only at a handle of the other type.
+  **`mode: "loose"`**: at any other handle.
+- A connection may start from a target handle: the edge is added the other way round, from the
+  handle it ends at.
+- Escape, a cancelled pointer or a lost pointer capture cancels it.
+
+## Rules are middleware
+
+There is no `isValidConnection` callback. A rule is a middleware on `edge.add`, and because the
+engine asks `model.can` during the drag, a vetoed handle is marked `data-invalid` before the drop:
+
+```ts
+model.use((ctx, next) => {
+    if (ctx.command === "edge.add" && ctx.payload.source === ctx.payload.target) {
+        return veto("an edge joins two different nodes");
+    }
+    return next();
+});
+```
+
+The same rule refuses the same edge from your code or from an assistant.
+[Connection rules](/docs/guides/connection-rules) builds typed ports, no cycles and one edge per
+input this way.
+
+<Example id="connection-validation" />
+
+## Moving an edge's end
+
+With `reconnection()` (which needs `connection()`), a press on an edge near one of its ends, or on
+a `Flow.ReconnectAnchor`, moves that end to another handle: the drop runs `edge.reconnect`, checked
+by the model like `edge.add`. An edge with `reconnectable: false` keeps its ends.
+
+## Events
+
+`engine.subscribe` hears `connect-start` (`nodeId`, `handleId`, `handleType`), `connect` (the new
+`edgeId`, `source`, `target`), `connect-cancel` (`refused`), and for reconnection
+`reconnect-start`, `reconnect` and `reconnect-cancel`.

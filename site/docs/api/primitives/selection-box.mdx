@@ -1,0 +1,44 @@
+---
+title: SelectionBox
+description: Flow.SelectionBox shows the box selection being drawn, in screen pixels, while selection() selects the nodes it covers.
+---
+
+`Flow.SelectionBox` goes inside `Flow.Root`, outside `Flow.Viewport` (it is in pixels relative to
+the root), and renders a `div` only while a box is drawn (`selection()`: Shift + drag on the pane,
+or any drag with `selection({ boxOnDrag: true })`). The nodes it covers are selected, wholly
+covered or touched by `selection({ boxMode })`. Give it its look.
+
+```tsx
+<Flow.Root<Types, typeof features> features={features} defaultNodes={nodes}>
+    <Flow.Viewport>…</Flow.Viewport>
+    <Flow.SelectionBox className="border border-blue-500 bg-blue-500/10" />
+</Flow.Root>
+```
+
+## Props
+
+`SelectionBoxProps` extends the [common primitive props](/docs/api/primitives/root#common-props)
+and every `div` attribute.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `children` | `ReactNode` | none | its content |
+
+## State
+
+`SelectionBoxState`, what `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `box` | `Rect` | the box, in pixels relative to the root |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"selection-box"` |
+| `data-selecting` | present while the box is drawn |
+
+## Structural style
+
+`position: absolute` at the box (`left`, `top`, `width`, `height`) and `pointer-events: none`.

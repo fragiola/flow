@@ -1,0 +1,48 @@
+---
+title: ToggleInteractive
+description: Flow.ToggleInteractive is a toggle button that locks the flow, so gestures and keys change nothing while pan and zoom keep working.
+---
+
+`Flow.ToggleInteractive` renders a `button` (`type="button"`) that runs the engine's
+`"set-interactive"` action with the opposite of `engine.is("interactive")`. While the flow is
+locked, gestures and keys change nothing (no drag, no connection, no selection, no Delete), and
+pan and zoom keep working. It is `aria-pressed` while locked and carries `data-interactive` while
+unlocked; it is disabled until the root is mounted. It sets no text: switch its icon on
+`state.interactive` and give it an `aria-label`.
+
+```tsx
+import { LockIcon, UnlockIcon } from "lucide-react";
+
+<Flow.ToggleInteractive
+    aria-label="Lock the flow"
+    render={(props, state) => <button {...props}>{state.interactive ? <UnlockIcon /> : <LockIcon />}</button>}
+/>;
+```
+
+The root's `interactive` prop sets the same lock from your state; a root whose `interactive` does
+not change leaves the toggle's lock alone.
+
+## Props
+
+`ToggleInteractiveProps` extends the [common primitive props](/docs/api/primitives/root#common-props)
+and every `button` attribute.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `children` | `ReactNode` | none | its icon or label |
+
+## State
+
+`ToggleInteractiveState`, what `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `interactive` | `boolean` | gestures and keys may change the flow |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"toggle-interactive"` |
+| `data-interactive` | present while the flow is unlocked |
+| `aria-pressed` | `true` while the flow is locked |

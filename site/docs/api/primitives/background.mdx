@@ -1,0 +1,53 @@
+---
+title: Background
+description: Flow.Background draws a pattern of dots, lines or crosses that pans and zooms with the flow, in currentColor, behind the viewport.
+---
+
+`Flow.Background` goes inside `Flow.Root`, before `Flow.Viewport`. It renders an SVG filled with
+one tile of a pattern (`background-pattern`): dots, lines or crosses, at `gap` flow units apart,
+moved and scaled with the viewport. The marks are drawn in `currentColor`: set the `color` (and
+the background itself) in your style.
+
+<Example id="backgrounds" />
+
+```tsx
+<Flow.Root<Types, typeof features> features={features} defaultNodes={nodes} className="bg-gray-50">
+    <Flow.Background variant="dots" gap={20} size={2} className="text-gray-300" />
+    <Flow.Background variant="lines" gap={100} className="text-gray-200" />
+    <Flow.Viewport>…</Flow.Viewport>
+</Flow.Root>
+```
+
+Several layers combine (a fine grid and a coarse one). Its `variant` is a prop, so a CSS theme
+cannot switch it: the examples render the three variants and let the theme's tokens show one.
+
+## Props
+
+`BackgroundProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and
+every SVG attribute of an `svg` but `children` and `offset`.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `variant` | `BackgroundVariant` | `"dots"` | the marks: `"dots"`, `"lines"` or `"cross"` |
+| `gap` | `number \| readonly [number, number]` | `20` | the distance between two marks, in flow units (`[x, y]` for two) |
+| `size` | `number` | the variant's | a dot's diameter, or a cross's arm length, in flow units |
+| `offset` | `number \| readonly [number, number]` | `0` | the pattern's shift from the flow's origin, in flow units |
+
+## State
+
+`BackgroundState`, what `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `pattern` | `BackgroundPattern` | the pattern's tile on the screen, at the current viewport ([engine reads](/docs/api/engine)) |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"background"`; inside it `"background-pattern"` (the `pattern`), `"background-mark"` (its `circle` or `path`) and `"background-fill"` (the `rect`) |
+
+## Structural style
+
+Absolute, `100%` of the root, `pointer-events: none`. The marks' `fill` or `stroke` is
+`currentColor`.

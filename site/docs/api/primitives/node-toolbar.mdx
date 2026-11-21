@@ -1,0 +1,63 @@
+---
+title: NodeToolbar
+description: Flow.NodeToolbar places your buttons next to a node, outside the zoom so they keep their size, shown while the node is selected by default.
+---
+
+`Flow.NodeToolbar` goes inside `Flow.Node` (or anywhere in the root with a `nodeId`). It is
+portalled into `Flow.Root`, outside the zoom, at the anchor `node-toolbar-by` gives: on the node's
+`side`, aligned to its `align`, `offset` pixels away. So it keeps its size at any zoom and follows
+the node as it moves. By default it is shown while its node is selected (`selection()`); `open`
+decides instead. Presses and the wheel over it are left to it. It renders only your children.
+
+<Example id="node-toolbar" />
+
+```tsx
+function Toolbar({ node }: { node: FlowNode<Types> }) {
+    const { model } = useFlow<Types, typeof features>();
+    return (
+        <Flow.NodeToolbar role="toolbar" aria-label={`${node.data.text}: actions`} side="top" offset={8}>
+            <button type="button" aria-label="Delete" onClick={() => model.run("node.remove", { nodeId: node.id })}>
+                <Trash2Icon />
+            </button>
+        </Flow.NodeToolbar>
+    );
+}
+```
+
+A toolbar has no role: give it `role="toolbar"` and a label when it holds several buttons.
+
+## Props
+
+`NodeToolbarProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and
+every `div` attribute.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `nodeId` | `string` | the enclosing `Flow.Node`'s | its node |
+| `side` | `HandleSide` | `"top"` | the node's side it stands on |
+| `align` | `"start" \| "center" \| "end"` | `"center"` | where along that side |
+| `offset` | `number` | `10` | the gap between the node and the toolbar, in pixels |
+| `open` | `boolean` | while its node is selected | whether it is shown |
+| `children` | `ReactNode` | none | your buttons |
+
+## State
+
+`NodeToolbarState`, what `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `nodeId` | `string` | its node |
+| `position` | `NodeToolbarPosition` | its anchor, in pixels relative to the root ([engine reads](/docs/api/engine)) |
+| `side` | `HandleSide` | the side it stands on |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"toolbar"` |
+| `data-flow-id` | its node's id |
+
+## Structural style
+
+`position: absolute; transform: translate(<x>px, <y>px) translate(<-anchorX × 100>%, <-anchorY × 100>%)`
+at its anchor.

@@ -1,0 +1,91 @@
+---
+title: Sizing the root
+description: The root fills the box your layout gives it and draws nothing outside it, so give it a height, and let nodes take their size from their content or the document.
+---
+
+`Flow.Root` is a `div` with `position: relative` and `overflow: hidden`, and nothing else: it has
+no size of its own. The viewport, the background and the edges' layer fill it, so a root without
+a height is a flow of zero pixels. Its size is yours to give, the same way you size any element.
+
+## Give the root a size
+
+A fixed height:
+
+```tsx
+<Flow.Root defaultNodes={nodes} className="h-[600px] w-full">
+    …
+</Flow.Root>
+```
+
+Or the room a parent leaves, in a flex or grid layout (the `min-h-0` lets a flex child shrink
+below its content):
+
+```tsx title="editor-page.tsx"
+export function EditorPage() {
+    return (
+        <div className="flex h-dvh flex-col">
+            <header className="h-12 border-b">Workflow</header>
+            <Flow.Root defaultNodes={nodes} className="min-h-0 flex-1">
+                …
+            </Flow.Root>
+        </div>
+    );
+}
+```
+
+The engine reads the root's box when it needs it: `engine.get("root-size")` gives it, and
+`fit-view`, `center-on`, the zoom buttons (they zoom around the root's centre), the minimap and
+`visible-nodes` use it.
+
+## Nodes size themselves
+
+A node is as big as what you render in it, unless the document gives it a `width` and a `height`.
+The engine measures each node's element (`offsetWidth`, `offsetHeight`) and uses the document's
+size where there is one, the measured one otherwise, dimension by dimension.
+
+```tsx
+const nodes: FlowNodeInput<Types>[] = [
+    // sized by its content
+    { id: "note", type: "note", position: { x: 0, y: 0 }, data: { text: "Hello" } },
+    // sized by the document: `Flow.Node` writes width and height on its element
+    { id: "group", type: "group", position: { x: 200, y: 0 }, width: 320, height: 200, data: {} },
+];
+```
+
+Edges wait for sizes: an edge is drawn once both its nodes are measured (`edge-path-by` is
+undefined until then), and the root's `fitView` runs once every visible node is. A node of 0 × 0
+counts as unmeasured.
+
+## Fit the nodes
+
+`fitView` on the root fits every node once they are measured, at mount only. Its value is
+`true`, or the `fit-view` payload: `padding` (a share of the root's size, default 0.1),
+`nodeIds`, `minZoom` and `maxZoom`.
+
+```tsx
+<Flow.Root defaultNodes={nodes} fitView={{ padding: 0.2, maxZoom: 1 }} className="h-96">
+    …
+</Flow.Root>
+```
+
+Later, fit again from code with `engine.run("fit-view")`, or with a `Flow.FitView` button
+([The viewport](/docs/concepts/viewport)).
+
+## Panels over the canvas
+
+Controls, a minimap or a toolbar of your own go inside the root, outside `Flow.Viewport`, placed
+with your style (`absolute` in a corner): the root's `position: relative` is their containing
+block. A panel of your own marks itself `data-flow-no-gesture` (presses on it start no pan) and
+`data-flow-no-wheel` (its wheel scrolls it instead of zooming the flow).
+
+```tsx
+<Flow.Root defaultNodes={nodes} className="relative h-96">
+    <Flow.Viewport>…</Flow.Viewport>
+    <aside data-flow-no-gesture="" data-flow-no-wheel="" className="absolute top-2 right-2 w-56 overflow-auto">
+        …
+    </aside>
+</Flow.Root>
+```
+
+`Flow.Controls` and `Flow.NodeToolbar` need neither: presses and the wheel over them are already
+left to them.

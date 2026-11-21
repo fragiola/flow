@@ -1,0 +1,95 @@
+---
+title: Model and engine
+description: The model holds the nodes, the edges and their rules without a DOM, and the engine is that flow on screen. Both answer the same five verbs, from run to is.
+---
+
+Behind the primitives are two objects. The **model** is the flow as data: the document, the
+commands that change it and the rules that keep it valid. It needs no DOM and runs in plain Node.
+The **engine** is one flow on screen: it holds the viewport, measures the nodes and their handles,
+draws the edges' paths, runs every gesture and tells what happened. `Flow.Root` creates both (the
+model unless you pass one); `useFlow()` returns them.
+
+## One pattern on both
+
+Each object has the same five verbs, each taking a kebab-case key and a payload:
+
+| verb | means | on the model | on the engine |
+| --- | --- | --- | --- |
+| `run` | do it | `model.run("node.move", { nodeId, position })`: a command | `engine.run("fit-view", { padding: 0.2 })`: a screen action |
+| `can` | could I? | `model.can("node.remove", { nodeId })` | `engine.can("zoom-in")` |
+| `check` | what would happen? | `model.check("edge.add", { source, target })` | `engine.check("zoom-to", { zoom: 2 })` |
+| `get` | read it | `model.get("node-by", { id })` | `engine.get("viewport")` |
+| `is` | yes or no? | `model.is("node-selected", { nodeId })` | `engine.is("dragging")` |
+
+A command's key has a dot (`node.move`), an engine action's never does (`fit-view`); a `get` key
+that takes an id ends in `-by`. The model also has `use` (a middleware), `subscribe` (every commit)
+and `dispatch` (`run` for untrusted JSON). The engine has `subscribe` (its events), `destroy` and
+`adapter`, what only the primitives call. [Model](/docs/api/model) and [Engine](/docs/api/engine)
+list every key.
+
+## What belongs where
+
+| the model knows | the engine knows |
+| --- | --- |
+| nodes, their positions, sizes the document gives, their data and flags | the viewport `{ x, y, zoom }` (view state, never in the document) |
+| edges, their ends, handles and types | each node's measured size, each handle's centre |
+| the selection (`selection()`), the parents (`subflows()`) | each edge's path and label point (`edge-path-by`) |
+| the rules: flags, duplicates, cycles, extents | the gestures under way: a pan, a drag, a connection, a resize, a box |
+
+So saving a flow is `model.get("flow-json")`, and saving where the user was looking is
+`engine.get("viewport")`, separately ([Saving and restoring flows](/docs/guides/persistence)).
+
+## The engine changes the flow through the model
+
+A gesture never writes the document: the engine runs the model's commands, so your middleware
+and listeners see them like any other. A drag runs `node.move` (transient steps, then a final
+one), a drop on a handle runs `edge.add`, a resize `node.resize`, a box selection
+`selection.set`, the Delete key `selection.remove`. That is why one middleware can refuse a
+connection whether it comes from a drag or from your code.
+
+```tsx title="zoom-readout.tsx"
+import { useFlow, useViewport } from "@fragiola/flow-react";
+
+export function ZoomReadout() {
+    const { engine } = useFlow();
+    const viewport = useViewport();
+    return (
+        <button type="button" onClick={() => engine.run("zoom-to", { zoom: 1 })} disabled={!engine.can("zoom-to", { zoom: 1 })}>
+            {Math.round(viewport.zoom * 100)}%
+        </button>
+    );
+}
+```
+
+## Events, not text
+
+`engine.subscribe` hears what happened on screen: `viewport-change`, `drag-start`, `nodes-move`,
+`drag-cancel`, `connect-start`, `connect`, `connect-cancel`, `reconnect-start`, `reconnect`,
+`reconnect-cancel`, `resize`, `box-select` and `remove`. They carry ids, never words: feed them
+into your own live region ([Accessible names](/docs/getting-started/accessible-names)), or into a
+controlled viewport.
+
+## The engine's lifetime
+
+The root creates its engine once it is mounted, and destroys it when it unmounts. Before that (the
+first render, a server render) there is no engine: nodes render at their model position, edges
+wait for their nodes' sizes. The `engine` `useFlow()` returns is there from the first render all
+the same: before the mount, an action is refused and a read is empty.
+
+The engine never touches the global `document` or `window`: it uses its root element's owner
+document and window (its `ResizeObserver`, its microtasks). The model never touches the DOM at
+all, so you test rules on a model in Node, without rendering anything.
+
+```ts title="rules.test.ts"
+import { createFlowModel } from "@fragiola/flow";
+import { expect, it } from "vitest";
+
+it("refuses an edge to the same node", () => {
+    const model = createFlowModel(json);
+    model.use(rules);
+    expect(model.check("edge.add", { source: "a", target: "a" })).toMatchObject({
+        ok: false,
+        error: { code: "vetoed" },
+    });
+});
+```

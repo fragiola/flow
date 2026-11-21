@@ -1,0 +1,111 @@
+---
+title: Flow — headless node-based editors and diagrams for React
+description: Nodes, edges and handles on a pannable, zoomable canvas, with typed commands, middleware rules and accessible gestures. Every pixel is yours.
+layout: landing
+---
+
+<Hero
+    eyebrow="@fragiola/flow · React"
+    title="Node-based editors, without a single line of CSS from us."
+    description="Workflow builders, pipelines, state machines and mind maps: nodes you drag, edges you draw from handles, a canvas you pan and zoom. It ships the behaviour and the accessibility, on a typed model of commands. Every pixel is yours."
+    actions={[
+        { label: "Browse {examples} examples", href: "/examples", variant: "primary", icon: "arrow" },
+        { label: "Set up your agent", href: "/ai", variant: "secondary" },
+        { label: "Read the docs", href: "/docs/getting-started/introduction", variant: "ghost" },
+        { label: "GitHub", href: "https://github.com/fragiola/flow", variant: "ghost", icon: "external" },
+    ]}
+/>
+
+<Example id="workflow-builder" variant="showcase" theme="light" height={600} label="A whole app, the same markup in five themes:" />
+
+<Section eyebrow="What it ships" title="Behaviour and accessibility, nothing to restyle" description="Composable primitives over a framework-free core: everything that is not rendering lives in the core.">
+<Features columns={3}>
+<Feature title="Gestures">
+Pan, wheel and pinch zoom, node drags with snapping, connections drawn from handles, edges
+reconnected, box selection and resizing: one Pointer Events path for mouse, touch and pen.
+</Feature>
+<Feature title="A typed model">
+The flow is one JSON document. Every change is a command with a JSON Schema, which middleware can
+veto or rewrite and an assistant can call.
+</Feature>
+<Feature title="Rules as middleware">
+A connection rule is a middleware on `edge.add`: the drag marks a refused handle `data-invalid`
+before the drop, and code obeys the same rule.
+</Feature>
+<Feature title="Opt-in features">
+Selection, drag, connection, reconnection, resizing, sub-flows, keyboard and the minimap, each on
+its own entry: a flow ships only what it imports.
+</Feature>
+<Feature title="Accessible by design">
+Focusable nodes and edges, arrow moves, Delete and Escape, and engine events your own live region
+turns into words.
+</Feature>
+<Feature title="Your markup">
+You render every node and edge with a children function, and swap any element with `render`: a
+`switch` on the node's type is your registry.
+</Feature>
+</Features>
+</Section>
+
+<Section eyebrow="What stays yours" title="What it never ships">
+<Pills strike items={["CSS", "Icons", "Text", "Node components", "Undo and redo"]} />
+
+The state is exposed as `data-*` attributes and ARIA, so any styling works: Tailwind, plain CSS,
+CSS modules, CSS-in-JS. The examples use Fragiola UI and its palettes, and keep app policy (undo,
+persistence) as code you copy.
+</Section>
+
+<Section eyebrow="Start" title="A flow in one component">
+
+```tsx title="pipeline.tsx"
+import { Flow, type FlowNodeInput, type FlowTypes } from "@fragiola/flow-react";
+import { connection } from "@fragiola/flow-react/connection";
+import { drag } from "@fragiola/flow-react/drag";
+import { selection } from "@fragiola/flow-react/selection";
+
+interface Types extends FlowTypes {
+    readonly nodes: { step: { label: string } };
+}
+
+const features = [selection(), drag(), connection()] as const;
+
+const nodes: FlowNodeInput<Types>[] = [
+    { id: "fetch", type: "step", position: { x: 0, y: 0 }, data: { label: "Fetch" } },
+    { id: "save", type: "step", position: { x: 0, y: 140 }, data: { label: "Save" } },
+];
+
+export function Pipeline() {
+    return (
+        <Flow.Root<Types, typeof features>
+            features={features}
+            defaultNodes={nodes}
+            defaultEdges={[{ id: "fetch-save", source: "fetch", target: "save" }]}
+            fitView
+            className="h-96"
+        >
+            <Flow.Viewport>
+                <Flow.Edges<Types>>
+                    {(edge) => <Flow.Edge<Types> edge={edge} className="stroke-gray-400" />}
+                </Flow.Edges>
+                <Flow.Nodes<Types>>
+                    {(node) => (
+                        <Flow.Node<Types> node={node} className="rounded border bg-white px-3 py-2">
+                            {node.data.label}
+                            <Flow.Handle type="target" side="top" className="size-2 rounded-full bg-gray-500" />
+                            <Flow.Handle type="source" side="bottom" className="size-2 rounded-full bg-gray-500" />
+                        </Flow.Node>
+                    )}
+                </Flow.Nodes>
+                <Flow.ConnectionLine className="stroke-gray-400" />
+            </Flow.Viewport>
+        </Flow.Root>
+    );
+}
+```
+
+<Cards>
+<Card title="Your first flow" href="/docs/getting-started/first-flow" description="From a document to a canvas you pan, zoom, drag and connect." />
+<Card title="Connection rules" href="/docs/guides/connection-rules" description="Typed ports and no cycles, as one middleware." />
+<Card title="Limitations" href="/docs/limitations" description="What xyflow has that this does not, and what to do instead." />
+</Cards>
+</Section>

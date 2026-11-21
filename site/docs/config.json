@@ -1,0 +1,299 @@
+{
+    "sections": [
+        {
+            "label": "Getting started",
+            "pages": [
+                {
+                    "label": "Introduction",
+                    "path": "getting-started/introduction"
+                },
+                {
+                    "label": "Installation",
+                    "path": "getting-started/installation"
+                },
+                {
+                    "label": "Your first flow",
+                    "path": "getting-started/first-flow"
+                },
+                {
+                    "label": "Sizing the root",
+                    "path": "getting-started/sizing"
+                },
+                {
+                    "label": "Accessible names",
+                    "path": "getting-started/accessible-names"
+                }
+            ]
+        },
+        {
+            "label": "Concepts",
+            "collapsible": true,
+            "pages": [
+                {
+                    "label": "The model and commands",
+                    "path": "concepts/model-and-commands"
+                },
+                {
+                    "label": "Model and engine",
+                    "path": "concepts/model-and-engine"
+                },
+                {
+                    "label": "Features",
+                    "path": "concepts/features"
+                },
+                {
+                    "label": "Composition",
+                    "path": "concepts/composition"
+                },
+                {
+                    "label": "The primitive contract",
+                    "path": "concepts/primitive-contract"
+                },
+                {
+                    "label": "State attributes",
+                    "path": "concepts/state-attributes"
+                },
+                {
+                    "label": "Typed data",
+                    "path": "concepts/typed-data"
+                },
+                {
+                    "label": "Nodes and edges",
+                    "path": "concepts/nodes-and-edges"
+                },
+                {
+                    "label": "Handles and connections",
+                    "path": "concepts/handles-and-connections"
+                },
+                {
+                    "label": "The viewport",
+                    "path": "concepts/viewport"
+                }
+            ]
+        },
+        {
+            "label": "Guides",
+            "collapsible": true,
+            "pages": [
+                {
+                    "label": "Custom nodes",
+                    "path": "guides/custom-nodes"
+                },
+                {
+                    "label": "Custom edges",
+                    "path": "guides/custom-edges"
+                },
+                {
+                    "label": "Connection rules",
+                    "path": "guides/connection-rules"
+                },
+                {
+                    "label": "Selection",
+                    "path": "guides/selection"
+                },
+                {
+                    "label": "Keyboard and accessibility",
+                    "path": "guides/keyboard"
+                },
+                {
+                    "label": "Sub-flows",
+                    "path": "guides/sub-flows"
+                },
+                {
+                    "label": "Resizing nodes",
+                    "path": "guides/resizing"
+                },
+                {
+                    "label": "Minimap and controls",
+                    "path": "guides/minimap-and-controls"
+                },
+                {
+                    "label": "Styling with plain CSS",
+                    "path": "guides/styling-css"
+                },
+                {
+                    "label": "Styling with Tailwind",
+                    "path": "guides/styling-tailwind"
+                },
+                {
+                    "label": "Theming with Fragiola palettes",
+                    "path": "guides/theming"
+                },
+                {
+                    "label": "Saving and restoring flows",
+                    "path": "guides/persistence"
+                },
+                {
+                    "label": "Undo and redo",
+                    "path": "guides/undo-redo"
+                },
+                {
+                    "label": "Testing your flow",
+                    "path": "guides/testing"
+                },
+                {
+                    "label": "AI and automation",
+                    "path": "guides/ai-and-automation"
+                }
+            ]
+        },
+        {
+            "label": "API: primitives (@fragiola/flow-react)",
+            "collapsible": true,
+            "pages": [
+                {
+                    "label": "Flow.Root",
+                    "path": "api/primitives/root"
+                },
+                {
+                    "label": "Flow.Viewport",
+                    "path": "api/primitives/viewport"
+                },
+                {
+                    "label": "Flow.Nodes",
+                    "path": "api/primitives/nodes"
+                },
+                {
+                    "label": "Flow.Node",
+                    "path": "api/primitives/node"
+                },
+                {
+                    "label": "Flow.Handle",
+                    "path": "api/primitives/handle"
+                },
+                {
+                    "label": "Flow.Edges",
+                    "path": "api/primitives/edges"
+                },
+                {
+                    "label": "Flow.Edge",
+                    "path": "api/primitives/edge"
+                },
+                {
+                    "label": "Flow.EdgePath",
+                    "path": "api/primitives/edge-path"
+                },
+                {
+                    "label": "Flow.EdgeLabel",
+                    "path": "api/primitives/edge-label"
+                },
+                {
+                    "label": "Flow.ReconnectAnchor",
+                    "path": "api/primitives/reconnect-anchor"
+                },
+                {
+                    "label": "Flow.ConnectionLine",
+                    "path": "api/primitives/connection-line"
+                },
+                {
+                    "label": "Flow.SelectionBox",
+                    "path": "api/primitives/selection-box"
+                },
+                {
+                    "label": "Flow.Background",
+                    "path": "api/primitives/background"
+                },
+                {
+                    "label": "Flow.Controls",
+                    "path": "api/primitives/controls"
+                },
+                {
+                    "label": "Flow.ZoomIn",
+                    "path": "api/primitives/zoom-in"
+                },
+                {
+                    "label": "Flow.ZoomOut",
+                    "path": "api/primitives/zoom-out"
+                },
+                {
+                    "label": "Flow.FitView",
+                    "path": "api/primitives/fit-view"
+                },
+                {
+                    "label": "Flow.ToggleInteractive",
+                    "path": "api/primitives/toggle-interactive"
+                },
+                {
+                    "label": "Flow.NodeToolbar",
+                    "path": "api/primitives/node-toolbar"
+                },
+                {
+                    "label": "MiniMap",
+                    "path": "api/primitives/mini-map"
+                },
+                {
+                    "label": "MiniMapNode",
+                    "path": "api/primitives/mini-map-node"
+                },
+                {
+                    "label": "MiniMapMask",
+                    "path": "api/primitives/mini-map-mask"
+                },
+                {
+                    "label": "NodeResizer",
+                    "path": "api/primitives/node-resizer"
+                },
+                {
+                    "label": "ResizeHandle",
+                    "path": "api/primitives/resize-handle"
+                },
+                {
+                    "label": "Hooks",
+                    "path": "api/primitives/hooks"
+                },
+                {
+                    "label": "The flow ref",
+                    "path": "api/primitives/flow-ref"
+                }
+            ]
+        },
+        {
+            "label": "API: core (@fragiola/flow)",
+            "collapsible": true,
+            "pages": [
+                {
+                    "label": "Model",
+                    "path": "api/model"
+                },
+                {
+                    "label": "The command bus",
+                    "path": "api/command-bus"
+                },
+                {
+                    "label": "Commands",
+                    "path": "api/commands"
+                },
+                {
+                    "label": "Flow JSON",
+                    "path": "api/json-document"
+                },
+                {
+                    "label": "Engine",
+                    "path": "api/engine"
+                },
+                {
+                    "label": "Features",
+                    "path": "api/features"
+                },
+                {
+                    "label": "Path helpers",
+                    "path": "api/path-helpers"
+                }
+            ]
+        },
+        {
+            "label": "More",
+            "pages": [
+                {
+                    "label": "Known limitations",
+                    "path": "limitations"
+                },
+                {
+                    "label": "Found a problem?",
+                    "href": "https://github.com/fragiola/flow/issues",
+                    "external": true
+                }
+            ]
+        }
+    ]
+}

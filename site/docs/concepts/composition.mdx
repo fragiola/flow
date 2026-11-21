@@ -1,0 +1,139 @@
+---
+title: Composition
+description: You assemble a flow from primitives under one namespace, render every node and edge yourself through children functions, and swap any element with render.
+---
+
+A flow is markup you write. `Flow.Root` holds the model and the engine; inside it, layers in the
+order they are drawn; inside the layers, your nodes and edges, rendered by children functions. No
+`nodeTypes` map, no registry of components: a node's type is a field your function reads.
+
+## The layers
+
+```tsx title="editor.tsx"
+<Flow.Root<Types, typeof features> features={features} defaultNodes={nodes} defaultEdges={edges} className="h-[600px]">
+    {/* behind the viewport, in screen space, panned and zoomed by the pattern itself */}
+    <Flow.Background variant="dots" />
+    {/* the pannable, zoomable layer: what is inside is in flow coordinates */}
+    <Flow.Viewport>
+        <Flow.Edges<Types>>{renderEdge}</Flow.Edges>
+        <Flow.Nodes<Types>>{renderNode}</Flow.Nodes>
+        <Flow.ConnectionLine />
+    </Flow.Viewport>
+    {/* over the viewport, in screen space */}
+    <Flow.SelectionBox />
+    <Flow.Controls>…</Flow.Controls>
+    <MiniMap />
+</Flow.Root>
+```
+
+- `Flow.Edges` comes before `Flow.Nodes`, so nodes are drawn above edges.
+- `Flow.ConnectionLine` is in the viewport (it is in flow coordinates); `Flow.SelectionBox`,
+  `Flow.Controls` and `MiniMap` are outside it (they are in screen pixels, and do not zoom).
+- Each primitive renders only what you give it: drop the ones you do not use.
+
+## Your function renders each node
+
+`Flow.Nodes` calls its children function for each node that is not hidden, keyed by its id. Switch
+on the node's type to render a different component per type; the registry narrows `node.data`:
+
+```tsx title="render-node.tsx"
+import { Flow, type FlowNode, type FlowTypes } from "@fragiola/flow-react";
+
+interface Types extends FlowTypes {
+    readonly nodes: {
+        trigger: { label: string; event: string };
+        action: { label: string; service: string };
+    };
+}
+
+function renderNode(node: FlowNode<Types>) {
+    switch (node.type) {
+        case "trigger":
+            return (
+                <Flow.Node<Types> node={node} className="node node-trigger">
+                    {node.data.label} on {node.data.event}
+                    <Flow.Handle type="source" side="right" />
+                </Flow.Node>
+            );
+        case "action":
+            return (
+                <Flow.Node<Types> node={node} className="node">
+                    <Flow.Handle type="target" side="left" />
+                    {node.data.label} ({node.data.service})
+                    <Flow.Handle type="source" side="right" />
+                </Flow.Node>
+            );
+    }
+}
+```
+
+Keep the function stable (a module function, as here, or `useCallback`): a new function re-renders
+every node. `Flow.Nodes` re-renders a node only when its node object changes, so a drag step
+re-renders the moved nodes only.
+
+## Your function draws each edge
+
+`Flow.Edges` calls its children function for each edge whose two nodes have a size. A `Flow.Edge`
+is an SVG group: its default child is a `Flow.EdgePath`, and you add a label, end anchors or a
+wider invisible path for presses.
+
+```tsx title="render-edge.tsx"
+function renderEdge(edge: FlowEdge<Types>) {
+    return (
+        <Flow.Edge<Types> edge={edge}>
+            <Flow.EdgePath className="stroke-transparent stroke-[12]" />
+            <Flow.EdgePath className="stroke-slate-400" />
+            {typeof edge.data?.label === "string" ? (
+                <Flow.EdgeLabel className="rounded bg-white px-1 text-xs">{edge.data.label}</Flow.EdgeLabel>
+            ) : null}
+            <Flow.ReconnectAnchor end="source" />
+            <Flow.ReconnectAnchor end="target" />
+        </Flow.Edge>
+    );
+}
+```
+
+`Flow.EdgeLabel` is HTML, centred on the path's label point: SVG holds no HTML, so it is portalled
+into the edges' HTML layer. `Flow.NodeToolbar`, likewise, portals into the root, outside the zoom.
+
+## Replacing an element: `render`
+
+Every primitive renders one element by default (a `div`, a `g`, a `path`, a `button`). `render`
+replaces it, never `asChild`: give an element, whose props are merged with the primitive's, or a
+function of the props and the state.
+
+```tsx
+<Flow.Node<Types> node={node} render={<article />}>
+    {node.data.label}
+</Flow.Node>
+
+<Flow.ToggleInteractive
+    aria-label="Lock the flow"
+    render={(props, state) => <button {...props}>{state.interactive ? <UnlockIcon /> : <LockIcon />}</button>}
+/>
+```
+
+Spread the props on what you return: they carry the ref that registers the element with the
+engine, the part attributes the engine resolves presses from, and the structural style.
+
+## The hooks layer
+
+Each part the engine needs is also a hook returning `{ state, props }`, for a node or a handle you
+render by hand: `useNode(node)`, `useEdge(edge)` and `useHandle({ type, side, handleId })`. Spread
+`props` on your element:
+
+```tsx
+function PlainNode({ node }: { node: FlowNode<Types> }) {
+    const { state, props } = useNode(node);
+    return (
+        <div {...props} className={state.selected ? "node node-selected" : "node"}>
+            {node.data.label}
+        </div>
+    );
+}
+```
+
+A node rendered by hand this way needs `Flow.Node`'s context for its handles: render its handles
+with `useHandle({ …, nodeId: node.id })` or `Flow.Handle nodeId={node.id}`. The value hooks
+(`useViewport`, `useConnection`, `useSelection`, `useNodes`, `useEdges`) re-render a component
+when what it reads changes ([Hooks](/docs/api/primitives/hooks)).

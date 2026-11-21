@@ -1,0 +1,62 @@
+---
+title: EdgePath
+description: Flow.EdgePath is an edge's SVG path, its d computed by the engine from the edge's type and ends, unfilled and styled by you.
+---
+
+`Flow.EdgePath` renders an SVG `path` inside `Flow.Edge` whose `d` is the engine's
+(`edge-path-by`, recomputed when its nodes move or are measured), with `fill="none"`. It is the
+default child of `Flow.Edge`. Give it its stroke in your style, through `data-selected` for the
+selected look.
+
+```tsx
+<Flow.Edge<Types> edge={edge}>
+    {/* a wide transparent path: a bigger press target */}
+    <Flow.EdgePath className="stroke-transparent stroke-[16]" />
+    <Flow.EdgePath className="stroke-gray-400 stroke-2 data-selected:stroke-blue-500" />
+</Flow.Edge>
+```
+
+A `d` of your own draws an app type: read the ends from `state.path` (`render` gets the state) or
+from [`useEdge`](/docs/api/primitives/hooks).
+
+```tsx
+<Flow.EdgePath
+    render={(props, state) => {
+        const { source, target } = state.path;
+        const mid = (source.y + target.y) / 2;
+        return <path {...props} d={`M${source.x},${source.y} V${mid} H${target.x} V${target.y}`} />;
+    }}
+/>
+```
+
+## Props
+
+`EdgePathProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and
+every SVG attribute of a `path`.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `edgeId` | `string` | the enclosing `Flow.Edge`'s | the edge |
+
+## State
+
+`EdgePathState`, what `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `edgeId` | `string` | the edge |
+| `path` | `EdgePath` | the path, its label point and its ends |
+| `selected` | `boolean` | the edge is selected |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"edge-path"` |
+| `data-flow-id` | the edge's id |
+| `data-selected` | present while the edge is selected |
+| `data-reconnecting` | present while one of its ends is moved |
+
+## Structural style
+
+None: `d` and `fill="none"` are attributes your props override.

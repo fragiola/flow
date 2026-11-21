@@ -1,0 +1,185 @@
+---
+title: Custom edges
+description: Draw the four built-in edge types, an edge type of your own from the path's ends, and HTML labels that pan and zoom with their edge.
+---
+
+An edge is an SVG group you render from `Flow.Edges`' children function. The engine computes its
+path once both nodes have a size, and recomputes it whenever they move or change size. Four edge
+types are drawn by the core: `bezier` (an edge with no `type`), `smoothstep`, `step` and
+`straight`. Any other type is yours: the engine gives you the path's ends and the sides they leave
+and enter by, and you draw the `d`. Strokes, colours, markers and labels are yours too.
+
+<Example id="edge-types" />
+
+## The built-in types
+
+`Flow.Edge` draws a `Flow.EdgePath` by default, whose `d` is the engine's path for the edge's
+type. Give the path its stroke: it is unfilled, and has no colour of its own.
+
+```tsx
+<Flow.Edges<Types>>
+    {(edge) => (
+        <Flow.Edge<Types> edge={edge}>
+            <Flow.EdgePath className="edge" />
+        </Flow.Edge>
+    )}
+</Flow.Edges>
+```
+
+```ts
+const edges: FlowEdgeInput<Types>[] = [
+    { id: "a-b", source: "a", target: "b" }, // bezier
+    { id: "b-c", source: "b", target: "c", type: "smoothstep" },
+    { id: "c-d", source: "c", target: "d", type: "step" },
+    { id: "d-e", source: "d", target: "e", type: "straight" },
+];
+```
+
+Their shape is the root's `pathOptions`: `curvature` (bezier, default 0.5), `borderRadius` (smooth
+step corners, default 5) and `offset` (how far a step leaves its node before turning, default 20).
+
+```tsx
+<Flow.Root pathOptions={{ borderRadius: 12, offset: 30 }} … />
+```
+
+## An edge type of your own
+
+Name the type and its data in the registry. The engine gives an app type the bezier path, and its
+ends: draw your own `d` from `state.path.source` and `state.path.target` (and their sides), read
+through [`useEdge`](/docs/api/primitives/hooks):
+
+```tsx title="wave-edge.tsx"
+import { type EdgePath, Flow, type FlowEdge, type FlowTypes, useEdge } from "@fragiola/flow-react";
+
+interface Types extends FlowTypes {
+    readonly nodes: { point: { label: string } };
+    readonly edges: { wave: { amplitude: number } };
+}
+
+/** A sine wave of `amplitude` across the straight line between the two ends. */
+function wavePath({ source, target }: EdgePath, amplitude: number): string {
+    const dx = target.x - source.x;
+    const dy = target.y - source.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const nx = -dy / length;
+    const ny = dx / length;
+    const waves = Math.max(1, Math.round(length / 60));
+    const steps = waves * 16;
+    const points: string[] = [];
+    for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const offset = Math.sin(t * waves * 2 * Math.PI) * amplitude;
+        points.push(`${source.x + dx * t + nx * offset},${source.y + dy * t + ny * offset}`);
+    }
+    return `M ${points.join(" L ")}`;
+}
+
+function WaveEdge({ edge }: { edge: Extract<FlowEdge<Types>, { type?: "wave" }> }) {
+    const { state } = useEdge<Types>(edge);
+    if (!state.path) return null; // its nodes have no size yet
+    return (
+        <Flow.Edge<Types> edge={edge}>
+            <Flow.EdgePath d={wavePath(state.path, edge.data?.amplitude ?? 8)} className="edge" />
+        </Flow.Edge>
+    );
+}
+
+function renderEdge(edge: FlowEdge<Types>) {
+    if (edge.type === "wave") return <WaveEdge edge={edge} />;
+    return (
+        <Flow.Edge<Types> edge={edge}>
+            <Flow.EdgePath className="edge" />
+        </Flow.Edge>
+    );
+}
+```
+
+The core's own path math is public too: `bezierPath`, `smoothStepPath`, `stepPath` and
+`straightPath` take the ends and return `{ path, label }`, a start for a path of your own. See
+[Path helpers](/docs/api/path-helpers).
+
+## A bigger press target
+
+Several `Flow.EdgePath`s may share an edge. A wide transparent one under the visible stroke makes
+the edge easier to click (to select it) without a thicker line:
+
+```tsx
+<Flow.Edge<Types> edge={edge}>
+    <Flow.EdgePath className="stroke-transparent stroke-[14px]" />
+    <Flow.EdgePath className="edge" />
+</Flow.Edge>
+```
+
+`Flow.Edge` takes presses on its stroke only (`pointer-events: visibleStroke`): a transparent
+stroke counts, a fill does not.
+
+## Labels
+
+<Example id="edge-labels" />
+
+`Flow.EdgeLabel` is HTML centred on the path's label point (halfway along it), in flow
+coordinates: it pans and zooms with its edge. It may hold anything; a button in it keeps its own
+clicks.
+
+```tsx
+function renderEdge(edge: FlowEdge<Types>) {
+    return (
+        <Flow.Edge<Types> edge={edge}>
+            <Flow.EdgePath className="edge" />
+            <Flow.EdgeLabel className="label">
+                {edge.type === "text" && <span>{edge.data?.text}</span>}
+                {edge.type === "removable" && <RemoveButton edge={edge} />}
+            </Flow.EdgeLabel>
+        </Flow.Edge>
+    );
+}
+
+function RemoveButton({ edge }: { edge: FlowEdge<Types> }) {
+    const { model } = useFlow<Types, typeof features>();
+    return (
+        <button
+            type="button"
+            aria-label={`Remove the edge from ${edge.source} to ${edge.target}`}
+            onClick={() => model.run("edge.remove", { edgeId: edge.id })}
+        >
+            ×
+        </button>
+    );
+}
+```
+
+Labels render in an HTML layer of `Flow.Edges` (SVG holds no HTML), so they sit above the edges
+and below the nodes.
+
+## Arrowheads
+
+Markers are plain SVG: define one in an `svg` of your own and point the path's `markerEnd` at it.
+`Flow.EdgePath` passes every SVG attribute through.
+
+```tsx
+<svg width="0" height="0" aria-hidden="true">
+    <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
+        </marker>
+    </defs>
+</svg>
+
+<Flow.EdgePath markerEnd="url(#arrow)" className="edge text-palette-line" />
+```
+
+## Selected edges
+
+With `selection()`, a selected edge's group and paths carry `data-selected`. Style it there:
+
+```css
+[data-flow-part="edge-path"] {
+    stroke: var(--fl-edge-color);
+    stroke-width: 1.5px;
+}
+
+[data-flow-part="edge-path"][data-selected] {
+    stroke: var(--fl-edge-selected);
+    stroke-width: 2.5px;
+}
+```

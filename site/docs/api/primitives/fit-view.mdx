@@ -1,0 +1,44 @@
+---
+title: FitView
+description: Flow.FitView fits every node into the root with one press, and is disabled until the engine knows the size of a node.
+---
+
+`Flow.FitView` renders a `button` (`type="button"`) that runs the engine's `"fit-view"` action:
+it fits every node in the root, with a padding of 0.1, within the zoom limits. Before the root and a node have a size the engine refuses it, so the button is `disabled` (and `data-disabled`) while `engine.can("fit-view")` is false; it
+re-renders when the view changes. It sets no text and no name: give it an icon and an
+`aria-label`. Put it in `Flow.Controls`, or anywhere inside `Flow.Root`.
+
+```tsx
+import { MaximizeIcon } from "lucide-react";
+
+<Flow.FitView aria-label="Fit view" className="p-1 data-disabled:opacity-40">
+    <MaximizeIcon />
+</Flow.FitView>;
+```
+
+The same action from code: `engine.run("fit-view")` ([engine](/docs/api/engine)).
+
+## Props
+
+`FitViewProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and
+every `button` attribute; a `disabled` of yours disables it too.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `children` | `ReactNode` | none | its icon or label |
+
+## State
+
+`ControlButtonState` ([Controls](/docs/api/primitives/controls)), what `className`, `style` and
+`render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `disabled` | `boolean` | the engine refuses its action now, or its `disabled` prop is set |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"fit-view"` |
+| `data-disabled` | present while disabled |

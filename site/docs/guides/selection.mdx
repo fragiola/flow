@@ -1,0 +1,108 @@
+---
+title: Selection
+description: Select nodes and edges with a click, a modifier click or a box, read the selection anywhere in the root, and change it from code.
+---
+
+`selection()` adds the selection to the document: a selected node or edge has `selected: true`,
+so the selection is saved, restored and undone like any other change. Its engine side selects on a
+click, adds with a modifier and draws a box. What a selected node looks like, and what the app does
+with the selection (a panel, a toolbar, a Delete button), is yours.
+
+<Example id="selection-and-keyboard" />
+
+## Turn it on
+
+```tsx
+import { drag } from "@fragiola/flow-react/drag";
+import { selection } from "@fragiola/flow-react/selection";
+
+const features = [selection(), drag()] as const;
+
+<Flow.Root<Types, typeof features> features={features} defaultNodes={nodes} defaultEdges={edges}>
+    {/* … */}
+    <Flow.SelectionBox className="border border-(--fl-selection-line) bg-(--fl-selection-bg)" />
+</Flow.Root>;
+```
+
+- **A click** on a node or an edge selects it alone; a click on the canvas clears the selection.
+- **Shift, Ctrl or ⌘ with a click** toggles it in the selection (`multiple: true`, the default).
+- **Shift with a drag on the canvas** draws a box, rendered by `Flow.SelectionBox` (in screen
+  pixels, so outside `Flow.Viewport`). Releasing it selects the nodes it holds and the edges
+  between them; Escape puts the selection back.
+- Pressing a selected node and dragging it (with `drag()`) moves the whole selection.
+
+## The options
+
+| option | default | does |
+| --- | --- | --- |
+| `boxMode` | `"full"` | a box takes the nodes it holds whole (`"full"`) or every node it touches (`"partial"`) |
+| `multiple` | `true` | a modifier click adds to the selection; `false`: a click always selects one |
+| `boxOnDrag` | `false` | any drag on the canvas draws a box, instead of Shift + drag (the canvas then never pans by dragging) |
+
+```ts
+const features = [selection({ boxMode: "partial", boxOnDrag: true }), drag()] as const;
+```
+
+## Style what is selected
+
+A selected node, edge, edge path, label and minimap node carries `data-selected`; the root carries
+`data-selecting` while a box is drawn.
+
+```tsx
+<Flow.Node<Types>
+    node={node}
+    className="border border-(--fl-node-line) data-selected:border-(--fl-edge-selected) data-selected:ring-2"
+>
+    {node.data.label}
+</Flow.Node>
+```
+
+## Read the selection
+
+[`useSelection`](/docs/api/primitives/hooks) re-renders its component when the selection changes,
+anywhere inside the root:
+
+```tsx
+import { useSelection } from "@fragiola/flow-react";
+
+function SelectionStatus() {
+    const selected = useSelection<Types>();
+    if (selected.nodes.length === 0 && selected.edges.length === 0) {
+        return <p role="status">Nothing selected</p>;
+    }
+    return (
+        <p role="status">
+            {selected.nodes.length} nodes, {selected.edges.length} edges selected
+        </p>
+    );
+}
+```
+
+Outside a root, or without React, read the model: `model.get("selected-nodes")`,
+`model.get("selected-edges")`, and `model.is("node-selected", { nodeId })`.
+
+## Change it from code
+
+The selection is three commands, so a button, a shortcut or an assistant changes it the way a
+click does:
+
+```ts
+model.run("selection.set", { nodeIds: ["build", "review"] }); // replace
+model.run("selection.set", { nodeIds: ["docs"], mode: "add" });
+model.run("selection.set", { edgeIds: ["build-docs"], mode: "toggle" });
+model.run("selection.clear");
+model.run("selection.remove"); // remove what is selected and deletable, with their edges
+```
+
+`selection.set` refuses an id that is not selectable (`selectable: false`) or does not exist.
+`selection.remove` is what the Delete key runs: it skips what is not deletable and removes the rest
+in one step.
+
+## Nodes that cannot be selected
+
+`selectable: false` on a node or an edge keeps it out of every selection: a click and a box skip
+it, and `selection.set` refuses it. A node made unselectable while selected is deselected.
+
+```ts
+model.run("node.set-flags", { nodeId: "legend", selectable: false });
+```

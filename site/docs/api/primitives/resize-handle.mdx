@@ -1,0 +1,57 @@
+---
+title: ResizeHandle
+description: ResizeHandle is a grab area on a corner or a side of a node; a press on it resizes the node from there, with resize() installed.
+---
+
+`ResizeHandle` comes from `@fragiola/flow-react/resize` and goes inside `NodeResizer`. A press on it
+resizes its node from its `position`, a `ResizePosition`: a corner (`top-left`, `top-right`,
+`bottom-right`, `bottom-left`) moves both dimensions, a side (`top`, `right`, `bottom`, `left`)
+one. A corner is centred on its corner and sits above the two sides it joins; a side spans its
+whole side. Give it its size (a side's thickness) and look. `RESIZE_POSITIONS` lists every
+position, corners then sides.
+
+```tsx
+import { NodeResizer, RESIZE_POSITIONS, ResizeHandle } from "@fragiola/flow-react/resize";
+
+<NodeResizer className="outline outline-blue-500">
+    {RESIZE_POSITIONS.map((position) => (
+        <ResizeHandle
+            key={position}
+            position={position}
+            className={position.includes("-") ? "size-2 bg-blue-500" : "data-[position=left]:w-1 data-[position=right]:w-1 data-[position=top]:h-1 data-[position=bottom]:h-1"}
+        />
+    ))}
+</NodeResizer>;
+```
+
+## Props
+
+`ResizeHandleProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and
+every `div` attribute.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `position` | `ResizePosition` | required | the corner or side it moves |
+| `nodeId` | `string` | the enclosing `Flow.Node`'s | its node |
+| `children` | `ReactNode` | none | its content |
+
+## State
+
+`ResizeHandleState`, what `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `nodeId` | `string` | its node |
+| `position` | `ResizePosition` | its corner or side |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"resize-handle"` |
+| `data-position` | its `ResizePosition` |
+
+## Structural style
+
+`position: absolute; pointer-events: auto` and its place: a corner at its corner,
+`translate(-50%, -50%)` and `z-index: 1`; a side along its side, `100%` long, centred on it.

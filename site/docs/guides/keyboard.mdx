@@ -1,0 +1,149 @@
+---
+title: Keyboard and accessibility
+description: Let keyboard users reach, select, move and delete nodes and edges, name every part yourself, and announce what happened in your own words.
+---
+
+`keyboard()` makes nodes and edges focusable and gives them keys: Tab walks them, the arrows move
+nodes, Enter selects, Delete removes, Escape clears. The package names nothing and says nothing
+aloud: it ships no text, no roles and no `aria-label`. The names, the descriptions and the
+announcements are yours, in your words and your language.
+
+<Example id="selection-and-keyboard" />
+
+## Turn it on
+
+```tsx
+import { keyboard } from "@fragiola/flow-react/keyboard";
+import { selection } from "@fragiola/flow-react/selection";
+
+const features = [selection(), drag(), keyboard()] as const;
+```
+
+With it, every node and edge gets `tabIndex={0}` (`engine.is("node-focusable", { nodeId })`), so
+Tab walks them in drawing order, and a node that takes focus is panned into view. On a focused
+node or edge:
+
+| key | does |
+| --- | --- |
+| Arrow keys | move the selected nodes, or the focused node, by `step` flow units (default 5), kept inside their parents; one step per press |
+| Shift + arrow | move by `fastStep` (default 20) |
+| Enter, Space | select it; with Shift, Ctrl or ⌘, toggle it in the selection |
+| Delete, Backspace | remove the selection (`selection.remove`), or without `selection()` the focused node or edge |
+| Escape | cancel a gesture under way, then clear the selection |
+
+```ts
+const features = [selection(), drag(), keyboard({ step: 10, fastStep: 50 })] as const;
+```
+
+A node that is not draggable does not move, and one that is not deletable stays. The root's
+`interactive={false}` (or `Flow.ToggleInteractive`) stops the keys from changing the flow.
+
+## Name every part
+
+A node is an element you render, so you name it. A flow is easier to follow when each node says
+what it is and each edge says what it joins:
+
+```tsx
+function renderNode(node: FlowNode<Types>) {
+    return (
+        <Flow.Node<Types>
+            node={node}
+            role="group"
+            aria-roledescription="node"
+            aria-label={node.data.label}
+            className="node"
+        >
+            {node.data.label}
+            <Flow.Handle type="target" side="left" className="handle" />
+            <Flow.Handle type="source" side="right" className="handle" />
+        </Flow.Node>
+    );
+}
+
+function renderEdge(edge: FlowEdge<Types>) {
+    return (
+        <Flow.Edge<Types>
+            edge={edge}
+            role="group"
+            aria-roledescription="edge"
+            aria-label={`${edge.source} to ${edge.target}`}
+        >
+            <Flow.EdgePath className="edge" />
+        </Flow.Edge>
+    );
+}
+```
+
+Name the root too (`role="group" aria-label="Release plan"`), and every control button: a
+`Flow.ZoomIn` renders only its children, an icon, so it needs `aria-label="Zoom in"`. See
+[Accessible names](/docs/getting-started/accessible-names).
+
+## Show focus
+
+Focus is DOM focus: style it with `:focus-visible`.
+
+```css
+[data-flow-part="node"]:focus-visible {
+    outline: var(--fl-focus-width) solid var(--fl-focus-line);
+    outline-offset: 2px;
+}
+```
+
+## Announce what happened
+
+<Example id="announcements" />
+
+A screen reader user does not see a node move. The engine tells what happened
+(`engine.subscribe`): `nodes-move` (with `source: "keyboard"` or `"pointer"`), `drag-cancel`,
+`connect`, `connect-cancel`, `remove`, `resize`, `box-select`, and more. Turn the events you care
+about into sentences and write them into a live region:
+
+```tsx title="live-region.tsx"
+import { type FlowEngineEvent, type FlowModel, useFlow } from "@fragiola/flow-react";
+import { useEffect, useState } from "react";
+
+type Model = FlowModel<Types, typeof features>;
+
+/** Your words for an event, or nothing for one you keep quiet about. */
+function describe(event: FlowEngineEvent, model: Model): string | undefined {
+    const name = (id: string) => model.get("node-by", { id })?.data.label ?? id;
+    switch (event.type) {
+        case "nodes-move":
+            return `Moved ${event.nodeIds.map(name).join(", ")}.`;
+        case "connect":
+            return `Connected ${name(event.source)} to ${name(event.target)}.`;
+        case "connect-cancel":
+            return event.refused ? "That connection is not allowed." : undefined;
+        case "remove":
+            return `Removed ${event.nodeIds.length} node(s) and ${event.edgeIds.length} edge(s).`;
+        default:
+            return undefined;
+    }
+}
+
+export function LiveRegion() {
+    const { model, engine } = useFlow<Types, typeof features>();
+    const [message, setMessage] = useState("");
+    useEffect(
+        () =>
+            engine.subscribe((event) => {
+                const next = describe(event, model);
+                if (next) setMessage(next);
+            }),
+        [model, engine],
+    );
+    return (
+        <p role="status" className="sr-only">
+            {message}
+        </p>
+    );
+}
+```
+
+Render `LiveRegion` inside the root (it reads the root's engine through `useFlow`).
+
+## What a keyboard cannot do yet
+
+Drawing a new edge and resizing a node are pointer gestures. Give keyboard users another way with
+the commands they run: a menu that runs `edge.add` between two chosen nodes, fields that run
+`node.resize`. The commands are the same for every input.

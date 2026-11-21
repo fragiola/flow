@@ -1,0 +1,119 @@
+---
+title: The viewport
+description: The viewport is the pan and the zoom of one flow on screen, held by the engine as view state, changed by gestures and actions, and never stored in the document.
+---
+
+The **viewport** is what part of the flow the root shows, and how big: `{ x, y, zoom }`, where
+`x` and `y` are the screen offset of the flow's origin from the root's top-left corner, in pixels,
+and `zoom` the scale. A flow point `p` is drawn at `p * zoom + (x, y)`. It is view state: the
+engine holds it, the document never does, so two views of one model can each have their own.
+
+<Example id="snap-to-grid" />
+
+## Gestures
+
+The core's viewport needs no feature. On the root:
+
+| gesture | does | root prop (default) |
+| --- | --- | --- |
+| drag on the pane | pans | `panOnDrag` (`true`) |
+| wheel | zooms around the pointer | `zoomOnScroll` (`true`) |
+| wheel, with `panOnScroll` | pans (Ctrl and the wheel zoom) | `panOnScroll` (`false`) |
+| two-finger pinch, trackpad pinch | zooms | `zoomOnPinch` (`true`) |
+| double click on the pane | zooms in by a step | `zoomOnDoubleClick` (`true`) |
+
+The zoom stays within `minZoom` (0.5) and `maxZoom` (2); `zoomStep` (1.2) is the factor of one
+step; `translateExtent`, a flow rectangle, keeps the view inside it. Every one of these props
+applies at once when it changes. With `selection({ boxOnDrag: true })`, a drag on the pane draws
+a selection box instead of panning.
+
+## Actions
+
+Change the viewport from code with the engine's actions (`useFlow().engine`, or a flow ref):
+
+```tsx title="view-buttons.tsx"
+import { useFlow } from "@fragiola/flow-react";
+
+export function ViewButtons({ nodeId }: { nodeId: string }) {
+    const { engine } = useFlow();
+    return (
+        <div data-flow-no-gesture="" className="absolute top-2 left-2 flex gap-1">
+            <button type="button" onClick={() => engine.run("fit-view", { padding: 0.2 })}>
+                Fit
+            </button>
+            <button type="button" onClick={() => engine.run("fit-view", { nodeIds: [nodeId], maxZoom: 1.5 })}>
+                Show the node
+            </button>
+            <button type="button" onClick={() => engine.run("zoom-to", { zoom: 1 })}>
+                100%
+            </button>
+            <button type="button" disabled={!engine.can("zoom-in")} onClick={() => engine.run("zoom-in")}>
+                Zoom in
+            </button>
+        </div>
+    );
+}
+```
+
+| action | payload |
+| --- | --- |
+| `set-viewport` | `{ x?, y?, zoom? }` |
+| `pan-by` | `{ x, y }`, in pixels |
+| `zoom-in`, `zoom-out` | `{ step?, around? }`: refused at the limit |
+| `zoom-to` | `{ zoom, around? }` |
+| `fit-view` | `{ padding?, nodeIds?, minZoom?, maxZoom? }`: refused before a size is known |
+| `center-on` | `{ x, y, zoom? }`, a flow point |
+| `focus-node` | `{ nodeId }` |
+
+`around` is a point relative to the root, in pixels (default its centre). `Flow.ZoomIn`,
+`Flow.ZoomOut` and `Flow.FitView` are these actions as buttons, disabled while `engine.can` says
+no ([Minimap and controls](/docs/guides/minimap-and-controls)).
+
+## Screen and flow coordinates
+
+`engine.get("screen-to-flow", point)` turns a client point (a pointer's `clientX` and `clientY`, a
+drop's) into flow coordinates, and `flow-to-screen` the other way round. That is how a palette
+drops a node where the pointer is:
+
+```tsx
+function onDrop(event: React.DragEvent) {
+    const point = engine.get("screen-to-flow", { x: event.clientX, y: event.clientY });
+    model.run("node.add", { type: "task", position: point, data: { title: "New task", done: false } });
+}
+```
+
+## Reading it
+
+`useViewport()` re-renders a component when the viewport changes (a zoom readout);
+`engine.get("viewport")` reads it once. `onViewportChange(viewport, gesture)` on the root hears
+every change, with `gesture` true for a pan, a zoom or a pinch by the user.
+
+## Controlled or not
+
+`defaultViewport` (default `{ x: 0, y: 0, zoom: 1 }`) is where the flow starts, read once;
+`fitView` fits the nodes once they are measured. A controlled `viewport` is set on the engine
+whenever it differs:
+
+```tsx
+const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
+
+<Flow.Root viewport={viewport} onViewportChange={setViewport} defaultNodes={nodes} className="h-96">
+    …
+</Flow.Root>;
+```
+
+React never renders the viewport's transform: the engine writes it on `Flow.Viewport`'s element
+itself, so a pan re-renders only what shows the viewport (the background, the minimap, toolbars,
+the zoom buttons), never the nodes.
+
+## Snapping is the drag's, the grid is yours
+
+The `snap-to-grid` example snaps dragged nodes with `drag({ snapGrid: [20, 20] })` and draws the
+same grid with `Flow.Background gap={20}`: the background is a pattern in flow units that pans and
+zooms with the viewport, but it does not know about the snap. Keep the two numbers equal.
+
+## Large flows
+
+`onlyRenderVisible` on the root renders only the nodes and edges in view (`visible-nodes`,
+`visible-edges`, plus the nodes not measured yet), for flows of hundreds of nodes. A node that
+leaves the view keeps its last size, so its edges are still drawn right.

@@ -1,0 +1,101 @@
+---
+title: Introduction
+description: What the package does for a node-based editor (panning, zooming, dragging, connecting, selecting) and what stays yours, down to every pixel and every word.
+---
+
+A node-based editor shows **nodes** joined by **edges** on a canvas you pan and zoom: a workflow
+builder, a data pipeline, a mind map, a state machine. Each node has **handles**, the points an
+edge starts or ends at, and a user draws a **connection** from one handle to another to add an
+edge. `@fragiola/flow-react` gives you that behaviour as headless primitives under one namespace,
+`Flow.*`, over a framework-free core, `@fragiola/flow`.
+
+What the package gives you:
+
+- **A pannable, zoomable viewport**: drag the pane, the wheel, a pinch, a double click, and
+  actions from code (`fit-view`, `zoom-in`, `center-on`).
+- **Gestures** with Pointer Events and pointer capture, one path for mouse, touch and pen:
+  dragging nodes, drawing and moving edges, box selection, resizing.
+- **Edges drawn for you**: bezier, smooth step, step and straight paths, recomputed whenever a
+  node moves or is measured, with the point a label goes at.
+- **Opt-in features**: selection, drag, connection, reconnection, resize, sub-flows, keyboard and
+  minimap, each from its own entry, so a flow ships only what it uses.
+- **A typed model** whose every change is a command with a JSON Schema, which middleware can
+  veto or rewrite: connection rules, undo, a back-end or an assistant all go through it.
+
+What stays **yours**: every pixel and every word. The package ships no CSS, no icons, no class
+names and no text. It writes only structural inline style (a node's position, the viewport's
+transform) and exposes its state as `data-*` attributes, so Tailwind, plain CSS, CSS modules or
+CSS-in-JS all work. You render each node's content, name every part for assistive technology, and
+decide what an announcement says.
+
+```tsx title="pipeline.tsx"
+import { Flow, type FlowNodeInput } from "@fragiola/flow-react";
+import { connection } from "@fragiola/flow-react/connection";
+import { drag } from "@fragiola/flow-react/drag";
+
+const features = [drag(), connection()] as const;
+
+const nodes: FlowNodeInput[] = [
+    { id: "read", type: "step", position: { x: 0, y: 0 }, data: { label: "Read" } },
+    { id: "write", type: "step", position: { x: 0, y: 120 }, data: { label: "Write" } },
+];
+
+export function Pipeline() {
+    return (
+        <Flow.Root
+            features={features}
+            defaultNodes={nodes}
+            defaultEdges={[{ id: "read-write", source: "read", target: "write" }]}
+            className="h-96 bg-gray-50"
+        >
+            <Flow.Viewport>
+                <Flow.Edges>
+                    {(edge) => (
+                        <Flow.Edge edge={edge}>
+                            <Flow.EdgePath className="stroke-gray-400" />
+                        </Flow.Edge>
+                    )}
+                </Flow.Edges>
+                <Flow.Nodes>
+                    {(node) => (
+                        <Flow.Node node={node} className="rounded border bg-white px-3 py-2 select-none">
+                            {String(node.data.label)}
+                            <Flow.Handle type="target" side="top" className="size-2 rounded-full bg-gray-500" />
+                            <Flow.Handle type="source" side="bottom" className="size-2 rounded-full bg-gray-500" />
+                        </Flow.Node>
+                    )}
+                </Flow.Nodes>
+                <Flow.ConnectionLine className="stroke-blue-500" />
+            </Flow.Viewport>
+        </Flow.Root>
+    );
+}
+```
+
+Nothing above is styled by the package: remove the class names and you get the same structure,
+with the same behaviour, unstyled.
+
+## What a flow is made of
+
+| piece | what it is | where it lives |
+| --- | --- | --- |
+| the document | `{ version: 1, nodes, edges }`, plain JSON | the model ([Nodes and edges](/docs/concepts/nodes-and-edges)) |
+| the model | the document and its rules: every change is a command | `@fragiola/flow` ([The model and commands](/docs/concepts/model-and-commands)) |
+| the engine | the flow on screen: the viewport, measurement, gestures, edge paths | `@fragiola/flow` ([Model and engine](/docs/concepts/model-and-engine)) |
+| the features | opt-in behaviour, each from its own entry | `@fragiola/flow-react/<feature>` ([Features](/docs/concepts/features)) |
+| the primitives | `Flow.Root`, `Flow.Node`, `Flow.Handle`, `Flow.Edge`, … | `@fragiola/flow-react` ([Composition](/docs/concepts/composition)) |
+
+## What it never ships
+
+Undo and redo, saving, translations and announcements are app policy: they stay in your app. The
+examples show each one as copyable code ([Undo and redo](/docs/guides/undo-redo),
+[Saving and restoring flows](/docs/guides/persistence),
+[Accessible names](/docs/getting-started/accessible-names)).
+
+## Next steps
+
+<Cards>
+    <Card title="Installation" href="/docs/getting-started/installation" description="The package, its peers and its entries." />
+    <Card title="Your first flow" href="/docs/getting-started/first-flow" description="From a list of nodes to a flow you drag and connect, in five steps." />
+    <Card title="The gallery" href="/examples/workflow-builder" description="Every example, in five themes, with its code." />
+</Cards>

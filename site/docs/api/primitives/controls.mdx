@@ -1,0 +1,55 @@
+---
+title: Controls
+description: Flow.Controls groups the viewport's buttons (zoom in, zoom out, fit view, lock) or your own, placed and named by you.
+---
+
+`Flow.Controls` renders a `div` inside `Flow.Root`, outside `Flow.Viewport`, for the viewport's
+buttons: `Flow.ZoomIn`, `Flow.ZoomOut`, `Flow.FitView`, `Flow.ToggleInteractive`, or your own
+calling the engine. Presses and the wheel over it are left to it. It has no role and no name:
+give it a group role and a label, and place it with your style.
+
+```tsx
+import { MaximizeIcon, MinusIcon, PlusIcon } from "lucide-react";
+
+<Flow.Controls role="group" aria-label="Zoom" className="absolute bottom-3 left-3 flex flex-col">
+    <Flow.ZoomIn aria-label="Zoom in" className="p-1 data-disabled:opacity-40">
+        <PlusIcon />
+    </Flow.ZoomIn>
+    <Flow.ZoomOut aria-label="Zoom out" className="p-1 data-disabled:opacity-40">
+        <MinusIcon />
+    </Flow.ZoomOut>
+    <Flow.FitView aria-label="Fit view" className="p-1">
+        <MaximizeIcon />
+    </Flow.FitView>
+</Flow.Controls>;
+```
+
+<Example id="minimap-and-controls" />
+
+## Props
+
+`ControlsProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and
+every `div` attribute.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `children` | `ReactNode` | none | the buttons |
+
+## State
+
+`ControlsState` is empty: its buttons have their own state.
+
+The buttons `Flow.ZoomIn`, `Flow.ZoomOut` and `Flow.FitView` share `ControlButtonState`, what
+their `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `disabled` | `boolean` | the engine refuses its action now (`!engine.can(…)`: a zoom at its limit, `fit-view` before a size), or its `disabled` prop |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"controls"` |
+
+The buttons carry their own parts (`zoom-in`, `zoom-out`, `fit-view`, `toggle-interactive`).

@@ -1,0 +1,84 @@
+---
+title: State attributes
+description: Every element a primitive renders names its part with data-flow-part and carries its state as data attributes, present or absent, for any styling approach.
+---
+
+The package styles nothing, but every element it renders says what it is and what state it is in,
+as attributes: style them from Tailwind's `data-*` variants, plain CSS selectors, CSS modules or
+CSS-in-JS. A boolean state attribute is present (`""`) or absent, never `"false"`.
+
+## Parts and ids
+
+Every element carries `data-flow-part`, the part it is: `root`, `viewport`, `nodes`, `node`,
+`handle`, `edges`, `edge`, `edge-path`, `edge-label`, `reconnect-anchor`, `connection-line`
+(and its default `connection-path`), `selection-box`, `background` (with `background-pattern`,
+`background-mark`, `background-fill` inside), `controls`, `zoom-in`, `zoom-out`, `fit-view`,
+`toggle-interactive`, `toolbar`, `minimap`, `minimap-node`, `minimap-mask`, `resizer`,
+`resize-handle`. An entity's part also carries `data-flow-id`: a node's id, an edge's id, a
+handle's `handleId`. There is no path attribute: a flow is a graph, not a tree.
+
+## By part
+
+| part | attributes |
+| --- | --- |
+| `root` | `data-interactive` (gestures may change the flow), `data-panning`, `data-dragging` (`drag()`), `data-connecting` (`connection()`), `data-selecting` (a box is drawn, `selection()`) |
+| `node` | `data-flow-id`, `data-selected`, `data-dragging`, `data-resizing` (`resize()`), `data-measured` (its size is known), `data-hidden` |
+| `handle` | `data-flow-id` (its `handleId`), `data-handle-type` (`source` or `target`), `data-side` (`top`, `right`, `bottom`, `left`), `data-connectable`, `data-connecting` (the connection under way starts here), `data-valid` / `data-invalid` (it would end here, accepted or refused) |
+| `edge`, `edge-path` | `data-flow-id`, `data-selected`, `data-reconnecting` (one of its ends is being moved) |
+| `edge-label` | `data-flow-id`, `data-selected` |
+| `reconnect-anchor` | `data-flow-id`, `data-end` (`source` or `target`), `data-reconnecting` |
+| `connection-line` | `data-valid` / `data-invalid`: the drop would add the edge, or be refused |
+| `selection-box` | `data-selecting` |
+| `zoom-in`, `zoom-out`, `fit-view` | `data-disabled` (and `disabled`) while the engine refuses the action |
+| `toggle-interactive` | `data-interactive`, and `aria-pressed` while the flow is locked |
+| `toolbar`, `resizer` | `data-flow-id` (its node); a resizer has `data-resizing` too |
+| `resize-handle` | `data-position` (`top-left`, `top`, `top-right`, `right`, `bottom-right`, `bottom`, `bottom-left`, `left`) |
+| `minimap-node` | `data-flow-id`, `data-selected` |
+
+Two attributes are yours to set: `data-flow-no-gesture` on an element whose presses start no
+gesture (a panel over the canvas, a part of a node), and `data-flow-no-wheel` on one that keeps its
+wheel (a scrolling list inside a node).
+
+## Styling from them
+
+```css title="flow.css"
+[data-flow-part="node"] {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    user-select: none;
+}
+[data-flow-part="node"][data-selected] {
+    border-color: var(--accent);
+}
+[data-flow-part="node"][data-dragging] {
+    cursor: grabbing;
+}
+[data-flow-part="handle"][data-valid] {
+    background: var(--valid);
+}
+[data-flow-part="handle"][data-invalid] {
+    background: var(--invalid);
+}
+[data-flow-part="edge-path"] {
+    stroke: var(--edge);
+    stroke-width: 1.5;
+}
+[data-flow-part="edge-path"][data-selected] {
+    stroke: var(--accent);
+}
+[data-flow-part="root"][data-connecting] [data-flow-part="handle"][data-handle-type="target"] {
+    outline: 2px dashed var(--accent);
+}
+```
+
+The same with Tailwind, on each part's `className`:
+
+```tsx
+<Flow.Node<Types> node={node} className="rounded-lg border bg-white select-none data-dragging:cursor-grabbing data-selected:border-blue-500" />
+<Flow.Handle type="target" side="top" className="size-2.5 rounded-full bg-slate-400 data-valid:bg-green-500 data-invalid:bg-red-500" />
+<Flow.EdgePath className="stroke-slate-400 data-selected:stroke-blue-500" />
+```
+
+See [Styling with plain CSS](/docs/guides/styling-css) and
+[Styling with Tailwind](/docs/guides/styling-tailwind).

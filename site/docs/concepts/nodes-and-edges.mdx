@@ -1,0 +1,131 @@
+---
+title: Nodes and edges
+description: A flow is one JSON document of nodes and edges, with ids, positions, data and permission flags, which the model keeps valid through every command.
+---
+
+A flow's whole state is one document, `{ version: 1, nodes, edges }`: plain JSON, frozen, checked
+against its JSON Schema when the model loads it. A **node** is a box at a position, of a type of
+yours, holding your data. An **edge** joins a source node to a target node, optionally at given
+handles, and is drawn as a path of its type. The viewport is not in the document: it is view state
+([The viewport](/docs/concepts/viewport)).
+
+## A node
+
+```ts
+const node: FlowNodeInput<Types> = {
+    id: "fetch",                    // optional on input: generated when missing
+    type: "task",                   // a node type of your registry
+    position: { x: 120, y: 80 },    // its top-left corner, in flow coordinates
+    data: { title: "Fetch orders", done: false },
+    width: 180,                     // optional: the size the document gives
+    height: 64,
+    draggable: true,                // flags, each with its default
+    selectable: true,
+    connectable: true,
+    deletable: true,
+    hidden: false,
+};
+```
+
+Flow coordinates have x growing to the right and y growing down. A node without `width` and
+`height` takes the size of what you render in it, measured by the engine. With `subflows()`, a
+node may live in a `parentId`, its position then relative to its parent
+([Sub-flows](/docs/guides/sub-flows)); with `selection()`, it may be `selected`.
+
+## An edge
+
+```ts
+const edge: FlowEdgeInput<Types> = {
+    id: "fetch-parse",              // optional on input
+    source: "fetch",                // the node it starts at
+    target: "parse",                // the node it ends at
+    sourceHandle: "out",            // optional: the source node's handle
+    targetHandle: "in",             // optional: the target node's handle
+    type: "smoothstep",             // bezier (default), smoothstep, step, straight, or your own
+    data: { weight: 1 },            // optional
+    selectable: true,
+    deletable: true,
+    hidden: false,
+    reconnectable: true,
+};
+```
+
+An edge without a handle uses its node's first handle of that type (a source handle at its
+source, a target handle at its target), or, when the node has none, leaves the source by its
+bottom and enters the target by its top. An edge of a type of yours gets the bezier path, and its
+ends to draw your own ([Custom edges](/docs/guides/custom-edges)).
+
+## The rules the model keeps
+
+- **Ids are unique**, among nodes and among edges. A node or an edge added without an id gets one
+  from `createId(kind)` (an option of `createFlowModel` and of the root), by default
+  `node-1`, `edge-1`, … The model never uses a global `crypto`.
+- **Edges join existing, connectable nodes.** `edge.add` refuses a missing node, a node with
+  `connectable: false`, and a second edge joining the same handles in the same direction. A self
+  loop is allowed; forbid it in a middleware if your flow does not want it
+  ([Connection rules](/docs/guides/connection-rules)).
+- **An edge never dangles.** Removing a node removes its edges in the same step (and, with
+  `subflows()`, its children), whatever the edges' own `deletable`.
+- **Flags hold for code too.** `draggable: false` refuses `node.move` from a drag and from your
+  code; `deletable: false` refuses `node.remove`; `selectable: false` refuses `selection.set`. Change
+  a flag with `node.set-flags` or `edge.set-flags`.
+- **A feature's field needs its feature.** `selected` needs `selection()`; `parentId`, `extent` and
+  `expandParent` need `subflows()`. A document carrying one without it is refused, with the path of
+  each problem.
+
+## Loading and validating
+
+```ts
+import { createFlowModel, FlowValidationError, validateFlow } from "@fragiola/flow-react";
+
+try {
+    const model = createFlowModel<Types, typeof features>(json, { features });
+} catch (error) {
+    if (error instanceof FlowValidationError) {
+        for (const issue of error.issues) console.warn(issue.path, issue.message);
+    }
+}
+
+// or, without throwing: every problem with its JSON path, none for a valid document
+const issues = validateFlow(json, { features });
+```
+
+`model.get("flow-json")` gives the document back as a writable copy, every id present: it loads
+again into `createFlowModel` unchanged. See [Flow JSON](/docs/api/json-document).
+
+## Reading nodes and edges
+
+```ts
+model.get("node-by", { id: "fetch" });                              // a node, or undefined
+model.get("all-nodes");                                             // every node, in drawing order
+model.get("node-edges-by", { nodeId: "fetch", handleType: "source" }); // the edges that start there
+model.get("connected-edges-by", { nodeIds: ["fetch", "parse"] });   // the edges touching either
+model.get("absolute-position-by", { nodeId: "fetch" });             // with its parents' positions added
+model.is("node-deletable", { nodeId: "fetch" });
+```
+
+In a component under the root, `useNodes()` and `useEdges()` re-render on every change, and
+`useSelection()` when the selection changes ([Hooks](/docs/api/primitives/hooks)).
+
+## Controlled or not
+
+The root creates its model from `defaultNodes` and `defaultEdges`, read once. Or control them:
+give `nodes` and `edges` with `onNodesChange` and `onEdgesChange`, and the root brings the model
+to your lists with the commands a user would have run, so middleware and listeners still see
+every change.
+
+```tsx
+const [nodes, setNodes] = useState<readonly FlowNode<Types>[]>(initialNodes);
+
+<Flow.Root<Types, typeof features>
+    features={features}
+    nodes={nodes}
+    onNodesChange={setNodes}
+    defaultEdges={edges}
+>
+    …
+</Flow.Root>;
+```
+
+Controlled nodes need every id. Keep the children functions stable when the app re-renders on each
+change (a module function, `useCallback`), or every node re-renders.

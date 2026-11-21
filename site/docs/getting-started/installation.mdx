@@ -1,0 +1,104 @@
+---
+title: Installation
+description: Install the React package, which re-exports the whole core, and import each feature from its own entry so a flow ships only what it uses.
+---
+
+The React package is the only one a React app installs: it re-exports everything the core
+exports, so the model, the engine, the types and the path helpers come from the same import.
+
+<Tabs items={["pnpm", "npm", "yarn"]}>
+<Tab value="pnpm">
+
+```bash
+pnpm add @fragiola/flow-react
+```
+
+</Tab>
+<Tab value="npm">
+
+```bash
+npm install @fragiola/flow-react
+```
+
+</Tab>
+<Tab value="yarn">
+
+```bash
+yarn add @fragiola/flow-react
+```
+
+</Tab>
+</Tabs>
+
+It needs `react` and `react-dom` 19 as peers. Nothing else: the package has no runtime dependency
+but its core, and ships no stylesheet to import.
+
+## Importing
+
+```tsx
+import { createFlowModel, Flow, type FlowTypes, useFlow } from "@fragiola/flow-react";
+```
+
+`Flow` is the namespace of the primitives (`Flow.Root`, `Flow.Viewport`, `Flow.Nodes`,
+`Flow.Node`, `Flow.Handle`, `Flow.Edges`, `Flow.Edge`, …); the hooks (`useFlow`, `useNode`,
+`useViewport`, `useSelection`, …) and `createFlowRef` / `useFlowRef` are named exports beside it.
+The components use hooks and the DOM: in a framework with server components, render them from a
+file that starts with `"use client"`.
+
+## The features' entries
+
+Every feature is a factory on its own entry. The main entry never imports one, so a feature you
+never import is not in your bundle:
+
+```tsx
+import { connection } from "@fragiola/flow-react/connection";
+import { drag } from "@fragiola/flow-react/drag";
+import { keyboard } from "@fragiola/flow-react/keyboard";
+import { MiniMap, minimap } from "@fragiola/flow-react/minimap";
+import { reconnection } from "@fragiola/flow-react/reconnection";
+import { NodeResizer, resize } from "@fragiola/flow-react/resize";
+import { selection } from "@fragiola/flow-react/selection";
+import { subflows } from "@fragiola/flow-react/subflows";
+```
+
+| entry | factory | brings |
+| --- | --- | --- |
+| `@fragiola/flow-react/selection` | `selection()` | click, multi-select, box select, the `selection.*` commands |
+| `@fragiola/flow-react/drag` | `drag()` | node dragging, snap to grid, multi-node drag |
+| `@fragiola/flow-react/connection` | `connection()` | drawing edges from handles, the connection line |
+| `@fragiola/flow-react/reconnection` | `reconnection()` | moving an edge's ends (needs `connection()`) |
+| `@fragiola/flow-react/resize` | `resize()` | resizing nodes, with `NodeResizer` and `ResizeHandle` |
+| `@fragiola/flow-react/subflows` | `subflows()` | nodes inside a parent node |
+| `@fragiola/flow-react/keyboard` | `keyboard()` | focus, arrow moves, Delete, Escape |
+| `@fragiola/flow-react/minimap` | `minimap()` | the minimap's view, with `MiniMap`, `MiniMapNode`, `MiniMapMask` |
+
+Each React entry re-exports the core's factory (`@fragiola/flow/<feature>`), so an app imports
+everything from the one package it installs. See [Features](/docs/concepts/features).
+
+## The core alone
+
+`@fragiola/flow` is the framework-free core: the document, the model and its commands, the engine
+and the path helpers, with zero runtime dependencies. Install it on its own for a server that
+validates and edits flows, a test, or another framework:
+
+```bash
+pnpm add @fragiola/flow
+```
+
+```ts title="server.ts"
+import { createFlowModel, type FlowJson, validateFlow } from "@fragiola/flow";
+
+/** Moves a node of a stored flow, or says why the flow is not one. */
+export function moveNode(json: unknown, nodeId: string, x: number, y: number) {
+    const issues = validateFlow(json);
+    if (issues.length > 0) return { ok: false as const, issues };
+    const model = createFlowModel(json as FlowJson);
+    const result = model.run("node.move", { nodeId, position: { x, y } });
+    return result.ok
+        ? { ok: true as const, json: model.get("flow-json") }
+        : { ok: false as const, issues: [{ path: "", message: result.error.message }] };
+}
+```
+
+The model runs in plain Node: it never touches the DOM. Only the engine needs one, and it reaches
+the DOM through the root element it is given (its owner document and window), never the globals.

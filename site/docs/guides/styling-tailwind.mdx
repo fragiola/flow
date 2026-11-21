@@ -1,0 +1,100 @@
+---
+title: Styling with Tailwind
+description: Style every primitive with plain Tailwind utilities, data-* variants, group variants and className functions, with no plugin and no preset.
+---
+
+The package paints nothing and ships no class names, so Tailwind styles it with ordinary
+utilities. Everything below is plain Tailwind v4, the way this site's examples are written; no
+plugin or preset is involved.
+
+<Example id="basic" />
+
+## State through `data-*` variants
+
+Tailwind v4 turns every attribute into a variant. The primitives expose their state as
+[`data-*` attributes](/docs/concepts/state-attributes), present or absent:
+
+```tsx
+<Flow.Node<Types>
+    node={node}
+    className="min-w-28 select-none rounded-lg border border-palette-line bg-palette-base px-3 py-2 data-dragging:cursor-grabbing data-selected:border-palette-ring data-selected:ring-2 data-selected:ring-palette-ring/30 focus-visible:outline-2"
+>
+    {node.data.label}
+    <Flow.Handle
+        type="source"
+        side="bottom"
+        className="size-2.5 rounded-full border border-palette-line bg-palette-base data-valid:bg-green-500 data-invalid:bg-red-500"
+    />
+</Flow.Node>
+```
+
+Valued attributes take the bracket form: `data-[side=left]:-translate-x-1/2`,
+`data-[handle-type=target]:rounded-none`, `data-[position=top-left]:cursor-nwse-resize`.
+
+## SVG parts
+
+Edges, the connection line, the background and the minimap are SVG: use the `stroke-*` and
+`fill-*` utilities.
+
+```tsx
+<Flow.EdgePath className="fill-none stroke-palette-line stroke-[1.5px] data-selected:stroke-palette-ring data-selected:stroke-[2.5px]" />
+<Flow.ConnectionLine className="fill-none stroke-palette-ring [stroke-dasharray:4_3]" />
+<Flow.Background variant="dots" size={2} className="text-palette-line" />
+```
+
+`Flow.Background` draws its marks in `currentColor`: its `text-*` utility is the marks' colour.
+
+## State of an ancestor: `group` and `in-data-*`
+
+A part inside a node styles itself from the node's state with a `group` on the node:
+
+```tsx
+<Flow.Node<Types> node={node} className="group node">
+    <span className="opacity-60 group-data-selected:opacity-100">{node.data.label}</span>
+    <NodeResizer className="hidden group-data-selected:block" />
+</Flow.Node>
+```
+
+`in-data-dragging:opacity-80` (Tailwind v4's `in-*` variant) does the same without naming the
+group: it matches when any ancestor carries the attribute, such as the root while a drag is under
+way.
+
+## Class name functions
+
+`className` also takes a function of the primitive's state: useful when the state is not an
+attribute, or for a lookup of your own.
+
+```tsx
+const TONE = { draft: "border-dashed", ready: "border-solid" } as const;
+
+<Flow.Node<Types>
+    node={node}
+    className={(state) => `node ${TONE[state.node.data.status]} ${state.measured ? "" : "invisible"}`}
+>
+    {node.data.label}
+</Flow.Node>;
+```
+
+## One string per part
+
+The examples keep every class string out of the markup, in a `styles.ts` beside the component:
+one entry per part, read from the theme's tokens. The markup stays readable, and a theme changes
+the look without touching it.
+
+```ts title="styles.ts"
+export const styles = {
+    root: "size-full min-h-0 bg-(--fl-canvas-bg) font-(family-name:--fl-font) text-palette-contrast",
+    node: "palette-raised min-w-28 select-none rounded-(--fl-node-radius) border-(length:--fl-node-border) border-(--fl-node-line) bg-(--fl-node-bg) p-(--fl-node-padding) data-selected:border-(--fl-edge-selected)",
+    handle: "size-(--fl-handle-size) rounded-(--fl-handle-radius) border-(length:--fl-handle-border) border-(--fl-handle-line) bg-(--fl-handle-bg) data-valid:bg-(--fl-valid) data-invalid:bg-(--fl-invalid)",
+    edge: "fill-none stroke-(--fl-edge-color) stroke-(length:--fl-edge-width) data-selected:stroke-(--fl-edge-selected)",
+};
+```
+
+See [Theming with Fragiola palettes](/docs/guides/theming) for the tokens.
+
+## Placing the overlays
+
+`Flow.Controls`, `MiniMap` and your own panels sit inside the root, which is `position: relative`:
+place them with `absolute` and logical insets (`bottom-3 start-3`, `bottom-3 end-3`). A panel of
+your own over the canvas marks itself `data-flow-no-gesture` (and `data-flow-no-wheel` when it
+scrolls), so a press on it never pans the flow.

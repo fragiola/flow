@@ -1,0 +1,56 @@
+---
+title: Nodes
+description: Flow.Nodes is the layer of the nodes, calling your children function once per node that is shown, keyed by id and memoized per node.
+---
+
+`Flow.Nodes` goes inside `Flow.Viewport`, after `Flow.Edges`. It calls its children function for
+each node that is not hidden, in drawing order, keyed by the node's id (a node keeps its element
+when it moves). With the root's `onlyRenderVisible`, only the nodes in view (and those not measured
+yet) are rendered (`visible-nodes`). You render each node: usually a `Flow.Node` with its content
+and handles, switching on `node.type` when the flow has several.
+
+```tsx
+function renderNode(node: FlowNode<Types>) {
+    return (
+        <Flow.Node<Types> node={node} className="rounded border bg-white p-2">
+            {node.data.label}
+            <Flow.Handle type="target" side="left" />
+            <Flow.Handle type="source" side="right" />
+        </Flow.Node>
+    );
+}
+
+<Flow.Nodes<Types>>{renderNode}</Flow.Nodes>;
+```
+
+Each node's render is memoized on the node and the children function: a drag step re-renders the
+moved nodes only. A new children function re-renders every node, so keep it stable (a module
+function as above, or `useCallback`) when the app re-renders on each change (controlled `nodes`).
+
+## Props
+
+`NodesProps<T>` extends the [common primitive props](/docs/api/primitives/root#common-props) and
+every `div` attribute but `children`.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `children` | `(node: FlowNode<T>) => ReactNode` | required | renders one node |
+
+## State
+
+`NodesState`, what `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `count` | `number` | how many nodes are rendered |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"nodes"` |
+
+## Structural style
+
+`position: absolute` at the viewport's origin. The layer is part of the pane: a press on it, off
+any node, pans or draws a selection box.
