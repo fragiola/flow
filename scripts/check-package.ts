@@ -14,8 +14,7 @@
 // - every adapter (`ADAPTERS`: each package under packages/ but the core) depends on the core at
 //   its exact version, and passes its smoke test: a scratch app outside the workspace installs
 //   that adapter's tarball (the core tarball comes as its dependency), typechecks, builds and
-//   loads its dev server. React's is a Vite + React app at the pins of examples/react once that
-//   app exists (packages/react's own pins until then); each later adapter Epic (Vue, Svelte,
+//   loads its dev server. React's is a Vite + React app at the pins of examples/react; each later adapter Epic (Vue, Svelte,
 //   Angular) adds its entry and its smoke app, as Splitter's. A consumer's dev server adds the
 //   `development` condition, which once pointed Dockable's published `exports` at sources that
 //   are not in the tarball.
@@ -210,12 +209,11 @@ export interface AdapterCheck {
 }
 
 /**
- * The pins a smoke app installs that no package of the repo pins yet: the Vite plugin of the React
- * examples app (fragiola/flow#6), Splitter's pin until that app exists.
+ * The pins a smoke app installs that no package of the repo pins: none since the React examples
+ * app (examples/react) pins the Vite plugin; a later adapter's smoke app may need one before its
+ * examples app exists.
  */
-const SMOKE_PINS: Readonly<Record<string, string>> = {
-    "@vitejs/plugin-react": "6.1.1",
-};
+const SMOKE_PINS: Readonly<Record<string, string>> = {};
 
 /**
  * The version of `name` a framework's smoke app installs, so that it installs nothing new: its

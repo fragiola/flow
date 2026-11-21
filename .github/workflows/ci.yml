@@ -16,6 +16,9 @@
 #                     .github, scripts, site) and a manual run: every suite. It also lists the
 #                     frameworks with an examples app (every `examples/<framework>` with a
 #                     playwright.config.ts).
+#   E2E (playground)  the playground's suite (apps/playground/e2e) on Chromium and Firefox: every
+#                     gesture on the unstyled fixture, with the mouse and with fingers, the
+#                     scenarios (500 nodes) and the shell, against its dev server (sources).
 #   E2E (examples)    a matrix over those frameworks, from the Changes outputs: the shared specs
 #                     (examples/shared/e2e) against a production build of that framework's embed,
 #                     served under /flow/embed/<framework>/ with a host page that frames it.
@@ -108,6 +111,40 @@ jobs:
           else
             node scripts/e2e-suites.ts --all
           fi
+
+  e2e-playground:
+    name: E2E (playground)
+    needs: changes
+    if: needs.changes.outputs.playground == 'true'
+    runs-on: ubuntu-latest
+    # Playwright's image: its browsers and their system packages, at the pinned @playwright/test
+    # (site/tests/ci-workflow.test.ts); no browser install
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --user 1001
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # the dev server serves the packages from their sources: nothing to build
+      - name: Run Playwright
+        run: pnpm --filter playground run e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-playground
+          path: apps/playground/playwright-report/
+          retention-days: 14
 
   e2e-examples:
     name: E2E (examples ${{ matrix.framework }})

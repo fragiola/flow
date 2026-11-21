@@ -24,6 +24,8 @@
         "typecheck": "pnpm -r typecheck",
         "test": "vitest run",
         "build": "pnpm -r build && node scripts/check-dts.ts && node scripts/check-features.ts",
+        "e2e": "pnpm --workspace-concurrency=1 --filter playground --filter \"./examples/*\" e2e",
+        "dev": "pnpm --filter playground dev",
         "check:package": "pnpm --filter \"./packages/*\" build && node scripts/check-package.ts"
     },
     "devDependencies": {

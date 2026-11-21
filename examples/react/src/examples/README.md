@@ -50,7 +50,7 @@ order); `order` is an example's place inside its level.
 1. Create `src/examples/<id>/index.tsx` and `styles.ts`, and its metadata in
    `examples/shared/src/meta/<id>.ts` (see `examples/shared/src/meta-types.ts`).
 2. `pnpm dev` at the root lists it in the playground (`apps/playground`), with hot reload, the
-   themes and its source: `http://localhost:5195/?example=<id>`. The embed alone is
+   themes and its source: `http://localhost:5197/?example=<id>`. The embed alone is
    `pnpm --filter examples-react dev` (`http://localhost:5185/?id=<id>`, `PORT` moves it; it
    regenerates the loaders).
 3. The smoke e2e visits it in every theme and inside an iframe. Add a spec for its main behaviour

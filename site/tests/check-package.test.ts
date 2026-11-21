@@ -150,27 +150,28 @@ describe("the adapters the package check covers", () => {
         ]);
     });
 
-    it("pin the React smoke app at the repo's versions, so it installs nothing new", () => {
-        const react = JSON.parse(
+    it("pin the React smoke app at the examples app's versions, so it installs nothing new", () => {
+        const app = JSON.parse(
             readFileSync(
-                join(import.meta.dirname, "../../packages/react/package.json"),
+                join(import.meta.dirname, "../../examples/react/package.json"),
                 "utf8",
             ),
-        ) as { devDependencies: Record<string, string> };
+        ) as {
+            dependencies: Record<string, string>;
+            devDependencies: Record<string, string>;
+        };
+        const pins = { ...app.dependencies, ...app.devDependencies };
         for (const name of [
             "react",
             "react-dom",
             "@types/react",
+            "@types/react-dom",
+            "@vitejs/plugin-react",
             "typescript",
             "vite",
         ]) {
-            expect(smokeVersion("react", name), name).toBe(
-                react.devDependencies[name],
-            );
+            expect(smokeVersion("react", name), name).toBe(pins[name]);
         }
-        expect(smokeVersion("react", "@vitejs/plugin-react")).toMatch(
-            /^\d+\.\d+\.\d+$/,
-        );
         expect(() => smokeVersion("react", "left-pad")).toThrow(/no pin/);
     });
 
