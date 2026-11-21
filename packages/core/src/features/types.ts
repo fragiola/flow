@@ -4,6 +4,8 @@
 // (`createFlowModel(json, { features: [selection()] })`). Every part is optional; the core composes
 // them once (`registry.ts`) and calls each contribution point where it would have done the work
 // itself. Features talk to each other only through keys, never by importing each other.
+
+import type { MutablePartAttributes } from "../attributes/part-attributes";
 import type { CommandDefinition, Failure } from "../commands/define";
 import type {
     CommandListener,
@@ -12,6 +14,14 @@ import type {
     RunOptions,
 } from "../commands/types";
 import type { FlowEdge, FlowNode, XY } from "../document/types";
+import type { FlowHandle, PressTarget } from "../engine/adapter";
+import type { FlowEngineEvent } from "../engine/events";
+import type {
+    EngineActionKey,
+    EngineGetKey,
+    EngineIsKey,
+} from "../engine/verbs";
+import type { EdgePath, Rect, Viewport } from "../geometry/types";
 import type { ValidationIssue } from "../schema/types";
 import type { Draft } from "../state/draft";
 import type { ModelGetKey, ModelIsKey } from "../state/queries";
@@ -48,9 +58,25 @@ export interface FeatureModel {
     subscribe(listener: CommandListener): () => void;
 }
 
+/** What the engine tells a gesture: the pointer moved, was released, or the gesture ends. */
+export interface FeatureGesture {
+    /** the pointer moved (its coalesced moves arrive one by one) */
+    move(event: PointerEvent): void;
+    /** the pointer was released: the gesture commits what it did */
+    end(event: PointerEvent): void;
+    /** the gesture ends without committing (Escape, `pointercancel`, a lost capture, a detach) */
+    cancel(): void;
+    /**
+     * whether the gesture has started doing something (a drag past its threshold): a press whose
+     * gesture is not active and that barely moved is a tap (`FeatureEngine.tap`)
+     */
+    active?(): boolean;
+}
+
 /**
- * What an engine gives the features of one view (fragiola/flow#3 adds its DOM means here: the
- * root, measured rects, handles, the viewport, events).
+ * What the engine gives the features of one view: the model, the view's means (the root, the
+ * viewport, measured rects and handles, point conversion), its notifications and a shared slot.
+ * Every member reads the engine at the call, never a snapshot.
  */
 export interface FeatureEngineHost {
     readonly model: FeatureModel;
@@ -59,12 +85,56 @@ export interface FeatureEngineHost {
      * session): features share state through it without importing each other
      */
     shared<V>(key: string, create: () => V): V;
+    /** the root element, when attached */
+    root(): HTMLElement | undefined;
+    /** the viewport */
+    viewport(): Viewport;
+    /** the least and the greatest zoom */
+    zoomLimits(): { readonly min: number; readonly max: number };
+    /** sets the viewport (zoom and translate extent kept); returns the viewport it got */
+    setViewport(viewport: Viewport): Viewport;
+    /** the root's size, in pixels (zero before it is attached and laid out) */
+    rootSize(): { readonly width: number; readonly height: number };
+    /** a pointer's client point (`clientX`, `clientY`) relative to the root's top-left corner */
+    toRoot(client: XY): XY;
+    /** a pointer's client point as a flow point */
+    toFlow(client: XY): XY;
+    /** a node's box in absolute flow coordinates with its measured (or given) size */
+    nodeRect(nodeId: string): Rect | undefined;
+    /** whether a node's size is known (measured, or given by the document) */
+    measured(nodeId: string): boolean;
+    /** every registered handle with its centre (absolute flow coordinates, once measured) */
+    handles(): readonly FlowHandle[];
+    /** an edge's drawn ends, once both its nodes are measured */
+    edgePath(edgeId: string): EdgePath | undefined;
+    /**
+     * a node's position (relative to its parent) kept inside its parent with the measured sizes
+     * when its `extent` is `"parent"`; `size` overrides the node's own (a resize under way)
+     */
+    keepInParent(
+        nodeId: string,
+        position: XY,
+        size?: { readonly width: number; readonly height: number },
+    ): XY;
+    /** a node's element, as the adapter registered it */
+    nodeElement(nodeId: string): HTMLElement | undefined;
+    /** whether the flow's gestures and keys may change it (the Controls' interactivity toggle) */
+    interactive(): boolean;
+    /** options an adapter gave a part (`engine.adapter.setPartOptions`: a resizer's limits) */
+    partOptions(
+        part: string,
+        id: string,
+    ): Readonly<Record<string, unknown>> | undefined;
+    /** the view changed (a gesture's state): adapters re-render */
+    changed(): void;
+    /** tells the app something happened (D12: an announcement's event) */
+    emit(event: FlowEngineEvent): void;
 }
 
 /**
- * What a feature adds to one engine (each engine on a model gets its own). The engine
- * (fragiola/flow#3) walks the hooks in install order, the first returning `true` taking the event,
- * and merges the keys into its verbs (a key two features add throws).
+ * What a feature adds to one engine (each engine on a model gets its own). The engine walks the
+ * hooks in install order, the first taking the event ending the walk, and merges the keys into its
+ * verbs (a key two features add throws).
  */
 export interface FeatureEngine {
     /** engine actions (`engine.run`), each with its dry run */
@@ -84,10 +154,28 @@ export interface FeatureEngine {
     readonly is?:
         | Readonly<Record<string, (payload: unknown) => boolean>>
         | undefined;
-    /** a primary press in the flow: `true` takes it (a drag, a connection, a box selection starts) */
-    pointerdown?(event: PointerEvent): boolean | undefined;
-    /** a key in the flow: `true` takes it */
-    keydown?(event: KeyboardEvent): boolean | undefined;
+    /**
+     * a primary press in the flow (`target` says on what): a gesture takes it (a drag, a
+     * connection, a box selection starts), `undefined` leaves it to the next feature and the core
+     */
+    pointerdown?(
+        event: PointerEvent,
+        target: PressTarget,
+    ): FeatureGesture | undefined;
+    /** a press released where it was pressed (no active gesture): `true` takes it (a click selects) */
+    tap?(event: PointerEvent, target: PressTarget): boolean | undefined;
+    /** the wheel in the flow: `true` takes it (the minimap zooms) */
+    wheel?(event: WheelEvent, target: PressTarget): boolean | undefined;
+    /** a key in the flow: `true` takes it (its default is prevented) */
+    keydown?(event: KeyboardEvent, target: PressTarget): boolean | undefined;
+    /** DOM focus entered a part of the flow (a node, an edge) */
+    focus?(target: PressTarget): void;
+    /** adds its state attributes to a part's record (`data-dragging` on a dragged node) */
+    attributes?(
+        part: string,
+        payload: Readonly<Record<string, unknown>>,
+        into: MutablePartAttributes,
+    ): void;
     /** the root element was attached */
     attached?(root: Element): void;
     /** the root goes away: what is under way (a gesture) ends */
@@ -189,5 +277,26 @@ export type ModelGetKeyOf<F extends FlowFeatures> = AllowedKeys<
 export type ModelIsKeyOf<F extends FlowFeatures> = AllowedKeys<
     "is",
     ModelIsKey,
+    F
+>;
+
+/** The `engine.run` actions of an engine whose model has the features `F`. */
+export type EngineActionKeyOf<F extends FlowFeatures> = AllowedKeys<
+    "engineRun",
+    EngineActionKey,
+    F
+>;
+
+/** The `engine.get` keys of an engine whose model has the features `F`. */
+export type EngineGetKeyOf<F extends FlowFeatures> = AllowedKeys<
+    "engineGet",
+    EngineGetKey,
+    F
+>;
+
+/** The `engine.is` keys of an engine whose model has the features `F`. */
+export type EngineIsKeyOf<F extends FlowFeatures> = AllowedKeys<
+    "engineIs",
+    EngineIsKey,
     F
 >;

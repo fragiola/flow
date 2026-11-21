@@ -1,9 +1,10 @@
 // The drag feature (D2, `@fragiola/flow/drag`): node dragging, snap to a grid, multi-node drag,
 // extent. Its model side is the core's `node.move` (refused for a node that is not draggable),
-// which a drag runs as `transient` steps, then once more for the drop (D9); its engine side (Pointer
-// Events, the threshold, the snap, moving every selected node) comes with the engine
-// (fragiola/flow#3), reading `options`.
+// which a drag runs as `transient` steps, then once more for the drop (D9); its engine side
+// (`drag-engine.ts`: Pointer Events, the threshold, the snap, moving every selected node) reads
+// `options`.
 import type { FlowFeature } from "../features/types";
+import { dragEngine } from "./drag-engine";
 
 /** Options of {@link drag}: read by its engine side. */
 export interface DragOptions {
@@ -18,16 +19,18 @@ export type DragFeature = FlowFeature<"drag", DragOptions>;
 
 /** Dragging nodes: `features: [drag()]` (`@fragiola/flow/drag`). */
 export function drag(options: Partial<DragOptions> = {}): DragFeature {
+    const resolved: DragOptions = Object.freeze({
+        snapGrid: options.snapGrid
+            ? (Object.freeze([...options.snapGrid]) as readonly [
+                  number,
+                  number,
+              ])
+            : undefined,
+        threshold: options.threshold ?? 1,
+    });
     return Object.freeze({
         name: "drag",
-        options: Object.freeze({
-            snapGrid: options.snapGrid
-                ? (Object.freeze([...options.snapGrid]) as readonly [
-                      number,
-                      number,
-                  ])
-                : undefined,
-            threshold: options.threshold ?? 1,
-        }),
+        options: resolved,
+        engine: (host) => dragEngine(host, resolved),
     } satisfies DragFeature);
 }

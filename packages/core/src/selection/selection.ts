@@ -1,13 +1,13 @@
 // The selection feature (D2, `@fragiola/flow/selection`): nodes and edges are selected. Its model
 // side is here: the `selection.*` commands, the `selected-*` and `*-selected` keys, the `selected`
 // field of a node and an edge, and its rule (a node or edge made unselectable is deselected). Its
-// engine side (click, modifier multi-select, box selection) comes with the engine
-// (fragiola/flow#3), reading `options`.
+// engine side (`selection-engine.ts`: click, modifier multi-select, box selection) reads `options`.
 import { fail } from "../commands/define";
 import { edgeFlag, nodeFlag } from "../document/flags";
 import type { FlowFeature, FlowReader } from "../features/types";
 import { stringOf } from "../state/core-queries";
 import { selectionClear, selectionRemove, selectionSet } from "./commands";
+import { selectionEngine } from "./selection-engine";
 
 /** How a box selection takes nodes: those it touches (`"partial"`) or those it holds whole (`"full"`). */
 export type BoxSelectionMode = "partial" | "full";
@@ -18,6 +18,8 @@ export interface SelectionOptions {
     readonly boxMode: BoxSelectionMode;
     /** whether a modifier click (Ctrl/⌘, Shift) adds to the selection; default true */
     readonly multiple: boolean;
+    /** whether any drag on the pane draws a selection box (instead of panning); default false: Shift + drag */
+    readonly boxOnDrag: boolean;
 }
 
 /** The selection feature, as `selection()` makes it. */
@@ -29,12 +31,15 @@ const UNSELECTABLE = "is selected, but not selectable";
 export function selection(
     options: Partial<SelectionOptions> = {},
 ): SelectionFeature {
+    const resolved: SelectionOptions = Object.freeze({
+        boxMode: options.boxMode ?? "full",
+        multiple: options.multiple ?? true,
+        boxOnDrag: options.boxOnDrag ?? false,
+    });
     return Object.freeze({
         name: "selection",
-        options: Object.freeze({
-            boxMode: options.boxMode ?? "full",
-            multiple: options.multiple ?? true,
-        }),
+        options: resolved,
+        engine: (host) => selectionEngine(host, resolved),
         commands: [selectionSet, selectionClear, selectionRemove],
         get: {
             "selected-nodes": (reader: FlowReader) =>

@@ -1,9 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { connection } from "../../src/connection/connection";
 import { drag } from "../../src/drag/drag";
+import type { PressTarget } from "../../src/engine/adapter";
 import { FEATURE_KEYS, ownerOf } from "../../src/features/keys";
 import { composeFeatures, featureEngine } from "../../src/features/registry";
-import type { AnyFlowFeature, FeatureModel } from "../../src/features/types";
+import type {
+    AnyFlowFeature,
+    FeatureEngineHost,
+    FeatureModel,
+} from "../../src/features/types";
 import { keyboard } from "../../src/keyboard/keyboard";
 import { minimap } from "../../src/minimap/minimap";
 import { createFlowModel } from "../../src/model/create-flow-model";
@@ -118,6 +123,7 @@ describe("the feature registry", () => {
 
     it("composes the features' engine sides: keys merged, hooks in install order", () => {
         const pressed: string[] = [];
+        const gesture = { move: vi.fn(), end: vi.fn(), cancel: vi.fn() };
         const withEngine = (
             name: "drag" | "connection",
             takes: boolean,
@@ -130,7 +136,7 @@ describe("the feature registry", () => {
                 },
                 pointerdown: () => {
                     pressed.push(name);
-                    return takes;
+                    return takes ? gesture : undefined;
                 },
                 destroy: vi.fn(),
             }),
@@ -146,7 +152,7 @@ describe("the feature registry", () => {
                 if (!slots.has(key)) slots.set(key, create());
                 return slots.get(key) as V;
             },
-        });
+        } as Partial<FeatureEngineHost> as FeatureEngineHost);
         expect([...engine.get.keys()]).toEqual(["drag-key", "connection-key"]);
         expect(engine.get.get("connection-key")?.(undefined)).toEqual({
             name: "connection",
@@ -154,9 +160,11 @@ describe("the feature registry", () => {
         expect(engine.get.get("drag-key")?.(undefined)).toEqual({
             name: "connection",
         });
-        expect(engine.pointerdown({} as PointerEvent)).toBe(true);
+        const target: PressTarget = { kind: "pane", element: undefined };
+        expect(engine.pointerdown({} as PointerEvent, target)).toBe(gesture);
         expect(pressed).toEqual(["drag", "connection"]);
-        expect(engine.keydown({} as KeyboardEvent)).toBe(false);
+        expect(engine.keydown({} as KeyboardEvent, target)).toBe(false);
+        expect(engine.tap({} as PointerEvent, target)).toBe(false);
         engine.destroy();
         for (const part of engine.list)
             expect(part.destroy).toHaveBeenCalledOnce();
@@ -181,10 +189,15 @@ describe("the feature factories", () => {
             step: 1,
             fastStep: 20,
         });
-        expect(minimap().options).toEqual({ pannable: true, zoomable: true });
+        expect(minimap().options).toEqual({
+            pannable: true,
+            zoomable: true,
+            padding: 5,
+        });
         expect(selection().options).toEqual({
             boxMode: "full",
             multiple: true,
+            boxOnDrag: false,
         });
         expect(subflows().options).toEqual({});
         for (const feature of ALL()) {

@@ -34,6 +34,9 @@ function offendersOf(pattern: RegExp, scan = codeOnly): string[] {
 
 const keep = (source: string) => source;
 
+/** The one file that writes a style: the viewport's transform (D4). */
+const STRUCTURAL_STYLE = "src/engine/structural-style.ts";
+
 // the core never reaches for the browser globals: DOM access goes through an element's
 // ownerDocument/defaultView, so it runs inside an iframe or a popup, and loads in Node
 const GLOBAL_DOM =
@@ -177,8 +180,20 @@ describe("core package guard", () => {
     });
 
     it("has no CSS class names and writes no cursor or style", () => {
-        expect(offendersOf(/\b(className|classList|\.style\b|cursor)/)).toEqual(
-            [],
+        expect(offendersOf(/\b(className|classList|cursor)/)).toEqual([]);
+        // the viewport's transform is the one structural style the engine writes (D4), in one file
+        expect(
+            offendersOf(/\.style\b/).filter(
+                (offender) => !offender.startsWith(STRUCTURAL_STYLE),
+            ),
+        ).toEqual([]);
+        const writes = [
+            ...codeOnly(
+                readFileSync(join(root, STRUCTURAL_STYLE), "utf8"),
+            ).matchAll(/\.style\.(\w+)/g),
+        ].map(([, property]) => property);
+        expect(new Set(writes)).toEqual(
+            new Set(["transformOrigin", "transform", "removeProperty"]),
         );
     });
 

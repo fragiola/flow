@@ -26,7 +26,16 @@ export const FEATURES: readonly FeatureSources[] = [
     "reconnection",
     "keyboard",
     "minimap",
-].map((subpath) => ({ subpath, folders: [`src/${subpath}/`] }));
+].map((subpath) => ({
+    subpath,
+    folders: [
+        `src/${subpath}/`,
+        // the connection session the two connection features share (no entry of its own)
+        ...(subpath === "connection" || subpath === "reconnection"
+            ? ["src/connect-session/"]
+            : []),
+    ],
+}));
 
 /** The chunks a built file imports (`./name.js`), by file name. */
 export function chunksOf(source: string): string[] {

@@ -1,0 +1,132 @@
+// What only an adapter (React, Vue, Svelte, Angular) calls on an engine (D13): the elements it
+// renders, the handles it registers (D8), the attributes it spreads (D11) and the view changes it
+// re-renders from. An app never needs it: it uses `run`, `can`, `check`, `get`, `is` and
+// `subscribe`. The adapter renders and attaches; the engine listens to the root's events itself
+// (Pointer Events with capture, the wheel, keys, focus) and decides.
+import type { PartAttributes } from "../attributes/part-attributes";
+import type { XY } from "../document/types";
+import type { HandleSide, Rect } from "../geometry/types";
+import type { FlowModel } from "../model/create-flow-model";
+import type { HandleType } from "../state/queries";
+
+/** A handle as its primitive registers it (D8). */
+export interface HandleRegistration {
+    /** the node it belongs to */
+    readonly nodeId: string;
+    /** its id among the node's handles of its type (none: the node's default handle) */
+    readonly handleId?: string | undefined;
+    /** whether edges start (`source`) or end (`target`) at it */
+    readonly type: HandleType;
+    /** the side of the node it sits on: the direction an edge leaves or enters by */
+    readonly side: HandleSide;
+    /** whether a connection may start or end at it; default true */
+    readonly connectable?: boolean | undefined;
+}
+
+/** A registered handle and where it is. */
+export interface FlowHandle {
+    readonly nodeId: string;
+    readonly handleId: string | undefined;
+    readonly type: HandleType;
+    readonly side: HandleSide;
+    readonly connectable: boolean;
+    /** its centre in absolute flow coordinates, once it and its node are measured */
+    readonly center: XY | undefined;
+    /** its box relative to its node's top-left corner, in flow units, once measured */
+    readonly bounds: Rect | undefined;
+}
+
+/** What a press, a key, the wheel or focus hit in the flow, read from the part attributes. */
+export interface PressTarget {
+    /**
+     * - `pane`: the flow's background (the root, the viewport, the background, the nodes' and
+     *   edges' layers);
+     * - `node`, `edge`, `handle`, `resize-handle`, `minimap`: that part (or an element inside it);
+     * - `other`: a part with its own behaviour (the controls, a toolbar, a panel) or a control
+     *   inside a node (a field, a button, `data-flow-no-gesture`): the flow leaves it alone
+     */
+    readonly kind:
+        | "pane"
+        | "node"
+        | "edge"
+        | "handle"
+        | "resize-handle"
+        | "minimap"
+        | "other";
+    /** the part's element */
+    readonly element: Element | undefined;
+    /** the node it is in (a node, a handle, a resize handle) */
+    readonly nodeId?: string | undefined;
+    /** the edge (an edge, its path or its label) */
+    readonly edgeId?: string | undefined;
+    /** the handle */
+    readonly handle?: FlowHandle | undefined;
+    /** a resize handle's corner or side (`data-position`: `top-left`, `top`, …) */
+    readonly position?: string | undefined;
+}
+
+/** What changed in the view, for an adapter to re-render only what depends on it. */
+export interface ViewChange {
+    /** the viewport moved or zoomed (the background, the minimap, toolbars) */
+    readonly viewport: boolean;
+    /** a node or handle was measured (edges, the minimap, toolbars) */
+    readonly measured: boolean;
+    /** a gesture's state changed (the connection line, the selection box, state attributes) */
+    readonly gesture: boolean;
+}
+
+/** The payload each part's attributes take (`engine.adapter.attributes(part, payload)`). */
+export interface PartPayloadMap {
+    node: { nodeId: string };
+    edge: { edgeId: string };
+    "edge-path": { edgeId: string };
+    "edge-label": { edgeId: string };
+    handle: HandleRegistration;
+    "resize-handle": { nodeId: string; position: string };
+    resizer: { nodeId: string };
+    "minimap-node": { nodeId: string };
+    toolbar: { nodeId: string };
+}
+
+/** What only an adapter calls on an engine. */
+export interface FlowEngineAdapter {
+    /** the model this engine draws */
+    readonly model: FlowModel;
+    /** the adapter's rendering settings, from the engine's options */
+    readonly settings: {
+        /** render only the nodes and edges in view (`visible-nodes`, `visible-edges`) */
+        readonly onlyRenderVisible: boolean;
+    };
+    /** attaches the root element (`Flow.Root`): the engine listens to its events; another replaces it */
+    attachRoot(element: HTMLElement): void;
+    /** detaches the root, cancelling a gesture under way */
+    detachRoot(): void;
+    /**
+     * attaches (or, with `null`, detaches) the viewport element: the engine writes its transform
+     * (`transform`, `transform-origin`) directly, and the framework never renders it (D4)
+     */
+    attachViewport(element: HTMLElement | SVGElement | null): void;
+    /** registers (or unregisters) a node's element: the engine measures it (`ResizeObserver`) */
+    registerNode(nodeId: string, element: HTMLElement | null): void;
+    /** registers (or unregisters) an edge's element (focus, a press on it) */
+    registerEdge(edgeId: string, element: Element | null): void;
+    /** registers (or, with `null`, unregisters) a handle's element (D8): the engine measures its centre */
+    registerHandle(handle: HandleRegistration, element: Element | null): void;
+    /** options a part's primitive takes (`resizer`: `minWidth`, …); `null` drops them */
+    setPartOptions(
+        part: string,
+        id: string,
+        options: Readonly<Record<string, unknown>> | null,
+    ): void;
+    /** a part's attributes (D11): `data-flow-part`, `data-flow-id` and its state */
+    attributes<P extends string>(
+        part: P,
+        ...payload: P extends keyof PartPayloadMap
+            ? [payload: PartPayloadMap[P]]
+            : [payload?: Readonly<Record<string, unknown>>]
+    ): PartAttributes;
+    /** calls `listener` when the view changed (not the model: adapters subscribe to it); returns its remover */
+    subscribe(listener: (change: ViewChange) => void): () => void;
+    /** a number that changes whenever the view changes */
+    getSnapshot(): number;
+}

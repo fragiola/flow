@@ -5,8 +5,8 @@
 // result, a document or payload issue naming the feature) and to type the verbs from the installed
 // features. The payload and result types stay in the core's maps (types cost no bytes); the code of
 // a feature lives only in its own entry (`@fragiola/flow/<feature>`), which nothing in the main
-// entry imports. The engine names (`engineRun`, `engineGet`, `engineIs`) are filled by the engine
-// (fragiola/flow#3) as each feature's engine side lands.
+// entry imports. The engine names (`engineRun`, `engineGet`, `engineIs`) are the keys each
+// feature's engine side adds to `engine.run` / `get` / `is` (fragiola/flow#3).
 
 /** Every feature's keys and fields. */
 export const FEATURE_KEYS = Object.freeze({
@@ -15,8 +15,8 @@ export const FEATURE_KEYS = Object.freeze({
         get: ["selected-nodes", "selected-edges"],
         is: ["node-selected", "edge-selected"],
         engineRun: [],
-        engineGet: [],
-        engineIs: [],
+        engineGet: ["selection-box"],
+        engineIs: ["box-selecting"],
         nodeFields: ["selected"],
         edgeFields: ["selected"],
     },
@@ -35,8 +35,8 @@ export const FEATURE_KEYS = Object.freeze({
         get: [],
         is: [],
         engineRun: [],
-        engineGet: [],
-        engineIs: [],
+        engineGet: ["dragging-node-ids"],
+        engineIs: ["node-dragging", "dragging"],
         nodeFields: [],
         edgeFields: [],
     },
@@ -46,7 +46,7 @@ export const FEATURE_KEYS = Object.freeze({
         is: [],
         engineRun: [],
         engineGet: [],
-        engineIs: [],
+        engineIs: ["node-resizing", "resizing"],
         nodeFields: [],
         edgeFields: [],
     },
@@ -56,7 +56,7 @@ export const FEATURE_KEYS = Object.freeze({
         is: [],
         engineRun: [],
         engineGet: ["connection"],
-        engineIs: [],
+        engineIs: ["connecting"],
         nodeFields: [],
         edgeFields: [],
     },
@@ -66,7 +66,7 @@ export const FEATURE_KEYS = Object.freeze({
         is: [],
         engineRun: [],
         engineGet: [],
-        engineIs: [],
+        engineIs: ["edge-reconnecting"],
         nodeFields: [],
         edgeFields: [],
     },
@@ -76,7 +76,7 @@ export const FEATURE_KEYS = Object.freeze({
         is: [],
         engineRun: [],
         engineGet: [],
-        engineIs: [],
+        engineIs: ["node-focusable", "edge-focusable"],
         nodeFields: [],
         edgeFields: [],
     },

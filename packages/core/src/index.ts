@@ -1,8 +1,21 @@
 // The public entry of @fragiola/flow, the framework-free core of Flow: the document and its JSON
-// Schema, the model and its commands, and the feature contract. Each feature is its own entry
+// Schema, the model and its commands, the engine that binds a flow to the DOM, the edge path
+// helpers, the part attributes and the feature contract. Each feature is its own entry
 // (`@fragiola/flow/selection`, `/subflows`, `/drag`, `/resize`, `/connection`, `/reconnection`,
-// `/keyboard`, `/minimap`), which this one never imports (`scripts/check-features.ts`). The engine
-// arrives with fragiola/flow#3.
+// `/keyboard`, `/minimap`), which this one never imports (`scripts/check-features.ts`).
+
+export {
+    type FlowPart,
+    flag,
+    ID_ATTRIBUTE,
+    type MutablePartAttributes,
+    NO_GESTURE_ATTRIBUTE,
+    NO_WHEEL_ATTRIBUTE,
+    PART_ATTRIBUTE,
+    type PartAttributes,
+    POSITION_ATTRIBUTE,
+    partAttributes,
+} from "./attributes/part-attributes";
 
 export type {
     CommandDefinition,
@@ -74,6 +87,48 @@ export {
     type ValidateFlowOptions,
     validateFlow,
 } from "./document/validate-flow";
+export type {
+    FlowEngineAdapter,
+    FlowHandle,
+    HandleRegistration,
+    PartPayloadMap,
+    PressTarget,
+    ViewChange,
+} from "./engine/adapter";
+export {
+    createFlowEngine,
+    type FlowEngine,
+    type FlowEngineOptions,
+} from "./engine/create-flow-engine";
+export type { PathOptions } from "./engine/edge-geometry";
+export type {
+    FlowEngineEvent,
+    FlowEngineEventType,
+    MoveSource,
+} from "./engine/events";
+export type {
+    BackgroundPattern,
+    BackgroundPatternPayload,
+    BackgroundVariant,
+    Connection,
+    EngineActionKey,
+    EngineActionMap,
+    EngineActionPayload,
+    EngineActionResult,
+    EngineGetKey,
+    EngineGetMap,
+    EngineGetPayload,
+    EngineGetResult,
+    EngineIsKey,
+    EngineIsMap,
+    EngineIsPayload,
+    FitViewPayload,
+    MinimapView,
+    NodeToolbarPayload,
+    NodeToolbarPosition,
+    SelectionBox,
+    ZoomStepPayload,
+} from "./engine/verbs";
 export {
     FEATURE_KEYS,
     type FeatureKeyKind,
@@ -84,8 +139,12 @@ export type {
     AllowedKeys,
     AnyFlowFeature,
     CommandNameOf,
+    EngineActionKeyOf,
+    EngineGetKeyOf,
+    EngineIsKeyOf,
     FeatureEngine,
     FeatureEngineHost,
+    FeatureGesture,
     FeatureModel,
     FeatureNamesOf,
     FlowFeature,
@@ -94,6 +153,28 @@ export type {
     ModelGetKeyOf,
     ModelIsKeyOf,
 } from "./features/types";
+export {
+    type BezierPathOptions,
+    bezierPath,
+} from "./geometry/bezier-path";
+export {
+    type SmoothStepPathOptions,
+    type StepPathOptions,
+    smoothStepPath,
+    stepPath,
+} from "./geometry/smooth-step-path";
+export {
+    type StraightPathOptions,
+    straightPath,
+} from "./geometry/straight-path";
+export type {
+    EdgePath,
+    HandleSide,
+    PathEnds,
+    PathResult,
+    Rect,
+    Viewport,
+} from "./geometry/types";
 export {
     type CommandArgs,
     createFlowModel,

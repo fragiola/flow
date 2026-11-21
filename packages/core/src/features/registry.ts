@@ -4,8 +4,11 @@
 // having it, it does nothing more. The engine (fragiola/flow#3) finds a model's composition through
 // `featuresOf(model)`, never through the model's public surface, and composes the features' engine
 // sides with `featureEngine`.
+
+import type { MutablePartAttributes } from "../attributes/part-attributes";
 import type { CommandDefinition, Failure } from "../commands/define";
 import type { FlowEdge, FlowNode, XY } from "../document/types";
+import type { PressTarget } from "../engine/adapter";
 import type { ValidationIssue } from "../schema/types";
 import type { Draft } from "../state/draft";
 import {
@@ -18,6 +21,7 @@ import type {
     AnyFlowFeature,
     FeatureEngine,
     FeatureEngineHost,
+    FeatureGesture,
     FlowReader,
 } from "./types";
 
@@ -245,10 +249,23 @@ export interface ComposedFeatureEngine {
         NonNullable<FeatureEngine["get"]>[string]
     >;
     readonly is: ReadonlyMap<string, NonNullable<FeatureEngine["is"]>[string]>;
-    /** the first feature whose hook takes a press: whether one did */
-    pointerdown(event: PointerEvent): boolean;
+    /** the gesture of the first feature that takes a press, if one does */
+    pointerdown(
+        event: PointerEvent,
+        target: PressTarget,
+    ): FeatureGesture | undefined;
+    /** the first feature whose hook takes a tap: whether one did */
+    tap(event: PointerEvent, target: PressTarget): boolean;
+    /** the first feature whose hook takes the wheel: whether one did */
+    wheel(event: WheelEvent, target: PressTarget): boolean;
     /** the first feature whose hook takes a key: whether one did */
-    keydown(event: KeyboardEvent): boolean;
+    keydown(event: KeyboardEvent, target: PressTarget): boolean;
+    focus(target: PressTarget): void;
+    attributes(
+        part: string,
+        payload: Readonly<Record<string, unknown>>,
+        into: MutablePartAttributes,
+    ): void;
     attached(root: Element): void;
     detached(): void;
     destroy(): void;
@@ -285,10 +302,25 @@ export function featureEngine(
         run,
         get,
         is,
-        pointerdown: (event) =>
-            list.some((engine) => engine.pointerdown?.(event) === true),
-        keydown: (event) =>
-            list.some((engine) => engine.keydown?.(event) === true),
+        pointerdown: (event, target) => {
+            for (const engine of list) {
+                const gesture = engine.pointerdown?.(event, target);
+                if (gesture) return gesture;
+            }
+            return undefined;
+        },
+        tap: (event, target) =>
+            list.some((engine) => engine.tap?.(event, target) === true),
+        wheel: (event, target) =>
+            list.some((engine) => engine.wheel?.(event, target) === true),
+        keydown: (event, target) =>
+            list.some((engine) => engine.keydown?.(event, target) === true),
+        focus: (target) => {
+            for (const engine of list) engine.focus?.(target);
+        },
+        attributes: (part, payload, into) => {
+            for (const engine of list) engine.attributes?.(part, payload, into);
+        },
         attached: (root) => {
             for (const engine of list) engine.attached?.(root);
         },
