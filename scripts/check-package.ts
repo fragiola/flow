@@ -211,24 +211,9 @@ export interface AdapterCheck {
 }
 
 /**
- * The pins a framework's smoke app installs that no package of the repo pins (or pins otherwise):
- * Vue's vue-tsc, its Vite plugin and the TypeScript 6 vue-tsc runs on (packages/vue builds with
- * TypeScript 7), until the Vue examples app (examples/vue) pins them, as Splitter's does.
- */
-const SMOKE_PINS: Readonly<
-    Partial<Record<Framework, Readonly<Record<string, string>>>>
-> = {
-    vue: {
-        "@vitejs/plugin-vue": "6.0.10",
-        typescript: "6.0.3",
-        "vue-tsc": "3.3.14",
-    },
-};
-
-/**
  * The version of `name` a framework's smoke app installs, so that it installs nothing new: its
- * examples app's pin (examples/<framework>), else {@link SMOKE_PINS}, else its package's own
- * (packages/<framework>).
+ * examples app's pin (examples/<framework>: React's Vite plugin and types, Vue's vue-tsc, its
+ * Vite plugin and the TypeScript 6 vue-tsc runs on), else its package's own (packages/<framework>).
  */
 export function smokeVersion(framework: Framework, name: string): string {
     const manifests = [
@@ -249,10 +234,7 @@ export function smokeVersion(framework: Framework, name: string): string {
             ? undefined
             : version;
     };
-    const pinned =
-        pinOf(manifests[0]) ??
-        SMOKE_PINS[framework]?.[name] ??
-        pinOf(manifests[1]);
+    const pinned = pinOf(manifests[0]) ?? pinOf(manifests[1]);
     if (pinned === undefined) {
         throw new Error(`no pin of ${name} for the ${framework} smoke app`);
     }

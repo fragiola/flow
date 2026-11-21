@@ -176,22 +176,38 @@ describe("the adapters the package check covers", () => {
         expect(() => smokeVersion("react", "left-pad")).toThrow(/no pin/);
     });
 
-    it("pin the Vue smoke app at the package's Vue and Vite, with vue-tsc on TypeScript 6", () => {
+    it("pin the Vue smoke app at examples/vue's pins: vue-tsc on TypeScript 6", () => {
+        const app = JSON.parse(
+            readFileSync(
+                join(import.meta.dirname, "../../examples/vue/package.json"),
+                "utf8",
+            ),
+        ) as {
+            dependencies: Record<string, string>;
+            devDependencies: Record<string, string>;
+        };
         const pkg = JSON.parse(
             readFileSync(
                 join(import.meta.dirname, "../../packages/vue/package.json"),
                 "utf8",
             ),
         ) as { devDependencies: Record<string, string> };
-        expect(smokeVersion("vue", "vue")).toBe(pkg.devDependencies.vue);
-        expect(smokeVersion("vue", "vite")).toBe(pkg.devDependencies.vite);
+        const pins = { ...app.dependencies, ...app.devDependencies };
+        for (const name of [
+            "vue",
+            "vite",
+            "@vitejs/plugin-vue",
+            "typescript",
+            "vue-tsc",
+        ]) {
+            expect(smokeVersion("vue", name), name).toBe(pins[name]);
+        }
+        // the app and the package agree on Vue and Vite
+        expect(pins.vue).toBe(pkg.devDependencies.vue);
+        expect(pins.vite).toBe(pkg.devDependencies.vite);
         // vue-tsc does not run on TypeScript 7, which the package builds with
         expect(pkg.devDependencies.typescript).toMatch(/^7\./);
         expect(smokeVersion("vue", "typescript")).toMatch(/^6\./);
-        expect(smokeVersion("vue", "vue-tsc")).toMatch(/^\d+\.\d+\.\d+$/);
-        expect(smokeVersion("vue", "@vitejs/plugin-vue")).toMatch(
-            /^\d+\.\d+\.\d+$/,
-        );
         expect(() => smokeVersion("vue", "left-pad")).toThrow(/no pin/);
     });
 
