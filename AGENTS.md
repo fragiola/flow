@@ -21,7 +21,10 @@ Each framework has an adapter, so **every piece of logic that isn't rendering li
 | `packages/vue` | `@fragiola/flow-vue` | the same primitives as Vue components, the hooks as composables | peer `vue` | planned |
 | `packages/svelte` | `@fragiola/flow-svelte` | the same primitives as Svelte components | peer `svelte` | planned |
 | `packages/angular` | `@fragiola/flow-angular` | the same primitives as Angular directives, the hooks as injection functions | peer `@angular/core` | planned |
-| `site` | private | for now only the repository's guard tests (`site/tests/`); the docs and the site export arrive with the React Epic | | |
+| `apps/playground` | private | the dev app: the examples in place, scenarios, the unstyled fixture Playwright drives, the inspector | the React package | Epic #8 (#6) |
+| `examples/shared` | `examples-shared`, private | what every framework's examples share: metadata, the five themes, the embed protocol, the manifest, every Playwright spec | no framework | Epic #8 (#6) |
+| `examples/react` | `examples-react`, private | the React examples (the site's gallery and its embed app), vendored Fragiola UI | the React package | Epic #8 (#6) |
+| `site` | private | for now only the repository's guard tests (`site/tests/`); the docs and the site export arrive with #7 | | |
 
 Every package stays at `0.0.0`; nothing is published (D15).
 
@@ -138,10 +141,15 @@ examples show them as copyable code.
 | `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit) |
 | `pnpm test` | Vitest: `core` (node; a test that needs a DOM opts into jsdom), `react` (jsdom) and `site` (the repository's guard tests) |
 | `pnpm build` | `pnpm -r build` (tsdown for the packages: each one's main entry and one entry per feature), then the `.d.ts` check (`scripts/check-dts.ts`: no `any`) and the features' bundle guard (`scripts/check-features.ts`: no main entry, nor a chunk it imports, built from a feature's folder, read from the source maps; tested with a planted import by `site/tests/check-features.test.ts`) |
-| `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs; for each adapter of `ADAPTERS` (React) checks its exact core pin and runs its smoke app: a scratch Vite + React app outside the workspace that installs the React tarball only, typechecks (strict, no `skipLibCheck`), builds and loads its dev server, at the pins of `examples/react` once it exists (`packages/react`'s until then, `SMOKE_PINS` for the Vite plugin) (`scripts/check-package.ts`) |
+| `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs; for each adapter of `ADAPTERS` (React) checks its exact core pin and runs its smoke app: a scratch Vite + React app outside the workspace that installs the React tarball only, typechecks (strict, no `skipLibCheck`), builds and loads its dev server, at the pins of `examples/react` (`scripts/check-package.ts`) |
 
-`pnpm e2e`, `pnpm dev`, `pnpm site:export` and `pnpm site:dev` arrive with the apps in the React
-Epic. There is no `changeset` or `release:version` script (D15).
+| `pnpm dev` | the playground (`apps/playground`, port 5197; `PLAYGROUND_PORT` moves it) |
+| `pnpm e2e` | Playwright: the playground's suite (Chromium and Firefox, its dev server, the sources), then each examples app's (`examples/*/playwright.config.ts`: the shared specs against a production build of its embed, built against the packages' `dist`: run `pnpm build` first) |
+| `pnpm --filter examples-react dev` | the React embed alone, port 5185 (`PORT` moves it; `?id=<id>&theme=<name>`) |
+| `pnpm --filter examples-react vendor` | vendors Fragiola UI (`scripts/vendor-fragiola.ts`; `FRAGIOLA_REGISTRY` points it elsewhere) |
+
+`pnpm site:export` and `pnpm site:dev` arrive with #7. There is no `changeset` or
+`release:version` script (D15).
 
 ## CI
 
@@ -157,18 +165,26 @@ tested (guidelines `repository.md#ci`). Its jobs today:
   `examples/react/**`: the playground and examples react; `packages/<framework>/**` or
   `examples/<framework>/**` (vue, svelte, angular): examples `<framework>`; any other path, and a
   manual run: every suite. **It is an allow-list of what may skip**: a new rule names what it
-  skips, never what it runs; an unknown path runs everything. No job reads its outputs yet.
+  skips, never what it runs; an unknown path runs everything.
+- **E2E (playground)**: when `Changes` says so, `pnpm --filter playground run e2e` (Chromium and
+  Firefox, the dev server: nothing built).
+- **E2E (examples \<framework\>)**: a matrix over `Changes`' `examples` output (every
+  `examples/<framework>` with a `playwright.config.ts`: React today): builds the packages, then
+  `pnpm --filter examples-<framework> run e2e`.
 
 No Changesets job and no release workflow (D15); `site/tests/ci-workflow.test.ts` checks the
 triggers and that neither exists.
 
-With the apps (React Epic) come the E2E jobs, the Site export job and the Trigger www build job
-(the only job a push to `main` will run). Every job that runs Playwright runs in
-`mcr.microsoft.com/playwright:v<version>-noble` (`container.options: --user 1001`), its tag the
-exact `@playwright/test` version the apps pin, and **never runs `playwright install`**;
-`site/tests/ci-workflow.test.ts` ties the tag to the version (it passes today with no Playwright
-job and no pin), so upgrading Playwright changes both in one PR. Shard a suite only when its test
-step alone passes about 3 minutes. `main` has no required checks: a skipped job blocks nothing.
+#7 adds the Site export job and the Trigger www build job (the only job a push to `main` will
+run). Every job that runs Playwright runs in `mcr.microsoft.com/playwright:v1.63.0-noble`
+(`container.options: --user 1001`), its tag the exact `@playwright/test` the apps pin (1.63.0 in
+the playground, `examples/shared` and `examples/react`), and **never runs `playwright install`**;
+`site/tests/ci-workflow.test.ts` ties the tag to the version, so upgrading Playwright changes both
+in one PR. `main` has no required checks: a skipped job blocks nothing.
+
+**Shards: none.** Shard a suite only when its test step alone passes about 3 minutes. Measured
+locally (4 workers; CI runs 2): the playground's 90 tests (45 per browser) in ~23 s, the React
+examples' 175 tests (95 smoke runs: 19 examples × 5 themes) in ~45 s, the embed build included.
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
@@ -425,13 +441,99 @@ Decisions of the adapter (#5):
 - **Every feature subpath is mirrored**, even those with no adapter code (the tree's): a React
   app imports the features from the one package it installs.
 - **Known limits:** jsdom lays nothing out, so the adapter tests stub the layout (`tests/flow.tsx`);
-  the gestures' real feel is the playground E2E's (#6).
+  the gestures' real feel is the playground E2E's (#6, Chromium and Firefox, mouse and touch).
+- **A resize corner is above its sides** (`zIndex: 1` in its structural place, #6): the side
+  handles span their whole side.
 
-For the playground and examples (#6): wrap the flow in a sized element (the root fills it); put
+For the playground and examples (#6, see [The playground and the examples](#the-playground-and-the-examples-issue-6)): wrap the flow in a sized element (the root fills it); put
 `Edges` before `Nodes` inside `Viewport`, and `Background`, `SelectionBox`, `Controls`, `MiniMap`
 outside it; give nodes `user-select: none`; style through `[data-flow-part]` and the state
 attributes (`data-selected`, `data-dragging`, `data-connecting`, `data-valid` / `data-invalid`,
 `data-handle-type`, `data-side`, `data-position`, `data-end`, `data-disabled`).
+
+## The playground and the examples (Issue #6)
+
+Every rule of the guidelines' Examples section (`../guidelines/docs/site.md#examples`) holds; what
+Flow decided on top of it:
+
+**`examples/shared`** (`examples-shared`, private, imports no framework: `tests/framework-free.test.ts`):
+
+| path | holds |
+| --- | --- |
+| `src/meta/<id>.ts` | one file per example: title, description, `level`, order, features, docs link, layout, height |
+| `src/meta-types.ts` | `LEVELS` (`basics`, `interaction`, `building-blocks`, `apps`, titled Basics, Interaction, Building blocks, Apps: `examples.json`'s `levels`), `DEFAULT_HEIGHT` |
+| `src/framework.ts` | `FRAMEWORKS` (react, vue, svelte, angular), entry files, adapter and icon packages |
+| `src/themes/` | `light`, `dark`, `ide`, `paper`, `terminal` (one CSS file of values each, `themes.ts`: name, title, description, scheme, swatch) |
+| `src/embed/messages.ts` | `fragiola:example:ready` / `resize` / `theme` |
+| `scripts/` | the examples finder, the manifest builder (`buildManifest`), the loader generator (`generate.ts <framework>`) |
+| `e2e/` | `examplesE2eConfig(framework)` (port 4360 + framework index, base `/flow/embed/<framework>/`), the server with its host page, `smoke`, `iframe`, `themes` and `examples/<id>.spec.ts` |
+
+`COMPLETE_FRAMEWORKS` is `["react"]`: a spec for an example another framework lacks is skipped
+there, failed in React.
+
+**The examples** (`examples/react/src/examples/<id>/index.tsx` + `styles.ts`; the README there is
+the authoring guide): Basics `basic`, `custom-nodes`, `edge-types`, `edge-labels`, `backgrounds`,
+`read-only`; Interaction `selection-and-keyboard`, `connection-validation`, `edge-reconnect`,
+`snap-to-grid`, `minimap-and-controls`; Building blocks `sub-flows`, `node-resizer`,
+`node-toolbar`, `add-nodes`, `save-and-restore`, `undo-redo`, `announcements`; Apps
+`workflow-builder` (the landing's showcase). `_kit/persistence.ts` and `_kit/undo.ts` are the
+copyable app policy.
+
+**Theme tokens** (`--fl-*`; `tests/themes.test.ts` holds the list, `e2e/themes.spec.ts` checks the
+shapes differ on computed styles): shape `font`, `font-size`, `title-weight`, `node-padding`,
+`node-radius`, `node-border`, `node-shadow`, `handle-size`, `handle-radius`, `handle-border`,
+`edge-width`, `edge-selected-width`, `edge-dash`, `grid-dots`, `grid-lines`, `grid-cross`,
+`control-radius`, `focus-width`, `motion`; colour, per palette: `canvas-bg`, `grid-color`,
+`node-bg`, `node-line`, `edge-color`, `edge-selected`, `handle-bg`, `handle-line`, `valid`,
+`invalid`, `selection-bg`, `selection-line`, `minimap-mask`, `focus-line`. Light: rounded nodes,
+round handles, dots. Dark: Light's shapes. IDE: near-square nodes, small square handles, hairline
+edges, lines. Paper: serif, round nodes, big ringed handles, thick edges. Terminal: monospace,
+square everything, dashed edges, crosses.
+
+**The playground** (`apps/playground`, `pnpm dev`, port 5197): the examples in place (themes,
+source panel), scenarios (`src/scenarios/<area>/<id>.tsx`, default export only: `gestures/every-
+feature`, `performance/five-hundred-nodes`, `api/commands`), the inspector
+(`src/inspector/flow-inspector.tsx`: viewport, gestures under way, selection, engine events, the
+document) and `fixtures/basic`, the unstyled flow its specs drive (`src/fixture/flow-fixture.tsx`:
+every feature, an 800 × 500 root at the page's corner, the viewport at `{ x: 100, y: 100, zoom:
+1 }`, its document, viewport and events printed beside it). Its suite runs on Chromium and Firefox:
+pan, wheel, double-click and pinch zoom, drag (selection, cancel, extent, snap), connect,
+reconnect, box select, resize, keyboard and minimap, each with the mouse and with fingers
+(`e2e/helpers.ts` `touch`: Chromium's real touch input through the DevTools protocol, touch
+pointer events in Firefox), and the 500-node scenario's re-render count.
+
+Decisions of #6:
+
+- **One background layer per pattern.** `Flow.Background`'s `variant` is a prop, so a theme cannot
+  switch it: every example renders `dots`, `lines` and `cross`, and the theme's `--fl-grid-dots`,
+  `--fl-grid-lines`, `--fl-grid-cross` (`block` | `none`) show one. Alternative: reading a token in
+  JavaScript; refused: not copyable, and a theme change would need a listener.
+- **Levels are the gallery's groups** (`level` in the metadata, not Dockable's `category`): the
+  Epic named them, and the contract calls them levels.
+- **No `_themes/`.** The repository template lists it, but no Fragiola project has one: the
+  themes live once in `examples/shared/src/themes`, and the theme contract test is
+  `examples/shared/tests/themes.test.ts` (Splitter's place), not a per-app test.
+- **No modal example**, so no overlay promotion; the workflow builder's Select is a non-modal
+  popup in the frame.
+- **Panels beside a root read its model**: the workflow builder makes its model with
+  `createFlowModel`, hands it to `Flow.Root`, and the palette, header and inspector outside the
+  root read it with `useSyncExternalStore` over `model.subscribe` (`use-workflow.ts`). A panel over
+  the canvas, inside the root, marks itself `data-flow-no-gesture` (and `data-flow-no-wheel`).
+- **Connection rules are middleware in every example** (`connection-validation`,
+  `workflow-builder`): a vetoed handle shows `data-invalid` while dragging.
+- **Ports**: the playground takes 5197 (the other Fragiola playgrounds take 5173, and a local run
+  reuses a server on its port); the examples' e2e server 4360+.
+- **Fixed in the packages, found by the E2E:** a resize corner is above the full-length sides it
+  joins (`zIndex: 1`, structural), or a press on a corner resized one dimension; a node whose
+  element goes while it stays in the flow (culled by `onlyRenderVisible`, hidden) keeps its last
+  size and handle bounds (`measurements.ts`: before, a culled node became unmeasured, was rendered
+  again, measured, culled, forever); its kept handles position its edges but are never a
+  connection's target, a node rendered again drops the handles it no longer renders, and a node
+  removed while not rendered is forgotten on the model's next commit.
+- **Known limits:** a reconnect anchor is drawn under its node's handle (edges come before nodes),
+  so the mouse grabs it beside the handle; a finger beside a handle lands on the handle
+  (Chromium's touch adjustment), so on touch an edge's end is grabbed on its stroke near the end:
+  give touch apps a wider `reconnection({ radius })` (the fixture uses 30).
 
 ## Repository layout
 
@@ -445,16 +547,23 @@ packages/core/      @fragiola/flow       src/<domain>/ (document, state, command
                                          entry index.ts; tests/ mirroring src/, tests/types/,
                                          tests/guard.test.ts
                     scripts/             generate-command-docs.ts (site/docs/api/commands.mdx)
+apps/playground/    playground           src/shell/ (catalog, view, stage, sidebar, toolbar, source panel),
+                                         src/scenarios/<area>/, src/inspector/, src/fixture/,
+                                         fixtures/basic/, e2e/ (Chromium + Firefox), tests/
+examples/shared/    examples-shared      src/meta/, src/themes/, src/embed/, scripts/, e2e/, tests/
+examples/react/     examples-react       src/examples/<id>/, src/examples/_kit/, src/embed/, vendored
+                                         Fragiola UI (src/components, src/lib, src/styles),
+                                         scripts/vendor-fragiola.ts, tests/
 site/               package.json         the repository's guard tests (tests/): the layout, .d.ts,
                                          package, E2E selection, CI workflow, features' bundle guard
                                          and command docs checks; docs/api/commands.mdx (generated)
 scripts/                                 check-layout.ts, check-dts.ts, source-condition.ts,
                                          check-package.ts, e2e-suites.ts, check-features.ts
-.github/workflows/  ci.yml               Checks, Package, Changes
+.github/workflows/  ci.yml               Checks, Package, Changes, E2E (playground), E2E (examples)
 ```
 
-Later Epics add `packages/{vue,svelte,angular}`; #6 and #7 add `apps/playground`, `examples/*` and the
-site's docs and export (`pnpm-workspace.yaml` already lists `apps/*`, `packages/*`, `examples/*`
+Later Epics add `packages/{vue,svelte,angular}` and their examples apps; #7 adds the site's docs
+and export (`pnpm-workspace.yaml` already lists `apps/*`, `packages/*`, `examples/*`
 and `site`).
 
 ## Provenance: xyflow
@@ -579,6 +688,8 @@ Decisions of the engine (#3):
   root, a browser's `click` targets the root.
 - **Sizes: the document's where it gives one, the measured one otherwise** (per dimension), so a
   resize is drawn at once and a node without a size is measured; a 0 × 0 measurement is no size.
+  A node whose element goes while it stays in the flow (culled, hidden) keeps its last size and
+  handle bounds, never offered to a connection; a removed node's are forgotten (#6).
 - **Extent with measured sizes (closes #2's L6).** `host.keepInParent` clamps a drag's and the
   arrows' positions with the measured sizes before each `node.move`. A resize keeps a child inside
   its parent (the bound wins over `minWidth`, the ratio kept by shrinking), never shrinks a parent
