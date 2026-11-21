@@ -1,3 +1,5 @@
+import { ApplicationRef } from "@angular/core";
+import { TestBed } from "@angular/core/testing";
 import { drag as dragFeature } from "@fragiola/flow/drag";
 import { keyboard } from "@fragiola/flow/keyboard";
 import { selection } from "@fragiola/flow/selection";
@@ -171,6 +173,32 @@ describe("nodes", () => {
         await Promise.resolve();
         await Promise.resolve();
         expect(node.style.transform).toBe("translate(0px, 5px)");
+    });
+
+    it("render several commits of one task once, and a root destroyed before its render throws nothing (#16)", async () => {
+        const flow = createFlowRef();
+        const { destroy } = await render(TestFlow, {
+            flowRef: flow,
+            defaultNodes: [task("a"), task("b", 0, 200)],
+        });
+        const tick = vi.spyOn(TestBed.inject(ApplicationRef), "tick");
+        const model = flow.current?.model;
+        if (!model) throw new Error("no model");
+        model.run("node.move", { nodeId: "a", position: { x: 10, y: 0 } });
+        model.run("node.move", { nodeId: "b", position: { x: 10, y: 200 } });
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(tick).toHaveBeenCalledTimes(1);
+        tick.mockClear();
+        model.run("node.move", { nodeId: "a", position: { x: 20, y: 0 } });
+        destroy();
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(() =>
+            model.run("node.move", { nodeId: "a", position: { x: 30, y: 0 } }),
+        ).not.toThrow();
+        await Promise.resolve();
+        tick.mockRestore();
     });
 
     it("are not focusable without keyboard()", async () => {

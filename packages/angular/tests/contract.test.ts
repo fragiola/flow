@@ -268,7 +268,7 @@ describe("the control buttons", () => {
         await settle();
     });
 
-    it("are disabled as soon as their own click reaches the limit, before the next render", async () => {
+    it("are disabled before the next task when their own click reaches the limit, and the app's click may allow it again", async () => {
         const { container } = await render(TestFlow, {
             controls: true,
             maxZoom: 1.2,
@@ -278,12 +278,30 @@ describe("the control buttons", () => {
         zoomIn.dispatchEvent(
             new MouseEvent("click", { bubbles: true, cancelable: true }),
         );
+        // the root renders in a microtask (renderSoon), not in Angular's later task
+        await Promise.resolve();
+        await Promise.resolve();
         expect(zoomIn).toBeDisabled();
         expect(zoomIn).toHaveAttribute("data-disabled", "");
         await settle();
         expect(zoomIn).toBeDisabled();
         const zoomOut = find(container, "out");
         await click(zoomOut);
+        expect(zoomIn).not.toBeDisabled();
+        expect(zoomIn).not.toHaveAttribute("data-disabled");
+    });
+
+    it("stay enabled when the app's click takes the zoom back from the limit in the same task", async () => {
+        const flow = createFlowRef();
+        const { container } = await render(TestFlow, {
+            controls: true,
+            flowRef: flow,
+            maxZoom: 1.2,
+            zoomInClick: () => flow.current?.engine.run("zoom-to", { zoom: 1 }),
+        });
+        const zoomIn = find(container, "in");
+        await click(zoomIn);
+        expect(flow.current?.engine.get("viewport").zoom).toBe(1);
         expect(zoomIn).not.toBeDisabled();
         expect(zoomIn).not.toHaveAttribute("data-disabled");
     });

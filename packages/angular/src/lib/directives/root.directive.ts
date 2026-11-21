@@ -285,7 +285,8 @@ export class FlowRootDirective<
      * theirs: zoneless Angular would render it in a later task (a timeout or a frame), so a key
      * press or a click that moved a node or reached a zoom limit would still show the old view to
      * whatever reads the page right after it (an assistive technology, a test). One render per
-     * task, however many commits and view changes it had.
+     * root and task, however many commits and view changes it had; none once the application is
+     * destroyed.
      */
     private renderSoon(): void {
         if (this.renderQueued) return;

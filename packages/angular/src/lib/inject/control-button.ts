@@ -1,8 +1,8 @@
 // The buttons of `[flowControls]`: each runs one engine action on its own click (before the app's
 // `(click)`: a directive's host listener comes first), and is disabled while the engine refuses
-// it (`engine.can`), updating when the view changes. Its own click writes its disabled state at
-// once: zoneless Angular renders the view in a later task, and a button the engine now refuses (a
-// zoom at its limit) must not look enabled meanwhile (a second click would do nothing).
+// it (`engine.can`), updating when the view changes: the root renders the change of its click
+// before the next task (`renderSoon`), so a button its click took to a limit never looks enabled
+// meanwhile (a second click would do nothing).
 import { computed, type Signal } from "@angular/core";
 import type { EngineActionKey } from "@fragiola/flow";
 import { injectFlowContext } from "../context";
@@ -46,11 +46,6 @@ export function controlButton(
             const engine = context.engine();
             if (!engine) return;
             engine.run(action, {} as never);
-            // the state the next render writes too (bindAttributes keeps both)
-            if (disabledInput() === true || !engine.can(action, {} as never)) {
-                host.setAttribute("disabled", "");
-                host.setAttribute("data-disabled", "");
-            }
         },
     };
 }
