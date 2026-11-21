@@ -272,6 +272,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         this.measurements = new Measurements(
             () => this.current.zoom,
             () => this.measured(),
+            (nodeId) => this.model.get("node-by", { id: nodeId }) !== undefined,
         );
         this.features = featureEngine(featuresOf(model), this.host());
         this.actions = {

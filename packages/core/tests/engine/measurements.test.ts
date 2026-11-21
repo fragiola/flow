@@ -47,20 +47,42 @@ describe("measurement", () => {
         expect(changes).toHaveLength(1);
     });
 
-    it("forgets a node's size when its element goes", () => {
+    it("forgets a removed node's size when its element goes", () => {
         const { engine, node, observer } = mount(flowOf({ a: [0, 0] }), {
             sizes: { a: [100, 50] },
         });
         const element = node("a");
+        engine.adapter.model.run("node.remove", { nodeId: "a" });
         engine.adapter.registerNode("a", null);
         expect(observer()?.observed.has(element)).toBe(false);
         expect(engine.is("node-measured", { nodeId: "a" })).toBe(false);
+    });
+
+    it("keeps the last size and handles of a node whose element goes while it stays in the flow", () => {
+        // culled by onlyRenderVisible, or hidden: forgetting its size would make it an unmeasured
+        // node, rendered again, measured, culled again, forever
+        const { engine, node, observer } = mount(flowOf({ a: [0, 0] }), {
+            sizes: { a: [100, 50] },
+        });
+        const element = node("a");
+        engine.adapter.registerHandle(
+            { nodeId: "a", handleId: "out", type: "source", side: "right" },
+            element,
+        );
+        engine.adapter.registerNode("a", null);
+        engine.adapter.registerHandle(
+            { nodeId: "a", handleId: "out", type: "source", side: "right" },
+            null,
+        );
+        expect(observer()?.observed.has(element)).toBe(false);
+        expect(engine.is("node-measured", { nodeId: "a" })).toBe(true);
         expect(engine.get("node-rect-by", { nodeId: "a" })).toEqual({
             x: 0,
             y: 0,
-            width: 0,
-            height: 0,
+            width: 100,
+            height: 50,
         });
+        expect(engine.get("handles-by", { nodeId: "a" })).toHaveLength(1);
     });
 
     it("takes the document's size where it gives one", () => {

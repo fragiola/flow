@@ -24,7 +24,8 @@ type ObserverConstructor = new (
 
 interface RegisteredHandle {
     readonly registration: HandleRegistration;
-    readonly element: Element;
+    /** its element; none once it went while its node stays in the flow (its last bounds kept) */
+    readonly element: Element | undefined;
     bounds: Rect | undefined;
 }
 
@@ -54,6 +55,12 @@ export class Measurements {
         private readonly zoom: () => number,
         /** something was measured: the nodes whose size or handles changed */
         private readonly measured: (nodeIds: readonly string[]) => void,
+        /**
+         * whether a node is still in the flow: a node whose element goes while it stays (culled by
+         * `onlyRenderVisible`, hidden) keeps its last size and handles, so that it is not taken
+         * for an unmeasured one (rendered again) and its edges keep their ends
+         */
+        private readonly inFlow: (nodeId: string) => boolean = () => false,
     ) {}
 
     /** A node's measured size, if it was measured. */
@@ -75,6 +82,8 @@ export class Measurements {
             this.nodes.delete(nodeId);
         }
         if (!element) {
+            if (this.inFlow(nodeId)) return;
+            this.forgetHandles(nodeId);
             if (this.sizes.delete(nodeId)) this.measured([nodeId]);
             return;
         }
@@ -96,11 +105,24 @@ export class Measurements {
             registration.handleId,
         );
         const previous = this.handles.get(key);
-        if (previous) {
+        if (previous?.element) {
             if (previous.element !== element) {
                 this.observer?.unobserve(previous.element);
             }
             this.handleOfElement.delete(previous.element);
+        }
+        if (
+            !element &&
+            previous &&
+            !this.nodes.has(registration.nodeId) &&
+            this.inFlow(registration.nodeId)
+        ) {
+            // its node's element went before it (React detaches a parent's ref first) and the node
+            // stays in the flow: the handle keeps its last bounds, without an element
+            this.handles.set(key, { ...previous, element: undefined });
+            return;
+        }
+        if (previous) {
             this.handles.delete(key);
             this.handlesByNode.get(registration.nodeId)?.delete(key);
         }
@@ -183,7 +205,7 @@ export class Measurements {
             const zoom = this.zoom() || 1;
             for (const key of this.handlesByNode.get(nodeId) ?? []) {
                 const entry = this.handles.get(key);
-                if (!entry) continue;
+                if (!entry?.element) continue;
                 const box = entry.element.getBoundingClientRect();
                 const bounds = {
                     x: (box.left - nodeBox.left) / zoom,
@@ -206,6 +228,19 @@ export class Measurements {
             if (touched) changed.push(nodeId);
         }
         if (changed.length > 0) this.measured(changed);
+    }
+
+    /** Forgets a node's handles (the node left the flow). */
+    private forgetHandles(nodeId: string): void {
+        for (const key of this.handlesByNode.get(nodeId) ?? []) {
+            const entry = this.handles.get(key);
+            if (entry?.element) {
+                this.observer?.unobserve(entry.element);
+                this.handleOfElement.delete(entry.element);
+            }
+            this.handles.delete(key);
+        }
+        this.handlesByNode.delete(nodeId);
     }
 
     /** Measures every registered node again (after a zoom, handles' client rects scale). */
