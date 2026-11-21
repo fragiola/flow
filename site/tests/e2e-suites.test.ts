@@ -149,8 +149,8 @@ describe("the examples apps", () => {
         );
     });
 
-    it("are React's and Vue's in this repository today (examples/shared has no suite of its own)", () => {
-        expect(examplesFrameworks()).toEqual(["react", "vue"]);
+    it("are React's, Svelte's and Vue's in this repository today (examples/shared has no suite of its own)", () => {
+        expect(examplesFrameworks()).toEqual(["react", "svelte", "vue"]);
     });
 });
 
