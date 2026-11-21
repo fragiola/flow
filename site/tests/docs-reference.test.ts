@@ -2,6 +2,7 @@
 // author and licence, rewritten for Flow's packages.
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { compile } from "svelte/compiler";
 import { describe, expect, it } from "vitest";
 
 // The API reference is written by hand, and this test keeps it honest.
@@ -941,6 +942,53 @@ describe("the Svelte reference", () => {
                 mdx.split('<Framework name="react">').length,
             );
         }
+    });
+
+    it("writes every Svelte block in Svelte: its fences compile, with no warning", () => {
+        let compiled = 0;
+        for (const slug of allPages()) {
+            const mdx = read(join(API, "..", `${slug}.mdx`));
+            const blocks = [
+                ...mdx.matchAll(
+                    /<Framework name="svelte">([\s\S]*?)<\/Framework>/g,
+                ),
+            ].map((match) => match[1] ?? "");
+            for (const block of blocks) {
+                const fences = [
+                    ...block.matchAll(/^```(\w+)[^\n]*\n([\s\S]*?)^```/gm),
+                ];
+                expect(
+                    fences.length,
+                    `${slug}: a Svelte block with no code`,
+                ).toBeGreaterThan(0);
+                for (const [, lang = "", code = ""] of fences) {
+                    expect(
+                        ["svelte", "ts", "bash"],
+                        `${slug}: a ${lang} fence`,
+                    ).toContain(lang);
+                    expect(code, slug).not.toMatch(
+                        /@fragiola\/flow-(react|vue)\b/,
+                    );
+                    if (lang === "ts") {
+                        expect(
+                            code,
+                            `${slug}: plain TypeScript of another package`,
+                        ).not.toMatch(/from "(react|vue)"/);
+                    }
+                    if (lang !== "svelte") continue;
+                    const { warnings } = compile(code, {
+                        runes: true,
+                        filename: `${slug}.svelte`,
+                    });
+                    expect(
+                        warnings.map((warning) => warning.message),
+                        slug,
+                    ).toEqual([]);
+                    compiled += 1;
+                }
+            }
+        }
+        expect(compiled).toBeGreaterThan(100);
     });
 
     it("closes every block, and writes a framework's code in its block only (or on its own page)", () => {
