@@ -1449,18 +1449,21 @@ Decisions of the animated viewport, auto-pan and pan/zoom options (#23, Epic #26
 - **`panOnDrag` buttons.** `true` is `[0]` (a touch and a pen press as button 0), `false` none. A
   non-primary button pans only from the pane (the Issue's "buttons that pan the pane"), and starts
   no feature gesture and no tap (a right click never clears the selection). The context menu is
-  prevented while a moved non-primary pan is under way and once after its release (Windows opens it
-  on release); a press that did not move keeps it (Linux and macOS open it on press, before any
-  move: it is not suppressed there).
+  prevented while a middle or right pan press is under way, moved or not (macOS and Linux open it
+  on press, before any move: otherwise it would open and the right-drag pan never happen), and,
+  for the right button only, once after a release that moved (Windows opens it on release). The
+  trade-off: with `2` in `panOnDrag`, a right click on the pane opens no menu on macOS and Linux
+  (on Windows a right click that did not move still opens it); a middle pan never blocks a later
+  keyboard context menu.
 - **Activation keys.** Held keys are tracked by `key` and `code` from the root's document
   (`keydown` ignored when its target is in a field: `input`, `textarea`, `select`,
   contenteditable), released on `keyup` anywhere, on the window's `blur` and on a detach. `Meta`,
   `Control`, `Alt` and `Shift` are read from the pointer or wheel event's modifier flags instead.
   The pan key pans even with `panOnDrag: false`, from every target but `other` (fields, controls,
-  panels); a key pan that did not move still taps, as a pane pan does. xyflow's "the pan key also
+  panels); a key pan never taps (a click with the key held selects nothing). xyflow's "the pan key also
   turns scroll panning on" is left out (not in #23). The zoom key zooms whatever `zoomOnScroll`
   says (it is the explicit request), at the wheel's rate (the pinch's with Ctrl); Apple platforms
   are told by `navigator.platform` / `userAgent` (`Mac`, `iPhone`, `iPad`, `iPod`).
-- **`panOnScrollMode`.** The mode filters after Shift's sideways mapping (Shift + wheel is a
-  horizontal delta, so `"vertical"` ignores it); `"horizontal"` ignores a plain wheel's vertical
-  delta (symmetric with `"vertical"`). `panOnScrollSpeed` defaults to 1, today's behaviour.
+- **`panOnScrollMode`.** Shift turns a vertical-only wheel sideways except in `"vertical"` mode
+  (there Shift + wheel still pans vertically); `"horizontal"` ignores a plain wheel's vertical
+  delta (symmetric with `"vertical"` ignoring horizontal ones). `panOnScrollSpeed` defaults to 1, today's behaviour.
