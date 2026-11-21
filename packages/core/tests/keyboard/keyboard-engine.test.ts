@@ -128,6 +128,30 @@ describe("the keyboard", () => {
         expect(key(flow.node("b"), "Backspace").defaultPrevented).toBe(false);
     });
 
+    it("removes with the deleteKeys given, and never with []", () => {
+        const flow = mount(json(), {
+            features: [selection(), keyboard({ deleteKeys: ["x", "KeyD"] })],
+            sizes,
+        });
+        flow.model.run("selection.set", { nodeIds: ["a"] });
+        expect(key(flow.node("b"), "Delete").defaultPrevented).toBe(false);
+        expect(flow.model.get("all-nodes")).toHaveLength(2);
+        key(flow.node("b"), "x");
+        expect(flow.model.get("all-nodes").map((n) => n.id)).toEqual(["b"]);
+        flow.model.run("selection.set", { nodeIds: ["b"] });
+        // a key's code counts too
+        key(flow.node("b"), "d", { code: "KeyD" });
+        expect(flow.model.get("all-nodes")).toEqual([]);
+        const off = mount(json(), {
+            features: [selection(), keyboard({ deleteKeys: [] })],
+            sizes,
+        });
+        off.model.run("selection.set", { nodeIds: ["a"] });
+        key(off.node("a"), "Delete");
+        key(off.node("a"), "Backspace");
+        expect(off.model.get("all-nodes")).toHaveLength(2);
+    });
+
     it("removes the focused node or edge without the selection feature", () => {
         const flow = mount(json(), { features: [keyboard()], sizes });
         key(flow.edge("ab"), "Backspace");

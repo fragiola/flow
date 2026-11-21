@@ -207,7 +207,8 @@ export function mount<const F extends FlowFeatures = readonly []>(
     const edges = new Map<string, SVGElement>();
 
     const nodeBox = (id: string) => {
-        const position = model.get("absolute-position-by", { nodeId: id }) ?? {
+        // where an adapter puts it: the engine's box (its `nodeOrigin` applied)
+        const position = engine.get("node-rect-by", { nodeId: id }) ?? {
             x: 0,
             y: 0,
         };
