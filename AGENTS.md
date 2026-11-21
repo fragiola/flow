@@ -17,7 +17,7 @@ Each framework has an adapter, so **every piece of logic that isn't rendering li
 | package | name | contains | depends on | status |
 |---|---|---|---|---|
 | `packages/core` | `@fragiola/flow` | the document and its JSON Schemas, the typed model and its commands, the feature registry and the features, the engine that binds a flow to the DOM | DOM only, zero runtime deps | Epic #4: the model (#2) and the engine (#3) |
-| `packages/react` | `@fragiola/flow-react` | the `Flow.*` primitives and hooks over the core | peer `react`, `react-dom` | planned (React Epic) |
+| `packages/react` | `@fragiola/flow-react` | the `Flow.*` primitives and hooks over the core, the core re-exported, the features' subpaths mirrored | the core (`workspace:*`); peers `react`, `react-dom` `^19` | Epic #8: the adapter (#5) |
 | `packages/vue` | `@fragiola/flow-vue` | the same primitives as Vue components, the hooks as composables | peer `vue` | planned |
 | `packages/svelte` | `@fragiola/flow-svelte` | the same primitives as Svelte components | peer `svelte` | planned |
 | `packages/angular` | `@fragiola/flow-angular` | the same primitives as Angular directives, the hooks as injection functions | peer `@angular/core` | planned |
@@ -136,9 +136,9 @@ examples show them as copyable code.
 | `pnpm check:fix` | Biome check with auto-fix |
 | `pnpm format`, `pnpm lint` | Biome format (writes), Biome lint |
 | `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit) |
-| `pnpm test` | Vitest: `core` (node; a test that needs a DOM opts into jsdom) and `site` (the repository's guard tests) |
-| `pnpm build` | `pnpm -r build` (tsdown for the packages: the core's main entry and one entry per feature), then the `.d.ts` check (`scripts/check-dts.ts`: no `any`) and the features' bundle guard (`scripts/check-features.ts`: no main entry, nor a chunk it imports, built from a feature's folder, read from the source maps; tested with a planted import by `site/tests/check-features.test.ts`) |
-| `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs; for each adapter of `ADAPTERS` (none yet) checks its exact core pin and runs its smoke app (`scripts/check-package.ts`) |
+| `pnpm test` | Vitest: `core` (node; a test that needs a DOM opts into jsdom), `react` (jsdom) and `site` (the repository's guard tests) |
+| `pnpm build` | `pnpm -r build` (tsdown for the packages: each one's main entry and one entry per feature), then the `.d.ts` check (`scripts/check-dts.ts`: no `any`) and the features' bundle guard (`scripts/check-features.ts`: no main entry, nor a chunk it imports, built from a feature's folder, read from the source maps; tested with a planted import by `site/tests/check-features.test.ts`) |
+| `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs; for each adapter of `ADAPTERS` (React) checks its exact core pin and runs its smoke app: a scratch Vite + React app outside the workspace that installs the React tarball only, typechecks (strict, no `skipLibCheck`), builds and loads its dev server, at the pins of `examples/react` once it exists (`packages/react`'s until then, `SMOKE_PINS` for the Vite plugin) (`scripts/check-package.ts`) |
 
 `pnpm e2e`, `pnpm dev`, `pnpm site:export` and `pnpm site:dev` arrive with the apps in the React
 Epic. There is no `changeset` or `release:version` script (D15).
@@ -216,6 +216,7 @@ Error codes: `unknown_command`, `invalid_payload` (schema, or a field of a featu
 `refused`, `vetoed`, `queued`, `middleware_error`.
 
 **Keys.** `get`: `node-by { id }`, `edge-by { id }`, `all-nodes`, `all-edges`,
+`commands-to { nodes?, edges? }` (the commands that bring the document to them: controlled props),
 `node-edges-by { nodeId, handleType?, handleId? }`, `connected-edges-by { nodeIds }`,
 `absolute-position-by { nodeId }`, `flow-json`, `commands`; `selected-nodes`, `selected-edges`
 (`selection()`); `node-children-by { nodeId }`, `node-parent-by { nodeId }` (`subflows()`). `is`:
@@ -323,9 +324,121 @@ offset? }` (a root-relative anchor outside the zoom); features: `selection-box` 
   task (the root window's microtask), so a mount re-renders once.
 - `settings.onlyRenderVisible`: render `visible-nodes` / `visible-edges` instead of every one.
 
+## The React adapter (Issue #5)
+
+`@fragiola/flow-react` renders and wires; every rule is the core's. `export *` of the core (a local
+name that shadows a core one fails `tests/index.test.ts`), the `Flow` namespace (`parts.ts`), the
+hooks, `createFlowRef` / `useFlowRef`, and one entry per feature mirrored from the core's subpaths
+(`/selection`, `/subflows`, `/drag`, `/resize`, `/connection`, `/reconnection`, `/keyboard`,
+`/minimap`: each re-exports the core's factory; `/minimap` adds `MiniMap`, `MiniMapNode`,
+`MiniMapMask`, `/resize` adds `NodeResizer`, `ResizeHandle`, `RESIZE_POSITIONS`). The main entry
+never imports a feature (the bundle guard reads its source maps: `src/<feature>/` is a feature's
+code in every package).
+
+| folder | holds |
+| --- | --- |
+| `src/components/` | one primitive per file |
+| `src/hooks/` | the public hooks, `create-flow-ref.ts`, `internal.ts` (`useFlowValue`: a value read from the model and the engine, kept while equal) |
+| `src/utils/` | `merge-props.ts`, `use-render.ts` (`render`, refs, `className` / `style` functions, structural style), `shallow-equal.ts`, `engine-facade.ts` |
+| `src/<feature>/` | a feature's entry, and its primitives (`minimap/`, `resize/`) |
+
+**Primitives** (`Flow.*`; every element carries `data-flow-part`, entities `data-flow-id`, the
+engine's state attributes from `engine.adapter.attributes(part, payload)`):
+
+| primitive | element | does |
+| --- | --- | --- |
+| `Root` | `div` `root` | owns the model (or takes `model`) and the engine, attaches the root; `position: relative; overflow: hidden` |
+| `Viewport` | `div` `viewport` | `attachViewport`: the engine writes its transform, React never does |
+| `Nodes` | `div` `nodes` | children function per node not hidden (`visible-nodes` with `onlyRenderVisible`), keyed by id |
+| `Node` | `div` `node` | `registerNode`; `transform: translate(x, y)` from `node-rect-by`, the document's `width`/`height`; `tabIndex` from `node-focusable` |
+| `Handle` | `div` `handle` | `registerHandle({ nodeId, handleId, type, side, connectable })`; centred on its side by default (a style may move it) |
+| `Edges` | `div` + `svg` `edges` | children function per edge whose `edge-path-by` is defined; the `div` is the HTML layer labels portal into |
+| `Edge` | `g` `edge` | default child `EdgePath`; `pointer-events: visibleStroke`; `tabIndex` from `edge-focusable` |
+| `EdgePath` | `path` `edge-path` | `d` from `edge-path-by` (a `d` of your own draws an app type), `fill="none"` |
+| `EdgeLabel` | `div` `edge-label` | portal into the edges' HTML layer, centred on the label point |
+| `ReconnectAnchor` | `circle` `reconnect-anchor` | an end's grab area (`end`), transparent, `r` 10 |
+| `ConnectionLine` | `svg` `connection-line` | while a connection is drawn; default child `path` `connection-path`, or a children function |
+| `SelectionBox` | `div` `selection-box` | while a box is drawn, root-relative |
+| `Background` | `svg` `background` | `background-pattern`: `pattern` `background-pattern`, `circle`/`path` `background-mark` in `currentColor`, `rect` `background-fill` |
+| `Controls` | `div` `controls` | a group for the buttons |
+| `ZoomIn`, `ZoomOut`, `FitView` | `button` `zoom-in`, `zoom-out`, `fit-view` | run their action; `disabled` / `data-disabled` while `!engine.can(...)` |
+| `ToggleInteractive` | `button` `toggle-interactive` | `set-interactive`; `aria-pressed` while locked, `data-interactive` |
+| `NodeToolbar` | `div` `toolbar` | portal into the root at `node-toolbar-by` (outside the zoom); `open`, default while its node is selected |
+| `MiniMap` (`/minimap`) | `svg` `minimap` | `width` × `height` (200 × 150), `minimap-view`; children default: a `MiniMapNode` per node and the `MiniMapMask` |
+| `MiniMapNode`, `MiniMapMask` | `rect` `minimap-node`, `path` `minimap-mask` | a node's box; the mask (`fill-rule="evenodd"`) |
+| `NodeResizer` (`/resize`) | `div` `resizer` | `setPartOptions("resizer", nodeId, { minWidth, … })`; default children: a `ResizeHandle` at each corner and side |
+| `ResizeHandle` | `div` `resize-handle` | `data-position`; placed on its corner or along its side |
+
+**Root props:** `model`, or `defaultNodes` / `defaultEdges` (read once) and the controlled `nodes` /
+`edges` with `onNodesChange` / `onEdgesChange`; `features` and `createId` (read once: a changed
+`features` warns); `viewport` (controlled: `set-viewport`) / `defaultViewport` and
+`onViewportChange(viewport, gesture)` (the `viewport-change` event); `fitView` (read once); the
+engine options `minZoom`, `maxZoom`, `translateExtent`, `panOnDrag`, `panOnScroll`, `zoomOnScroll`,
+`zoomOnPinch`, `zoomOnDoubleClick`, `zoomStep`, `interactive`, `onlyRenderVisible`, `pathOptions`
+(a change sends only the keys that changed, `adapter.setOptions`); `flowRef`.
+
+**Hooks:** `useFlow<T, F>()` → `{ model, engine }` (the engine a facade: there from the first
+render, an action refused before the mount); part hooks `useNode(node)`, `useEdge(edge)`,
+`useHandle({ type, side, handleId?, connectable?, nodeId? })` → `{ state, props }`; values
+`useViewport()`, `useConnection()`, `useSelection()` (`{ nodes, edges }`), `useNodes()`,
+`useEdges()`. `createFlowRef<T, F>()` / `useFlowRef<T, F>()`: `ref.current` is `{ model, engine }`
+while the root is mounted.
+
+Decisions of the adapter (#5):
+
+- **The engine is created in the root's layout effect** (the tree's), destroyed in its cleanup: a
+  StrictMode double mount creates two and keeps the second (starting at the first one's viewport);
+  the first render and a server render have no engine (nodes at their model position with their
+  static attributes, no edge).
+- **Re-rendering:** `useFlowValue` reads a value again on every model commit and every
+  `adapter.subscribe` notification, and keeps the last object while equal (records by their
+  entries, edge paths by value), so a pan re-renders only what shows the viewport (the
+  background, the minimap, toolbars, the zoom buttons). `Nodes` and `Edges` memo each entity's
+  render on the entity and the children function: a drag step re-renders the moved nodes and
+  their edges only. A new children function re-renders every node: in a controlled flow, keep it
+  stable (`useCallback`, a module function).
+- **Controlled `nodes` / `edges` map onto commands through a core key**, `model.get("commands-to",
+  { nodes?, edges? })` (`packages/core/src/state/commands-to.ts`): the commands a user would run,
+  one `batch` with `meta: { source: "controlled" }` (which `onNodesChange` does not echo). The
+  props are the app's document: a flag that stops a user (`draggable`, `deletable`,
+  `connectable`) is unlocked for its step and locked again in the same batch; what no command
+  expresses (a node's type, a removed data key, a size given back) removes and adds the entity
+  again with its id; the drawing order is not synced. A batch a middleware refuses runs step by
+  step; whenever the model then differs from the props (a veto, an extent clamp), the change
+  callbacks get the model's lists, so the app's state follows the model. Only a list whose
+  identity changed is diffed. Alternative: the diff in the adapter (tree's `sync`); refused: every
+  adapter would re-implement it.
+- **Labels and toolbars are portals**: SVG holds no HTML, so `EdgeLabel` goes to the HTML layer of
+  `Edges` (inside the viewport, in flow coordinates); `NodeToolbar` goes to the root (outside the
+  zoom).
+- **Inner elements carry part names of their own** (`connection-path`, `background-pattern`,
+  `background-mark`, `background-fill`; the control buttons' `zoom-in`, …): every element has a
+  part (D11), and the engine leaves parts it does not know alone.
+- **SVG presentation defaults** are structural: `fill="none"` on paths, `currentColor` for the
+  background's marks, a transparent reconnect anchor, so an unstyled flow draws correctly; any
+  attribute or style of the consumer overrides them.
+- **A handle's place on its side is a default the consumer's style overrides** (`baseStyle` in
+  `use-render.ts`), unlike the structural keys that always win (`position`), so an app may put
+  several handles on one side.
+- **No role and no name**: nodes and edges get `tabIndex` from the engine and no role
+  (`aria-roledescription` would be text); the app names them.
+- **Every feature subpath is mirrored**, even those with no adapter code (the tree's): a React
+  app imports the features from the one package it installs.
+- **Known limits:** jsdom lays nothing out, so the adapter tests stub the layout (`tests/flow.tsx`);
+  the gestures' real feel is the playground E2E's (#6).
+
+For the playground and examples (#6): wrap the flow in a sized element (the root fills it); put
+`Edges` before `Nodes` inside `Viewport`, and `Background`, `SelectionBox`, `Controls`, `MiniMap`
+outside it; give nodes `user-select: none`; style through `[data-flow-part]` and the state
+attributes (`data-selected`, `data-dragging`, `data-connecting`, `data-valid` / `data-invalid`,
+`data-handle-type`, `data-side`, `data-position`, `data-end`, `data-disabled`).
+
 ## Repository layout
 
 ```
+packages/react/     @fragiola/flow-react src/components/, src/hooks/, src/utils/, src/<feature>/ (each core
+                                         feature's entry; minimap/ and resize/ with their primitives);
+                                         entries index.ts, parts.ts, context.ts; tests/ by behaviour
 packages/core/      @fragiola/flow       src/<domain>/ (document, state, commands, model, features,
                                          one folder per feature, engine, geometry, attributes,
                                          connect-session);
@@ -340,7 +453,7 @@ scripts/                                 check-layout.ts, check-dts.ts, source-c
 .github/workflows/  ci.yml               Checks, Package, Changes
 ```
 
-Later Epics add `packages/{react,vue,svelte,angular}`, `apps/playground`, `examples/*` and the
+Later Epics add `packages/{vue,svelte,angular}`; #6 and #7 add `apps/playground`, `examples/*` and the
 site's docs and export (`pnpm-workspace.yaml` already lists `apps/*`, `packages/*`, `examples/*`
 and `site`).
 
