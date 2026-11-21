@@ -20,7 +20,7 @@ Each framework has an adapter, so **every piece of logic that isn't rendering li
 | `packages/react` | `@fragiola/flow-react` | the `Flow.*` primitives and hooks over the core, the core re-exported, the features' subpaths mirrored | the core (`workspace:*`); peers `react`, `react-dom` `^19` | Epic #8: the adapter (#5) |
 | `packages/vue` | `@fragiola/flow-vue` | the same primitives as Vue components, the hooks as composables, the core re-exported, the features' subpaths mirrored | the core (`workspace:*`); peer `vue` `^3.5` | Epic #11: the adapter (#9) |
 | `packages/svelte` | `@fragiola/flow-svelte` | the same primitives as Svelte 5 components, the hooks as runes (`.svelte.ts`), the core re-exported, the features' subpaths mirrored | the core (`workspace:*`); peer `svelte` `^5.29.0` | Epic #14: the adapter (#12) |
-| `packages/angular` | `@fragiola/flow-angular` | the same primitives as Angular directives, the hooks as injection functions | peer `@angular/core` | planned |
+| `packages/angular` | `@fragiola/flow-angular` | the same primitives as Angular standalone directives on the app's elements, the hooks as injection functions (signals), the core re-exported, the features' subpaths mirrored as ng-packagr secondary entry points | the core (`workspace:*`); peer `@angular/core` `^22.0.0` | Epic #17: the adapter (#15) |
 | `apps/playground` | private | the dev app: the examples in place, scenarios, the unstyled fixture Playwright drives, the inspector | the React package | Epic #8 (#6) |
 | `examples/shared` | `examples-shared`, private | what every framework's examples share: metadata, the five themes, the embed protocol, the manifest, every Playwright spec | no framework | Epic #8 (#6) |
 | `examples/react` | `examples-react`, private | the React examples (the site's gallery and its embed app), vendored Fragiola UI | the React package | Epic #8 (#6) |
@@ -124,7 +124,8 @@ an implementation detail. Where the Epic's decisions say nothing, the Fragiola g
     TypeScript 7.0.2, tsdown 0.23.0, Vitest 5.0.2, Biome 2.5.14, Playwright 1.63.0. Pin dependencies
     to exact versions published at least 7 days ago (`npm view <pkg> time`). Exception: the Svelte
     package (and its smoke app) pins TypeScript 6.0.3, since `svelte-check` and `svelte-package`
-    take TypeScript 5 or 6 only (as Vue's `vue-tsc`). The workspace packages
+    take TypeScript 5 or 6 only (as Vue's `vue-tsc`); so does the Angular package (and its smoke
+    app), since `ngc` and ng-packagr take `typescript >=6.0 <6.1`. The workspace packages
     resolve to their sources through the `@fragiola/source` export condition
     (`scripts/source-condition.ts`, the tsconfig `customConditions`); the published `exports` are
     `publishConfig.exports`, dist-only. **No runtime dependency** in the core.
@@ -142,10 +143,10 @@ examples show them as copyable code.
 | `pnpm check:layout` | the source layout check (`scripts/check-layout.ts`, from Dockable): every tracked name kebab-case, a package's `src/` root holds only its entries |
 | `pnpm check:fix` | Biome check with auto-fix |
 | `pnpm format`, `pnpm lint` | Biome format (writes), Biome lint |
-| `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit; `packages/svelte`: `svelte-check --fail-on-warnings` on TypeScript 6) |
-| `pnpm test` | Vitest: `core` (node; a test that needs a DOM opts into jsdom), `react`, `vue` and `svelte` (jsdom; a server render opts into node) and `site` (the repository's guard tests) |
-| `pnpm build` | `pnpm -r build` (tsdown for the core, React and Vue: each one's main entry and one entry per feature; `svelte-package` for Svelte: `dist/` file for file), then the `.d.ts` check (`scripts/check-dts.ts`: no `any`) and the features' bundle guard (`scripts/check-features.ts`: no main entry, nor a chunk it imports, built from a feature's folder, read from the source maps, or for the unbundled Svelte build from the file's own path; tested with a planted import by `site/tests/check-features.test.ts`) |
-| `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`svelte`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs (Svelte: one exception, see [The Svelte adapter](#the-svelte-adapter-issue-12)); for each adapter of `ADAPTERS` (React, Vue, Svelte) checks its exact core pin and runs its smoke app: a scratch app outside the workspace that installs the adapter's tarball only, typechecks (strict, no `skipLibCheck`), builds and loads its dev server: Vite + React at the pins of `examples/react`; Vite + a Vue single-file component checked by `vue-tsc` on TypeScript 6, at the pins of `examples/vue`; Vite + a Svelte 5 component checked by `svelte-check` on TypeScript 6, at the pins of `examples/svelte` (`smokeVersion`: the examples app's pin, else the package's, for an adapter whose examples app comes in a later Issue) (`scripts/check-package.ts`) |
+| `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit; `packages/svelte`: `svelte-check --fail-on-warnings` on TypeScript 6; `packages/angular`: `ngc -p tsconfig.json`, strict templates, on TypeScript 6.0) |
+| `pnpm test` | Vitest: `core` (node; a test that needs a DOM opts into jsdom), `react`, `vue`, `svelte` and `angular` (jsdom; a server render opts into node; Angular's through `@analogjs/vite-plugin-angular` and a zoneless TestBed) and `site` (the repository's guard tests) |
+| `pnpm build` | `pnpm -r build` (tsdown for the core, React and Vue: each one's main entry and one entry per feature; `svelte-package` for Svelte: `dist/` file for file; ng-packagr for Angular: `dist/fesm2022` and `dist/types`, one bundle per entry, then its `scripts/check-dist.ts`), then the `.d.ts` check (`scripts/check-dts.ts`: no `any`) and the features' bundle guard (`scripts/check-features.ts`: no main entry, nor a chunk it imports, built from a feature's folder, read from the source maps, or for the unbundled Svelte build from the file's own path; a package's main entry is its published `exports["."]` target, Angular's FESM bundle; tested with a planted import by `site/tests/check-features.test.ts`) |
+| `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`svelte`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs (Svelte: one exception, see [The Svelte adapter](#the-svelte-adapter-issue-12)); for each adapter of `ADAPTERS` (React, Vue, Svelte, Angular) checks its exact core pin and runs its smoke app: a scratch app outside the workspace that installs the adapter's tarball only, typechecks (strict, no `skipLibCheck`), builds and loads its dev server: Vite + React at the pins of `examples/react`; Vite + a Vue single-file component checked by `vue-tsc` on TypeScript 6, at the pins of `examples/vue`; Vite + a Svelte 5 component checked by `svelte-check` on TypeScript 6, at the pins of `examples/svelte`; Vite + Analog (`@analogjs/vite-plugin-angular`) with a standalone component checked by `ngc` (strict templates) on TypeScript 6.0, at `packages/angular`'s pins until `examples/angular` exists (`smokeVersion`: the examples app's pin, else the package's, for an adapter whose examples app comes in a later Issue) (`scripts/check-package.ts`) |
 | `pnpm dev` | the playground (`apps/playground`, port 5197; `PLAYGROUND_PORT` moves it) |
 | `pnpm e2e` | Playwright: the playground's suite (Chromium and Firefox, its dev server, the sources), then each examples app's (`examples/*/playwright.config.ts`: the shared specs against a production build of its embed, built against the packages' `dist`: run `pnpm build` first) |
 | `pnpm --filter examples-react dev` | the React embed alone, port 5185 (`PORT` moves it; `?id=<id>&theme=<name>`) |
@@ -680,6 +681,137 @@ Decisions of the Svelte adapter (#12):
   runs the pinned 5.57.3); the gestures' real feel is checked by the Svelte examples' shared specs (#13: they passed
   with no adapter fix).
 
+## The Angular adapter (Issue #15)
+
+`@fragiola/flow-angular` is the React adapter in Angular 22 (signals, standalone, zoneless,
+OnPush by default), in the ecosystem's Angular way (Splitter's, Tree's, Data Grid's): the same 24
+primitives as **attribute directives on the app's own elements** (`<div flowRoot>`,
+`<div [flowNode]="node">`, `<svg:g [flowEdge]="edge">`, `<button flowZoomIn>`), in files of React's
+base names with Angular's suffix (`src/lib/directives/<name>.directive.ts`, `src/minimap/`,
+`src/resize/`: `tests/index.test.ts` compares them), the same part names, state attributes,
+structural styles, inputs and state fields, over the same core keys. `export *` of the core, the
+directives (`Flow<Name>Directive`, and `FLOW`, every main-entry directive for a component's
+`imports`: React's `Flow` namespace), the injection functions, `createFlowRef` / `injectFlowRef`,
+and the eight feature entries as ng-packagr secondary entry points (`/minimap` adds
+`FlowMiniMapDirective`, `FlowMiniMapNodeDirective`, `FlowMiniMapMaskDirective`, `FLOW_MINIMAP`;
+`/resize` adds `FlowNodeResizerDirective`, `FlowResizeHandleDirective`, `RESIZE_POSITIONS`,
+`FLOW_RESIZE`). Built by ng-packagr (partial compilation, FESM and bundled types), typechecked by
+`ngc`, tested with Vitest, jsdom, Analog's Vite plugin and a zoneless TestBed.
+
+| folder | holds |
+| --- | --- |
+| `src/lib/directives/` | one primitive per file (`root.directive.ts` … `zoom-out.directive.ts`); `nodes.directive.ts` and `edges.directive.ts` also hold their item templates (`FlowNodesItemDirective`, `FlowEdgesItemDirective`) |
+| `src/lib/inject/` | the public injection functions (`inject-*.ts`), `create-flow-ref.ts`, `inject-flow-ref.ts`, `internal.ts` (`flowValue`, `sameValue`, `valueNow`, `partOwnerId`), `control-button.ts`, `bind-edge-path.ts` |
+| `src/lib/utils/` | `helpers.ts` (`injectHost`, the input transforms, `beforeInputs`, `bindStructuralStyle` (Splitter's), `bindBaseStyle`, `bindAttributes`, `bindBaseAttributes`), `views.ts` (`SlotViews`, `FlowSlot`, `SignalContext`), `presence.ts` (`bindPresence`), `default-content.ts`, `engine-facade.ts` and `shallow-equal.ts` (React's) |
+| `src/lib/` | `context.ts` (the injection tokens), `flow.ts` (`FLOW`) |
+| `src/<feature>/` | a feature's entry (`index.ts`) and its directives (`minimap/`, `resize/`); `<feature>/ng-package.json` at the package root points ng-packagr at it (Data Grid's layout) |
+| `src/` root | `public-api.ts` |
+
+**How React's API maps to Angular:**
+
+| React | Angular |
+| --- | --- |
+| `<Flow.Root …>` and every part | the part's directive on the app's element: `flowRoot`, `flowViewport`, `flowNodes`, `flowNode`, `flowHandle`, `flowEdges`, `flowEdge`, `flowEdgePath`, `flowEdgeLabel`, `flowReconnectAnchor`, `flowConnectionLine`, `flowSelectionBox`, `flowBackground`, `flowControls`, `flowZoomIn`, `flowZoomOut`, `flowFitView`, `flowToggleInteractive`, `flowNodeToolbar`, `flowMiniMap`, `flowMiniMapNode`, `flowMiniMapMask`, `flowNodeResizer`, `flowResizeHandle` |
+| `render={<section />}`, `render={(props, state) => …}` | not applicable: the app writes its own element and puts the directive on it |
+| the children functions of `Nodes`, `Edges` | `<ng-template flowNodesItem let-node>` inside `[flowNodes]` (or `*flowNodesItem="let node"`), `<ng-template flowEdgesItem let-edge>` inside `[flowEdges]` (its elements with the `svg:` prefix); `[flowNodesItem]="model"` types the node by the registry (`ngTemplateContextGuard`) |
+| the children functions of `ConnectionLine`, `MiniMap` | the app's elements inside them, reading `#line="flowConnectionLine"`'s `line.state()?.connection` or `#map="flowMiniMap"`'s `map.state().view` |
+| a part's default children (`Edge`'s `EdgePath`, `NodeResizer`'s handles, `MiniMap`'s nodes and mask, `ConnectionLine`'s path) | added by the directive when the app wrote no element in it (`defaultContent`, once rendered) |
+| `className` / `style` functions of the state | the app's `[class.x]` / `[style.x]` bindings over the part's state (`#n="flowNode"`, `[class.selected]="n.state()?.selected"`), and the `data-*` |
+| `ref` | the element is the app's own (`viewChild`, a template reference); the directive through `exportAs` (`#flow="flowRoot"`: `model()`, `engine`, `state()`) |
+| `onClick` … | `(click)` …: the directive's host listener runs first |
+| `nodes` + `onNodesChange`, `edges` + `onEdgesChange` | `[(nodes)]`, `[(edges)]` (inputs with `nodesChange` / `edgesChange`) |
+| `viewport` + `onViewportChange(viewport, gesture)` | `[(viewport)]` (`viewportChange`), and `(viewportMove)` with `{ viewport, gesture }` |
+| `flowRef={ref}`, `ref.current` | `[flowRef]="flow"`, `flow.current` (a signal's value: a template follows it) |
+| `useFlow()` | `injectFlow()` → `{ model: Signal, engine }` |
+| `useNode(node)` → `{ state, props }` | `injectNode(node, a signal or a getter)` → `{ state, props }` as signals; it binds the host of its injection context (a component `article[appNode]`) |
+| `useEdge`, `useHandle` | `injectEdge`, `injectHandle`, as `injectNode` (`injectHandle` takes a `nodeId` outside `[flowNode]`) |
+| `useViewport()`, `useConnection()`, `useSelection()`, `useNodes()`, `useEdges()` | `injectViewport()`, `injectConnection()`, `injectSelection()`, `injectNodes()`, `injectEdges()`: signals |
+| `useFlowRef()` | `injectFlowRef()` (`createFlowRef()` in a field) |
+| `<Flow.Root<Types, typeof features>>` | inferred from the inputs (`[model]`); a child types `injectFlow<Types, typeof features>()` |
+
+Decisions of the Angular adapter (#15):
+
+- **TypeScript 6.0.3 for the Angular package and its smoke app** (D16's exception): `ngc` and
+  ng-packagr take `typescript >=6.0 <6.1`. Splitter's pins, published at least 7 days before
+  2026-11-21: `@angular/*` 22.2.5 (2026-11-06), `@angular/build` 22.2.6 (2026-11-04),
+  `ng-packagr` 22.2.6 (2026-11-04), `@analogjs/vite-plugin-angular` and `@analogjs/vitest-angular`
+  2.9.6 (2026-11-04), `typescript` 6.0.3 (2026-04-16), `rxjs` 7.8.2. `pnpm-workspace.yaml` takes
+  Splitter's `allowBuilds` (`@parcel/watcher`, `lmdb`, `msgpackr-extract`: their prebuilt binaries)
+  and its `packageExtensions` (Analog's plugin gets this package's TypeScript as a peer). The
+  transitive `@angular-devkit/schematics` (a peer Analog's test plugin installs) resolved to
+  22.3.0, as the lockfile's other transitive entries, unpinned.
+- **Packaging, Data Grid's way**: ng-packagr builds into `dist` (`fesm2022/*.mjs` with their maps,
+  `types/*.d.ts`); `scripts/check-dist.ts` removes the manifests and the README and licence copies
+  it writes there, and fails a bundle importing anything but `@angular/core`, the core and the
+  package itself. The package is packed from its folder (`files: ["dist"]`, `publishConfig.exports`,
+  as every package), not from `dist` (Splitter's `publishConfig.directory`). publint and attw
+  (`esm-only`) pass with no exception; check-dts's Angular metadata exception covers `ɵdir`/`ɵfac`.
+  The bundle guard reads each package's main entry from its published `exports["."]`.
+- **The feature entries build on the main entry's public API** (ng-packagr compiles them against
+  its types): the helpers they need are exported with Angular's `ɵ` prefix (`ɵinjectFlowContext`,
+  `ɵflowValue`, `ɵbindAttributes`, …), not an app's API; `tests/index.test.ts` keeps the rest of the
+  surface exact and forbids a relative import out of a feature folder. No feature of Flow adds a
+  root input, so Data Grid's "a directive of the feature's entry on the root" has nothing to carry:
+  the entries add only their primitives.
+- **The model's state is never reactive**: the root bumps one `revision` signal on every model
+  commit and every `adapter.subscribe` notification; each part reads the model and the engine in a
+  `computed` (`flowValue`) whose `equal` keeps its last object while equal (React's comparison).
+  The directives write their attributes, structural style and defaults to their element in effects
+  (`bindAttributes`; `bindStructuralStyle`: the structural keys win over the app's static style and
+  style bindings, written back after every render; `bindBaseStyle` / `bindBaseAttributes`: a
+  handle's place, `fill`, `d`, `r`, `type="button"`, which the app's own win over).
+- **One root view per node and per edge (`SlotViews`)**: Angular checks a template's embedded
+  views with their component (an embedded view has no reactive consumer of its own: a signal read
+  in one marks its component), so a node's view in the app's component would be checked on every
+  drag step of any node. Each entity's view is created in a `FlowSlot` (a template-less component
+  made with `createComponent` on a host out of the document, attached to the application), its
+  elements moved before the item template's anchor in order, so a drag step checks the moved
+  node's view only. The item directive's `ngDoCheck` marks every slot whenever the app's component
+  is checked, as embedded views are; another template (an `@if` around two) is another directive
+  and renders every entity again (Vue's #11 bug cannot happen).
+- **Edges draw in an SVG the directive adds** to the app's `[flowEdges]` element (React's `div` +
+  `svg`), and the item template's anchor is moved into it; the app's element is the HTML layer
+  labels go to.
+- **No portals: a part moves its element** (`bindPresence`): an edge label (written
+  `<xhtml:div flowEdgeLabel>` inside the SVG group: the prefix makes it HTML) goes into the edges'
+  HTML layer, a toolbar into the root, and a part shown only sometimes (the connection line, the
+  selection box, a minimap node, a toolbar not open) leaves the document meanwhile, a comment
+  keeping its place; `SlotViews` never pulls a moved element back, and a default content counts a
+  moved element as the app's (#15's review); an element moved away goes with its directive.
+- **The engine is created after the first render** (`afterNextRender`, then an effect per model):
+  another `model` destroys it and creates one at the last viewport, the facade and the flow ref
+  following; `DestroyRef` (the effects' cleanups) releases the engine, the model's listeners, the
+  flow ref and the moved elements.
+- **The model is not read before the root's inputs are set** (#15's review): a read from a child's
+  constructor throws Angular's NG0950 (code -950, a clear message) instead of creating a model
+  without `defaultNodes`, `features` or `createId`; templates, computeds and effects read it once
+  `ngOnInit` ran.
+- **Controlled lists reuse `commands-to`**, exactly React's algorithm, in an effect over the
+  lists' identity; the model's own list given back (`[(nodes)]` after a drag step) is recognized by
+  identity and diffs nothing. The outputs always emit (React's callbacks), with the model's frozen
+  lists; Angular signals never proxy them.
+- **A bound output marks the app's component** (Angular's listeners do): binding
+  `(viewportChange)` or `[(nodes)]` checks the app's whole template (every slot) on every pan or
+  drag step. Bind them where needed; `injectViewport()` and the flow ref's `engine.subscribe` give
+  the same without it.
+- **Engine state in a template comes through a signal**: `injectViewport()`, a part's `state()`,
+  `flow.current` follow the engine; `engine.can(…)` read alone in a template does not update (the
+  Svelte gotcha).
+- **Known limits:** no server render nor hydration (the sibling Angular adapters do not support it
+  either; `[flowEdges]` adds its SVG in its constructor); jsdom lays nothing out, so the tests stub
+  the layout (`tests/flow.ts`, React's); a part that leaves the document while hidden must not be
+  the first root element of a repeated view (an `@for` of `[flowMiniMapNode]`s: Angular would
+  insert before a detached element; wrap it); a default content is added only when the app wrote
+  no element by the first render; each structural-style element writes its keys back after every
+  render (cheap reads, one hook per element); the gestures' real feel is for the Angular examples'
+  shared specs (#16).
+
+For #16 (`examples/angular`, its docs): its e2e port is 4363 (`examplesE2eConfig("angular")`),
+its pins become the smoke app's (`smokeVersion`), and the Changes job already maps
+`packages/angular` and `examples/angular`. Write a node template as an `ng-template
+flowNodesItem` typed by the model, edges with the `svg:` prefix and labels with `xhtml:`, keep
+components OnPush (the default), and remember that a bound output checks the whole template.
+
 ## The playground and the examples (Issue #6)
 
 Every rule of the guidelines' Examples section (`../guidelines/docs/site.md#examples`) holds; what
@@ -967,6 +1099,12 @@ packages/react/     @fragiola/flow-react src/components/, src/hooks/, src/utils/
 packages/vue/       @fragiola/flow-vue   src/components/, src/composables/, src/utils/, src/<feature>/
                                          (minimap/ and resize/ with their primitives); entries
                                          index.ts, parts.ts, context.ts, typed.ts; tests/ by behaviour
+packages/angular/   @fragiola/flow-angular src/lib/directives/ (.directive.ts), src/lib/inject/,
+                                         src/lib/utils/, src/lib/context.ts, src/lib/flow.ts;
+                                         src/<feature>/ (minimap/ and resize/ with their directives)
+                                         and <feature>/ng-package.json; entry src/public-api.ts;
+                                         scripts/check-dist.ts; tests/ by behaviour,
+                                         tests/fixtures.ts (the flows, as components)
 packages/svelte/    @fragiola/flow-svelte src/components/ (.svelte), src/runes/ (.svelte.ts), src/utils/,
                                          src/<feature>/ (minimap/ and resize/ with their primitives);
                                          entries index.ts, parts.ts, context.ts, typed.ts; tests/ by
@@ -1010,7 +1148,7 @@ docs/                                    docs-examples-gaps.md: what the docs an
                                          Site export, Trigger www build
 ```
 
-Later Epics add `packages/angular` and its examples app (`pnpm-workspace.yaml`
+Issue #16 adds `examples/angular` (`pnpm-workspace.yaml`
 already lists `apps/*`, `packages/*`, `examples/*` and `site`).
 
 ## Provenance: xyflow
