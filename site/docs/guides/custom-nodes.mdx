@@ -15,6 +15,8 @@ on it. What the node looks like, what it shows and what its fields do are yours.
 Name your node types and their data in a `Types` registry: `node.type` then narrows `node.data`,
 so each branch of the function reads the fields of its own type.
 
+<Framework name="react">
+
 ```tsx title="custom-nodes.tsx"
 import { Flow, type FlowNode, type FlowTypes } from "@fragiola/flow-react";
 
@@ -47,11 +49,58 @@ Keep the function stable (a module function, or `useCallback`): `Flow.Nodes` mem
 rendering on the node and the function, so a drag step re-renders only the nodes it moved. A new
 function on every render re-renders every node.
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="custom-nodes.vue"
+<script lang="ts">
+import type { FlowTypes } from "@fragiola/flow-vue";
+
+interface Types extends FlowTypes {
+    readonly nodes: {
+        colour: { label: string; colour: string };
+        number: { label: string; value: number };
+        preview: { label: string };
+    };
+}
+</script>
+
+<script setup lang="ts">
+import { typedFlow } from "@fragiola/flow-vue";
+import ColourNode from "./colour-node.vue";
+import NumberNode from "./number-node.vue";
+import PreviewNode from "./preview-node.vue";
+
+const Flow = typedFlow<Types>();
+</script>
+
+<template>
+    <!-- inside the root -->
+    <Flow.Nodes v-slot="{ node }">
+        <Flow.Node :node="node" class="node">
+            <ColourNode v-if="node.type === 'colour'" :node="node" />
+            <NumberNode v-else-if="node.type === 'number'" :node="node" />
+            <PreviewNode v-else :node="node" />
+        </Flow.Node>
+    </Flow.Nodes>
+</template>
+```
+
+In Vue, the children function is the default scoped slot of `Flow.Nodes` (`v-slot="{ node }"`),
+and `node.type` narrows `node.data` in the template too. Each node's slot renders in a component
+of its own whose props are the node: a drag step re-renders only the nodes it moved, whatever
+the slot holds.
+
+</Framework>
+
 ## A component per type
 
 Each branch is an ordinary component. `Extract` gives it the node of its own type, and
 [`useFlow`](/docs/api/primitives/hooks) gives it the model to change its data with
 `node.set-data`, a shallow merge:
+
+<Framework name="react">
 
 ```tsx
 import { Flow, type FlowNode, type FlowTypes, useFlow } from "@fragiola/flow-react";
@@ -84,6 +133,47 @@ function ColourNode({ node }: { node: Extract<FlowNode<Types>, { type: "colour" 
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="colour-node.vue"
+<script setup lang="ts">
+import { type FlowNode, typedFlow, useFlow } from "@fragiola/flow-vue";
+import { connection } from "@fragiola/flow-vue/connection";
+import { drag } from "@fragiola/flow-vue/drag";
+import { selection } from "@fragiola/flow-vue/selection";
+
+const features = [selection(), drag(), connection()] as const;
+
+defineProps<{ node: Extract<FlowNode<Types>, { type: "colour" }> }>();
+const Flow = typedFlow<Types, typeof features>();
+const { model } = useFlow<Types, typeof features>();
+</script>
+
+<template>
+    <label>
+        <span>{{ node.data.label }}</span>
+        <input
+            type="color"
+            :value="node.data.colour"
+            @input="
+                model.run('node.set-data', {
+                    nodeId: node.id,
+                    data: { colour: ($event.target as HTMLInputElement).value },
+                })
+            "
+        />
+    </label>
+    <Flow.Handle type="source" side="right" class="handle" />
+</template>
+```
+
+Declare `features` once in a module of its own and import it where you need its type: here it
+is inline to keep the snippet whole.
+
+</Framework>
+
 A press on a field, a button or a link inside a node starts no gesture: typing in the input never
 drags the node. Mark anything else that must keep its presses with `data-flow-no-gesture`, and an
 element that scrolls with `data-flow-no-wheel` (the wheel then scrolls it instead of zooming).
@@ -93,10 +183,23 @@ element that scrolls with `data-flow-no-wheel` (the wheel then scrolls it instea
 A `Flow.Handle` sits at the middle of its `side` by default. Give a node several handles of one
 type with a `handleId` each, and move them along the side with your style:
 
+<Framework name="react">
+
 ```tsx
 <Flow.Handle type="target" side="left" handleId="colour" className="handle" style={{ top: "35%" }} />
 <Flow.Handle type="target" side="left" handleId="size" className="handle" style={{ top: "75%" }} />
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Handle type="target" side="left" handle-id="colour" class="handle" :style="{ top: '35%' }" />
+<Flow.Handle type="target" side="left" handle-id="size" class="handle" :style="{ top: '75%' }" />
+```
+
+</Framework>
 
 An edge names the handle it ends at with `targetHandle: "colour"` (and `sourceHandle` at its
 start). See [Handles and connections](/docs/concepts/handles-and-connections).
@@ -105,6 +208,8 @@ start). See [Handles and connections](/docs/concepts/handles-and-connections).
 
 A node that shows its inputs reads the edges and the nodes with
 [`useEdges` and `useNodes`](/docs/api/primitives/hooks), which re-render it when they change:
+
+<Framework name="react">
 
 ```tsx
 import { useEdges, useNodes } from "@fragiola/flow-react";
@@ -118,6 +223,29 @@ function useInput(nodeId: string, handleId: string) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```ts title="use-input.ts"
+import { useEdges, useNodes } from "@fragiola/flow-vue";
+import { computed } from "vue";
+
+/** The node wired into one of `nodeId`'s target handles, if any. */
+export function useInput(nodeId: string, handleId: string) {
+    const edges = useEdges<Types>();
+    const nodes = useNodes<Types>();
+    return computed(() => {
+        const edge = edges.value.find((e) => e.target === nodeId && e.targetHandle === handleId);
+        return nodes.value.find((n) => n.id === edge?.source);
+    });
+}
+```
+
+In Vue, `useEdges` and `useNodes` are computed refs: derive from them with `computed`.
+
+</Framework>
+
 For a large flow, read only what you need with `model.get("node-edges-by", { nodeId, handleType:
 "target" })` in a `model.subscribe` listener instead: `useNodes` re-renders on every change of any
 node.
@@ -130,6 +258,8 @@ A palette outside the root reaches the flow through a [flow ref](/docs/api/primi
 The browser's own drag and drop carries the node type; on the drop,
 `engine.get("screen-to-flow", { x, y })` turns the drop's client point into flow coordinates, and
 `node.add` puts the node there:
+
+<Framework name="react">
 
 ```tsx title="add-nodes.tsx"
 import { Flow, type FlowTypes, useFlowRef } from "@fragiola/flow-react";
@@ -185,6 +315,66 @@ export function Editor() {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="add-nodes.vue"
+<script lang="ts">
+import type { FlowTypes } from "@fragiola/flow-vue";
+
+type Shape = "circle" | "square" | "diamond";
+
+interface Types extends FlowTypes {
+    readonly nodes: { shape: { shape: Shape; label: string } };
+}
+
+const MIME = "application/x-flow-shape";
+</script>
+
+<script setup lang="ts">
+import { typedFlow, useFlowRef } from "@fragiola/flow-vue";
+
+const Flow = typedFlow<Types, typeof features>();
+const flow = useFlowRef<Types, typeof features>();
+
+function onDragOver(event: DragEvent) {
+    if (!event.dataTransfer?.types.includes(MIME)) return;
+    event.preventDefault();
+}
+
+function onDrop(event: DragEvent) {
+    const shape = event.dataTransfer?.getData(MIME) as Shape | undefined;
+    const current = flow.value;
+    if (!shape || !current) return;
+    event.preventDefault();
+    const point = current.engine.get("screen-to-flow", { x: event.clientX, y: event.clientY });
+    current.model.run("node.add", {
+        type: "shape",
+        // the node's top-left corner, so that its middle lands on the point
+        position: { x: point.x - 50, y: point.y - 20 },
+        data: { shape, label: shape },
+    });
+}
+</script>
+
+<template>
+    <div class="layout">
+        <button type="button" draggable="true" @dragstart="$event.dataTransfer?.setData(MIME, 'square')">
+            Task
+        </button>
+        <Flow.Root :features="features" :flow-ref="flow" class="flow" @dragover="onDragOver" @drop="onDrop">
+            <!-- the viewport, edges and nodes -->
+        </Flow.Root>
+    </div>
+</template>
+```
+
+In Vue, `flowRef={flow}` is `:flow-ref="flow"` and `flow.current` is `flow.value`; the root's
+element takes your listeners (`@dragover`, `@drop`) as it takes any attribute.
+
+</Framework>
 
 `node.add` generates the id when you leave it out (the model's `createId`). A node added without a
 `width` and `height` is measured once rendered, and its edges are drawn from then on.

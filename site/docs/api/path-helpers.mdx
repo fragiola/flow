@@ -11,6 +11,8 @@ parameter t = 0.5, the others halfway along their length).
 They are written from the geometry (no code is ported from another library) and tested on known
 points.
 
+<Framework name="react">
+
 ```tsx
 import { Flow, type FlowEdge, smoothStepPath } from "@fragiola/flow-react";
 
@@ -27,6 +29,36 @@ function RoundedEdge({ edge }: { edge: FlowEdge<Types> }) {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="rounded-edge.vue"
+<script setup lang="ts">
+import { type FlowEdge, smoothStepPath, typedFlow } from "@fragiola/flow-vue";
+
+/** An app edge type drawn from the engine's ends: a smooth step with wider corners. */
+defineProps<{ edge: FlowEdge<Types> }>();
+
+const Flow = typedFlow<Types>();
+</script>
+
+<template>
+    <Flow.Edge :edge="edge">
+        <Flow.EdgePath>
+            <template #render="{ props, state }">
+                <path v-bind="props" :d="smoothStepPath({ ...state.path, borderRadius: 16 }).path" />
+            </template>
+        </Flow.EdgePath>
+    </Flow.Edge>
+</template>
+```
+
+In Vue, `render={(props, state) => …}` is the `render` scoped slot, `#render="{ props, state }"`:
+bind `props` on your element and read the engine's ends from `state.path`.
+
+</Framework>
 
 `state.path` is the edge's `EdgePath` (`engine.get("edge-path-by", { edgeId })`): its own path and
 label, and its ends (`PathEnds`), so spreading it gives a helper everything it needs. More on app

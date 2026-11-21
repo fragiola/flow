@@ -14,6 +14,8 @@ plugin or preset is involved.
 Tailwind v4 turns every attribute into a variant. The primitives expose their state as
 [`data-*` attributes](/docs/concepts/state-attributes), present or absent:
 
+<Framework name="react">
+
 ```tsx
 <Flow.Node<Types>
     node={node}
@@ -28,6 +30,26 @@ Tailwind v4 turns every attribute into a variant. The primitives expose their st
 </Flow.Node>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Node
+    :node="node"
+    class="min-w-28 select-none rounded-lg border border-palette-line bg-palette-base px-3 py-2 data-dragging:cursor-grabbing data-selected:border-palette-ring data-selected:ring-2 data-selected:ring-palette-ring/30 focus-visible:outline-2"
+>
+    {{ node.data.label }}
+    <Flow.Handle
+        type="source"
+        side="bottom"
+        class="size-2.5 rounded-full border border-palette-line bg-palette-base data-valid:bg-green-500 data-invalid:bg-red-500"
+    />
+</Flow.Node>
+```
+
+</Framework>
+
 Valued attributes take the bracket form: `data-[side=left]:-translate-x-1/2`,
 `data-[handle-type=target]:rounded-none`, `data-[position=top-left]:cursor-nwse-resize`.
 
@@ -36,11 +58,25 @@ Valued attributes take the bracket form: `data-[side=left]:-translate-x-1/2`,
 Edges, the connection line, the background and the minimap are SVG: use the `stroke-*` and
 `fill-*` utilities.
 
+<Framework name="react">
+
 ```tsx
 <Flow.EdgePath className="fill-none stroke-palette-line stroke-[1.5px] data-selected:stroke-palette-ring data-selected:stroke-[2.5px]" />
 <Flow.ConnectionLine className="fill-none stroke-palette-ring [stroke-dasharray:4_3]" />
 <Flow.Background variant="dots" size={2} className="text-palette-line" />
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.EdgePath class="fill-none stroke-palette-line stroke-[1.5px] data-selected:stroke-palette-ring data-selected:stroke-[2.5px]" />
+<Flow.ConnectionLine class="fill-none stroke-palette-ring [stroke-dasharray:4_3]" />
+<Flow.Background variant="dots" :size="2" class="text-palette-line" />
+```
+
+</Framework>
 
 `Flow.Background` draws its marks in `currentColor`: its `text-*` utility is the marks' colour.
 
@@ -48,12 +84,27 @@ Edges, the connection line, the background and the minimap are SVG: use the `str
 
 A part inside a node styles itself from the node's state with a `group` on the node:
 
+<Framework name="react">
+
 ```tsx
 <Flow.Node<Types> node={node} className="group node">
     <span className="opacity-60 group-data-selected:opacity-100">{node.data.label}</span>
     <NodeResizer className="hidden group-data-selected:block" />
 </Flow.Node>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Node :node="node" class="group node">
+    <span class="opacity-60 group-data-selected:opacity-100">{{ node.data.label }}</span>
+    <NodeResizer class="hidden group-data-selected:block" />
+</Flow.Node>
+```
+
+</Framework>
 
 `in-data-dragging:opacity-80` (Tailwind v4's `in-*` variant) does the same without naming the
 group: it matches when any ancestor carries the attribute, such as the root while a drag is under
@@ -63,6 +114,8 @@ way.
 
 `className` also takes a function of the primitive's state: useful when the state is not an
 attribute, or for a lookup of your own.
+
+<Framework name="react">
 
 ```tsx
 const TONE = { draft: "border-dashed", ready: "border-solid" } as const;
@@ -74,6 +127,30 @@ const TONE = { draft: "border-dashed", ready: "border-solid" } as const;
     {node.data.label}
 </Flow.Node>;
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+const TONE = { draft: "border-dashed", ready: "border-solid" } as const;
+</script>
+
+<template>
+    <Flow.Nodes v-slot="{ node }">
+        <Flow.Node :node="node" :class="['node not-data-measured:invisible', TONE[node.data.status]]">
+            {{ node.data.label }}
+        </Flow.Node>
+    </Flow.Nodes>
+</template>
+```
+
+Vue has no class function: `class` takes Vue's forms only (a string, an array, an object). A
+lookup of your own reads the node the slot gives, and the state reads its `data-*` attribute
+(`not-data-measured:invisible`); for anything else, the `render` slot gives the `state`.
+
+</Framework>
 
 ## One string per part
 

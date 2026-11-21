@@ -12,12 +12,27 @@ announcements are yours, in your words and your language.
 
 ## Turn it on
 
+<Framework name="react">
+
 ```tsx
 import { keyboard } from "@fragiola/flow-react/keyboard";
 import { selection } from "@fragiola/flow-react/selection";
 
 const features = [selection(), drag(), keyboard()] as const;
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```tsx
+import { keyboard } from "@fragiola/flow-vue/keyboard";
+import { selection } from "@fragiola/flow-vue/selection";
+
+const features = [selection(), drag(), keyboard()] as const;
+```
+
+</Framework>
 
 With it, every node and edge gets `tabIndex={0}` (`engine.is("node-focusable", { nodeId })`), so
 Tab walks them in drawing order, and a node that takes focus is panned into view. On a focused
@@ -42,6 +57,8 @@ A node that is not draggable does not move, and one that is not deletable stays.
 
 A node is an element you render, so you name it. A flow is easier to follow when each node says
 what it is and each edge says what it joins:
+
+<Framework name="react">
 
 ```tsx
 function renderNode(node: FlowNode<Types>) {
@@ -74,6 +91,38 @@ function renderEdge(edge: FlowEdge<Types>) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Edges v-slot="{ edge }">
+    <Flow.Edge
+        :edge="edge"
+        role="group"
+        aria-roledescription="edge"
+        :aria-label="`${edge.source} to ${edge.target}`"
+    >
+        <Flow.EdgePath class="edge" />
+    </Flow.Edge>
+</Flow.Edges>
+<Flow.Nodes v-slot="{ node }">
+    <Flow.Node
+        :node="node"
+        role="group"
+        aria-roledescription="node"
+        :aria-label="node.data.label"
+        class="node"
+    >
+        {{ node.data.label }}
+        <Flow.Handle type="target" side="left" class="handle" />
+        <Flow.Handle type="source" side="right" class="handle" />
+    </Flow.Node>
+</Flow.Nodes>
+```
+
+</Framework>
+
 Name the root too (`role="group" aria-label="Release plan"`), and every control button: a
 `Flow.ZoomIn` renders only its children, an icon, so it needs `aria-label="Zoom in"`. See
 [Accessible names](/docs/getting-started/accessible-names).
@@ -97,6 +146,8 @@ A screen reader user does not see a node move. The engine tells what happened
 (`engine.subscribe`): `nodes-move` (with `source: "keyboard"` or `"pointer"`), `drag-cancel`,
 `connect`, `connect-cancel`, `remove`, `resize`, `box-select`, and more. Turn the events you care
 about into sentences and write them into a live region:
+
+<Framework name="react">
 
 ```tsx title="live-region.tsx"
 import { type FlowEngineEvent, type FlowModel, useFlow } from "@fragiola/flow-react";
@@ -139,6 +190,51 @@ export function LiveRegion() {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="live-region.vue"
+<script setup lang="ts">
+import { type FlowEngineEvent, type FlowModel, useFlow } from "@fragiola/flow-vue";
+import { onUnmounted, ref } from "vue";
+
+type Model = FlowModel<Types, typeof features>;
+
+/** Your words for an event, or nothing for one you keep quiet about. */
+function describe(event: FlowEngineEvent, model: Model): string | undefined {
+    const name = (id: string) => model.get("node-by", { id })?.data.label ?? id;
+    switch (event.type) {
+        case "nodes-move":
+            return `Moved ${event.nodeIds.map(name).join(", ")}.`;
+        case "connect":
+            return `Connected ${name(event.source)} to ${name(event.target)}.`;
+        case "connect-cancel":
+            return event.refused ? "That connection is not allowed." : undefined;
+        case "remove":
+            return `Removed ${event.nodeIds.length} node(s) and ${event.edgeIds.length} edge(s).`;
+        default:
+            return undefined;
+    }
+}
+
+const { model, engine } = useFlow<Types, typeof features>();
+const message = ref("");
+onUnmounted(
+    engine.subscribe((event) => {
+        const next = describe(event, model);
+        if (next) message.value = next;
+    }),
+);
+</script>
+
+<template>
+    <p role="status" class="sr-only">{{ message }}</p>
+</template>
+```
+
+</Framework>
 
 Render `LiveRegion` inside the root (it reads the root's engine through `useFlow`).
 

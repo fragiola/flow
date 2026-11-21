@@ -112,6 +112,8 @@ See [State attributes](/docs/concepts/state-attributes) for the full list.
 
 Every primitive takes `className` (and `style`), as a value or as a function of its state:
 
+<Framework name="react">
+
 ```tsx
 <Flow.Node<Types>
     node={node}
@@ -120,6 +122,27 @@ Every primitive takes `className` (and `style`), as a value or as a function of 
     {node.data.label}
 </Flow.Node>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Node :node="node" class="node">
+    <template #render="{ props, state, children }">
+        <div v-bind="props" :class="{ 'node--selected': state.selected }">
+            <component :is="children" />
+        </div>
+    </template>
+    {{ node.data.label }}
+</Flow.Node>
+```
+
+In Vue, `class` and `style` take Vue's own forms (a string, an array, an object), never a function
+of the state: Vue normalizes them before the primitive sees them. Read the state from the
+`data-*` attributes (the CSS above), or from the `render` slot's `state`, as here.
+
+</Framework>
 
 See the [common props](/docs/api/primitives/root#common-props).
 

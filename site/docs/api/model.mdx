@@ -8,6 +8,8 @@ only commands change. It needs no DOM: it runs in Node, on a server and in tests
 creates one from its props unless you give it yours with `model`, which is what you do when you
 want its middleware, its events or its document outside the root.
 
+<Framework name="react">
+
 ```ts
 import { createFlowModel, type FlowJson, type FlowTypes } from "@fragiola/flow-react";
 import { selection } from "@fragiola/flow-react/selection";
@@ -29,6 +31,34 @@ model.get("node-by", { id: "review" });
 model.get("node-children-by", { nodeId: "group-1" });
 model.is("node-selected", { nodeId: "review" });
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+import { createFlowModel, type FlowJson, type FlowTypes } from "@fragiola/flow-vue";
+import { selection } from "@fragiola/flow-vue/selection";
+import { subflows } from "@fragiola/flow-vue/subflows";
+
+interface Types extends FlowTypes {
+    readonly nodes: { task: { title: string }; group: { label: string } };
+}
+
+const features = [selection(), subflows()] as const;
+
+declare const saved: FlowJson<Types>;
+
+const model = createFlowModel<Types, typeof features>(saved, {
+    features,
+    createId: (kind) => `${kind}-${crypto.randomUUID()}`,
+});
+model.get("node-by", { id: "review" });
+model.get("node-children-by", { nodeId: "group-1" });
+model.is("node-selected", { nodeId: "review" });
+```
+
+</Framework>
 
 ## `createFlowModel`
 
@@ -56,6 +86,8 @@ throws a `TypeError` naming both.
 It never throws for a document. Give it the same `features` as the model (`ValidateFlowOptions`):
 a field of a feature that is not installed (`selected` without `selection()`) is an issue.
 
+<Framework name="react">
+
 ```ts
 import { createFlowModel, FlowValidationError, validateFlow } from "@fragiola/flow-react";
 
@@ -70,6 +102,27 @@ try {
     if (error instanceof FlowValidationError) console.warn(error.issues);
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+import { createFlowModel, FlowValidationError, validateFlow } from "@fragiola/flow-vue";
+
+declare const json: unknown;
+
+const issues = validateFlow(json, { features });
+if (issues.length > 0) console.warn(issues); // [{ path: "/nodes/0/position", message: "…" }]
+
+try {
+    createFlowModel(json as never, { features });
+} catch (error) {
+    if (error instanceof FlowValidationError) console.warn(error.issues);
+}
+```
+
+</Framework>
 
 `FlowValidationError` is an `Error` whose `issues` lists every problem; its message names the
 first one.

@@ -12,6 +12,8 @@ node joins or leaves one, are yours.
 
 ## A parent and its children
 
+<Framework name="react">
+
 ```tsx
 import { selection } from "@fragiola/flow-react/selection";
 import { drag } from "@fragiola/flow-react/drag";
@@ -46,6 +48,46 @@ const nodes: FlowNodeInput<Types>[] = [
 ];
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```tsx
+import { selection } from "@fragiola/flow-vue/selection";
+import { drag } from "@fragiola/flow-vue/drag";
+import { subflows } from "@fragiola/flow-vue/subflows";
+
+interface Types extends FlowTypes {
+    readonly nodes: {
+        group: { label: string };
+        item: { label: string };
+    };
+}
+
+const features = [selection(), drag(), subflows()] as const;
+
+const nodes: FlowNodeInput<Types>[] = [
+    {
+        id: "frontend",
+        type: "group",
+        position: { x: 0, y: 0 },
+        width: 260,
+        height: 220,
+        data: { label: "Frontend" },
+    },
+    {
+        id: "ui",
+        type: "item",
+        parentId: "frontend",
+        extent: "parent",
+        position: { x: 20, y: 50 }, // relative to the frontend group
+        data: { label: "UI" },
+    },
+];
+```
+
+</Framework>
+
 Without `subflows()`, `parentId` and `extent` are validation issues: the document is refused,
 naming the feature. A child may come before its parent in `nodes`.
 
@@ -55,6 +97,8 @@ Nodes are rendered flat: a child's element is not inside its parent's. `Flow.Nod
 node to your function, and each `Flow.Node` is placed at its absolute position (its parents'
 positions added). Draw the group first in the list so it sits under its children, and give it
 the size the document gives it:
+
+<Framework name="react">
 
 ```tsx
 function renderNode(node: FlowNode<Types>) {
@@ -74,6 +118,25 @@ function renderNode(node: FlowNode<Types>) {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Nodes v-slot="{ node }">
+    <Flow.Node v-if="node.type === 'group'" :node="node" class="rounded-lg border border-dashed bg-palette-soft/40">
+        <span class="p-2 text-xs">{{ node.data.label }}</span>
+    </Flow.Node>
+    <Flow.Node v-else :node="node" class="node">
+        {{ node.data.label }}
+        <Flow.Handle type="target" side="top" class="handle" />
+        <Flow.Handle type="source" side="bottom" class="handle" />
+    </Flow.Node>
+</Flow.Nodes>
+```
+
+</Framework>
 
 Dragging the group drags its children with it; with `extent: "parent"`, a dragged child stops at
 its parent's edges (measured sizes during the drag, the document's sizes in the model).
@@ -95,6 +158,8 @@ The model does not decide when a node joins a group: the app does. Listen for th
 (`nodes-move`), find the group under the dropped node's centre, and run `node.set-parent`. It keeps
 the node where it is on screen (its position becomes relative to the new parent), and
 `parentId: null` takes it out.
+
+<Framework name="react">
 
 ```tsx title="drop-into-groups.tsx"
 import { useFlow } from "@fragiola/flow-react";
@@ -136,6 +201,56 @@ function DropIntoGroups() {
     return null;
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="drop-into-groups.vue"
+<script setup lang="ts">
+import { useFlow } from "@fragiola/flow-vue";
+import { onUnmounted } from "vue";
+
+// inside the root: a component that renders nothing, only listens
+const { model, engine } = useFlow<Types, typeof features>();
+
+onUnmounted(
+    engine.subscribe((event) => {
+        if (event.type !== "nodes-move") return;
+        for (const nodeId of event.nodeIds) {
+            const node = model.get("node-by", { id: nodeId });
+            const rect = engine.get("node-rect-by", { nodeId });
+            if (node?.type !== "item" || !rect) continue;
+            const centre = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+            const group = model.get("all-nodes").find((candidate) => {
+                if (candidate.type !== "group") return false;
+                const box = engine.get("node-rect-by", { nodeId: candidate.id });
+                return (
+                    box !== undefined &&
+                    centre.x >= box.x &&
+                    centre.x <= box.x + box.width &&
+                    centre.y >= box.y &&
+                    centre.y <= box.y + box.height
+                );
+            });
+            const parentId = group?.id ?? null;
+            if ((node.parentId ?? null) === parentId) continue;
+            model.run("node.set-parent", {
+                nodeId,
+                parentId,
+                extent: parentId ? "parent" : null,
+            });
+        }
+    }),
+);
+</script>
+
+<template>
+    <!-- nothing to render -->
+</template>
+```
+
+</Framework>
 
 Render `<DropIntoGroups />` inside the root. `node.set-parent` refuses a cycle (a node into its own
 child).

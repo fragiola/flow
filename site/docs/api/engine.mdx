@@ -14,6 +14,8 @@ the global `document` or `window`: everything goes through the root element.
 [`useFlow`](/docs/api/primitives/hooks) or a [flow ref](/docs/api/primitives/flow-ref), and its
 surface is the same five verbs as the model's:
 
+<Framework name="react">
+
 ```tsx
 import { useFlow } from "@fragiola/flow-react";
 
@@ -26,6 +28,27 @@ function ZoomReadout() {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="zoom-readout.vue"
+<script setup lang="ts">
+import { useFlow } from "@fragiola/flow-vue";
+
+const { engine } = useFlow<Types, typeof features>();
+</script>
+
+<template>
+    <button type="button" @click="engine.run('fit-view', { padding: 0.2 })">Fit</button>
+</template>
+```
+
+In Vue, `useFlow` is a composable of the same name: call it in `setup`, inside the root. The engine
+is there from `setup` on; before the root has mounted, an action is refused and a read is empty.
+
+</Framework>
 
 ## `createFlowEngine`
 
