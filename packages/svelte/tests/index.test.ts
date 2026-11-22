@@ -54,6 +54,12 @@ const PRIMITIVES = [
     "ZoomOut",
 ];
 
+// #36: React's parts this adapter has not got yet; its #36 helper adds them and removes this list
+const AHEAD_IN_REACT = ["NodesSelection:nodes-selection"];
+const notAhead = (entry: string) => !AHEAD_IN_REACT.includes(entry);
+const notAheadFile = (file: string) =>
+    !AHEAD_IN_REACT.some((entry) => entry.endsWith(`:${file}`));
+
 describe("@fragiola/flow-svelte", () => {
     it("re-exports the whole core", () => {
         expect(read("src/index.ts")).toMatch(
@@ -127,7 +133,7 @@ describe("@fragiola/flow-svelte", () => {
             exported(
                 read("../react/src/parts.ts"),
                 /^export \{ (\w+) \} from "\.\/components\/([\w-]+)";$/gm,
-            ),
+            ).filter(notAhead),
         );
         expect(parts).toHaveLength(PRIMITIVES.length);
         // and every primitive file, the features' too, under the same name as React's
@@ -137,7 +143,7 @@ describe("@fragiola/flow-svelte", () => {
                 .sort();
         for (const dir of ["components", "minimap", "resize"]) {
             expect(files(`src/${dir}`), dir).toEqual(
-                files(`../react/src/${dir}`),
+                files(`../react/src/${dir}`).filter(notAheadFile),
             );
         }
     });

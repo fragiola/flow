@@ -89,6 +89,7 @@ const MODULE_PAGES: Record<string, string> = {
     "./components/node": "primitives/node",
     "./components/node-toolbar": "primitives/node-toolbar",
     "./components/nodes": "primitives/nodes",
+    "./components/nodes-selection": "primitives/nodes-selection",
     "./components/reconnect-anchor": "primitives/reconnect-anchor",
     "./components/root": "primitives/root",
     "./components/selection-box": "primitives/selection-box",
@@ -103,6 +104,13 @@ const MODULE_PAGES: Record<string, string> = {
     "./hooks/use-edges": "primitives/hooks",
     "./hooks/use-flow": "primitives/hooks",
     "./hooks/use-flow-ref": "primitives/flow-ref",
+    "./hooks/use-flow-store": "primitives/hooks",
+    "./hooks/use-internal-node": "primitives/hooks",
+    "./hooks/use-key-press": "primitives/hooks",
+    "./hooks/use-node-connections": "primitives/hooks",
+    "./hooks/use-node-id": "primitives/hooks",
+    "./hooks/use-nodes-data": "primitives/hooks",
+    "./hooks/use-on-viewport-change": "primitives/hooks",
     "./hooks/use-handle": "primitives/hooks",
     "./hooks/use-node": "primitives/hooks",
     "./hooks/use-nodes": "primitives/hooks",
@@ -413,6 +421,7 @@ describe("the React reference", () => {
                 "NodeResizer",
                 "NodeToolbar",
                 "Nodes",
+                "NodesSelection",
                 "ReconnectAnchor",
                 "ResizeHandle",
                 "Root",
@@ -566,6 +575,21 @@ describe("the React reference", () => {
 });
 
 /**
+ * #36: React's parts an adapter has not got yet, left out of its parity checks; the adapter's #36
+ * helper adds them and empties its list.
+ */
+const AHEAD_IN_REACT: Record<"vue" | "svelte" | "angular", readonly string[]> =
+    {
+        vue: ["NodesSelection"],
+        svelte: ["NodesSelection"],
+        angular: ["NodesSelection"],
+    };
+const notAhead =
+    (framework: keyof typeof AHEAD_IN_REACT) =>
+    (name: string): boolean =>
+        !AHEAD_IN_REACT[framework].includes(name);
+
+/**
  * The pages with React code, which show it in Vue, in Svelte and in Angular too
  * (`<Framework name="vue">`, `<Framework name="svelte">`, `<Framework name="angular">`). Every page
  * whose snippets use the React API belongs here.
@@ -665,11 +689,14 @@ describe("the Vue reference", () => {
         expect(vueIndex).toMatch(/^export \* from "@fragiola\/flow";$/m);
         expect(vueIndex).toMatch(/export \* as Flow from "\.\/parts"/);
         expect(vueParts.map((entry) => entry.name)).toEqual(
-            partExports.map((entry) => entry.name),
+            partExports.map((entry) => entry.name).filter(notAhead("vue")),
         );
         // every React primitive, the features' included, is a Vue one with the same page
         expect(vuePrimitives.map((part) => part.name).sort()).toEqual(
-            primitives.map((part) => part.name).sort(),
+            primitives
+                .map((part) => part.name)
+                .filter(notAhead("vue"))
+                .sort(),
         );
     });
 
@@ -855,11 +882,14 @@ describe("the Svelte reference", () => {
         expect(svelteIndex).toMatch(/^export \* from "@fragiola\/flow";$/m);
         expect(svelteIndex).toMatch(/export \* as Flow from "\.\/parts\.js"/);
         expect(svelteParts.map((entry) => entry.name)).toEqual(
-            partExports.map((entry) => entry.name),
+            partExports.map((entry) => entry.name).filter(notAhead("svelte")),
         );
         // every React primitive, the features' included, is a Svelte one with the same page
         expect(sveltePrimitives.map((part) => part.name).sort()).toEqual(
-            primitives.map((part) => part.name).sort(),
+            primitives
+                .map((part) => part.name)
+                .filter(notAhead("svelte"))
+                .sort(),
         );
     });
 
@@ -1155,7 +1185,9 @@ describe("the Angular reference", () => {
                 entryExports(entrySource(entry)),
             ),
         ];
-        for (const { name } of primitives) {
+        for (const { name } of primitives.filter((part) =>
+            notAhead("angular")(part.name),
+        )) {
             expect(all, name).toContain(`Flow${name}Directive`);
         }
     });
