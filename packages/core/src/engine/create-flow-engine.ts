@@ -14,7 +14,7 @@ import {
     NO_WHEEL_ATTRIBUTE,
     PART_ATTRIBUTE,
     type PartAttributes,
-    POSITION_ATTRIBUTE,
+    resizeHandleAttributes,
 } from "../attributes/part-attributes";
 import { fail, ok } from "../commands/define";
 import type { CommandResult } from "../commands/types";
@@ -2627,7 +2627,13 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 break;
             }
             case "resize-handle":
-                into[POSITION_ATTRIBUTE] = id("position");
+                Object.assign(
+                    into,
+                    resizeHandleAttributes(id("position"), {
+                        direction: id("direction"),
+                        variant: id("variant"),
+                    }),
+                );
                 break;
             case "edges-layer":
                 into[LEVEL_ATTRIBUTE] =

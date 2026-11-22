@@ -29,9 +29,15 @@ export interface KeyboardConnector {
 export interface KeyboardResizer {
     /**
      * moves the sides a resize handle at `position` moves by `delta` flow units, within the
-     * resizer's limits, in one step (`node.resize`); whether the node changed
+     * resizer's limits, in one step (`node.resize`); `direction` is the handle's own, over its
+     * resizer's; whether the key was the resizer's
      */
-    step(nodeId: string, position: string, delta: XY): boolean;
+    step(
+        nodeId: string,
+        position: string,
+        delta: XY,
+        direction?: "horizontal" | "vertical" | undefined,
+    ): boolean;
 }
 
 /** The links of one engine. */

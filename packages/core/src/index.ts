@@ -6,6 +6,7 @@
 // `/keyboard`, `/minimap`), which this one never imports (`scripts/check-features.ts`).
 
 export {
+    DIRECTION_ATTRIBUTE,
     DRAG_HANDLE_ATTRIBUTE,
     END_ATTRIBUTE,
     edgesLayerAttributes,
@@ -20,6 +21,11 @@ export {
     type PartAttributes,
     POSITION_ATTRIBUTE,
     partAttributes,
+    type ResizeHandleAttributeOptions,
+    type ResizeHandleDirection,
+    type ResizeHandleVariant,
+    resizeHandleAttributes,
+    VARIANT_ATTRIBUTE,
 } from "./attributes/part-attributes";
 
 export type {

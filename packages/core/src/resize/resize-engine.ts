@@ -10,7 +10,8 @@
 // and left edges). It works on the node's absolute box, so the `nodeOrigin` is applied once, when
 // the box becomes a position. Each step is transient, the release the final one. With
 // `keyboard()`, the arrows on a focused resize handle move its sides by the keyboard's step, the
-// same rules kept, each key one final step (offered through the host's keyboard links).
+// same rules kept, each key one final step (offered through the host's keyboard links). A handle's
+// own direction (`data-direction`, #40) wins over its resizer's, for a press and for a key.
 import { flag } from "../attributes/part-attributes";
 import type { BatchEntry } from "../commands/types";
 import type { FlowNode, XY } from "../document/types";
@@ -298,10 +299,13 @@ export function resizeEngine(
         start: Start,
         position: ResizePosition,
         client: XY,
+        own: ResizeDirection | undefined,
     ): FeatureGesture => {
         let active = false;
         let last: { commands: BatchEntry[]; rect: Rect } | undefined;
-        const limits = limitsOf(start.nodeId);
+        // the handle's own direction (`data-direction`, read at the press) wins over its resizer's
+        const resizer = limitsOf(start.nodeId);
+        const limits = { ...resizer, direction: own ?? resizer.direction };
         // the flow point pressed: an auto-pan moves the flow under a still pointer
         const anchor = host.toFlow(client);
         return {
@@ -384,11 +388,11 @@ export function resizeEngine(
 
     // with keyboard(): the arrows on a focused resize handle move its sides, one final step each
     keyboardLinks(host).resize = {
-        step: (nodeId, position, delta) => {
+        step: (nodeId, position, delta, own) => {
             if (!resizable(position)) return false;
             // the arrow moves none of this handle's sides (its direction kept): not the
             // resizer's key
-            const { direction } = limitsOf(nodeId);
+            const direction = own ?? limitsOf(nodeId).direction;
             const horizontal =
                 direction !== "vertical" &&
                 (position.includes("left") || position.includes("right"));
@@ -404,7 +408,7 @@ export function resizeEngine(
             const start = startOf(nodeId);
             if (!start) return false;
             // a key moves by the keyboard's step, never snapped back to where it was
-            const limits = { ...limitsOf(nodeId), snap: undefined };
+            const limits = { ...limitsOf(nodeId), direction, snap: undefined };
             const rect = kept(
                 start,
                 resizedRect(start.rect, position, delta, limits),
@@ -447,10 +451,15 @@ export function resizeEngine(
             }
             const start = nodeId === undefined ? undefined : startOf(nodeId);
             return start
-                ? gestureFor(start, position, {
-                      x: event.clientX,
-                      y: event.clientY,
-                  })
+                ? gestureFor(
+                      start,
+                      position,
+                      {
+                          x: event.clientX,
+                          y: event.clientY,
+                      },
+                      target.direction,
+                  )
                 : undefined;
         },
         attributes: (part, payload, into) => {
