@@ -205,8 +205,9 @@ feature at the moment it would act: no feature is installed again.
 
 | field | type | description |
 | --- | --- | --- |
-| `padding` | `number` | the share of the root's size kept free on every side; default `0.1` |
+| `padding` | `FitPadding` | the room kept free on every side: a number is a share of the root's size, a `"<n>px"` string pixels, `{ top, right, bottom, left }` each side's (a side left out keeps none); default `0.1` |
 | `nodeIds` | `string[]` | only these nodes; default every node that is not hidden |
+| `includeHidden` | `boolean` | without `nodeIds`, the hidden nodes of known size too; default `false` |
 | `minZoom` | `number` | the least zoom it may pick, within the engine's limits (it narrows them, never widens) |
 | `maxZoom` | `number` | the greatest zoom it may pick, within the engine's limits |
 | `duration` | `number` | how long it animates, in milliseconds; default `0`: at once |
@@ -239,11 +240,12 @@ feature at the moment it would act: no feature is installed again.
 | `"handles-by"` | `{ nodeId }` | a node's registered handles (`FlowHandle[]`), with their centres |
 | `"background-pattern"` | `BackgroundPatternPayload` | one tile of a background pattern at the current viewport |
 | `"node-toolbar-by"` | `NodeToolbarPayload` | where a node's toolbar goes, outside the zoom: beside a node, or beside several nodes' bounds (`nodeIds`); undefined until one of them has a size |
-| `"edge-toolbar-by"` | `EdgeToolbarPayload` | where an edge's toolbar goes, outside the zoom (an `EdgeToolbarPosition`): at its label point or one of its ends; undefined until the edge is drawn |
+| `"edge-toolbar-by"` | `EdgeToolbarPayload` | where an edge's toolbar goes, outside the zoom (an `EdgeToolbarPosition`): at its label point, one of its ends or a flow point; undefined until the edge is drawn |
 | `"selection-box"` | none | the box being drawn (a root-relative `SelectionBox`), or null (`selection()`; `undefined` without it) |
 | `"dragging-node-ids"` | none | the nodes being dragged (`drag()`) |
 | `"connection"` | none | the `Connection` being drawn, or null (`connection()`; `undefined` without it) |
 | `"minimap-view"` | `{ width, height }` | what a minimap of that many pixels draws (`minimap()`) |
+| `"minimap-point-to-flow"` | `{ client }` | a client point on the minimap (the one under it, else the first) as a flow point, for a click on it; undefined while no minimap has a size (`minimap()`) |
 
 `IntersectingNodesPayload`:
 
@@ -258,7 +260,7 @@ feature at the moment it would act: no feature is installed again.
 | field | type | description |
 | --- | --- | --- |
 | `bounds` | `Rect` | the flow rectangle to frame |
-| `padding` | `number` | the share of the root's size kept free on every side; default 0.1 |
+| `padding` | `FitPadding` | the room kept free on every side, or each side's, as `fit-view`'s; default 0.1 |
 | `minZoom` | `number` | the least zoom it may pick (within the engine's limits); default the engine's `minZoom` |
 | `maxZoom` | `number` | the greatest zoom it may pick (within the engine's limits); default the engine's `maxZoom` |
 
@@ -268,8 +270,13 @@ render, a thumbnail, a saved view), with no engine. Its `ViewportForBoundsOption
 
 | option | type | description |
 | --- | --- | --- |
-| `padding` | `number` | the share of the root's size kept free on every side; default 0.1 |
+| `padding` | `FitPadding` | the room kept free on every side, or each side's (the bounds centred in what is left); default 0.1 |
 | `minZoom` | `number` | the least zoom it may pick; default 0.5 |
+
+`FitPadding` is a `PaddingValue` for every side, or `{ top?, right?, bottom?, left? }` of them; a
+`PaddingValue` is a number (a share of the root's width for the left and right, of its height for
+the top and bottom) or a `` `${number}px` `` string (pixels). A plain number frames exactly as
+before per-side padding existed.
 | `maxZoom` | `number` | the greatest zoom it may pick; default 2 |
 
 `BackgroundPatternPayload`:
@@ -319,10 +326,13 @@ render, a thumbnail, a saved view), with no engine. Its `ViewportForBoundsOption
 | --- | --- | --- |
 | `edgeId` | `string` | the edge |
 | `position` | `"label" \| "source" \| "target"` | the point of the edge it stands at: its label point (default) or one of its ends |
+| `point` | `XY` | a flow point it stands at instead (absolute flow coordinates); wins over `position` |
 | `offset` | `XY` | a screen offset from that point, in pixels; default `{ x: 0, y: 0 }` |
+| `alignX` | `"start" \| "center" \| "end"` | which of the toolbar's edges goes at the point across: its left, its centre (default) or its right |
+| `alignY` | `"start" \| "center" \| "end"` | the same down: its top, its centre (default) or its bottom |
 
-`EdgeToolbarPosition` is a `NodeToolbarPosition` whose `anchorX` and `anchorY` are `0.5`: the
-toolbar's centre goes to the point. The `toolbar` part's attributes take `{ edgeId }` for an
+`EdgeToolbarPosition` is a `NodeToolbarPosition` whose `anchorX` and `anchorY` follow `alignX` and
+`alignY` (`0`, `0.5` or `1`; `0.5` by default: the toolbar's centre goes to the point). The `toolbar` part's attributes take `{ edgeId }` for an
 edge's toolbar (its `data-flow-id`), `{ nodeId }` for a node's, nothing for several nodes'.
 
 `Connection`, the connection being drawn:

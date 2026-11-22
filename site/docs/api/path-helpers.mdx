@@ -135,6 +135,13 @@ label is the curve's middle.
 | --- | --- | --- |
 | `curvature` | `number` | the share of the distance along a side its control point stands out by; default `0.5` |
 
+It returns a `BezierPathResult`: the `PathResult` below and `labelOffset`, the distance across
+(`x`) and down (`y`) from the source to the label point, both positive.
+
+`edgeCenter(source, target)` gives an `EdgeCenter`: `center`, the point halfway between two ends,
+and `offset`, half their distance across (`x`) and down (`y`). It is where a straight edge's label
+goes, and a point an app's own path may centre on.
+
 ## `simpleBezierPath`
 
 `simpleBezierPath(options)` (the `simplebezier` type): one cubic curve whose control points lie on
@@ -150,16 +157,21 @@ and enters each handle along its side, each corner rounded. `stepPath(options)` 
 with square corners. Each end first stands out from its node by `offset`; the route then turns
 once halfway between two ends facing each other, goes out, across and back in when the target is
 behind, and joins perpendicular sides with one or two corners. The label goes halfway along the
-route's length.
+route's length. Where that one turn (or the run across) sits is the `StepTurnOptions`':
+`stepPosition` of the way from the source, or `centerX` / `centerY` for a turn at a fixed place.
 
-`SmoothStepPathOptions` (with the `PathEnds`):
+`SmoothStepPathOptions` (with the `PathEnds` and the `StepTurnOptions`):
 
 | option | type | description |
 | --- | --- | --- |
 | `borderRadius` | `number` | the radius of each rounded corner, in flow units; default `5` |
 | `offset` | `number` | how far each end stands out from its node before the route turns; default `20` |
+| `stepPosition` | `number` | where the turn sits between the source (`0`) and the target (`1`), along the ends' axis (across it when the target is behind); default `0.5` |
+| `centerX` | `number` | the x of a vertical turn, in flow coordinates, over `stepPosition` |
+| `centerY` | `number` | the y of a horizontal turn, in flow coordinates, over `stepPosition` |
 
-`StepPathOptions` (with the `PathEnds`): `offset` only, as above.
+`StepPathOptions` (with the `PathEnds` and the `StepTurnOptions`): `offset`, `stepPosition`,
+`centerX` and `centerY`, as above.
 
 ## `straightPath`
 
@@ -204,6 +216,12 @@ every edge of the flow:
 | `curvature` | `number` | bezier: the share of the distance a control point stands out by; default `0.5` |
 | `borderRadius` | `number` | smooth step: the corners' radius; default `5` |
 | `offset` | `number` | smooth step and step: how far an end stands out before turning; default `20` |
+| `stepPosition` | `number` | smooth step and step: where the turn sits between the source (`0`) and the target (`1`); default `0.5` |
+| `centerX` | `number` | smooth step and step: the x of a vertical turn, in flow coordinates; default none |
+| `centerY` | `number` | smooth step and step: the y of a horizontal turn, in flow coordinates; default none |
+
+An edge's own `pathOptions` (an `EdgePathOptions`, in the [JSON document](/docs/api/json-document))
+go over these, key by key, for that edge.
 
 `Rect`, an axis-aligned rectangle (a node's box, the selection box, a minimap's view):
 

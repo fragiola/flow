@@ -184,6 +184,18 @@ What every edge has (`EdgeFields`):
 | `sourceHandle` | `string` | the source node's handle it starts at; none: the node's default source handle |
 | `targetHandle` | `string` | the target node's handle it ends at; none: the node's default target handle |
 | `zIndex` | `number` (an integer) | its place in the edges' drawing order: a greater one is drawn above (edges stay under the nodes); default 0 |
+| `pathOptions` | `EdgePathOptions` | the shape of its path, over the engine's `pathOptions` key by key (below); a controlled sync that changes them replaces the edge |
+
+`EdgePathOptions`, each built-in type reading its own keys (the others are ignored):
+
+| option | type | description |
+| --- | --- | --- |
+| `curvature` | `number` | bezier: the share of the distance a control point stands out by |
+| `borderRadius` | `number` | smooth step: the corners' radius, in flow units |
+| `offset` | `number` | smooth step and step: how far an end stands out before turning |
+| `stepPosition` | `number` | smooth step and step: where the turn sits between the source (`0`) and the target (`1`) |
+| `centerX` | `number` | smooth step and step: the x of a vertical turn, in flow coordinates |
+| `centerY` | `number` | smooth step and step: the y of a horizontal turn, in flow coordinates |
 
 Its flags (`EdgeFlags`):
 
@@ -194,11 +206,16 @@ Its flags (`EdgeFlags`):
 | `hidden` | `false` | it is not drawn |
 | `reconnectable` | `true` | its ends may be moved (`edge.reconnect`): both (`true`), none (`false`), or only its `"source"` or its `"target"` end (the reconnect anchor of the other end draws nothing, and a press near it grabs nothing) |
 | `focusable` | `true` | it takes DOM focus with `keyboard()` (`edge-focusable`; the engine's `edgesFocusable` turns every edge's off) |
+| `animated` | `false` | it is drawn animated: its parts carry `data-animated`, which the app's CSS animates (`edge.set-flags` toggles it) |
 
 The rules beyond the fields: one edge per pair of handles and direction (a second is refused), a
 self loop is allowed (forbid it in a middleware), and every `source`, `target` and `parentId` names
 a node of the document. With sub-flows, children may come before their parent and a parent cycle
 is an issue.
+
+`isNode(value)` and `isEdge(value)` tell a node from an edge by its shape (a node: a string `id`
+and a `position`, no `source` or `target`; an edge: a string `id`, `source` and `target`), as type
+guards for a mixed list. They are not a validation: `validateFlow` is.
 
 ## The schemas
 
