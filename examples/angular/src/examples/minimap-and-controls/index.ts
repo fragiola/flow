@@ -22,11 +22,11 @@ import {
 } from "@lucide/angular";
 import { styles } from "./styles";
 
-// `minimap()` draws the whole flow small (`flowMiniMap`): a `flowMiniMapNode` per node and a `flowMiniMapMask`
-// over what the root does not show; dragging in it pans the flow, the wheel over it zooms.
-// `flowControls` groups the buttons; each runs one engine action and is disabled while the engine
-// refuses it (at the zoom limits); `duration` animates its change over 200 ms. The lock (`flowToggleInteractive`) stops every gesture that
-// changes the flow; pan and zoom stay.
+// `minimap()` draws the whole flow small (`flowMiniMap`): a `flowMiniMapNode` per node and a
+// `flowMiniMapMask` over what the root does not show; dragging in it pans the flow, the wheel over
+// it zooms. `flowControls` groups the buttons; each runs one engine action and is disabled while
+// the engine refuses it (at the zoom limits); `duration` animates its change over 200 ms. The lock
+// (`flowToggleInteractive`) stops every gesture that changes the flow; pan and zoom stay.
 
 interface Types extends FlowTypes {
     readonly nodes: { city: { label: string } };
