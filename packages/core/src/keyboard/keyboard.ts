@@ -7,9 +7,12 @@ import { keyboardEngine } from "./keyboard-engine";
 
 /** Options of {@link keyboard}: read by its engine side. */
 export interface KeyboardOptions {
-    /** how far an arrow moves a node, in flow units; default 5 */
+    /**
+     * how far an arrow moves a node (or, with `resize()`, a focused resize handle's sides), in
+     * flow units; default 5
+     */
     readonly step: number;
-    /** how far Shift with an arrow moves it; default 20 */
+    /** how far Shift with an arrow moves it (or the sides); default 20 */
     readonly fastStep: number;
     /**
      * the keys that remove the selection (`KeyboardEvent.key` or `.code`); default

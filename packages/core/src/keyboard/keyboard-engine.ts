@@ -203,6 +203,24 @@ export function keyboardEngine(
             const edgeId = target.kind === "edge" ? target.edgeId : undefined;
             const onEntity = nodeId !== undefined || edgeId !== undefined;
             const direction = ARROWS[event.key];
+            // the arrows on a focused resize handle move its sides (`resize()`)
+            if (
+                direction &&
+                target.kind === "resize-handle" &&
+                target.nodeId !== undefined &&
+                target.position !== undefined &&
+                links.resize !== undefined
+            ) {
+                if (event.altKey || event.ctrlKey || event.metaKey)
+                    return false;
+                const distance = event.shiftKey
+                    ? options.fastStep
+                    : options.step;
+                return links.resize.step(target.nodeId, target.position, {
+                    x: direction.x * distance,
+                    y: direction.y * distance,
+                });
+            }
             if (direction) {
                 if (event.altKey || event.ctrlKey || event.metaKey)
                     return false;
