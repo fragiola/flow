@@ -295,8 +295,10 @@ the parent's box and its children. At a limit the key does nothing (and the page
 an arrow across the handle's sides, or with Ctrl, Alt or ⌘, is left to the page. Each press is one
 final `node.resize` (one undo step) and a `resize` event with `source: "keyboard"`.
 
-A focused handle needs a name a screen reader can read. Name your own handles (`aria-hidden` on a
-focusable element hides what has focus):
+A focused handle needs a name a screen reader can read. A default `NodeResizer` (no children)
+renders eight handles that cannot be named, all focusable once `keyboard()` is installed: pass
+your own `ResizeHandle` children with an `aria-label` each (`aria-hidden` on a focusable element
+hides what has focus):
 
 <Framework name="react">
 

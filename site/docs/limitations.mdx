@@ -49,7 +49,8 @@ something missing from this page? [Open an issue](https://github.com/fragiola/fl
   edge and draw it again from the keyboard, or offer a menu that runs `edge.reconnect`.
 - **Handles and resize handles take focus only with `keyboard()` and their feature**
   (`connection()`, `resize()`): give them a name (`aria-label`) once they do, or a screen reader
-  reads nothing.
+  reads nothing. A default `NodeResizer`'s eight handles cannot be named: once `keyboard()` is
+  installed, pass your own `ResizeHandle` children, each with its `aria-label`.
 - **A toolbar for several nodes (`nodeIds`) shows while every one of them is selected**: for the
   selection, pass the selected nodes' ids; a node's own toolbar still shows beside it.
 - **A reconnect anchor is drawn under its node's handle** (edges come before nodes), so the mouse

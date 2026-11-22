@@ -555,24 +555,99 @@ Render `LiveRegion` inside the root (it reads the root's engine through `useFlow
 A keyboard connection has more to say: where it starts, which handle it points at, and how it ends.
 `connect-start`, `connect` and `connect-cancel` carry `input: "keyboard"` (or `"pointer"`), and
 `connect-target` comes on every move of the target, with its place in the list (`index`, from 0,
-of `count`; `-1` of `0` when no handle accepts the connection). Add their cases to your
-`describe`:
+of `count`; `-1` of `0` when no handle accepts the connection). `connect-start` and the first
+`connect-target` come at once, and a live region reads only its last text: say the start, the
+first target and the keys in one message. Give `describe` the node the connection started from,
+and add these cases:
 
 ```ts
-case "connect-start":
-    return event.input === "keyboard"
-        ? `Connecting from ${name(event.nodeId)}. Tab to choose a target, Enter to connect, Escape to cancel.`
-        : undefined;
-case "connect-target":
-    return event.nodeId === undefined
-        ? "No handle accepts this connection."
-        : `Target ${event.index + 1} of ${event.count}: ${name(event.nodeId)}.`;
+// describe(event, model, startedFrom?: string): startedFrom is set only for the first target
+case "connect-target": {
+    const target =
+        event.nodeId === undefined
+            ? "No handle accepts this connection."
+            : `Target ${event.index + 1} of ${event.count}: ${name(event.nodeId)}.`;
+    if (startedFrom === undefined) return target;
+    const keys = event.nodeId === undefined ? "Escape to cancel." : "Tab for the next, Enter to connect, Escape to cancel.";
+    return `Connecting from ${name(startedFrom)}. ${target} ${keys}`;
+}
 case "connect-cancel":
     if (event.refused) return "That connection is not allowed.";
     return event.input === "keyboard" ? "Connection cancelled." : undefined;
 case "resize":
     return event.source === "keyboard" ? `${name(event.nodeId)} is ${event.width} by ${event.height}.` : undefined;
 ```
+
+The listener remembers the start until the first target:
+
+<Framework name="react">
+
+```tsx
+useEffect(() => {
+    let startedFrom: string | undefined; // a keyboard connection just started, until its first target
+    return engine.subscribe((event) => {
+        if (event.type === "connect-start") startedFrom = event.input === "keyboard" ? event.nodeId : undefined;
+        const next = describe(event, model, startedFrom);
+        if (event.type === "connect-target") startedFrom = undefined;
+        if (next) setMessage(next);
+    });
+}, [model, engine]);
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+const { model, engine } = useFlow<Types, typeof features>();
+const message = ref("");
+let startedFrom: string | undefined; // a keyboard connection just started, until its first target
+onUnmounted(
+    engine.subscribe((event) => {
+        if (event.type === "connect-start") startedFrom = event.input === "keyboard" ? event.nodeId : undefined;
+        const next = describe(event, model, startedFrom);
+        if (event.type === "connect-target") startedFrom = undefined;
+        if (next) message.value = next;
+    }),
+);
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```ts
+const flow = useFlow<Types, typeof features>();
+let message = $state("");
+$effect(() => {
+    let startedFrom: string | undefined; // a keyboard connection just started, until its first target
+    return flow.engine.subscribe((event) => {
+        if (event.type === "connect-start") startedFrom = event.input === "keyboard" ? event.nodeId : undefined;
+        const next = describe(event, flow.model, startedFrom);
+        if (event.type === "connect-target") startedFrom = undefined;
+        if (next) message = next;
+    });
+});
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+constructor() {
+    let startedFrom: string | undefined; // a keyboard connection just started, until its first target
+    const stop = this.flow.engine.subscribe((event) => {
+        if (event.type === "connect-start") startedFrom = event.input === "keyboard" ? event.nodeId : undefined;
+        const next = describe(event, this.flow.model(), startedFrom);
+        if (event.type === "connect-target") startedFrom = undefined;
+        if (next) this.message.set(next);
+    });
+    inject(DestroyRef).onDestroy(stop);
+}
+```
+
+</Framework>
 
 The `announcements` example above does it: Tab to a handle and press Enter.
 
