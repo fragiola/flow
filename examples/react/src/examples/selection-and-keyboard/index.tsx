@@ -7,6 +7,7 @@ import {
     type FlowTypes,
     useSelection,
 } from "@fragiola/flow-react";
+import { connection } from "@fragiola/flow-react/connection";
 import { drag } from "@fragiola/flow-react/drag";
 import { keyboard } from "@fragiola/flow-react/keyboard";
 import { selection } from "@fragiola/flow-react/selection";
@@ -15,13 +16,16 @@ import { styles } from "./styles";
 // `selection()` selects with a click, adds with Shift (or Ctrl/Cmd) and draws a box with Shift and
 // a drag on the canvas; `keyboard()` makes nodes and edges focusable: Tab moves through them,
 // Enter or Space selects, the arrows move the selection (Shift for a bigger step), Delete removes
-// it and Escape clears it. The package names nothing: each node and edge gets its name here.
+// it and Escape clears it. With `connection()` too, Tab also reaches the handles: Enter on one
+// starts a connection, Tab (or the arrows) points at the next handle that accepts it, Enter draws
+// the edge and Escape cancels. The package names nothing: each node, handle and edge gets its name
+// here.
 
 interface Types extends FlowTypes {
     readonly nodes: { task: { label: string } };
 }
 
-const features = [selection(), drag(), keyboard()] as const;
+const features = [selection(), drag(), connection(), keyboard()] as const;
 
 const nodes: FlowNodeInput<Types>[] = [
     {
@@ -74,8 +78,18 @@ function renderNode(node: FlowNode<Types>) {
             className={styles.node}
         >
             {node.data.label}
-            <Flow.Handle type="target" side="left" className={styles.handle} />
-            <Flow.Handle type="source" side="right" className={styles.handle} />
+            <Flow.Handle
+                type="target"
+                side="left"
+                aria-label={`${node.data.label} input`}
+                className={styles.handle}
+            />
+            <Flow.Handle
+                type="source"
+                side="right"
+                aria-label={`${node.data.label} output`}
+                className={styles.handle}
+            />
         </Flow.Node>
     );
 }
@@ -126,11 +140,13 @@ export default function SelectionAndKeyboard() {
             <Flow.Viewport>
                 <Flow.Edges<Types>>{renderEdge}</Flow.Edges>
                 <Flow.Nodes<Types>>{renderNode}</Flow.Nodes>
+                <Flow.ConnectionLine className={styles.connection} />
             </Flow.Viewport>
             <Flow.SelectionBox className={styles.box} />
             <SelectionStatus />
             <p className={styles.hint}>
-                Shift + drag draws a box · Tab, arrows, Delete, Escape
+                Shift + drag draws a box · Tab, arrows, Delete, Escape · Enter
+                on a handle connects
             </p>
         </Flow.Root>
     );

@@ -4,6 +4,7 @@ import {
     type FlowNodeInput,
     type FlowTypes,
     useFlow,
+    useSelection,
 } from "@fragiola/flow-react";
 import { drag } from "@fragiola/flow-react/drag";
 import { selection } from "@fragiola/flow-react/selection";
@@ -13,6 +14,8 @@ import { styles } from "./styles";
 // `Flow.NodeToolbar` stands next to its node, outside the zoom: it keeps its size whatever the
 // zoom, and shows while its node is selected (or as `open` says). Its buttons run commands:
 // duplicate (`node.add` with a new id), recolour (`node.set-data`) and delete (`node.remove`).
+// With `nodeIds` it stands beside several nodes' bounds: Shift-click a second note, and the
+// selection's toolbar below them recolours (one `batch`) or deletes (`selection.remove`) them all.
 
 const TONES = ["blue", "green", "orange", "purple"] as const;
 type Tone = (typeof TONES)[number];
@@ -93,6 +96,48 @@ function Toolbar({ node }: { node: FlowNode<Types> }) {
     );
 }
 
+/** The selection's toolbar, below the selected notes while there are two or more. */
+function SelectionToolbar() {
+    const { model } = useFlow<Types, typeof features>();
+    const selected = useSelection<Types>();
+    if (selected.nodes.length < 2) return null;
+    const nodeIds = selected.nodes.map((node) => node.id);
+    return (
+        <Flow.NodeToolbar
+            nodeIds={nodeIds}
+            side="bottom"
+            role="toolbar"
+            aria-label={`${nodeIds.length} notes: actions`}
+            className={styles.toolbar}
+        >
+            {TONES.map((tone) => (
+                <button
+                    key={tone}
+                    type="button"
+                    aria-label={`Make them ${tone}`}
+                    onClick={() =>
+                        model.run("batch", {
+                            commands: nodeIds.map((nodeId) => ({
+                                command: "node.set-data" as const,
+                                payload: { nodeId, data: { tone } },
+                            })),
+                        })
+                    }
+                    className={styles.tone(tone)}
+                />
+            ))}
+            <button
+                type="button"
+                aria-label="Delete them"
+                onClick={() => model.run("selection.remove", {})}
+                className={styles.delete}
+            >
+                <Trash2Icon />
+            </button>
+        </Flow.NodeToolbar>
+    );
+}
+
 function renderNode(node: FlowNode<Types>) {
     return (
         <Flow.Node<Types> node={node} className={styles.sticky(node.data.tone)}>
@@ -116,6 +161,7 @@ export default function NodeToolbarExample() {
             <Flow.Viewport>
                 <Flow.Nodes<Types>>{renderNode}</Flow.Nodes>
             </Flow.Viewport>
+            <SelectionToolbar />
         </Flow.Root>
     );
 }

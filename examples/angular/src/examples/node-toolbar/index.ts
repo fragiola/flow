@@ -9,20 +9,23 @@ import {
 import { drag } from "@fragiola/flow-angular/drag";
 import { selection } from "@fragiola/flow-angular/selection";
 import { LucideCopy, LucideTrash2 } from "@lucide/angular";
+import { SelectionToolbar } from "./selection-toolbar";
 import { styles } from "./styles";
 
-// `flowNodeToolbar` stands next to its node, outside the zoom: it keeps its size whatever the
-// zoom, and shows while its node is selected (or as `open` says). Its buttons run commands:
-// duplicate (`node.add` with a new id), recolour (`node.set-data`) and delete (`node.remove`).
+// `flowNodeToolbar` stands next to its node, outside the zoom: it keeps its size whatever the zoom,
+// and shows while its node is selected (or as `open` says). Its buttons run commands: duplicate
+// (`node.add` with a new id), recolour (`node.set-data`) and delete (`node.remove`). With
+// `[nodeIds]` it stands beside several nodes' bounds: Shift-click a second note, and the
+// selection's toolbar below them (selection-toolbar.ts) recolours or deletes them all.
 
-const TONES = ["blue", "green", "orange", "purple"] as const;
-type Tone = (typeof TONES)[number];
+export const TONES = ["blue", "green", "orange", "purple"] as const;
+export type Tone = (typeof TONES)[number];
 
-interface Types extends FlowTypes {
+export interface Types extends FlowTypes {
     readonly nodes: { sticky: { text: string; tone: Tone } };
 }
 
-const features = [selection(), drag()] as const;
+export const features = [selection(), drag()] as const;
 
 const nodes: FlowNodeInput<Types>[] = [
     {
@@ -44,7 +47,7 @@ let copies = 0;
 
 @Component({
     selector: "example-node-toolbar",
-    imports: [FLOW, LucideCopy, LucideTrash2],
+    imports: [FLOW, LucideCopy, LucideTrash2, SelectionToolbar],
     host: { class: "contents" },
     template: `
         <div flowRoot [model]="model" [fitView]="{ padding: 0.2, maxZoom: 1 }" [class]="styles.root">
@@ -92,6 +95,7 @@ let copies = 0;
                     </ng-template>
                 </div>
             </div>
+            <example-selection-toolbar />
         </div>
     `,
 })

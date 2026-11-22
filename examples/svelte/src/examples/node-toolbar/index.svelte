@@ -6,7 +6,9 @@
     // `Flow.NodeToolbar` stands next to its node, outside the zoom: it keeps its size whatever the
     // zoom, and shows while its node is selected (or as `open` says). Its buttons run commands:
     // duplicate (`node.add` with a new id), recolour (`node.set-data`) and delete (`node.remove`),
-    // in toolbar.svelte.
+    // in toolbar.svelte. With `nodeIds` it stands beside several nodes' bounds: Shift-click a
+    // second note, and the selection's toolbar below them (selection-toolbar.svelte) recolours or
+    // deletes them all.
 
     export const TONES = ["blue", "green", "orange", "purple"] as const;
     export type Tone = (typeof TONES)[number];
@@ -37,6 +39,7 @@
 <script lang="ts">
     import { typedFlow } from "@fragiola/flow-svelte";
     import { styles } from "./styles";
+    import SelectionToolbar from "./selection-toolbar.svelte";
     import Toolbar from "./toolbar.svelte";
 
     const Flow = typedFlow<Types, typeof features>();
@@ -61,4 +64,5 @@
             {/snippet}
         </Flow.Nodes>
     </Flow.Viewport>
+    <SelectionToolbar />
 </Flow.Root>

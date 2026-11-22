@@ -7,7 +7,9 @@
     // `Flow.EdgeLabel` is HTML placed at the edge's label point (halfway along its path), in flow
     // coordinates: it pans and zooms with the edge. It may hold anything: text from the edge's
     // data, a badge, a button (remove-button.svelte). A button in a label keeps its own clicks (it
-    // never starts a gesture).
+    // never starts a gesture). `Flow.EdgeToolbar` (edge-actions.svelte) stands at the same point
+    // but outside the zoom (it keeps its size), moved up by `offset`, and shows while its edge is
+    // selected: click an edge for its actions.
 
     export interface Types extends FlowTypes {
         readonly nodes: { stage: { label: string } };
@@ -61,6 +63,7 @@
             target: "lint",
             type: "status",
             data: { status: "failing" },
+            selected: true,
         },
         {
             id: "test-deploy",
@@ -82,6 +85,7 @@
 <script lang="ts">
     import { typedFlow } from "@fragiola/flow-svelte";
     import { Badge } from "#/components/atoms/badge";
+    import EdgeActions from "./edge-actions.svelte";
     import RemoveButton from "./remove-button.svelte";
     import { styles } from "./styles";
 
@@ -102,7 +106,9 @@
     <Flow.Viewport>
         <Flow.Edges>
             {#snippet children(edge)}
-                <Flow.Edge {edge}>
+                <Flow.Edge {edge} class={styles.edgeGroup}>
+                    <!-- a wide transparent path: a bigger target for a click -->
+                    <Flow.EdgePath class={styles.edgeHit} />
                     <Flow.EdgePath class={styles.edge} />
                     <Flow.EdgeLabel class={styles.label}>
                         {#if edge.type === "text"}
@@ -115,6 +121,7 @@
                             <RemoveButton {edge} />
                         {/if}
                     </Flow.EdgeLabel>
+                    <EdgeActions {edge} />
                 </Flow.Edge>
             {/snippet}
         </Flow.Edges>

@@ -5,7 +5,9 @@ import { selection } from "@fragiola/flow-vue/selection";
 
 // `Flow.NodeToolbar` stands next to its node, outside the zoom: it keeps its size whatever the
 // zoom, and shows while its node is selected (or as `open` says). Its buttons run commands:
-// duplicate (`node.add` with a new id), recolour (`node.set-data`) and delete (`node.remove`), in toolbar.vue.
+// duplicate (`node.add` with a new id), recolour (`node.set-data`) and delete (`node.remove`), in
+// toolbar.vue. With `nodeIds` it stands beside several nodes' bounds: Shift-click a second note,
+// and the selection's toolbar below them (selection-toolbar.vue) recolours or deletes them all.
 
 export const TONES = ["blue", "green", "orange", "purple"] as const;
 export type Tone = (typeof TONES)[number];
@@ -36,6 +38,7 @@ const nodes: FlowNodeInput<Types>[] = [
 <script setup lang="ts">
 import { typedFlow } from "@fragiola/flow-vue";
 import { styles } from "./styles";
+import SelectionToolbar from "./selection-toolbar.vue";
 import Toolbar from "./toolbar.vue";
 
 const Flow = typedFlow<Types, typeof features>();
@@ -59,5 +62,6 @@ const Flow = typedFlow<Types, typeof features>();
                 </Flow.Node>
             </Flow.Nodes>
         </Flow.Viewport>
+        <SelectionToolbar />
     </Flow.Root>
 </template>

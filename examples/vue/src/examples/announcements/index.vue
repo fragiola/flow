@@ -15,7 +15,8 @@ import { selection } from "@fragiola/flow-vue/selection";
 // (`engine.subscribe`: nodes moved, an edge connected, something removed), and the app writes it,
 // in its own words and language, into a live region a screen reader reads (`role="status"`). The
 // log beside it shows the same messages. Try it with the keyboard: Tab to a node, move it with the
-// arrows, delete it with Delete.
+// arrows, delete it with Delete; or Tab to a handle and press Enter: each target the connection
+// points at is announced (`connect-target`, its `index` of `count`) until Enter connects.
 
 interface Types extends FlowTypes {
     readonly nodes: { room: { label: string } };
@@ -59,12 +60,19 @@ function describe(event: FlowEngineEvent, model: Model): string | undefined {
             return `Moved ${names(event.nodeIds)}${event.source === "keyboard" ? " with the keyboard" : ""}.`;
         case "drag-cancel":
             return `Put ${names(event.nodeIds)} back.`;
-        case "connect":
-            return `Connected ${name(event.source)} to ${name(event.target)}.`;
-        case "connect-cancel":
-            return event.refused
-                ? "That connection is not allowed."
+        case "connect-start":
+            return event.input === "keyboard"
+                ? `Connecting from ${name(event.nodeId)}. Tab to choose a target, Enter to connect, Escape to cancel.`
                 : undefined;
+        case "connect-target":
+            return event.nodeId === undefined
+                ? "No handle accepts this connection."
+                : `Target ${event.index + 1} of ${event.count}: ${name(event.nodeId)}.`;
+        case "connect":
+            return `Connected ${name(event.source)} to ${name(event.target)}${event.input === "keyboard" ? " with the keyboard" : ""}.`;
+        case "connect-cancel":
+            if (event.refused) return "That connection is not allowed.";
+            return event.input === "keyboard" ? "Connection cancelled." : undefined;
         case "remove": {
             const parts = [
                 event.nodeIds.length > 0
@@ -141,8 +149,18 @@ watch(
                     :class="styles.node"
                 >
                     {{ node.data.label }}
-                    <Flow.Handle type="target" side="top" :class="styles.handle" />
-                    <Flow.Handle type="source" side="bottom" :class="styles.handle" />
+                    <Flow.Handle
+                        type="target"
+                        side="top"
+                        :aria-label="`${node.data.label} input`"
+                        :class="styles.handle"
+                    />
+                    <Flow.Handle
+                        type="source"
+                        side="bottom"
+                        :aria-label="`${node.data.label} output`"
+                        :class="styles.handle"
+                    />
                 </Flow.Node>
             </Flow.Nodes>
             <Flow.ConnectionLine :class="styles.connection" />

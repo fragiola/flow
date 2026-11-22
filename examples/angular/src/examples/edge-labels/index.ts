@@ -10,13 +10,15 @@ import {
 import { connection } from "@fragiola/flow-angular/connection";
 import { drag } from "@fragiola/flow-angular/drag";
 import { selection } from "@fragiola/flow-angular/selection";
-import { LucideX } from "@lucide/angular";
+import { LucideRefreshCw, LucideTrash2, LucideX } from "@lucide/angular";
 import { Badge } from "#/components/atoms/badge";
 import { styles } from "./styles";
 
 // `flowEdgeLabel` is HTML placed at the edge's label point (halfway along its path), in flow
 // coordinates: it pans and zooms with the edge. It may hold anything: text from the edge's data, a
 // badge, a button. A button in a label keeps its own clicks (it never starts a gesture).
+// `flowEdgeToolbar` stands at the same point but outside the zoom (it keeps its size), moved up by
+// `offset`, and shows while its edge is selected: click an edge for its actions.
 
 interface Types extends FlowTypes {
     readonly nodes: { stage: { label: string } };
@@ -70,6 +72,7 @@ const edges: FlowEdgeInput<Types>[] = [
         target: "lint",
         type: "status",
         data: { status: "failing" },
+        selected: true,
     },
     {
         id: "test-deploy",
@@ -89,7 +92,7 @@ const edges: FlowEdgeInput<Types>[] = [
 
 @Component({
     selector: "example-edge-labels",
-    imports: [FLOW, Badge, LucideX],
+    imports: [FLOW, Badge, LucideRefreshCw, LucideTrash2, LucideX],
     host: { class: "contents" },
     template: `
         <div
@@ -105,7 +108,9 @@ const edges: FlowEdgeInput<Types>[] = [
             <div flowViewport>
                 <div flowEdges>
                     <ng-template [flowEdgesItem]="model" let-edge>
-                        <svg:g [flowEdge]="edge">
+                        <svg:g [flowEdge]="edge" [class]="styles.edgeGroup">
+                            <!-- a wide transparent path: a bigger target for a click -->
+                            <svg:path flowEdgePath [class]="styles.edgeHit" />
                             <svg:path flowEdgePath [class]="styles.edge" />
                             <xhtml:div flowEdgeLabel [class]="styles.label">
                                 @if (edge.type === "text") {
@@ -125,6 +130,33 @@ const edges: FlowEdgeInput<Types>[] = [
                                         <svg lucideX aria-hidden="true"></svg>
                                     </button>
                                 }
+                            </xhtml:div>
+                            <!-- the selected edge's actions: flip a status, remove the edge -->
+                            <xhtml:div
+                                flowEdgeToolbar
+                                [offset]="{ x: 0, y: -36 }"
+                                role="toolbar"
+                                [attr.aria-label]="edge.source + ' to ' + edge.target + ': actions'"
+                                [class]="styles.toolbar"
+                            >
+                                @if (edge.type === "status") {
+                                    <button
+                                        type="button"
+                                        [attr.aria-label]="edge.data?.status === 'failing' ? 'Mark it passing' : 'Mark it failing'"
+                                        [class]="styles.action"
+                                        (click)="flip(edge)"
+                                    >
+                                        <svg lucideRefreshCw aria-hidden="true"></svg>
+                                    </button>
+                                }
+                                <button
+                                    type="button"
+                                    aria-label="Remove it"
+                                    [class]="styles.danger"
+                                    (click)="remove(edge)"
+                                >
+                                    <svg lucideTrash2 aria-hidden="true"></svg>
+                                </button>
                             </xhtml:div>
                         </svg:g>
                     </ng-template>
@@ -149,6 +181,16 @@ export default class EdgeLabels {
         { version: 1, nodes, edges },
         { features },
     );
+
+    protected flip(edge: FlowEdge<Types>): void {
+        if (edge.type !== "status") return;
+        this.model.run("edge.set-data", {
+            edgeId: edge.id,
+            data: {
+                status: edge.data?.status === "failing" ? "passing" : "failing",
+            },
+        });
+    }
 
     protected remove(edge: FlowEdge<Types>): void {
         this.model.run("edge.remove", { edgeId: edge.id });

@@ -7,10 +7,10 @@ import type {
 import { drag } from "@fragiola/flow-vue/drag";
 import { selection } from "@fragiola/flow-vue/selection";
 
-// The edge's `type` picks its path: the core draws `bezier` (the default), `smoothstep`, `step` and
-// `straight`. Any other type is the app's: `Flow.EdgePath` takes a `d` of your own, drawn here from
-// the edge's ends (`useEdge(edge).state.path`) as a wave (wave-edge.vue). Drag the nodes to see
-// each path follow.
+// The edge's `type` picks its path: the core draws `bezier` (the default), `simplebezier` (one
+// curve, its control points halfway on each end's axis), `smoothstep`, `step` and `straight`. Any
+// other type is the app's: `Flow.EdgePath` takes a `d` of your own, drawn here from the edge's ends
+// (`useEdge(edge).state.path`) as a wave (wave-edge.vue). Drag the nodes to see each path follow.
 
 export interface Types extends FlowTypes {
     readonly nodes: { point: { label: string } };
@@ -19,7 +19,7 @@ export interface Types extends FlowTypes {
 
 export const features = [selection(), drag()] as const;
 
-const TYPES = ["bezier", "smoothstep", "step", "straight", "wave"] as const;
+const TYPES = ["bezier", "simplebezier", "smoothstep", "step", "straight", "wave"] as const;
 
 const nodes: FlowNodeInput<Types>[] = TYPES.flatMap((type, index) => [
     {

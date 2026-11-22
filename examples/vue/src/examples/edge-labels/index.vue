@@ -11,7 +11,9 @@ import { selection } from "@fragiola/flow-vue/selection";
 // `Flow.EdgeLabel` is HTML placed at the edge's label point (halfway along its path), in flow
 // coordinates: it pans and zooms with the edge. It may hold anything: text from the edge's data, a
 // badge, a button (remove-button.vue). A button in a label keeps its own clicks (it never starts a
-// gesture).
+// gesture). `Flow.EdgeToolbar` (edge-actions.vue) stands at the same point but outside the zoom (it
+// keeps its size), moved up by `offset`, and shows while its edge is selected: click an edge for
+// its actions.
 
 export interface Types extends FlowTypes {
     readonly nodes: { stage: { label: string } };
@@ -65,6 +67,7 @@ const edges: FlowEdgeInput<Types>[] = [
         target: "lint",
         type: "status",
         data: { status: "failing" },
+        selected: true,
     },
     {
         id: "test-deploy",
@@ -86,6 +89,7 @@ const edges: FlowEdgeInput<Types>[] = [
 <script setup lang="ts">
 import { typedFlow } from "@fragiola/flow-vue";
 import { Badge } from "#/components/atoms/badge";
+import EdgeActions from "./edge-actions.vue";
 import RemoveButton from "./remove-button.vue";
 import { styles } from "./styles";
 
@@ -106,7 +110,9 @@ const Flow = typedFlow<Types, typeof features>();
         <Flow.Background variant="cross" :class="styles.cross" />
         <Flow.Viewport>
             <Flow.Edges v-slot="{ edge }">
-                <Flow.Edge :edge="edge">
+                <Flow.Edge :edge="edge" :class="styles.edgeGroup">
+                    <!-- a wide transparent path: a bigger target for a click -->
+                    <Flow.EdgePath :class="styles.edgeHit" />
                     <Flow.EdgePath :class="styles.edge" />
                     <Flow.EdgeLabel :class="styles.label">
                         <span v-if="edge.type === 'text'" :class="styles.text">
@@ -124,6 +130,7 @@ const Flow = typedFlow<Types, typeof features>();
                             :edge="edge"
                         />
                     </Flow.EdgeLabel>
+                    <EdgeActions :edge="edge" />
                 </Flow.Edge>
             </Flow.Edges>
             <Flow.Nodes v-slot="{ node }">
