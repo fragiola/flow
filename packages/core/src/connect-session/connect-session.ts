@@ -28,6 +28,14 @@ export interface ConnectStart {
         | undefined;
 }
 
+/** How a connection gesture starts (`ConnectSession.gesture`). */
+export interface GestureOptions {
+    /** it has started already: a tap began it */
+    readonly following?: boolean | undefined;
+    /** it starts only once the pointer moved past this many pixels; default: 1 pixel */
+    readonly tolerance?: number | undefined;
+}
+
 /** The shared connection state of one engine. */
 export class ConnectSession {
     /** how near (in pixels) a handle snaps; set by `connection()` */
@@ -150,13 +158,14 @@ export class ConnectSession {
 
     /**
      * A gesture drawing a connection from `start`, pressed at `client`: it starts once the pointer
-     * moves; `following`, it has started (a tap began it: it follows the pointer until the next
-     * press's release, its drop).
+     * moves (1 pixel, or past `tolerance` pixels: a press that moves less stays a tap); `following`,
+     * it has started (a tap began it: it follows the pointer until the next press's release, its
+     * drop).
      */
     gesture(
         start: ConnectStart,
         client: XY,
-        following = false,
+        { following = false, tolerance }: GestureOptions = {},
     ): FeatureGesture {
         let active = following;
         const finish = () => {
@@ -172,7 +181,15 @@ export class ConnectSession {
             move: (event) => {
                 const point = { x: event.clientX, y: event.clientY };
                 if (!active) {
-                    if (Math.hypot(point.x - client.x, point.y - client.y) < 1)
+                    const travel = Math.hypot(
+                        point.x - client.x,
+                        point.y - client.y,
+                    );
+                    if (
+                        tolerance === undefined
+                            ? travel < 1
+                            : travel <= tolerance
+                    )
                         return;
                     active = true;
                     this.started(start);

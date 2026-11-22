@@ -177,4 +177,59 @@ describe("click-to-connect", () => {
         expect(clicks.model.get("all-edges")).toHaveLength(1);
         expect(typesOf(clicks.events)).toEqual(["connect-start", "connect"]);
     });
+
+    it("starts on a tap that jitters within the tap tolerance", () => {
+        const flow = clicking();
+        const out = flow.handle("a", "source", "out");
+        pointer(out, "pointerdown", at(100, 25));
+        pointer(flow.root, "pointermove", at(102, 26));
+        pointer(flow.root, "pointerup", at(102, 26));
+        expect(flow.engine.is("connecting")).toBe(true);
+        tap(flow.handle("b", "target", "in"), at(301, 24));
+        expect(flow.model.get("all-edges")).toHaveLength(1);
+        // past the tolerance, it is a drag again
+        const more = clicking();
+        pointer(more.handle("a", "source", "out"), "pointerdown", at(100, 25));
+        pointer(more.root, "pointermove", at(110, 25));
+        expect(more.engine.is("connecting")).toBe(true);
+        pointer(more.root, "pointerup", at(110, 25));
+        expect(more.engine.is("connecting")).toBe(false);
+        expect(typesOf(more.events)).toEqual([
+            "connect-start",
+            "connect-cancel",
+        ]);
+    });
+
+    it("cancels on Escape anywhere in the page, on set-interactive false and on destroy", () => {
+        const flow = clicking();
+        tap(flow.handle("a", "source", "out"), at(100, 25));
+        // focus left the root: the key goes to the page's body
+        const escapeKey = new KeyboardEvent("keydown", {
+            key: "Escape",
+            bubbles: true,
+            cancelable: true,
+        });
+        document.body.dispatchEvent(escapeKey);
+        expect(flow.engine.is("connecting")).toBe(false);
+        expect(escapeKey.defaultPrevented).toBe(true);
+        expect(flow.events.at(-1)).toEqual({
+            type: "connect-cancel",
+            refused: false,
+        });
+        tap(flow.handle("a", "source", "out"), at(100, 25));
+        flow.engine.run("set-interactive", { interactive: false });
+        expect(flow.engine.is("connecting")).toBe(false);
+        expect(flow.events.at(-1)?.type).toBe("connect-cancel");
+        flow.engine.run("set-interactive", { interactive: true });
+        tap(flow.handle("a", "source", "out"), at(100, 25));
+        expect(flow.engine.is("connecting")).toBe(true);
+        const before = flow.events.length;
+        flow.engine.destroy();
+        expect(flow.events.slice(before).map((e) => e.type)).toEqual([
+            "connect-cancel",
+        ]);
+        // nothing follows the pointer any more
+        pointer(flow.root, "pointermove", at(200, 60));
+        expect(flow.events).toHaveLength(before + 1);
+    });
 });

@@ -6,6 +6,7 @@
 // handle connects; elsewhere it is cancelled, as Escape does).
 import { connectSessionOf } from "../connect-session/connect-session";
 import type { FlowHandle, PressTarget } from "../engine/adapter";
+import { TAP_TOLERANCE } from "../engine/tap";
 import type { FeatureEngine, FeatureEngineHost } from "../features/types";
 import type { ConnectionOptions } from "./connection";
 
@@ -35,10 +36,14 @@ export function connectionEngine(
         is: { connecting: () => session.current() !== null },
         pointerdown: (event, target) => {
             const handle = startable(target);
+            // with click-to-connect, a press that barely moves stays a tap (it starts one)
             return handle
                 ? session.gesture(
                       { from: handle },
                       { x: event.clientX, y: event.clientY },
+                      options.clickToConnect
+                          ? { tolerance: TAP_TOLERANCE }
+                          : {},
                   )
                 : undefined;
         },
@@ -49,7 +54,7 @@ export function connectionEngine(
                 ? session.gesture(
                       { from: handle },
                       { x: event.clientX, y: event.clientY },
-                      true,
+                      { following: true },
                   )
                 : undefined;
         },

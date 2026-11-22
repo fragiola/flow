@@ -81,6 +81,7 @@ import {
     writeRootTouchAction,
     writeViewportTransform,
 } from "./structural-style";
+import { TAP_TOLERANCE } from "./tap";
 import type {
     BackgroundPatternPayload,
     EngineActionKey,
@@ -214,9 +215,6 @@ type ActionHandler = (
     payload: unknown,
     dryRun: boolean,
 ) => CommandResult<unknown>;
-
-/** How far (in pixels) a press may move and still be a tap. */
-const TAP_TOLERANCE = 3;
 
 /** A press under way: its pointer, where it started, and the gesture that took it. */
 interface Press {
@@ -1547,6 +1545,13 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     /** A key went down or up in the root's document: the activation keys read it. */
     private keyHeld(event: KeyboardEvent, down: boolean): void {
+        // a connection a tap started waits without a press, often with focus outside the root (the
+        // handle's press kept it from moving): Escape anywhere in the page cancels it
+        if (down && event.key === "Escape" && this.following && !this.press) {
+            this.cancelFollowing();
+            event.preventDefault();
+            return;
+        }
         if (down) {
             // typing in a field (a node's, the page's) holds no activation key
             if (asElement(event.target)?.closest?.(EDITABLE)) return;
