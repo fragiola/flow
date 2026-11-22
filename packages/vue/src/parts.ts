@@ -14,6 +14,7 @@ export { Handle } from "./components/handle";
 export { Node } from "./components/node";
 export { NodeToolbar } from "./components/node-toolbar";
 export { Nodes } from "./components/nodes";
+export { NodesSelection } from "./components/nodes-selection";
 export { ReconnectAnchor } from "./components/reconnect-anchor";
 export { Root } from "./components/root";
 export { SelectionBox } from "./components/selection-box";
