@@ -202,9 +202,10 @@ the playground, `examples/shared` and `examples/react`), and **never runs `playw
 in one PR. `main` has no required checks: a skipped job blocks nothing.
 
 **Shards: none.** Shard a suite only when its test step alone passes about 3 minutes. Measured
-locally (4 workers; CI runs 2): the playground's 196 tests (98 per browser) in ~80 s, each
-examples app's 215 tests (105 smoke runs: 21 examples × 5 themes) in ~24 to ~55 s, its embed build
-included (measured after #36; Angular and React the slower).
+locally (4 workers; CI runs 2): the playground's 208 tests (104 per browser; TO UPDATE: plus the
+server-HTML check with JavaScript disabled of #40) in ~80 s, each examples app's 226 tests (110
+smoke runs: 22 examples × 5 themes) in ~24 to ~55 s, its embed build included (counts after #40,
+times measured after #36; Angular and React the slower).
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
@@ -535,7 +536,7 @@ engine's state attributes from `engine.adapter.attributes(part, payload)`):
 | primitive | element | does |
 | --- | --- | --- |
 | `Root` | `div` `root` | owns the model (or takes `model`) and the engine, attaches the root; `position: relative; overflow: hidden` |
-| `Viewport` | `div` `viewport` | `attachViewport`: the engine writes its transform, React never does |
+| `Viewport` | `div` `viewport` | `attachViewport`: the engine writes its transform, React never does (none before the engine: the identity viewport); `isolation: isolate` (#40: its own stacking context from the server on) |
 | `Nodes` | `div` `nodes` | children function per node not hidden (`visible-nodes` with `onlyRenderVisible`), keyed by id; `isolation: isolate` (#25: the nodes' `z-index` stays inside the layer; #39: dropped while `render-layers` has several levels) |
 | `Node` | `div` `node` | `registerNode`; `transform: translate(x, y)` from `node-rect-by` (its origin applied), `z-index` from `node-z-index-by` (#25), the document's `width`/`height`; before the engine, #39: the static geometry's `nodeRects` / `nodeZIndexes`; `tabIndex` from `node-focusable` |
 | `Handle` | `div` `handle` | `registerHandle({ nodeId, handleId, type, side, connectable })`; centred on its side by default (a style may move it); the engine's record, `tabindex` as `tabIndex` (#28: with `keyboard()` + `connection()`) |
@@ -2425,6 +2426,17 @@ Decisions of Epic #40 (#38 core, #39 adapters and docs; React Flow v12's SSR, `z
   rectangle focusable with `keyboard()` (`tabindex`, the arrows moving the selection, a delete key
   removing it, Escape clearing it, Enter and Space nothing; the app names it). `limitations.mdx`
   loses its "Not yet" section.
+- **The server HTML checked without the site export**: the Issue's "site export check of a docs
+  page's server HTML" became server-render tests of the `server-rendering` example
+  (`examples/{react,vue,svelte}/tests/server-rendering.test.ts`: React's, Vue's and Svelte's
+  server renderers in node, every edge's path and every node's place in the HTML) and a
+  playground check of the server HTML in a real browser with JavaScript disabled, because
+  `site:export` prerenders no flow (each embed is a client-only build).
+- **The server draws the identity viewport**: only the engine writes the viewport's transform
+  (D4), so `defaultViewport` and `fitView` apply once it is attached after mount, and move the
+  whole flow then. The `server-rendering` example has neither: its nodes are placed to fit the
+  frame at zoom 1. The viewport part is its own stacking context (`isolation: isolate`) in every
+  adapter, from the server on, so a layered flow stacks the same before the engine.
 - **Docs**: `guides/server-rendering.mdx` (new), `concepts/nodes-and-edges.mdx` (sizes and handles
   before measuring, a node's own origin, z-order and how it is drawn), `api/engine.mdx`
   (`zIndexMode`, `render-layers`, `refocus`, the `edges-layer` part, static geometry),
