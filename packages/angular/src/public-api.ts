@@ -58,6 +58,10 @@ export {
     type TypedBy,
 } from "./lib/directives/nodes.directive";
 export {
+    FlowNodesSelectionDirective,
+    type NodesSelectionState,
+} from "./lib/directives/nodes-selection.directive";
+export {
     FlowReconnectAnchorDirective,
     type ReconnectAnchorState,
 } from "./lib/directives/reconnect-anchor.directive";
@@ -97,19 +101,35 @@ export {
 export { injectEdges } from "./lib/inject/inject-edges";
 export { type InjectFlowResult, injectFlow } from "./lib/inject/inject-flow";
 export { injectFlowRef } from "./lib/inject/inject-flow-ref";
+export { injectFlowStore } from "./lib/inject/inject-flow-store";
 export {
     type HandleState,
     type InjectHandleOptions,
     type InjectHandleResult,
     injectHandle,
 } from "./lib/inject/inject-handle";
+export { injectInternalNode } from "./lib/inject/inject-internal-node";
+export {
+    type InjectKeyPressOptions,
+    injectKeyPress,
+} from "./lib/inject/inject-key-press";
 export {
     type InjectNodeResult,
     injectNode,
     type NodeElementProps,
     type NodeState,
 } from "./lib/inject/inject-node";
+export {
+    type InjectNodeConnectionsOptions,
+    injectNodeConnections,
+} from "./lib/inject/inject-node-connections";
+export { injectNodeId } from "./lib/inject/inject-node-id";
 export { injectNodes } from "./lib/inject/inject-nodes";
+export { injectNodesData } from "./lib/inject/inject-nodes-data";
+export {
+    type InjectOnViewportChangeOptions,
+    injectOnViewportChange,
+} from "./lib/inject/inject-on-viewport-change";
 export {
     type FlowSelection,
     injectSelection,
