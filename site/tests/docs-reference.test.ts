@@ -582,7 +582,7 @@ const AHEAD_IN_REACT: Record<"vue" | "svelte" | "angular", readonly string[]> =
     {
         vue: [],
         svelte: [],
-        angular: ["NodesSelection"],
+        angular: [],
     };
 const notAhead =
     (framework: keyof typeof AHEAD_IN_REACT) =>
