@@ -242,6 +242,7 @@ feature at the moment it would act: no feature is installed again.
 | `"node-toolbar-by"` | `NodeToolbarPayload` | where a node's toolbar goes, outside the zoom: beside a node, or beside several nodes' bounds (`nodeIds`); undefined until one of them has a size |
 | `"edge-toolbar-by"` | `EdgeToolbarPayload` | where an edge's toolbar goes, outside the zoom (an `EdgeToolbarPosition`): at its label point, one of its ends or a flow point; undefined until the edge is drawn |
 | `"selection-box"` | none | the box being drawn (a root-relative `SelectionBox`), or null (`selection()`; `undefined` without it) |
+| `"selection-rect"` | none | the flow-space bounds (a `Rect`) of the selected nodes, for the rectangle around them (the `nodes-selection` part, in the viewport): while two or more are selected by a box (`selection({ rect: "always" })`: by anything), until the selection changes otherwise; null otherwise and while a box is drawn (`selection()`) |
 | `"dragging-node-ids"` | none | the nodes being dragged (`drag()`) |
 | `"connection"` | none | the `Connection` being drawn, or null (`connection()`; `undefined` without it) |
 | `"minimap-view"` | `{ width, height }` | what a minimap of that many pixels draws (`minimap()`) |
@@ -394,10 +395,11 @@ viewport from it.
 | `"node-click"`, `"edge-click"`, `"pane-click"` | `nodeId` / `edgeId`, `point`, `client`, `event` | a tap: a primary press released within the tap distance (`paneClickDistance`, `nodeClickDistance`) that started no gesture; a press that dragged or panned is none. Told after the selection changed, and while the flow is not interactive too |
 | `"node-double-click"`, `"edge-double-click"`, `"pane-double-click"` | the same | a double click whose two presses were taps; on the pane it also zooms in (`zoomOnDoubleClick`) |
 | `"node-context-menu"`, `"edge-context-menu"`, `"pane-context-menu"` | the same | a context menu (a right click, the menu key); the app calls `event.preventDefault()` to show its own. One a right-button pan keeps out is none |
-| `"selection-context-menu"` | `nodeIds`, `edgeIds`, `point`, `client`, `event` | a context menu on a selected node while several nodes are selected (instead of `node-context-menu`) |
+| `"selection-context-menu"` | `nodeIds`, `edgeIds`, `point`, `client`, `event` | a context menu on a selected node while several nodes are selected (instead of `node-context-menu`), or on the rectangle around the selection (`nodes-selection`) |
 | `"drag-start"` | `nodeIds` | a drag of these nodes started (`drag()`) |
 | `"nodes-move"` | `nodeIds`, `source` | nodes were dropped after a drag, or moved by the arrows; `source` is a `MoveSource`, `"pointer"` or `"keyboard"` |
 | `"drag-cancel"` | `nodeIds` | a drag was cancelled: its nodes went back |
+| `"selection-drag-start"`, `"selection-drag"`, `"selection-drag-end"` | `nodeIds`, `client`, `point` (a `SelectionDragStep`) | a press on the rectangle around the selection (`nodes-selection`, `drag()`) dragged the selection, as a node drag (threshold, snap, extent, auto-pan): it started (instead of `drag-start`), moved its nodes (each step), dropped them (after their `nodes-move`); a cancel is `drag-cancel` |
 | `"connect-start"` | `nodeId`, `handleId`, `handleType`, `input` | a connection started from a handle (`connection()`); `input` (a `MoveSource`): `"pointer"` (a drag or a tap) or `"keyboard"` (Enter on a focused handle, with `keyboard()`) |
 | `"connect-target"` | `nodeId`, `handleId`, `handleType`, `index`, `count` | a keyboard connection points at another target: the `index`-th of the `count` handles the model accepts, nearest first (`index` -1 and no handle when it accepts none), for your live region |
 | `"connect"` | `edgeId`, `source`, `target`, `input` | a connection was dropped on a handle (or Enter chose it): an edge was added |

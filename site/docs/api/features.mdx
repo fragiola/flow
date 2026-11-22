@@ -137,7 +137,7 @@ factory returns a frozen object with its resolved `options`.
 selects a node or an edge (replacing the selection), a modifier click toggles it in the selection,
 a plain click on the pane clears it, and Shift + drag on the pane draws a selection box. It owns the `selected` field of nodes and edges, the commands `selection.set`,
 `selection.clear` and `selection.remove`, the keys `"selected-nodes"`, `"selected-edges"`,
-`"node-selected"`, `"edge-selected"`, and on the engine `"selection-box"` and `"box-selecting"`.
+`"node-selected"`, `"edge-selected"`, and on the engine `"selection-box"`, `"selection-rect"` and `"box-selecting"`.
 
 `SelectionOptions`:
 
@@ -148,6 +148,7 @@ a plain click on the pane clears it, and Shift + drag on the pane draws a select
 | `boxOnDrag` | `boolean` | `false` | any drag on the pane draws a box (instead of panning); otherwise the box key + drag |
 | `multiKey` | `SelectionKey` | `["Meta", "Control", "Shift"]` | held, a click toggles a node or an edge in the selection (with `multiple`); `null` for none |
 | `boxKey` | `SelectionKey` | `"Shift"` | held, a drag on the pane draws a selection box; `null` for none (only `boxOnDrag` then) |
+| `rect` | `SelectionRectMode` | `"box"` | when the rectangle around the selected nodes (`selection-rect`, the `nodes-selection` part) shows: after a box selected two or more, until the selection changes otherwise (`"box"`), or whenever two or more are selected (`"always"`) |
 
 `SelectionKey` is a key (`KeyboardEvent.key` or `.code`; `Meta`, `Control`, `Alt` and `Shift`
 read from the pointer event), several (any of them held), or `null`.

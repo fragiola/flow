@@ -354,7 +354,10 @@ the edge's point on the screen, the toolbar's centre there, undefined until it i
 `intersecting-nodes { nodeId } | { rect }, partial?` (#27: the shown nodes of known size sharing
 area with it, `partial: false` wholly inside, the node itself left out), `viewport-for-bounds
 { bounds, padding?, minZoom?, maxZoom? }` (#27: what `fit-view` would set, undefined without a root
-size; #35: `fit-view`'s padding forms); features: `selection-box` (selection),
+size; #35: `fit-view`'s padding forms); features: `selection-box` (selection), `selection-rect` (selection, #35: the flow `Rect`
+of the selected nodes while two or more were selected by a box, until the selection changes
+otherwise, or whenever two or more are selected with `selection({ rect: "always" })`; null
+otherwise and while a box is drawn),
 `dragging-node-ids` (drag), `connection` (connection: `from`, `fromPoint`, `toPoint`, `toSide`,
 `to`, `status` valid/invalid/null, `path`, `reconnecting`), `minimap-view { width, height }`
 (minimap: `viewBox`, `viewBoxAttribute`, `scale`, `nodes`, `view`, `maskPath` for
@@ -377,7 +380,10 @@ to, client, point }`, `resize { nodeId, width, height, source }` (#27: `source`)
 gesture }`, `ready`, `node-click` / `edge-click` / `pane-click`, the `*-double-click` and
 `*-context-menu` variants and `selection-context-menu` (`{ nodeId | edgeId | nodeIds, edgeIds,
 point, client, event }`, a `FlowPointerInfo`), `box-select-start { client, point }`,
-`resize-start { nodeId, width, height }`, `resize-cancel { nodeId }`.
+`resize-start { nodeId, width, height }`, `resize-cancel { nodeId }`; #35: `selection-drag-start`,
+`selection-drag` (each step), `selection-drag-end { nodeIds, client, point }` (a
+`SelectionDragStep`) for a drag of the `nodes-selection` part (instead of `drag-start`; the drop
+still tells `nodes-move` first, a cancel `drag-cancel`), and `selection-context-menu` on that part.
 
 **The adapter contract** (`engine.adapter`, what `Flow.*` primitives call; an app never does):
 
@@ -404,7 +410,11 @@ point, client, event }`, a `FlowPointerInfo`), `box-select-start { client, point
   the pane; `node`; `handle`; `edge`/`edge-path`/`edge-label`; `reconnect-anchor { edgeId, end }`
   (`data-end`: an edge end's grab area, drawn above the handles); `resize-handle { nodeId,
   position }` (`data-position`: `top-left` … `left`, inside the node's element); `minimap`,
-  `minimap-node`, `minimap-mask`; anything else (`controls`, `toolbar`, `panel`) is left alone
+  `minimap-node`, `minimap-mask`; `nodes-selection` (#35, no payload: the rectangle around the
+  selection, rendered in the viewport at `selection-rect` as a structural `transform:
+  translate(x, y)`, `width`, `height` when non-null; a press drags the selection with `drag()`'s
+  own gesture, led by its first draggable node, so threshold, snap, extent and auto-pan are a node
+  drag's; `data-dragging` while it drags; a context menu is the selection's); anything else (`controls`, `toolbar`, `panel`) is left alone
   (a `toolbar`'s record takes `{ nodeId }`, or since #27 `{ edgeId }` for an edge's, as its
   `data-flow-id`, and nothing for several nodes'). With `keyboard()` and `connection()`, a
   connectable `handle`'s record holds `tabindex: "0"`; with `keyboard()` and `resize()`, every

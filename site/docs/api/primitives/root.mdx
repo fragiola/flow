@@ -326,6 +326,9 @@ through `engine.adapter.setOptions`).
 | `onNodeDragStart` | `(event: FlowEngineEventOf<"drag-start">) => void` | none | `drag-start`: a drag of nodes started (`drag()`) |
 | `onNodesMove` | `(event: FlowEngineEventOf<"nodes-move">) => void` | none | `nodes-move`: nodes were dropped, or moved by the arrows |
 | `onNodeDragCancel` | `(event: FlowEngineEventOf<"drag-cancel">) => void` | none | `drag-cancel`: a drag was cancelled |
+| `onSelectionDragStart` | `(event: FlowEngineEventOf<"selection-drag-start">) => void` | none | `selection-drag-start`: a drag of the rectangle around the selection started |
+| `onSelectionDrag` | `(event: FlowEngineEventOf<"selection-drag">) => void` | none | `selection-drag`: the rectangle's drag moved its nodes (each step) |
+| `onSelectionDragStop` | `(event: FlowEngineEventOf<"selection-drag-end">) => void` | none | `selection-drag-end`: the rectangle's drag dropped its nodes |
 | `onConnectStart` | `(event: FlowEngineEventOf<"connect-start">) => void` | none | `connect-start`: a connection started (`connection()`) |
 | `onConnectTarget` | `(event: FlowEngineEventOf<"connect-target">) => void` | none | `connect-target`: a keyboard connection points at another target |
 | `onConnect` | `(event: FlowEngineEventOf<"connect">) => void` | none | `connect`: an edge was added by a connection |
