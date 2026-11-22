@@ -209,6 +209,7 @@ the result is the viewport it ends at (zoom limits and extent kept), and every f
 | `"edge-path-by"` | `{ edgeId }` | its `EdgePath` (path, label point, ends and sides), undefined until both nodes have a size; an app type gets the bezier |
 | `"node-rect-by"` | `{ nodeId }` | its absolute box (size 0 until measured or given) |
 | `"nodes-bounds"` | `{ nodeIds? }` | the box of the nodes (or some); none without a node |
+| `"viewport-for-bounds"` | `ViewportForBoundsPayload` | the viewport that frames a flow rectangle in the root, as `fit-view` would set it (padding, zoom limits and translate extent kept); undefined while the root has no size |
 | `"screen-to-flow"` | `XY` | a client point as a flow point (a drop's position) |
 | `"flow-to-screen"` | `XY` | a flow point as a client point |
 | `"visible-nodes"` | none | the nodes in view, plus those not measured yet |
@@ -222,6 +223,25 @@ the result is the viewport it ends at (zoom limits and extent kept), and every f
 | `"dragging-node-ids"` | none | the nodes being dragged (`drag()`) |
 | `"connection"` | none | the `Connection` being drawn, or null (`connection()`; `undefined` without it) |
 | `"minimap-view"` | `{ width, height }` | what a minimap of that many pixels draws (`minimap()`) |
+
+`ViewportForBoundsPayload`:
+
+| field | type | description |
+| --- | --- | --- |
+| `bounds` | `Rect` | the flow rectangle to frame |
+| `padding` | `number` | the share of the root's size kept free on every side; default 0.1 |
+| `minZoom` | `number` | the least zoom it may pick (within the engine's limits); default the engine's `minZoom` |
+| `maxZoom` | `number` | the greatest zoom it may pick (within the engine's limits); default the engine's `maxZoom` |
+
+The same framing is a pure function, `viewportForBounds(bounds, width, height, options?)`: the
+viewport that shows `bounds` whole and centred in a root of `width` × `height` pixels (a server
+render, a thumbnail, a saved view), with no engine. Its `ViewportForBoundsOptions`:
+
+| option | type | description |
+| --- | --- | --- |
+| `padding` | `number` | the share of the root's size kept free on every side; default 0.1 |
+| `minZoom` | `number` | the least zoom it may pick; default 0.5 |
+| `maxZoom` | `number` | the greatest zoom it may pick; default 2 |
 
 `BackgroundPatternPayload`:
 

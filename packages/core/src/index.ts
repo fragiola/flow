@@ -131,6 +131,7 @@ export type {
     NodeToolbarPayload,
     NodeToolbarPosition,
     SelectionBox,
+    ViewportForBoundsPayload,
     ZoomStepPayload,
 } from "./engine/verbs";
 export type { ViewportEasing } from "./engine/viewport-animation";
@@ -180,6 +181,10 @@ export type {
     Rect,
     Viewport,
 } from "./geometry/types";
+export {
+    type ViewportForBoundsOptions,
+    viewportForBounds,
+} from "./geometry/viewport-for-bounds";
 export {
     type CommandArgs,
     createFlowModel,

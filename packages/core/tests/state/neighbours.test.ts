@@ -110,9 +110,7 @@ describe("incomers-by and outgoers-by", () => {
             },
             { features: [subflows()] },
         );
-        expect(ids(model.get("outgoers-by", { nodeId: "y" }))).toEqual([
-            "out",
-        ]);
+        expect(ids(model.get("outgoers-by", { nodeId: "y" }))).toEqual(["out"]);
         expect(ids(model.get("incomers-by", { nodeId: "y" }))).toEqual(["x"]);
         expect(ids(model.get("incomers-by", { nodeId: "x" }))).toEqual([
             "group",

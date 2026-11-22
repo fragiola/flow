@@ -28,6 +28,18 @@ export interface FitViewPayload {
     duration?: number | undefined;
 }
 
+/** What `viewport-for-bounds` takes: a flow rectangle and `fit-view`'s framing options. */
+export interface ViewportForBoundsPayload {
+    /** the flow rectangle to frame */
+    bounds: Rect;
+    /** the share of the root's size kept free on every side; default 0.1 */
+    padding?: number | undefined;
+    /** the least zoom it may pick (within the engine's limits); default the engine's `minZoom` */
+    minZoom?: number | undefined;
+    /** the greatest zoom it may pick (within the engine's limits); default the engine's `maxZoom` */
+    maxZoom?: number | undefined;
+}
+
 /** A zoom by a step around a point (`zoom-in`, `zoom-out`). */
 export interface ZoomStepPayload {
     /** the factor; default the engine's `zoomStep` (1.2) */
@@ -237,6 +249,14 @@ export interface EngineGetMap<T extends FlowTypes = AnyTypes> {
     "nodes-bounds": {
         payload: { nodeIds?: string[] | undefined };
         result: Rect | undefined;
+    };
+    /**
+     * the viewport that frames a flow rectangle in the root, as `fit-view` would set it (padding,
+     * zoom limits and translate extent kept); undefined while the root has no size
+     */
+    "viewport-for-bounds": {
+        payload: ViewportForBoundsPayload;
+        result: Viewport | undefined;
     };
     /** a client point (a pointer's `clientX`, `clientY`) as a flow point */
     "screen-to-flow": { payload: XY; result: XY };

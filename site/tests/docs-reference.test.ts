@@ -1420,16 +1420,21 @@ describe("the core reference", () => {
     });
 
     it("has a row for every field of the engine's payloads and reads", () => {
-        const checked = expectRows("engine", "engine/verbs.ts", [
-            "FitViewPayload",
-            "ZoomStepPayload",
-            "BackgroundPatternPayload",
-            "BackgroundPattern",
-            "NodeToolbarPayload",
-            "NodeToolbarPosition",
-            "Connection",
-            "MinimapView",
-        ]);
+        const checked =
+            expectRows("engine", "engine/verbs.ts", [
+                "FitViewPayload",
+                "ZoomStepPayload",
+                "BackgroundPatternPayload",
+                "BackgroundPattern",
+                "NodeToolbarPayload",
+                "NodeToolbarPosition",
+                "Connection",
+                "MinimapView",
+                "ViewportForBoundsPayload",
+            ]) +
+            expectRows("engine", "geometry/viewport-for-bounds.ts", [
+                "ViewportForBoundsOptions",
+            ]);
         expect(checked).toBeGreaterThan(30);
     });
 

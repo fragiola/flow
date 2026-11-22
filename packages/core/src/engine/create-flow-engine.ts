@@ -49,9 +49,12 @@ import {
 } from "../geometry/rect";
 import type { EdgePath, Rect, Viewport } from "../geometry/types";
 import {
+    type ViewportForBoundsOptions,
+    viewportForBounds,
+} from "../geometry/viewport-for-bounds";
+import {
     centeredOn,
     clampZoom,
-    fitBounds,
     keptInExtent,
     type Size,
     toFlow,
@@ -537,6 +540,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                     Array.isArray(nodeIds) ? nodeIds : undefined,
                 );
             },
+            "viewport-for-bounds": (p) => this.viewportForBoundsRead(p),
             "screen-to-flow": (p) => {
                 const point = pointOf(p);
                 return point ? this.toFlow(point) : undefined;
@@ -791,14 +795,70 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         }
         const bounds = this.boundsOf(payload.nodeIds);
         if (!bounds) return fail("refused", "no node has a size yet");
-        const viewport = fitBounds(
-            bounds,
-            size,
-            payload.padding ?? 0.1,
-            payload.minZoom ?? this.minZoom,
-            payload.maxZoom ?? this.maxZoom,
+        return this.apply(
+            this.framing(bounds, size, payload),
+            dryRun,
+            duration,
         );
-        return this.apply(viewport, dryRun, duration);
+    }
+
+    /**
+     * The viewport that frames `bounds` in the root (`viewportForBounds`): `fit-view`'s and
+     * `viewport-for-bounds`'; its own zoom limits default to the engine's (which still bound it).
+     */
+    private framing(
+        bounds: Rect,
+        size: Size,
+        options: ViewportForBoundsOptions,
+    ): Viewport {
+        return viewportForBounds(bounds, size.width, size.height, {
+            padding: options.padding ?? 0.1,
+            minZoom: options.minZoom ?? this.minZoom,
+            maxZoom: options.maxZoom ?? this.maxZoom,
+        });
+    }
+
+    /** `viewport-for-bounds`: the viewport `fit-view` would set for a flow rectangle. */
+    private viewportForBoundsRead(payload: unknown): Viewport | undefined {
+        const record = payloadRecord(payload);
+        const bounds = payloadRecord(record.bounds);
+        const size = this.rootSize();
+        if (
+            size.width <= 0 ||
+            size.height <= 0 ||
+            !finite(bounds.x) ||
+            !finite(bounds.y) ||
+            !finite(bounds.width) ||
+            !finite(bounds.height) ||
+            bounds.width < 0 ||
+            bounds.height < 0
+        ) {
+            return undefined;
+        }
+        return Object.freeze(
+            this.kept(
+                this.framing(
+                    {
+                        x: bounds.x,
+                        y: bounds.y,
+                        width: bounds.width,
+                        height: bounds.height,
+                    },
+                    size,
+                    {
+                        padding: finite(record.padding)
+                            ? record.padding
+                            : undefined,
+                        minZoom: finite(record.minZoom)
+                            ? record.minZoom
+                            : undefined,
+                        maxZoom: finite(record.maxZoom)
+                            ? record.maxZoom
+                            : undefined,
+                    },
+                ),
+            ),
+        );
     }
 
     private focusNode(
