@@ -79,7 +79,8 @@ an implementation detail. Where the Epic's decisions say nothing, the Fragiola g
 6. **Commands (D6)**, `<entity>.<verb>`, payload ids `<entity>Id`: `node.add`, `node.remove`,
    `node.move`, `node.resize`, `node.set-data`, `node.set-flags`, `node.set-parent`, `edge.add`,
    `edge.remove`, `edge.reconnect`, `edge.set-data`, `edge.set-flags`, `selection.set`,
-   `selection.clear`, `selection.remove`, `batch`. Removing a node removes its edges (and, with
+   `selection.clear`, `selection.remove`, `batch` (#24 added `node.set-z-index`,
+   `edge.set-z-index`). Removing a node removes its edges (and, with
    `subflows()`, its children) in one step. The catalogue is made with `defineCommand` and JSON
    Schemas, like Dockable's; `model.get("commands")` lists it;
    `packages/core/scripts/generate-command-docs.ts --check` runs in `pnpm check`
@@ -239,6 +240,7 @@ surface exact). The source layout of the core:
 | `node.resize` | core | sets a node's size (and position); transient |
 | `node.set-data`, `edge.set-data` | core | shallow-merge a data patch |
 | `node.set-flags`, `edge.set-flags` | core | set some flags |
+| `node.set-z-index`, `edge.set-z-index` | core | set the `zIndex` in place (`null`: the default, 0; #24) |
 | `edge.add` | core | joins two connectable nodes; one edge per pair of handles and direction |
 | `edge.remove` | core | removes an edge; refused when not deletable |
 | `batch` | core | several commands, all or nothing, one event; transient when each may be |
@@ -1494,14 +1496,14 @@ z-order (#24, Epic #26):
   to `boxOnDrag`. `keyboard({ deleteKeys })` matches `KeyboardEvent.key` or `.code`; Enter/Space's
   toggle modifiers stay the keyboard's own (features talk only through keys, and the keyboard does
   not read the selection's options).
-- **Click-to-connect is a gesture that outlives its press.** `FeatureEngine.tap` may return a
+- **Click-to-connect is a gesture that outlives its press** (see the tap tolerance below). `FeatureEngine.tap` may return a
   `FeatureGesture`: the engine keeps it as the gesture under way without a press, moves it on every
   primary pointer move (the hover), and gives it the next primary press (no other gesture starts,
   no pan; a press on `other` parts, the controls, leaves it waiting; the pan key still pans); that
   press's release is its `end`, a drop at that point: within `radius` of an eligible handle it
   connects through `model.can("edge.add")` (`connect`), a vetoed one `connect-cancel { refused:
   true }`, anywhere else `connect-cancel { refused: false }`. Escape, `cancel-gesture`,
-  `set-interactive false`, a detach and `destroy` cancel it. So a tap on the pane that cancels it
+  `set-interactive false`, a detach and `destroy` cancel it (Escape from anywhere in the page). So a tap on the pane that cancels it
   does not also clear the selection (the press is the connection's). The session is the drag's
   (`connect-session`), started at once (`connect-start`, `connection` non-null, `data-connecting`).
   Why the engine and not a feature flag: the engine owns Escape, capture and the press routing for
@@ -1542,6 +1544,19 @@ z-order (#24, Epic #26):
   order (`drawn-edges`) is its `zIndex`, plus 10 000 when selected with `elevateEdgesOnSelect`,
   stable among equals (the document's order). Why a read and not an attribute: `z-index` is style,
   not state, and an SVG has no `z-index`; the adapters (#25) apply the number to the node's
-  structural style and render `drawn-edges` instead of their own filter. No command sets `zIndex`:
-  a change through controlled props (`commands-to`) replaces the node or edge, as a type change
-  does; elevation covers the usual raise.
+  structural style and render `drawn-edges` instead of their own filter. `node.set-z-index` and
+  `edge.set-z-index` (core commands: an app with no feature raises a node in code too; `null` puts
+  the default back) set it in place, and controlled props (`commands-to`) emit them, so a raise
+  keeps the node's edges and measurements (replacing it, the first choice, removed and re-added
+  them). D6's catalogue grows by these two.
+- **A drag step is computed from the start, never accumulated.** Each step (and the drop, from the
+  release's point) puts every dragged node's start box at the pointer's travel and turns it into a
+  position against its parent's corner as it is then (`host.positionFor`), so a child whose parent
+  grows (`expandParent`) past its left or top edge stays under the pointer.
+- **Click-to-connect and the tap tolerance.** With `clickToConnect`, a handle's drag starts only
+  past the engine's tap tolerance (`TAP_TOLERANCE`, 3 pixels, `engine/tap.ts`), so a tap that
+  jitters still starts a connection; without it, a drag starts after 1 pixel, as before. Escape
+  cancels a waiting connection from anywhere in the root's document (its `keydown` listener, #23's),
+  since the handle's press may have kept the focus outside the root.
+- **Resizing a node already past its bounds** gives it its least size (`minWidth`/`minHeight`) on
+  that side instead of a negative one.

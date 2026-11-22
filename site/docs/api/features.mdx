@@ -229,8 +229,8 @@ See [Sub-flows](/docs/guides/sub-flows).
 
 `keyboard(options?)` from `@fragiola/flow-react/keyboard` returns a `KeyboardFeature`: nodes and
 edges take DOM focus (`tabindex="0"`, the engine's `"node-focusable"` and `"edge-focusable"`); the
-arrows move the selection (or the focused node), Delete and Backspace remove it
-(`selection.remove` with `selection()`), Enter and Space select, Escape clears the selection. See
+arrows move the selection (or the focused node), the delete keys (`deleteKeys`: Delete and
+Backspace by default) remove it (`selection.remove` with `selection()`), Enter and Space select, Escape clears the selection. See
 [Keyboard and accessibility](/docs/guides/keyboard).
 
 `KeyboardOptions`:

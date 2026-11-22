@@ -326,7 +326,7 @@ viewport from it.
 | `"reconnect-cancel"` | `edgeId`, `refused` | a reconnection ended with the edge as it was |
 | `"resize"` | `nodeId`, `width`, `height` | a node was resized (`resize()`) |
 | `"box-select"` | `nodeIds`, `edgeIds` | a box selection ended with these selected (`selection()`) |
-| `"remove"` | `nodeIds`, `edgeIds` | Delete or Backspace removed these (`keyboard()`) |
+| `"remove"` | `nodeIds`, `edgeIds` | a delete key (`deleteKeys`: Delete or Backspace by default) removed these (`keyboard()`) |
 
 ```ts
 const stop = engine.subscribe((event) => {
