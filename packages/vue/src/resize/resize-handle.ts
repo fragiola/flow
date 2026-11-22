@@ -1,6 +1,6 @@
 import { partAttributes } from "@fragiola/flow";
 import { useFlowValue } from "../composables/internal";
-import { useFlowContext, useNodeId } from "../context";
+import { useFlowContext, usePartNodeId } from "../context";
 import {
     definePrimitive,
     type FlowComponent,
@@ -110,7 +110,7 @@ export const ResizeHandle: FlowComponent<ResizeHandleProps, ResizeHandleSlots> =
         "ResizeHandle",
         ["position", "nodeId", "as"],
         (props, { attrs, slots }) => {
-            const nodeId = useNodeId("ResizeHandle", () => props.nodeId);
+            const nodeId = usePartNodeId("ResizeHandle", () => props.nodeId);
             const context = useFlowContext("ResizeHandle");
             // the engine's record: `data-position`, and `tabindex` with `keyboard()` (arrows resize)
             const attributes = useFlowValue(context, () => {

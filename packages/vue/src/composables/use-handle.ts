@@ -11,7 +11,7 @@ import {
     type MaybeRefOrGetter,
     toValue,
 } from "vue";
-import { useFlowContext, useNodeId } from "../context";
+import { useFlowContext, usePartNodeId } from "../context";
 import { type ElementRef, elementRef } from "../utils/render";
 import { useFlowValue } from "./internal";
 
@@ -86,7 +86,7 @@ export function useHandle(
     options: MaybeRefOrGetter<UseHandleOptions>,
 ): UseHandleResult {
     const context = useFlowContext("useHandle");
-    const nodeIdOf = useNodeId("Handle", () => toValue(options).nodeId);
+    const nodeIdOf = usePartNodeId("Handle", () => toValue(options).nodeId);
     // the last object while its fields stay: a new one registers the handle again
     const registration = computed<HandleRegistration>((previous) => {
         const {

@@ -5,6 +5,7 @@
 export * from "@fragiola/flow/minimap";
 export {
     MiniMap,
+    type MiniMapEmits,
     type MiniMapProps,
     type MiniMapSlots,
     type MiniMapState,

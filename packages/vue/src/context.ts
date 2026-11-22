@@ -94,7 +94,7 @@ export function useFlowContext(part: string): FlowContextValue {
 }
 
 /** The node of `nodeId`, or the enclosing `Flow.Node`'s, read when called. */
-export function useNodeId(
+export function usePartNodeId(
     part: string,
     nodeId: () => string | undefined,
 ): () => string {

@@ -16,17 +16,14 @@ export function useControlButton(
     part: string,
     action: EngineActionKey,
     disabledProp: () => boolean | undefined,
-    duration: () => number | undefined = () => undefined,
+    fields: () => object = () => ({}),
 ): {
     state: ComputedRef<ControlButtonState>;
     props: () => Record<string, unknown>;
 } {
     const context = useFlowContext(part);
-    // its `duration` when given (an absent one is the engine's default)
-    const payload = () => {
-        const value = duration();
-        return value === undefined ? {} : { duration: value };
-    };
+    // the fields its props give (an absent one is the engine's default)
+    const payload = () => givenPayload(fields());
     const allowed = useFlowValue(context, () => {
         const engine = context.engine.value;
         return engine ? engine.can(action, payload() as never) : false;
@@ -50,6 +47,13 @@ export function useControlButton(
             };
         },
     };
+}
+
+/** @internal a control's payload: the fields its props give (an absent one is the engine's default) */
+export function givenPayload<P extends object>(fields: P): Partial<P> {
+    return Object.fromEntries(
+        Object.entries(fields).filter(([, value]) => value !== undefined),
+    ) as Partial<P>;
 }
 
 /** `ZoomIn` → `zoom-in`. */

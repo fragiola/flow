@@ -40,7 +40,7 @@ export const ZoomOut: FlowComponent<ZoomOutProps, ZoomOutSlots> =
                 "ZoomOut",
                 "zoom-out",
                 () => props.disabled,
-                () => numberProp(props.duration) as number | undefined,
+                () => ({ duration: numberProp(props.duration) }),
             );
             return () => {
                 const current = state.value;
