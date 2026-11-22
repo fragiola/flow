@@ -29,7 +29,9 @@ describe("a render with no engine", () => {
         );
         // one level: today's layers, no edges-layer
         expect(html).not.toContain("edges-layer");
-        expect(html).toContain("isolation:isolate");
+        expect(html).toMatch(
+            /data-flow-part="nodes" style="[^"]*isolation:isolate/,
+        );
     });
 
     it("draws the edge from the declared handles and an initial size, as staticGeometry does", async () => {
@@ -100,7 +102,13 @@ describe("a render with no engine", () => {
         expect(upper).toMatch(/^[^>]*><svg data-flow-part="edges"/);
         expect(upper).toMatch(/data-flow-id="ac"/);
         expect(upper.indexOf('data-flow-id="ab"')).toBe(-1);
-        expect(html).not.toContain("isolation:isolate");
+        expect(html).not.toMatch(
+            /data-flow-part="nodes" style="[^"]*isolation:isolate/,
+        );
+        // the viewport is a stacking context before the engine: the negative ranks stay in it
+        expect(html).toMatch(
+            /data-flow-part="viewport" style="[^"]*isolation:isolate/,
+        );
         // the static z-indexes: the nodes between the two levels
         expect(html).toMatch(/data-flow-id="a"[^>]*z-index:-\d+;/);
     });
@@ -118,6 +126,8 @@ describe("a render with no engine", () => {
         });
         expect(html).not.toContain("edges-layer");
         expect(html).toContain('data-flow-id="ac"');
-        expect(html).toContain("isolation:isolate");
+        expect(html).toMatch(
+            /data-flow-part="nodes" style="[^"]*isolation:isolate/,
+        );
     });
 });

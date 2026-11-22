@@ -53,7 +53,9 @@ describe("a render with no engine", () => {
         expect(body).not.toContain("touch-action");
         // one level: today's DOM
         expect(body).not.toContain('data-flow-part="edges-layer"');
-        expect(body).toContain("isolation: isolate");
+        expect(body).toMatch(
+            /data-flow-part="nodes" style="[^"]*isolation: isolate/,
+        );
     });
 
     it("waits for the engine to draw an edge whose nodes have no size", () => {
@@ -119,14 +121,22 @@ describe("a render with no engine", () => {
             );
         }
         // the nodes interleave with the levels: no stacking context of their own
-        expect(body).not.toContain("isolation: isolate");
+        expect(body).not.toMatch(
+            /data-flow-part="nodes" style="[^"]*isolation: isolate/,
+        );
+        // the viewport is a stacking context before the engine: the negative ranks stay in it
+        expect(body).toMatch(
+            /data-flow-part="viewport" style="[^"]*isolation: isolate/,
+        );
         expect(body).toMatch(
             /data-level="1"[^>]*>(?:(?!data-level).)*data-flow-id="ab"/,
         );
         // basic: one level, today's DOM
         const basic = serverRender({ ...props, zIndexMode: "basic" });
         expect(basic).not.toContain("edges-layer");
-        expect(basic).toContain("isolation: isolate");
+        expect(basic).toMatch(
+            /data-flow-part="nodes" style="[^"]*isolation: isolate/,
+        );
     });
 });
 

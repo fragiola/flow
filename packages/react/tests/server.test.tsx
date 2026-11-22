@@ -31,7 +31,9 @@ describe("a render with no engine", () => {
         expect(html).toMatch(/data-flow-part="edge-path"[^>]* d="M ?50[ ,]40/);
         // one level: today's DOM, the nodes layer its own stacking context
         expect(html).not.toContain('data-flow-part="edges-layer"');
-        expect(html).toContain("isolation:isolate");
+        expect(html).toMatch(
+            /data-flow-part="nodes" style="[^"]*isolation:isolate/,
+        );
     });
 
     it("gives the edge parts data-selected and data-animated from the document, as the engine does", () => {
@@ -104,7 +106,13 @@ describe("a render with no engine", () => {
         expect(html.match(/data-flow-part="edges-layer"/g)).toHaveLength(2);
         expect(html).toContain('data-level="0"');
         expect(html).toContain('data-level="1"');
-        expect(html).not.toContain("isolation:isolate");
+        expect(html).not.toMatch(
+            /data-flow-part="nodes" style="[^"]*isolation:isolate/,
+        );
+        // the viewport is a stacking context before the engine: the negative ranks stay in it
+        expect(html).toMatch(
+            /data-flow-part="viewport" style="[^"]*isolation:isolate/,
+        );
         const level1 = html.slice(html.indexOf('data-level="1"'));
         expect(level1).toContain('data-flow-id="ac"');
         expect(level1).not.toContain('data-flow-id="ab"');
