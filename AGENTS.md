@@ -1650,5 +1650,10 @@ Decisions of the docs, examples and E2E of the new options (#25, part 2, Epic #2
 - **Edges over nodes and a per-node origin are "Not yet"** in `limitations.mdx` (a cost decision,
   not a principle); the first render's top-left placement and missing `z-index`, the overridden
   `z-index` and the gesture-only extent rectangle are known limits there.
-- **No adapter or core change was needed**: every new spec passed on the first run in the
-  playground (Chromium, Firefox) and in the four examples apps.
+- **What the specs and the review changed in the packages**: the docs, examples and specs of this
+  part passed on their first run, but the Epic's review then fixed the adapters and the core
+  (3736fd0: the nodes' layer is its own stacking context, `isolation: isolate` in the four
+  adapters, so a raised node never covers the connection line, with a playground spec; 08de796: a
+  node without a parent gets its z-index without walking a chain; 4d6b834: Vue's `duration` and
+  `pan-on-scroll-speed` take a number's text). The `node.move` / `node.resize` descriptions now
+  say the model keeps `extent: "parent"` only (a rectangle is the gestures').
