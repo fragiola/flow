@@ -26,6 +26,11 @@ import { createRoot } from "react-dom/client";
 //   ?boxOnDrag=1   any drag on the canvas draws a selection box (`selection({ boxOnDrag })`): how a
 //                  touch screen, which has no Shift, box-selects
 //   ?snap=20       drags snap to a 20 px grid
+//   ?clickToConnect=1   a tap on a handle starts a connection, a tap on another ends it
+//   ?dragHandle=1  nodes a and b drag only from their `grip` (a `data-flow-drag-handle` element)
+//   ?origin=0.5    every node's position is its box's centre (`nodeOrigin: { x: 0.5, y: 0.5 }`)
+//   ?panOnDrag=0,1 the mouse buttons that pan the pane (here the primary and the middle one)
+//   ?duration=300  the zoom and fit-view buttons animate for 300 ms
 //
 // `reconnection({ radius: 30 })`: a press on an edge's stroke within 30 px of an end moves that end,
 // which is how a finger reconnects (a finger beside a handle lands on the handle).
@@ -43,11 +48,15 @@ import { createRoot } from "react-dom/client";
 
 const params = new URLSearchParams(location.search);
 const snap = Number(params.get("snap")) || undefined;
+const dragHandle = params.get("dragHandle") === "1";
+const origin = Number(params.get("origin")) || undefined;
+const panOnDrag = params.get("panOnDrag")?.split(",").map(Number);
+const duration = Number(params.get("duration")) || undefined;
 
 const features = [
     selection({ boxOnDrag: params.get("boxOnDrag") === "1" }),
     drag(snap ? { snapGrid: [snap, snap] } : {}),
-    connection(),
+    connection({ clickToConnect: params.get("clickToConnect") === "1" }),
     reconnection({ radius: 30 }),
     resize({ minWidth: 80, minHeight: 40 }),
     subflows(),
@@ -122,6 +131,8 @@ function Fixture() {
             defaultNodes={nodes}
             defaultEdges={edges}
             defaultViewport={{ x: 100, y: 100, zoom: 1 }}
+            nodeOrigin={origin ? { x: origin, y: origin } : undefined}
+            panOnDrag={panOnDrag}
             flowRef={flow}
             data-testid="root"
         >
@@ -140,6 +151,10 @@ function Fixture() {
                     {(node) => (
                         <Flow.Node node={node} aria-label={`Node ${node.id}`}>
                             {node.id}
+                            {dragHandle &&
+                                (node.id === "a" || node.id === "b") && (
+                                    <span data-flow-drag-handle="">grip</span>
+                                )}
                             {node.type === "box" && (
                                 <>
                                     <Flow.Handle type="target" side="top" />
@@ -154,9 +169,9 @@ function Fixture() {
             </Flow.Viewport>
             <Flow.SelectionBox />
             <Flow.Controls>
-                <Flow.ZoomIn>zoom in</Flow.ZoomIn>
-                <Flow.ZoomOut>zoom out</Flow.ZoomOut>
-                <Flow.FitView>fit view</Flow.FitView>
+                <Flow.ZoomIn duration={duration}>zoom in</Flow.ZoomIn>
+                <Flow.ZoomOut duration={duration}>zoom out</Flow.ZoomOut>
+                <Flow.FitView duration={duration}>fit view</Flow.FitView>
                 <Flow.ToggleInteractive>lock</Flow.ToggleInteractive>
             </Flow.Controls>
             <MiniMap width={200} height={150} aria-label="Minimap" />

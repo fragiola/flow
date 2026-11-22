@@ -79,3 +79,25 @@ test("the commands scenario logs what the model runs, and the inspector follows"
     await expect(log.first()).toHaveText("selection.remove");
     await expect(page.locator('[data-flow-part="edge"]')).toHaveCount(0);
 });
+
+for (const [id, count] of [
+    ["gestures/viewport-options", 12],
+    ["gestures/click-to-connect-and-drag-handles", 4],
+    ["gestures/origin-extent-and-z-order", 4],
+] as const) {
+    test(`${id} renders its flow without an error`, async ({ page }) => {
+        const errors: string[] = [];
+        page.on("pageerror", (error) => errors.push(String(error)));
+        page.on("console", (message) => {
+            if (message.type() === "error") errors.push(message.text());
+        });
+        await page.goto(`/?scenario=${id}`);
+        await expect(page.locator('[data-flow-part="node"]')).toHaveCount(
+            count,
+        );
+        await expect(
+            page.locator('[data-flow-part="node"]:not([data-measured])'),
+        ).toHaveCount(0);
+        expect(errors).toEqual([]);
+    });
+}
