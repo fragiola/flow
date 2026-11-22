@@ -9,7 +9,7 @@ export interface EdgeToolbarState {
     readonly edgeId: string;
     /** the point of the edge it stands at */
     readonly position: "label" | "source" | "target";
-    /** where it is anchored (its centre), in pixels relative to the root */
+    /** where it is anchored (its `alignX` / `alignY` point), in pixels relative to the root */
     readonly anchor: EdgeToolbarPosition;
 }
 
@@ -18,8 +18,14 @@ export interface EdgeToolbarProps extends DivPrimitiveProps<EdgeToolbarState> {
     edgeId?: string | undefined;
     /** the point of the edge it stands at: its label point, its source or its target end; default `"label"` */
     position?: "label" | "source" | "target" | undefined;
+    /** a flow point it stands at instead (absolute flow coordinates); wins over `position` */
+    point?: XY | undefined;
     /** a screen offset from that point, in pixels; default `{ x: 0, y: 0 }` */
     offset?: XY | undefined;
+    /** which of its edges goes at the point across: its left (`"start"`), centre (default) or right */
+    alignX?: "start" | "center" | "end" | undefined;
+    /** which of its edges goes at the point down: its top (`"start"`), centre (default) or bottom */
+    alignY?: "start" | "center" | "end" | undefined;
     /** whether it is shown; default while its edge is selected (`selection()`) */
     open?: boolean | undefined;
     children?: React.ReactNode;
@@ -35,7 +41,10 @@ export function EdgeToolbar(props: EdgeToolbarProps) {
     const {
         edgeId: edgeIdProp,
         position = "label",
+        point,
         offset,
+        alignX,
+        alignY,
         open,
         ...rest
     } = props;
@@ -49,7 +58,10 @@ export function EdgeToolbar(props: EdgeToolbarProps) {
         const anchor = engine.get("edge-toolbar-by", {
             edgeId,
             position,
+            point,
             offset,
+            alignX,
+            alignY,
         });
         return anchor
             ? {
@@ -70,7 +82,16 @@ export function EdgeToolbar(props: EdgeToolbarProps) {
 }
 
 function EdgeToolbarElement(
-    props: Omit<EdgeToolbarProps, "edgeId" | "position" | "offset" | "open"> & {
+    props: Omit<
+        EdgeToolbarProps,
+        | "edgeId"
+        | "position"
+        | "point"
+        | "offset"
+        | "alignX"
+        | "alignY"
+        | "open"
+    > & {
         state: EdgeToolbarState;
         attributes: PartAttributes;
     },

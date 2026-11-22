@@ -1,5 +1,6 @@
+import type { ResizeDirection } from "@fragiola/flow/resize";
 import type * as React from "react";
-import { useFlowContext, useNodeId } from "../context";
+import { useFlowContext, usePartNodeId } from "../context";
 import { useFlowValue, useIsomorphicLayoutEffect } from "../hooks/internal";
 import { type DivPrimitiveProps, useRenderElement } from "../utils/use-render";
 import { RESIZE_POSITIONS, ResizeHandle } from "./resize-handle";
@@ -20,6 +21,11 @@ export interface NodeResizerProps extends DivPrimitiveProps<NodeResizerState> {
     maxHeight?: number | undefined;
     /** this node keeps its aspect ratio, over `resize()`'s */
     keepAspectRatio?: boolean | undefined;
+    /**
+     * the sides its handles move: `"horizontal"` only the width (and x), `"vertical"` only the
+     * height (and y); default both. A corner then moves its one dimension
+     */
+    direction?: ResizeDirection | undefined;
     /** its handles; default a `ResizeHandle` at each corner and side */
     children?: React.ReactNode;
 }
@@ -43,10 +49,11 @@ export function NodeResizer(props: NodeResizerProps) {
         maxWidth,
         maxHeight,
         keepAspectRatio,
+        direction,
         children,
         ...rest
     } = props;
-    const nodeId = useNodeId("NodeResizer", nodeIdProp);
+    const nodeId = usePartNodeId("NodeResizer", nodeIdProp);
     const { model, engine } = useFlowContext("NodeResizer");
     useIsomorphicLayoutEffect(() => {
         if (!engine) return;
@@ -57,6 +64,7 @@ export function NodeResizer(props: NodeResizerProps) {
                 maxWidth,
                 maxHeight,
                 keepAspectRatio,
+                direction,
             }).filter(([, value]) => value !== undefined),
         );
         engine.adapter.setPartOptions("resizer", nodeId, options);
@@ -69,6 +77,7 @@ export function NodeResizer(props: NodeResizerProps) {
         maxWidth,
         maxHeight,
         keepAspectRatio,
+        direction,
     ]);
     const attributes = useFlowValue(model, engine, () =>
         engine

@@ -1,6 +1,6 @@
 import { partAttributes } from "@fragiola/flow";
 import type * as React from "react";
-import { useFlowContext, useNodeId } from "../context";
+import { useFlowContext, usePartNodeId } from "../context";
 import { useFlowValue } from "../hooks/internal";
 import {
     attributeProps,
@@ -99,7 +99,7 @@ const PLACE: Record<ResizePosition, React.CSSProperties> = {
  */
 export function ResizeHandle(props: ResizeHandleProps) {
     const { position, nodeId: nodeIdProp, children, ...rest } = props;
-    const nodeId = useNodeId("ResizeHandle", nodeIdProp);
+    const nodeId = usePartNodeId("ResizeHandle", nodeIdProp);
     const { model, engine } = useFlowContext("ResizeHandle");
     // the engine's record: `data-position`, and `tabindex` with `keyboard()` (arrows resize)
     const attributes = useFlowValue(model, engine, () =>

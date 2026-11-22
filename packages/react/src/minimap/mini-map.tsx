@@ -1,7 +1,7 @@
-import { type MinimapView, partAttributes } from "@fragiola/flow";
-import type * as React from "react";
+import { type MinimapView, partAttributes, type XY } from "@fragiola/flow";
+import * as React from "react";
 import { useFlowContext } from "../context";
-import { useFlowValue } from "../hooks/internal";
+import { useFlowValue, useIsomorphicLayoutEffect } from "../hooks/internal";
 import { type SvgPrimitiveProps, useRenderElement } from "../utils/use-render";
 import { MiniMapContext } from "./mini-map-context";
 import { MiniMapMask } from "./mini-map-mask";
@@ -13,11 +13,26 @@ export interface MiniMapState {
 }
 
 export interface MiniMapProps
-    extends Omit<SvgPrimitiveProps<MiniMapState, SVGSVGElement>, "children"> {
+    extends Omit<
+        SvgPrimitiveProps<MiniMapState, SVGSVGElement>,
+        "children" | "onClick"
+    > {
     /** its width, in pixels; default 200 */
     width?: number | undefined;
     /** its height, in pixels; default 150 */
     height?: number | undefined;
+    /**
+     * a drag on it moves the view the other way (as grabbing the flow), and a press does not
+     * centre the view; default `minimap()`'s `inversePan`
+     */
+    inversePan?: boolean | undefined;
+    /** how fast its wheel zooms: 10 is the flow's own wheel, 20 twice as fast; default `minimap()`'s `zoomStep` */
+    zoomStep?: number | undefined;
+    /**
+     * a tap on it (`minimap-click`), with the flow point under the pointer on the minimap: center
+     * the view there, add a node there
+     */
+    onClick?: ((event: MouseEvent, point: XY) => void) | undefined;
     /**
      * what it draws, in flow coordinates; default a `MiniMapNode` per node, then the `MiniMapMask`
      */
@@ -40,8 +55,37 @@ const EMPTY_VIEW: MinimapView = Object.freeze({
  * style.
  */
 export function MiniMap(props: MiniMapProps) {
-    const { width = 200, height = 150, children, ...rest } = props;
+    const {
+        width = 200,
+        height = 150,
+        inversePan,
+        zoomStep,
+        onClick,
+        children,
+        ...rest
+    } = props;
     const { model, engine } = useFlowContext("MiniMap");
+    // its options over `minimap()`'s, one set for the root's minimaps (the engine's part options)
+    useIsomorphicLayoutEffect(() => {
+        if (!engine) return;
+        const options = Object.fromEntries(
+            Object.entries({ inversePan, zoomStep }).filter(
+                ([, value]) => value !== undefined,
+            ),
+        );
+        engine.adapter.setPartOptions("minimap", "", options);
+        return () => engine.adapter.setPartOptions("minimap", "", null);
+    }, [engine, inversePan, zoomStep]);
+    const latestClick = React.useRef(onClick);
+    latestClick.current = onClick;
+    React.useEffect(() => {
+        if (!engine) return;
+        return engine.subscribe((event) => {
+            if (event.type === "minimap-click") {
+                latestClick.current?.(event.event, event.point);
+            }
+        });
+    }, [engine]);
     const view = useFlowValue(
         model,
         engine,

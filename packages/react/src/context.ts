@@ -57,7 +57,7 @@ export function useFlowContext(part: string): FlowContextValue {
 }
 
 /** The node of `nodeId`, or the enclosing `Flow.Node`'s. */
-export function useNodeId(part: string, nodeId?: string): string {
+export function usePartNodeId(part: string, nodeId?: string): string {
     const context = React.useContext(NodeContext);
     const id = nodeId ?? context?.nodeId;
     if (id === undefined) {
