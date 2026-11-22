@@ -613,6 +613,7 @@ const PAGES_IN_EVERY_FRAMEWORK = [
     "guides/persistence",
     "guides/resizing",
     "guides/selection",
+    "guides/server-rendering",
     "guides/styling-css",
     "guides/styling-tailwind",
     "guides/sub-flows",

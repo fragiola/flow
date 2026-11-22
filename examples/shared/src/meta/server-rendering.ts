@@ -14,5 +14,5 @@ export default {
         "origin",
         "staticGeometry",
     ],
-    docs: "/docs/concepts/nodes-and-edges",
+    docs: "/docs/guides/server-rendering",
 } satisfies ExampleMeta;
