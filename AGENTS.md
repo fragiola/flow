@@ -617,7 +617,7 @@ attributes (`data-selected`, `data-dragging`, `data-connecting`, `data-valid` / 
 
 ## The Vue adapter (Issue #9)
 
-`@fragiola/flow-vue` is the React adapter in Vue 3.5: the same 25 primitives (the 20 of `Flow`,
+`@fragiola/flow-vue` is the React adapter in Vue 3.5: the same 26 primitives (the 21 of `Flow`,
 `MiniMap`, `MiniMapNode`, `MiniMapMask` on `/minimap`, `NodeResizer`, `ResizeHandle` on
 `/resize`), in files of the same names (`components/<name>.ts`, `minimap/`, `resize/`:
 `tests/index.test.ts` compares them with React's), the same elements, part names, state
@@ -723,6 +723,34 @@ Decisions of the Vue adapter (#9):
 - **Known limits:** jsdom lays nothing out, so the tests stub the layout (`tests/flow.ts`,
   React's); the gestures' real feel is the Vue examples' shared Playwright specs (#10), which
   needed no adapter fix.
+
+Decisions of #36 in Vue (React's props, part and hooks, mirrored):
+
+- **`MiniMap`'s tap is the `click` emit, `(event, point)`** (`MiniMapEmits`), from the engine's
+  `minimap-click`: declared, it is no fallthrough listener on the SVG (the root captures the
+  pointer, a DOM click never reaches it); the contract test gives it `onDblclick` instead.
+  `inverse-pan` is a bare boolean, `zoom-step` a `[Number, String]` prop (`numberProp`), both into
+  `setPartOptions("minimap", "", …)` from a `watchEffect` (cleared with `null`); the subscription
+  is a `watchEffect` on the engine too.
+- **`FitView`'s framing goes through `givenPayload`** (`use-control-button.ts`, React's helper):
+  the button's 4th argument is now a getter of its payload's fields, an absent one left out
+  (`ZoomIn` / `ZoomOut` give `{ duration }`); `min-zoom` and `max-zoom` take their text as a number,
+  `include-hidden` is a bare boolean, `nodeIds` is spread (a reactive array reaches the engine as a
+  copy). `NodeResizer`'s `direction` and `EdgeToolbar`'s `point`, `alignX`, `alignY` are passed as
+  React's.
+- **`Flow.NodesSelection`** (`components/nodes-selection.ts`) renders nothing while
+  `selection-rect` is null; its attributes are a lazy computed, read only while it shows.
+- **The composables return refs**: `useFlowStore`, `useNodeId`, `useNodesData`,
+  `useNodeConnections`, `useInternalNode` are `ComputedRef`s over `useFlowValue` (with
+  `sameFlowValue` where React uses it; the root's `revision` recomputes them on a view change
+  too, and an equal value keeps the last object, so nothing renders); `useKeyPress` is a read-only
+  `Ref<boolean>`. Their ids and options take a value, a ref or a getter (`MaybeRefOrGetter`);
+  `useNodeConnections` throws in `setup` outside a node without an `id`. `useKeyPress` and
+  `useOnViewportChange` listen from a `watchEffect` (the root's element and engine exist only
+  once it is mounted); `useOnViewportChange` reads its callbacks at each event.
+- **The internal `useNodeId(part, getter)` of `context.ts` is `usePartNodeId`** (React's
+  rename), leaving the name to the public composable. Tested in `tests/part-options.test.ts` and
+  `tests/composables.test.ts` (render counts); no core change was needed.
 
 ## The Svelte adapter (Issue #12)
 
@@ -1198,6 +1226,11 @@ Decisions of #10:
   "for React and Vue" passes the contract's 60 characters, and the next adapters need no edit; the
   Hero's eyebrow lists the frameworks.
 - **No adapter or core fix was needed**: every shared spec passed on the first Vue run.
+- **#36**: `selection-and-keyboard` adds `Flow.NodesSelection`, `node-resizer` the `banner` node
+  (`direction="horizontal"`, a `v-else-if` resizer with its two side handles), `edge-types` the
+  `EDGE_OPTIONS` of React; `connected-data` splits React's file into `index.vue`, `number-body.vue`
+  and `sum-body.vue` (`useNodesData` given a getter of the connections' sources). Every shared
+  spec passed (215) with no adapter fix.
 
 ## The Svelte examples and the Svelte docs (Issue #13)
 
