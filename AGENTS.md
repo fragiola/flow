@@ -202,9 +202,9 @@ the playground, `examples/shared` and `examples/react`), and **never runs `playw
 in one PR. `main` has no required checks: a skipped job blocks nothing.
 
 **Shards: none.** Shard a suite only when its test step alone passes about 3 minutes. Measured
-locally (4 workers; CI runs 2): the playground's 122 tests (61 per browser) in ~30 s, each
-examples app's 178 tests (95 smoke runs: 19 examples × 5 themes) in ~20 to ~45 s, its embed build
-included (measured after #25; Angular and React the slower).
+locally (4 workers; CI runs 2): the playground's 152 tests (76 per browser) in ~35 s, each
+examples app's 187 tests (95 smoke runs: 19 examples × 5 themes) in ~20 to ~45 s, its embed build
+included (measured after #28; Angular and React the slower).
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
@@ -991,7 +991,10 @@ the authoring guide): Basics `basic`, `custom-nodes`, `edge-types`, `edge-labels
 copyable app policy. Epic #26's options where they are natural (#25): `custom-nodes`' preview drags
 only by its title bar (`data-flow-drag-handle`, `styles.dragHandle` and `styles.grip` from the
 theme tokens), `minimap-and-controls`' zoom and fit-view buttons animate for 200 ms (`duration`),
-the same in the four apps; the shared specs cover both.
+the same in the four apps; the shared specs cover both. #28: `edge-types` draws `simplebezier`,
+`node-toolbar` adds the selection's toolbar (`nodeIds`, below the notes), `edge-labels` an
+`EdgeToolbar` on the selected edge, `selection-and-keyboard` keyboard connections (it installs
+`connection()` and names its handles) and `announcements` each step of one (`connect-target`).
 
 **Theme tokens** (`--fl-*`; `tests/themes.test.ts` holds the list, `e2e/themes.spec.ts` checks the
 shapes differ on computed styles): shape `font`, `font-size`, `title-weight`, `node-padding`,
@@ -1008,17 +1011,23 @@ square everything, dashed edges, crosses.
 source panel), scenarios (`src/scenarios/<area>/<id>.tsx`, default export only: `gestures/every-
 feature`, `gestures/viewport-options`, `gestures/click-to-connect-and-drag-handles`,
 `gestures/origin-extent-and-z-order` (#25: every option of Epic #26 behind a control),
-`performance/five-hundred-nodes`, `api/commands`), the inspector
+`gestures/keyboard-and-toolbars` and `api/graph-and-geometry-helpers` (#28: keyboard connections
+and resizing with a live region, the edge and selection toolbars; neighbours, overlaps, framing
+and `simplebezier` edges), `performance/five-hundred-nodes`, `api/commands`), the inspector
 (`src/inspector/flow-inspector.tsx`: viewport, gestures under way, selection, engine events, the
 document) and `fixtures/basic`, the unstyled flow its specs drive (`src/fixture/flow-fixture.tsx`:
 every feature, an 800 × 500 root at the page's corner, the viewport at `{ x: 100, y: 100, zoom:
 1 }`, its document, viewport and events printed beside it; its query turns options on:
 `boxOnDrag=1`, `snap=20`, and since #25 `clickToConnect=1`, `dragHandle=1` (a `grip` drag handle in a and b),
-`origin=0.5` (`nodeOrigin`), `panOnDrag=0,1`, `duration=300` (the controls)). Its suite runs on
+`origin=0.5` (`nodeOrigin`), `panOnDrag=0,1`, `duration=300` (the controls), and since #28
+`edgeToolbar=1` (an `EdgeToolbar` on ab), `nodeToolbar=1` (a `NodeToolbar` for a and b),
+`edgeType=simplebezier` (ab's type), `field=1` (a text field beside the root)). Its suite runs on
 Chromium and Firefox: pan, wheel, double-click and pinch zoom, drag (selection, cancel, extent,
 snap), connect, reconnect, box select, resize, keyboard and minimap, and (`e2e/gestures.spec.ts`,
 #25) auto-pan, animated controls, the middle-button and Space pans, click-to-connect, drag handles,
-`nodeOrigin`, a selected node's z-order and the connection line above a selected node, each with the mouse and with fingers
+`nodeOrigin`, a selected node's z-order and the connection line above a selected node, and
+(#28) keyboard connections and resizing (`e2e/keyboard.spec.ts`), the edge toolbar, the
+several-nodes toolbar and `simplebezier` (`e2e/toolbars.spec.ts`), each with the mouse and with fingers
 (`e2e/helpers.ts` `touch`: Chromium's real touch input through the DevTools protocol, touch
 pointer events in Firefox), and the 500-node scenario's re-render count.
 
@@ -1827,3 +1836,46 @@ Decisions of the toolbars and keyboard handles in the adapters (#28, Epic #29):
   `FlowEdgeToolbarDirective`), its contract test has an edge-toolbar case on part `toolbar`
   (`slot: "edge-toolbar"`, `open`), and `site/tests/docs-reference.test.ts` maps the new module to
   `api/primitives/edge-toolbar.mdx`.
+
+Decisions of the docs, examples and E2E of the helpers, toolbars and keyboard flows (#28, part 2,
+Epic #29):
+
+- **The edge toolbar lives in `edge-labels`**, not a new example: the toolbar and the labels share
+  the label point, so one example shows the difference (a label zooms, a toolbar keeps its size).
+  `build-lint` starts selected (as `node-toolbar`'s first note), the edges get a wide transparent
+  hit path, and the toolbar flips a status (`edge.set-data`) and removes the edge. The gallery
+  stays at 19 examples; `edge-toolbar.mdx` and `custom-edges.mdx` embed `edge-labels`.
+- **The selection's toolbar stands below the notes and each note keeps its own** in
+  `node-toolbar`: rendered while two notes or more are selected (`useSelection` /
+  `injectSelection`), it recolours them (one `batch` of `node.set-data`) or deletes them
+  (`selection.remove`). Hiding the per-node toolbars meanwhile needed the selection in every
+  node's toolbar (and, in Angular, outside the root's injection context); refused for an example a
+  reader copies.
+- **`selection-and-keyboard` installs `connection()`** (its handles were already drawn) and names
+  each handle (`<label> input` / `output`); the shared spec's Tab walk now expects a node's two
+  handles after it, as the playground's does. `announcements` names its handles too and says
+  `connect-start` (keyboard only), each `connect-target` (`Target 1 of 2: Hall.`), `connect`
+  with "with the keyboard" and a keyboard cancel.
+- **The fixture takes query options** again (`edgeToolbar`, `nodeToolbar`, `edgeType`, `field`):
+  one known layout for every spec. The keyboard specs read the pointed-at handle from
+  `data-valid` and the `connect-target` events rather than a target order, so a font or a size a
+  pixel off does not change them; an edge is selected for its toolbar with the keyboard (a press
+  on b would select b), and positions after a zoom or a move are polled (`toPass`) or settled
+  (two equal viewport polls), never waited for.
+- **Docs**: the API references (`model.mdx`, `engine.mdx`, `path-helpers.mdx`, the primitives)
+  came with #27 and part 1; part 2 wrote the task sections: `guides/keyboard.mdx` (draw an edge,
+  resize, announce, known limits), `guides/resizing.mdx#from-the-keyboard` (named handles: an
+  `aria-hidden` handle that takes focus hides it), `guides/custom-edges.mdx` (`simplebezier`, a
+  toolbar on an edge), `guides/selection.mdx` (a toolbar for the selection),
+  `concepts/viewport.mdx#frame-an-area` (`viewport-for-bounds`, and `viewportForBounds` for an
+  export, imported from `@fragiola/flow`: a React import outside a React block fails the docs
+  test), `guides/custom-nodes.mdx` (neighbours, overlaps), `concepts/handles-and-connections.mdx`
+  and `getting-started/accessible-names.mdx`. Model and engine reads stay plain `ts` blocks (the
+  same in every framework).
+- **`limitations.mdx`** drops the several-nodes toolbar and keyboard connections and resizing from
+  "Not yet"; keyboard reconnection is not a "Not yet" row (xyflow has none either) but a known
+  limit, beside the targets fixed at the start, no scroll into view, a press only cancelling, and
+  handles needing a name once they take focus. The `Panel` / `ViewportPortal` /
+  `EdgeLabelRenderer` row is unchanged.
+- **No package change**: every spec of this part passed against the adapters and core as part 1
+  left them.
