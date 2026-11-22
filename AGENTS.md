@@ -454,7 +454,7 @@ engine's state attributes from `engine.adapter.attributes(part, payload)`):
 | `Background` | `svg` `background` | `background-pattern`: `pattern` `background-pattern`, `circle`/`path` `background-mark` in `currentColor`, `rect` `background-fill` |
 | `Controls` | `div` `controls` | a group for the buttons |
 | `ZoomIn`, `ZoomOut`, `FitView` | `button` `zoom-in`, `zoom-out`, `fit-view` | run their action (with their `duration` prop, #25); `disabled` / `data-disabled` while `!engine.can(...)` |
-| `ToggleInteractive` | `button` `toggle-interactive` | `set-interactive`; `aria-pressed` while locked, `data-interactive` |
+| `ToggleInteractive` | `button` `toggle-interactive` | `set-interactive`; #33: switches `drag`, `connect` and `select` (React Flow's interactive button), locked (`aria-pressed`) while none of them is allowed (`interactive-by`); `data-interactive` while unlocked |
 | `NodeToolbar` | `div` `toolbar` | portal into the root at `node-toolbar-by` (outside the zoom); `open`, default while its node is selected; #28: `nodeIds` (not empty: beside their bounds, no enclosing node needed, no `data-flow-id`, shown while every one is selected) |
 | `EdgeToolbar` | `div` `toolbar` | #28: portal into the root at `edge-toolbar-by` (outside the zoom, its centre on the point); `edgeId` (default the enclosing `Edge`'s), `position` (`"label"` / `"source"` / `"target"`), `offset` (`XY`), `open`, default while its edge is selected; `data-flow-id` its edge's id |
 | `MiniMap` (`/minimap`) | `svg` `minimap` | `width` × `height` (200 × 150), `minimap-view`; children default: a `MiniMapNode` per node and the `MiniMapMask` |
@@ -470,8 +470,19 @@ engine options `minZoom`, `maxZoom`, `translateExtent`, `panOnDrag`, `panOnScrol
 `zoomOnPinch`, `zoomOnDoubleClick`, `zoomStep`, `interactive`, `onlyRenderVisible`, `pathOptions`,
 and #23's and #24's (#25) `autoPan`, `panActivationKey`, `panOnScrollMode`, `panOnScrollSpeed`,
 `zoomActivationKey`, `easing`, `nodeOrigin`, `nodeExtent`, `elevateNodesOnSelect`,
-`elevateEdgesOnSelect` (the core's names and defaults; `panOnDrag` takes mouse buttons too; a
-change sends only the keys that changed, `adapter.setOptions`); `flowRef`.
+`elevateEdgesOnSelect`, and #33's `paneClickDistance`, `nodeClickDistance`, `preventScrolling`,
+`nodesFocusable`, `edgesFocusable` (the core's names and defaults; `panOnDrag` takes mouse
+buttons too; a change sends only the keys that changed, `adapter.setOptions`);
+`defaultEdgeOptions` (#33, read once: the model option); `flowRef`; and #33's event callbacks
+(`RootEventProps`): one `on<Name>` per entry of the core's `ENGINE_EVENT_CALLBACKS` (`onInit`,
+`onMoveStart`, `onMoveEnd`, `onNodeClick`, `onNodeDoubleClick`, `onNodeContextMenu`, the edge's
+and the pane's, `onSelectionContextMenu`, `onSelectionStart`, `onSelectionEnd`,
+`onNodeDragStart`, `onNodesMove`, `onNodeDragCancel`, `onConnectStart`, `onConnectTarget`,
+`onConnect`, `onConnectCancel`, `onReconnectStart`, `onReconnect`, `onReconnectCancel`,
+`onResizeStart`, `onResizeEnd`, `onResizeCancel`, `onDelete`), each called with the engine
+event, the latest prop read, none spread on the element. `Handle` / `useHandle` take
+`connectableStart` and `connectableEnd` (#33); `ReconnectAnchor` renders nothing at an end its
+edge's `reconnectable` keeps fixed (`model.is("edge-reconnectable", { edgeId, end })`).
 
 **Hooks:** `useFlow<T, F>()` → `{ model, engine }` (the engine a facade: there from the first
 render, an action refused before the mount); part hooks `useNode(node)`, `useEdge(edge)`,
@@ -999,7 +1010,7 @@ while its app is written (the test uses a fake one).
 the authoring guide): Basics `basic`, `custom-nodes`, `edge-types`, `edge-labels`, `backgrounds`,
 `read-only`; Interaction `selection-and-keyboard`, `connection-validation`, `edge-reconnect`,
 `snap-to-grid`, `minimap-and-controls`; Building blocks `sub-flows`, `node-resizer`,
-`node-toolbar`, `add-nodes`, `save-and-restore`, `undo-redo`, `announcements`; Apps
+`node-toolbar`, `add-nodes`, `save-and-restore`, `undo-redo`, `announcements`, `context-menu` (#33); Apps
 `workflow-builder` (the landing's showcase). `_kit/persistence.ts` and `_kit/undo.ts` are the
 copyable app policy. Epic #26's options where they are natural (#25): `custom-nodes`' preview drags
 only by its title bar (`data-flow-drag-handle`, `styles.dragHandle` and `styles.grip` from the
@@ -1079,7 +1090,7 @@ Decisions of #6:
 
 ## The Vue examples and the Vue docs (Issue #10)
 
-`examples/vue` (`examples-vue`, private) is `examples/react` in Vue: the 19 examples with the same
+`examples/vue` (`examples-vue`, private) is `examples/react` in Vue: the 20 examples (19 before #33) with the same
 ids, metadata, text, names, roles and test ids, and the same scripts (`generate`, `dev` (port
 5186), `build`, `typecheck` (`vue-tsc`, TypeScript 6.0.3 pinned in this app, Splitter's), `e2e`,
 `test`); `src/examples/README.md` says how an example is written in Vue. Its
@@ -1134,7 +1145,7 @@ Decisions of #10:
 
 ## The Svelte examples and the Svelte docs (Issue #13)
 
-`examples/svelte` (`examples-svelte`, private) is `examples/react` in Svelte 5 (runes): the 19
+`examples/svelte` (`examples-svelte`, private) is `examples/react` in Svelte 5 (runes): the 20
 examples with the same ids, metadata, text, names, roles and test ids, and the same scripts
 (`generate`, `dev` (port 5187), `build`, `typecheck` (`svelte-check --fail-on-warnings`, TypeScript
 6.0.3 pinned in this app, as `packages/svelte`), `e2e`, `test`); `src/examples/README.md` says how an
@@ -1203,7 +1214,7 @@ Decisions of #13:
 ## The Angular examples and the Angular docs (Issue #16)
 
 `examples/angular` (`examples-angular`, private) is `examples/react` in Angular 22 (standalone
-components, signals, zoneless, OnPush): the 19 examples with the same ids, metadata, text, names,
+components, signals, zoneless, OnPush): the 20 examples with the same ids, metadata, text, names,
 roles and test ids, and the same scripts as Splitter's Angular app (`generate`, `dev` (port 5188),
 `build` (Vite + `@analogjs/vite-plugin-angular`, `tsconfig.app.json`), `typecheck` (`ngc -p
 tsconfig.json --noEmit`, strict templates, TypeScript 6.0.3 pinned in this app, as
@@ -2000,4 +2011,47 @@ none of xyflow's code):
   shown node measured and a pending `fitView` done (`is("ready")`). Known limit: an empty flow whose
   root measured 0 × 0 when attached is not ready until something is measured again (the root is
   not observed).
+
+Decisions of the interaction options and events in the adapters, the docs, examples and E2E (#33,
+Epic #34):
+
+- **One table names every callback** (`ENGINE_EVENT_CALLBACKS`, core, `engine/event-callbacks.ts`):
+  each engine event but `viewport-change` to a name after `on` (`NodeClick`), React Flow's where it
+  has one (`MoveStart`, `Init` for `ready`, `SelectionStart` / `SelectionEnd` for the box,
+  `ConnectCancel` for React Flow's `onConnectEnd` with its connection state, `ResizeEnd` for
+  `resize`, `Delete` for `remove`). React: `onNodeClick`; Vue: the emit `node-click`
+  (`RootEventEmits`, in `ROOT_EMITS`; an `h()` call types it as `"onNode-click"`); Svelte:
+  `onnodeclick`, lowercase as the adapter's other callbacks (`onnodeschange`), not the Epic's
+  `onNodeClick`; Angular: the output `nodeClick`, declared one by one (a type-level map and a test
+  of `ɵdir.outputs` keep them equal to the table; `moveStart` / `moveEnd` have their types written
+  out, ng-packagr could not name the core's `ViewportMove`). Every callback gets the event object
+  (`FlowEngineEventOf<K>`), never positional arguments. Each adapter's `tests/interaction.test.*`.
+- **The lock is React Flow's**: `ToggleInteractive` switches `drag`, `connect` and `select`;
+  `interactive` (the root prop, `data-interactive` on the root) stays the whole flow's switch, and
+  a locked flow by `interactive={false}` unlocks whole from the button. A resize and the delete
+  keys stay unlocked by the button (React Flow's do too).
+- **A reconnect anchor at a fixed end is not rendered** (Angular: out of the document), rather
+  than rendered and inert.
+- **The playground fixture logs the gesture callbacks** in its `gestures` list (through the root's
+  callbacks, so the adapter is under test), apart from `events`, so the specs written before
+  keep their exact event lists; its new queries: `selectOnDrag=0`, `roles=1`,
+  `reconnectable=target`, `dropToAdd=1`, `confirmDelete=1`, `preventScrolling=0`,
+  `zoomOnScroll=0`, `threshold=10`, `tall=1` (`e2e/interaction.spec.ts`). The scenario
+  `gestures/interaction-and-events` puts the options behind controls and logs every callback.
+- **Examples**: a new `context-menu` (Building blocks, order 8: the menus of a node, the selection
+  and the canvas at the press, a double click marking a task done), `add-nodes` adds a task where
+  a connection is dropped on the canvas (`onConnectCancel`'s `point`), and `minimap-and-controls`'
+  lock keeps the flow `interactive` (its spec checks a click selects nothing). The gallery has 20
+  examples. The rest of the options (`selectOnDrag`, the tap distances, `preventScrolling`, the
+  threshold, roles, per-end reconnection, `beforeDelete`) stay in the docs and the playground: no
+  gallery example needs them, as #25 decided for its options.
+- **Docs**: the root's props table lists every callback (the docs test reads the core's table),
+  the four primitives pages name each framework's spelling (Angular one row per output),
+  `concepts/handles-and-connections.mdx` (a handle's role, a drop on the canvas, the threshold and
+  the line, default edge fields, per-end reconnection), `guides/selection.mdx` (clicks, double
+  clicks and context menus, drag without selecting), `guides/keyboard.mdx` (confirm before
+  deleting, focus and the view), `guides/minimap-and-controls.mdx` and `toggle-interactive.mdx`
+  (the lock's switches), `limitations.mdx` (`onConnect` is no longer "on purpose" missing;
+  `nodesDraggable`-like props are `set-interactive`'s switches; `onConnectEnd` is
+  `onConnect` + `onConnectCancel`; the known limits of #32).
 

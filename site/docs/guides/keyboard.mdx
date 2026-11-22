@@ -84,6 +84,33 @@ const features = [selection(), keyboard({ deleteKeys: ["Delete"] })] as const; /
 A node that is not draggable does not move, and one that is not deletable stays. The root's
 `interactive={false}` (or `Flow.ToggleInteractive`) stops the keys from changing the flow.
 
+## Confirm before deleting
+
+`keyboard({ beforeDelete })` is asked before a delete key removes anything, with the nodes and the
+edges it would remove (a removed node's edges among them). It answers `true` (remove them),
+`false` (keep everything) or a `{ nodes, edges }` subset (only those), or a promise of one: the key
+is taken at once, and when the promise settles what is still there goes, in one step (a node
+removed meanwhile is skipped). Your confirmation, a dialog of your app, waits there:
+
+```ts
+const features = [
+    selection(),
+    keyboard({
+        beforeDelete: async (nodes, edges) => confirmDelete(nodes.length, edges.length), // your UI
+    }),
+] as const;
+```
+
+## Focus and the view
+
+`keyboard({ panOnFocus: false })` keeps the view still when a node out of it takes focus. A node or
+an edge with `focusable: false` takes no focus (it leaves the tab order), and the root's
+`nodesFocusable={false}` / `edgesFocusable={false}` take every node's or edge's out:
+
+```ts
+model.run("node.set-flags", { nodeId: "legend", focusable: false });
+```
+
 ## Draw an edge from the keyboard
 
 With `connection()` installed beside `keyboard()`, every connectable handle (of a connectable

@@ -389,6 +389,94 @@ below the nodes), or pass each node's toolbar `open` from your own rule. A toolb
 group of nodes (a lane, a cluster) takes their ids the same way and shows only while all of them
 are selected. See [`NodeToolbar`](/docs/api/primitives/node-toolbar).
 
+## Clicks, double clicks and context menus
+
+The root tells what a user clicked: `onNodeClick`, `onEdgeClick`, `onPaneClick`, their
+double-click and context-menu callbacks, and `onSelectionContextMenu` for a right click on one of
+several selected nodes. Each gets the event: the node's or edge's id, the flow point (`point`), the
+client point (`client`) and the DOM event (`event`), whose default you prevent to show your own
+menu. A click is the engine's own: a press released within `nodeClickDistance` (on the pane
+`paneClickDistance`, both 3 pixels) that dragged nothing, so the click that ends a drag or a pan
+is never one. It comes after the click selected.
+
+<Framework name="react">
+
+```tsx
+<Flow.Root
+    features={features}
+    onNodeDoubleClick={(event) => rename(event.nodeId)}
+    onNodeContextMenu={(event) => {
+        event.event.preventDefault();
+        openMenu(event.nodeId, event.client);
+    }}
+>
+    {/* … */}
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Root
+    :features="features"
+    @node-double-click="(event) => rename(event.nodeId)"
+    @node-context-menu="(event) => { event.event.preventDefault(); openMenu(event.nodeId, event.client); }"
+>
+    <!-- … -->
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Root
+    {features}
+    onnodedoubleclick={(event) => rename(event.nodeId)}
+    onnodecontextmenu={(event) => {
+        event.event.preventDefault();
+        openMenu(event.nodeId, event.client);
+    }}
+>
+    <!-- … -->
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div
+    flowRoot
+    [features]="features"
+    (nodeDoubleClick)="rename($event.nodeId)"
+    (nodeContextMenu)="$event.event.preventDefault(); openMenu($event.nodeId, $event.client)"
+>
+    <!-- … -->
+</div>
+```
+
+</Framework>
+
+<Example id="context-menu" />
+
+## Drag without selecting
+
+A drag of a node that is not selected selects it first. With `drag({ selectOnDrag: false })` it
+is dragged alone and the selection stays as it was:
+
+```ts
+const features = [selection(), drag({ selectOnDrag: false })] as const;
+```
+
+`engine.run("set-interactive", { select: false })` stops selecting altogether (clicks, the box,
+Enter and Space) while dragging goes on; `Flow.ToggleInteractive` switches dragging, connecting
+and selecting together.
+
 ## Change it from code
 
 The selection is three commands, so a button, a shortcut or an assistant changes it the way a

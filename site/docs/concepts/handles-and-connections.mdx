@@ -180,6 +180,129 @@ const features = [selection(), drag(), connection({ clickToConnect: true })] as 
 It is off by default: a tap on a handle then does nothing, and a slightly shaky press on a handle
 starts a drag after 1 pixel instead of 3.
 
+## A handle's role
+
+A handle starts and ends connections by default. `connectableStart={false}` makes it an end only
+(a press, a click or Enter on it starts nothing, and it takes no focus), `connectableEnd={false}`
+a start only (no connection ever ends there): React Flow's `isConnectableStart` and
+`isConnectableEnd`. Its part carries `data-connectable-start` and `data-connectable-end` while it
+may, to style the difference.
+
+<Framework name="react">
+
+```tsx
+<Flow.Handle type="source" side="right" connectableEnd={false} />
+<Flow.Handle type="target" side="left" connectableStart={false} />
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Handle type="source" side="right" :connectable-end="false" />
+<Flow.Handle type="target" side="left" :connectable-start="false" />
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Handle type="source" side="right" connectableEnd={false} />
+<Flow.Handle type="target" side="left" connectableStart={false} />
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowHandle type="source" side="right" [connectableEnd]="false"></div>
+<div flowHandle type="target" side="left" [connectableStart]="false"></div>
+```
+
+</Framework>
+
+## Dropped on the canvas
+
+A connection that ends over no handle is told by `onConnectCancel` (Vue `@connect-cancel`, Svelte
+`onconnectcancel`, Angular `(connectCancel)`), with the handle it came from (`from`), the handle
+it was over (`to`, none here) and the drop point, as a client point (`client`) and a flow point
+(`point`): what "drop a connection on the canvas to add a node" needs.
+
+<Framework name="react">
+
+```tsx
+<Flow.Root
+    features={features}
+    onConnectCancel={(event) => {
+        if (event.to) return;
+        const added = model.run("node.add", { type: "task", position: event.point, data: {} });
+        if (added.ok) model.run("edge.add", { source: event.from.nodeId, target: added.value.nodeId });
+    }}
+>
+    {/* … */}
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<!-- addAt(event): if (!event.to) model.run("node.add", { …, position: event.point }) -->
+<Flow.Root :model="model" @connect-cancel="addAt">
+    <!-- … -->
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<!-- addAt(event): if (!event.to) model.run("node.add", { …, position: event.point }) -->
+<Flow.Root {model} onconnectcancel={addAt}>
+    <!-- … -->
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<!-- addAt(event): if (!event.to) model.run("node.add", { …, position: event.point }) -->
+<div flowRoot [model]="model" (connectCancel)="addAt($event)">
+    <!-- … -->
+</div>
+```
+
+</Framework>
+
+<Example id="add-nodes" />
+
+## The threshold and the line
+
+`connection({ threshold })` is how far (in pixels, default 1) a press on a handle moves before it
+draws a connection, and `connection({ lineType })` the connection line's path, one of the built-in
+edge types (`"bezier"` by default, `"simplebezier"`, `"smoothstep"`, `"step"`, `"straight"`):
+
+```ts
+const features = [connection({ threshold: 4, lineType: "smoothstep" })] as const;
+```
+
+## Default edge fields
+
+The model option `defaultEdgeOptions` (the root's `defaultEdgeOptions` prop when it creates the
+model) fills every `edge.add` where its payload leaves a field out, before any rule sees it, so a
+connection's new edges get your type and data:
+
+```ts
+const model = createFlowModel(json, { features, defaultEdgeOptions: { type: "smoothstep" } });
+```
+
 ## From the keyboard
 
 With `keyboard()` installed too, a connectable handle takes focus: Enter on it starts a
@@ -212,12 +335,16 @@ input this way.
 
 With `reconnection()` (which needs `connection()`), a press on an edge near one of its ends, or on
 a `Flow.ReconnectAnchor`, moves that end to another handle: the drop runs `edge.reconnect`, checked
-by the model like `edge.add`. An edge with `reconnectable: false` keeps its ends.
+by the model like `edge.add`. An edge with `reconnectable: false` keeps its ends;
+`reconnectable: "source"` (or `"target"`) moves that end only: the other end's anchor draws
+nothing, a press near it grabs nothing, and `edge.reconnect` refuses to move it, from code too.
 
 ## Events
 
 `engine.subscribe` hears `connect-start` (`nodeId`, `handleId`, `handleType`), `connect` (the new
-`edgeId`, `source`, `target`), `connect-cancel` (`refused`), each with `input` (`"pointer"` or
-`"keyboard"`); `connect-target` (`nodeId`, `handleId`, `index`, `count`) while a keyboard
-connection moves its target; and for reconnection `reconnect-start`, `reconnect` and
-`reconnect-cancel`.
+`edgeId`, `source`, `target`), `connect-cancel` (`refused`, and where it ended: `from`, `to`,
+`client`, `point`), each with `input` (`"pointer"` or `"keyboard"`); `connect-target` (`nodeId`,
+`handleId`, `index`, `count`) while a keyboard connection moves its target; and for reconnection
+`reconnect-start`, `reconnect` and `reconnect-cancel` (with the `end` it moved and where it
+ended). The root calls each back: `onConnectStart`, `onConnect`, `onConnectCancel`,
+`onReconnectCancel`, … ([Root](/docs/api/primitives/root#props)).

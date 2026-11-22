@@ -21,7 +21,9 @@ something missing from this page? [Open an issue](https://github.com/fragiola/fl
 | xyflow | here | why, and what to do instead |
 | --- | --- | --- |
 | **`nodeTypes` and `edgeTypes`** maps of components. | A children function on `Flow.Nodes` and `Flow.Edges`. | You render every node and edge, so a `switch` on `node.type` is your registry, typed by your own `Types` (see [Custom nodes](/docs/guides/custom-nodes)). |
-| **`isValidConnection`** and `onConnect` callbacks. | Connection rules are middleware on the model. | One rule for every edge, from a drag or from code: `model.use` vetoes `edge.add`, and the drag shows `data-invalid` before the drop (see [Connection rules](/docs/guides/connection-rules)). |
+| **`isValidConnection`**. | Connection rules are middleware on the model. | One rule for every edge, from a drag or from code: `model.use` vetoes `edge.add`, and the drag shows `data-invalid` before the drop (see [Connection rules](/docs/guides/connection-rules)). `onConnect`, `onConnectStart` and the other gesture callbacks are the root's ([Root](/docs/api/primitives/root#props)). |
+| **`nodesDraggable`, `nodesConnectable`, `elementsSelectable`, `edgesReconnectable`** props. | `engine.run("set-interactive", { drag, connect, select, reconnect })`, engine state the lock button switches; the document's flags per node and edge. | One switch per kind at run time, read by every gesture when it acts: run it from your own toggle, or use `Flow.ToggleInteractive`. The root's `interactive` prop switches them all. |
+| **`onConnectEnd`** called after every connection. | `onConnect` after an edge was added, `onConnectCancel` (with `from`, `to` and the drop point) when none was. | Handle both: `onConnectCancel` is what "drop on the pane makes a node" needs. |
 | **`applyNodeChanges`**, change objects and `onNodesChange(changes)`. | Commands, and the model's lists. | `onNodesChange` receives the nodes; a middleware or `model.subscribe` sees every command with its payload. |
 | **Edge markers** (`markerEnd`, `MarkerType`). | No marker is built in. | Markers are plain SVG: define a `marker` and point `markerEnd` at it (see [Custom edges](/docs/guides/custom-edges)). |
 | Default styles (`@xyflow/react/dist/style.css`), the default node and its label. | Structural style only, and no text at all. | Style every part from `data-flow-part` and its state attributes (see [Styling with plain CSS](/docs/guides/styling-css)). |
@@ -65,5 +67,22 @@ something missing from this page? [Open an issue](https://github.com/fragiola/fl
 - **Presses on a node keep their default (focus)**: give nodes `user-select: none`, or a drag
   selects their text.
 - **`fit-view`'s own `minZoom` and `maxZoom` narrow the engine's limits**, never widen them.
+- **A click is the engine's tap**: a press released within `paneClickDistance` (pane) or
+  `nodeClickDistance` (anything else, both 3 px) that started no gesture. A pan that stayed within
+  the pane's distance is still a click (its few pixels stay); a click on a handle is not a node's.
+  Clicks are told while the flow is locked too (they change nothing).
+- **A context menu on one of several selected nodes is the selection's**
+  (`onSelectionContextMenu`), not the node's: there is no selection rectangle to right-click.
+- **A resize's steps are the model's transient `node.resize` commands** (`onNodesChange`,
+  `model.subscribe`): there is no per-step resize event; `onResizeStart`, `onResizeEnd` and
+  `onResizeCancel` frame them.
+- **`defaultEdgeOptions` fills `edge.add` only**: the document's own edges (`defaultEdges`, a
+  loaded flow) stay as they are, and an edge is not drawn with defaults it does not hold.
+- **`beforeDelete` deletes with `node.remove` and `edge.remove`** (one `batch`), not
+  `selection.remove`: a middleware watching `selection.remove` does not see those deletes.
+- **`onInit` waits for a sized root**: an empty flow whose root had no size when it mounted is not
+  ready until a node is measured.
+- **The wheel's move ends 150 ms after its last event** (`onMoveEnd`): a wheel has no end of its
+  own.
 - **jsdom lays nothing out**: in unit tests, stub the sizes (see [Testing your flow](/docs/guides/testing));
   the gestures are tested in a real browser.

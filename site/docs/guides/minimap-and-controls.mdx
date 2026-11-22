@@ -138,9 +138,17 @@ icon.
 | `Flow.FitView` | `fit-view` (every node in view) | before a node is measured |
 | `Flow.ToggleInteractive` | `set-interactive` | only before the root is mounted (no engine yet); `aria-pressed` while the flow is locked |
 
-A disabled button has `disabled` and `data-disabled`: style it with `disabled:opacity-40`. While
-locked, gestures and keys change nothing (no drag, no connection, no selection, no Delete), and
-panning and zooming stay; the root and the toggle lose `data-interactive`.
+A disabled button has `disabled` and `data-disabled`: style it with `disabled:opacity-40`. The
+lock turns dragging, connecting and selecting off (`set-interactive { drag, connect, select }`,
+React Flow's interactive button): no drag, no connection, no selection, nor their keys; panning
+and zooming stay, and the toggle loses `data-interactive` (the root keeps it: the flow is still
+`interactive`, which the root's `interactive={false}` turns off whole). Each kind is also its own
+switch from code:
+
+```ts
+engine.run("set-interactive", { connect: false }); // no new edges; drag and select stay
+engine.is("interactive-by", { kind: "connect" }); // false
+```
 
 ## Animated buttons
 
