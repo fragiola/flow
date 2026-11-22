@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="robots" content="noindex" />
+        <title>Flow layers fixture</title>
+        <style>
+            /* nodes without a border, so a declared handle's box is its measured one; a wide edge
+               stroke, so a hit test on the line finds it */
+            body { margin: 0; font: 13px/1.2 system-ui, sans-serif; }
+            [data-flow-part="root"] { width: 800px; height: 500px; background: #f4f4f4; }
+            [data-flow-part="node"] { box-sizing: border-box; padding: 10px; background: #fff; color: #111; box-shadow: 0 0 0 1px #333; user-select: none; }
+            [data-flow-part="node"][data-selected] { box-shadow: 0 0 0 2px #06f; }
+            [data-flow-part="handle"] { width: 12px; height: 12px; border-radius: 50%; background: #333; }
+            [data-flow-part="edge-path"] { stroke: #333; stroke-width: 6; }
+            [data-flow-part="edge-path"][data-selected] { stroke: #06f; }
+            pre { position: fixed; left: 0; top: 520px; margin: 0; color: #111; font-size: 10px; white-space: pre-wrap; }
+        </style>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="module">
+            import { mountLayersFixture } from "../../src/fixture/layers-fixture.tsx";
+            mountLayersFixture();
+        </script>
+    </body>
+</html>
