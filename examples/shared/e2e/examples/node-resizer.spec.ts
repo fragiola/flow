@@ -1,6 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { node, openExample, part } from "../helpers";
-import { boxOf, dragBy, near, press, viewportOf } from "./helpers";
+import {
+    boxOf,
+    dragBy,
+    expectNamedHandles,
+    near,
+    press,
+    viewportOf,
+} from "./helpers";
 
 test.beforeEach(async ({ page }) => {
     await openExample(page, "node-resizer");
@@ -43,4 +50,39 @@ test("the photo keeps its aspect ratio", async ({ page }) => {
     expect(after.width).toBeGreaterThan(before.width);
     near(after.width / after.height, before.width / before.height, 0.02);
     await expect(part(page, "resizer")).toHaveCount(2);
+});
+
+test("the arrows on a focused handle resize by a step, Shift by a bigger one, within the limits", async ({
+    page,
+}) => {
+    const note = node(page, "note");
+    const { zoom } = await viewportOf(page);
+    const width = async () => (await boxOf(note)).width / zoom;
+    // how far a size (in flow units, from the screen box) is from what it should be
+    const off = (size: () => Promise<number>, expected: number) => async () =>
+        Math.abs((await size()) - expected);
+    // the note starts 200 × 120; keyboard() steps by 5, Shift by 20
+    const right = corner(page, "note", "right");
+    await right.focus();
+    await expect(right).toBeFocused();
+    await expect(right).toHaveAccessibleName("Resize note: right");
+    await page.keyboard.press("ArrowRight");
+    await expect.poll(off(width, 205)).toBeLessThan(1.5);
+    await page.keyboard.press("Shift+ArrowRight");
+    await expect.poll(off(width, 225)).toBeLessThan(1.5);
+    await page.keyboard.press("ArrowLeft");
+    await expect.poll(off(width, 220)).toBeLessThan(1.5);
+    // a corner takes both axes
+    const height = async () => (await boxOf(note)).height / zoom;
+    await corner(page, "note", "bottom-right").focus();
+    await page.keyboard.press("ArrowDown");
+    await expect.poll(off(height, 125)).toBeLessThan(1.5);
+    // the minimum width, 120: Shift + Arrow Left from 220 five times stops there
+    await right.focus();
+    for (let i = 0; i < 6; i++) await page.keyboard.press("Shift+ArrowLeft");
+    await expect.poll(off(width, 120)).toBeLessThan(1.5);
+});
+
+test("every resize handle a keyboard reaches has a name", async ({ page }) => {
+    await expectNamedHandles(page, 8);
 });

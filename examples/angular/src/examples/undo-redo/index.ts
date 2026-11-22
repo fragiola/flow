@@ -83,8 +83,20 @@ const edges: FlowEdgeInput<Types>[] = [{ id: "a-c", source: "a", target: "c" }];
                             [class]="styles.node"
                         >
                             {{ node.data.label }}
-                            <div flowHandle type="target" side="top" [class]="styles.handle"></div>
-                            <div flowHandle type="source" side="bottom" [class]="styles.handle"></div>
+                            <div
+                                flowHandle
+                                type="target"
+                                side="top"
+                                [attr.aria-label]="node.data.label + ' input'"
+                                [class]="styles.handle"
+                            ></div>
+                            <div
+                                flowHandle
+                                type="source"
+                                side="bottom"
+                                [attr.aria-label]="node.data.label + ' output'"
+                                [class]="styles.handle"
+                            ></div>
                         </div>
                     </ng-template>
                 </div>

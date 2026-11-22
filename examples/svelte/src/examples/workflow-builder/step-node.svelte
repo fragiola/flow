@@ -53,7 +53,13 @@
         </span>
     {/if}
     {#if step.type !== "trigger"}
-        <Flow.Handle type="target" side="top" handleId="in" class={styles.port} />
+        <Flow.Handle
+            type="target"
+            side="top"
+            handleId="in"
+            aria-label="{step.data.title} input"
+            class={styles.port}
+        />
     {/if}
     {#if step.type === "condition"}
         {#each BRANCHES as { branch, left } (branch)}
@@ -62,11 +68,18 @@
                 side="bottom"
                 handleId={branch}
                 title={branch}
+                aria-label="{step.data.title} output: {branch}"
                 class={styles.branchPort(branch)}
                 style={{ left }}
             />
         {/each}
     {:else}
-        <Flow.Handle type="source" side="bottom" handleId="out" class={styles.port} />
+        <Flow.Handle
+            type="source"
+            side="bottom"
+            handleId="out"
+            aria-label="{step.data.title} output"
+            class={styles.port}
+        />
     {/if}
 </Flow.Node>

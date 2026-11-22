@@ -38,7 +38,14 @@ const BRANCHES = [
             >{{ issues().length }}</span>
         }
         @if (step().type !== "trigger") {
-            <div flowHandle type="target" side="top" handleId="in" [class]="styles.port"></div>
+            <div
+                flowHandle
+                type="target"
+                side="top"
+                handleId="in"
+                [attr.aria-label]="step().data.title + ' input'"
+                [class]="styles.port"
+            ></div>
         }
         @if (step().type === "condition") {
             @for (output of branches; track output.branch) {
@@ -48,12 +55,20 @@ const BRANCHES = [
                     side="bottom"
                     [handleId]="output.branch"
                     [attr.title]="output.branch"
+                    [attr.aria-label]="step().data.title + ' output: ' + output.branch"
                     [class]="styles.branchPort(output.branch)"
                     [style.left]="output.left"
                 ></div>
             }
         } @else {
-            <div flowHandle type="source" side="bottom" handleId="out" [class]="styles.port"></div>
+            <div
+                flowHandle
+                type="source"
+                side="bottom"
+                handleId="out"
+                [attr.aria-label]="step().data.title + ' output'"
+                [class]="styles.port"
+            ></div>
         }
     `,
 })

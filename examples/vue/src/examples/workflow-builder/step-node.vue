@@ -59,6 +59,7 @@ const icon = computed(() => iconOf(props.step));
             type="target"
             side="top"
             handle-id="in"
+            :aria-label="`${step.data.title} input`"
             :class="styles.port"
         />
         <template v-if="step.type === 'condition'">
@@ -69,6 +70,7 @@ const icon = computed(() => iconOf(props.step));
                 side="bottom"
                 :handle-id="branch"
                 :title="branch"
+                :aria-label="`${step.data.title} output: ${branch}`"
                 :class="styles.branchPort(branch)"
                 :style="{ left }"
             />
@@ -78,6 +80,7 @@ const icon = computed(() => iconOf(props.step));
             type="source"
             side="bottom"
             handle-id="out"
+            :aria-label="`${step.data.title} output`"
             :class="styles.port"
         />
     </Flow.Node>

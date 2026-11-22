@@ -5,6 +5,7 @@ import {
     type FlowTypes,
 } from "@fragiola/flow-react";
 import { drag } from "@fragiola/flow-react/drag";
+import { keyboard } from "@fragiola/flow-react/keyboard";
 import {
     NodeResizer,
     RESIZE_POSITIONS,
@@ -17,7 +18,9 @@ import { styles } from "./styles";
 // `resize()` and `NodeResizer`: a handle on each corner and side of the node; dragging one resizes
 // the node (`node.resize`, its `width` and `height` written to the document). Each resizer has its
 // own limits over the feature's; the photo keeps its aspect ratio. The handles show while the node
-// is selected (a style on the node's `data-selected`).
+// is selected (a style on the node's `data-selected`). With `keyboard()` each handle takes focus:
+// Tab to one and use the arrows (Shift for a bigger step); each has its own name, the default
+// handles have none.
 
 interface Types extends FlowTypes {
     readonly nodes: {
@@ -30,6 +33,7 @@ const features = [
     selection(),
     drag(),
     resize({ minWidth: 80, minHeight: 60 }),
+    keyboard(),
 ] as const;
 
 const nodes: FlowNodeInput<Types>[] = [
@@ -56,11 +60,13 @@ const nodes: FlowNodeInput<Types>[] = [
     },
 ];
 
-function Handles() {
+/** Every corner and side, each named: with `keyboard()` a handle takes focus. */
+function Handles({ nodeId }: { nodeId: string }) {
     return RESIZE_POSITIONS.map((position) => (
         <ResizeHandle
             key={position}
             position={position}
+            aria-label={`Resize ${nodeId}: ${position}`}
             className={styles.resizeHandle}
         />
     ));
@@ -81,7 +87,7 @@ function renderNode(node: FlowNode<Types>) {
                         maxHeight={240}
                         className={styles.resizer}
                     >
-                        <Handles />
+                        <Handles nodeId={node.id} />
                     </NodeResizer>
                 </>
             ) : (
@@ -92,7 +98,7 @@ function renderNode(node: FlowNode<Types>) {
                         className={styles.photo}
                     />
                     <NodeResizer keepAspectRatio className={styles.resizer}>
-                        <Handles />
+                        <Handles nodeId={node.id} />
                     </NodeResizer>
                 </>
             )}

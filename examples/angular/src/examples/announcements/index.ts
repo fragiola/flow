@@ -50,8 +50,16 @@ const nodes: FlowNodeInput<Types>[] = [
 
 type Model = FlowModel<Types, typeof features>;
 
-/** The app's words for an engine event, or nothing for one it keeps quiet about. */
-function describe(event: FlowEngineEvent, model: Model): string | undefined {
+/**
+ * The app's words for an engine event, or nothing for one it keeps quiet about. `startedFrom`:
+ * the node a keyboard connection has just started from, said with its first target (both come
+ * at once, and a live region reads only the last message) with the keys to use.
+ */
+function describe(
+    event: FlowEngineEvent,
+    model: Model,
+    startedFrom?: string,
+): string | undefined {
     const name = (id: string) => model.get("node-by", { id })?.data.label ?? id;
     const names = (ids: readonly string[]) => ids.map(name).join(", ");
     switch (event.type) {
@@ -59,14 +67,18 @@ function describe(event: FlowEngineEvent, model: Model): string | undefined {
             return `Moved ${names(event.nodeIds)}${event.source === "keyboard" ? " with the keyboard" : ""}.`;
         case "drag-cancel":
             return `Put ${names(event.nodeIds)} back.`;
-        case "connect-start":
-            return event.input === "keyboard"
-                ? `Connecting from ${name(event.nodeId)}. Tab to choose a target, Enter to connect, Escape to cancel.`
-                : undefined;
-        case "connect-target":
-            return event.nodeId === undefined
-                ? "No handle accepts this connection."
-                : `Target ${event.index + 1} of ${event.count}: ${name(event.nodeId)}.`;
+        case "connect-target": {
+            const target =
+                event.nodeId === undefined
+                    ? "No handle accepts this connection."
+                    : `Target ${event.index + 1} of ${event.count}: ${name(event.nodeId)}.`;
+            if (startedFrom === undefined) return target;
+            const keys =
+                event.nodeId === undefined
+                    ? "Escape to cancel."
+                    : "Tab for the next, Enter to connect, Escape to cancel.";
+            return `Connecting from ${name(startedFrom)}. ${target} ${keys}`;
+        }
         case "connect":
             return `Connected ${name(event.source)} to ${name(event.target)}${event.input === "keyboard" ? " with the keyboard" : ""}.`;
         case "connect-cancel":
@@ -182,9 +194,19 @@ export default class Announcements {
         effect((onCleanup) => {
             const engine = this.flow.current?.engine;
             if (!engine) return;
+            // a keyboard connection that has just started, until its first target
+            let startedFrom: string | undefined;
             onCleanup(
                 engine.subscribe((event) => {
-                    const message = describe(event, this.model);
+                    if (event.type === "connect-start") {
+                        startedFrom =
+                            event.input === "keyboard"
+                                ? event.nodeId
+                                : undefined;
+                    }
+                    const message = describe(event, this.model, startedFrom);
+                    if (event.type === "connect-target")
+                        startedFrom = undefined;
                     if (message)
                         this.log.update((previous) =>
                             [message, ...previous].slice(0, 6),

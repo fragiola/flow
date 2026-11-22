@@ -150,11 +150,13 @@ export default function UndoRedo() {
                             <Flow.Handle
                                 type="target"
                                 side="top"
+                                aria-label={`${node.data.label} input`}
                                 className={styles.handle}
                             />
                             <Flow.Handle
                                 type="source"
                                 side="bottom"
+                                aria-label={`${node.data.label} output`}
                                 className={styles.handle}
                             />
                         </Flow.Node>

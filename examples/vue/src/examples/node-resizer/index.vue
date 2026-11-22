@@ -1,13 +1,16 @@
 <script lang="ts">
 import type { FlowNodeInput, FlowTypes } from "@fragiola/flow-vue";
 import { drag } from "@fragiola/flow-vue/drag";
+import { keyboard } from "@fragiola/flow-vue/keyboard";
 import { resize } from "@fragiola/flow-vue/resize";
 import { selection } from "@fragiola/flow-vue/selection";
 
 // `resize()` and `NodeResizer`: a handle on each corner and side of the node; dragging one resizes
 // the node (`node.resize`, its `width` and `height` written to the document). Each resizer has its
 // own limits over the feature's; the photo keeps its aspect ratio. The handles show while the node
-// is selected (a style on the node's `data-selected`).
+// is selected (a style on the node's `data-selected`). With `keyboard()` each handle takes focus:
+// Tab to one and use the arrows (Shift for a bigger step); each has its own name, the default
+// handles have none.
 
 interface Types extends FlowTypes {
     readonly nodes: {
@@ -20,6 +23,7 @@ const features = [
     selection(),
     drag(),
     resize({ minWidth: 80, minHeight: 60 }),
+    keyboard(),
 ] as const;
 
 const nodes: FlowNodeInput<Types>[] = [
@@ -87,6 +91,7 @@ const Flow = typedFlow<Types, typeof features>();
                                 v-for="position in RESIZE_POSITIONS"
                                 :key="position"
                                 :position="position"
+                                :aria-label="`Resize ${node.id}: ${position}`"
                                 :class="styles.resizeHandle"
                             />
                         </NodeResizer>
@@ -102,6 +107,7 @@ const Flow = typedFlow<Types, typeof features>();
                                 v-for="position in RESIZE_POSITIONS"
                                 :key="position"
                                 :position="position"
+                                :aria-label="`Resize ${node.id}: ${position}`"
                                 :class="styles.resizeHandle"
                             />
                         </NodeResizer>

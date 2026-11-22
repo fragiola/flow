@@ -1,13 +1,16 @@
 <script module lang="ts">
     import type { FlowNodeInput, FlowTypes } from "@fragiola/flow-svelte";
     import { drag } from "@fragiola/flow-svelte/drag";
+    import { keyboard } from "@fragiola/flow-svelte/keyboard";
     import { resize } from "@fragiola/flow-svelte/resize";
     import { selection } from "@fragiola/flow-svelte/selection";
 
-    // `resize()` and `NodeResizer`: a handle on each corner and side of the node; dragging one resizes
-    // the node (`node.resize`, its `width` and `height` written to the document). Each resizer has its
-    // own limits over the feature's; the photo keeps its aspect ratio. The handles show while the node
-    // is selected (a style on the node's `data-selected`).
+    // `resize()` and `NodeResizer`: a handle on each corner and side of the node; dragging one
+    // resizes the node (`node.resize`, its `width` and `height` written to the document). Each
+    // resizer has its own limits over the feature's; the photo keeps its aspect ratio. The handles
+    // show while the node is selected (a style on the node's `data-selected`). With `keyboard()`
+    // each handle takes focus: Tab to one and use the arrows (Shift for a bigger step); each has
+    // its own name, the default handles have none.
 
     interface Types extends FlowTypes {
         readonly nodes: {
@@ -20,6 +23,7 @@
         selection(),
         drag(),
         resize({ minWidth: 80, minHeight: 60 }),
+        keyboard(),
     ] as const;
 
     const nodes: FlowNodeInput<Types>[] = [
@@ -80,14 +84,22 @@
                             class={styles.resizer}
                         >
                             {#each RESIZE_POSITIONS as position (position)}
-                                <ResizeHandle {position} class={styles.resizeHandle} />
+                                <ResizeHandle
+                                    {position}
+                                    aria-label="Resize {node.id}: {position}"
+                                    class={styles.resizeHandle}
+                                />
                             {/each}
                         </NodeResizer>
                     {:else}
                         <div role="img" aria-label="A placeholder photo" class={styles.photo}></div>
                         <NodeResizer keepAspectRatio class={styles.resizer}>
                             {#each RESIZE_POSITIONS as position (position)}
-                                <ResizeHandle {position} class={styles.resizeHandle} />
+                                <ResizeHandle
+                                    {position}
+                                    aria-label="Resize {node.id}: {position}"
+                                    class={styles.resizeHandle}
+                                />
                             {/each}
                         </NodeResizer>
                     {/if}
