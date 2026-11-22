@@ -7,10 +7,12 @@ import {
     createFlowEngine,
     type FlowEngine,
 } from "../../src/engine/create-flow-engine";
+import type { FlowEngineEventOf } from "../../src/engine/events";
 import type { Connection } from "../../src/engine/verbs";
-import type { EdgePath, Viewport } from "../../src/geometry/types";
+import type { EdgePath, Rect, Viewport } from "../../src/geometry/types";
 import { minimap } from "../../src/minimap/minimap";
 import { createFlowModel } from "../../src/model/create-flow-model";
+import { selection } from "../../src/selection/selection";
 
 function use(_value: unknown): void {}
 
@@ -142,6 +144,27 @@ export function featureKeys(): void {
     use(point);
     // @ts-expect-error the selection box is the selection feature's
     engine.get("selection-box");
+}
+
+export function selectionRect(): void {
+    const features = [selection({ rect: "always" }), drag()] as const;
+    const engine = createFlowEngine(createFlowModel(undefined, { features }));
+    const rect: Rect | null = engine.get("selection-rect");
+    use(rect);
+    use(engine.adapter.attributes("nodes-selection"));
+    // @ts-expect-error the rectangle shows after a box or always
+    selection({ rect: "never" });
+    engine.subscribe((event) => {
+        if (event.type === "selection-drag") {
+            const step: FlowEngineEventOf<"selection-drag"> = event;
+            use([step.nodeIds, step.client.x, step.point.y]);
+        }
+    });
+    const bare = createFlowEngine(
+        createFlowModel(undefined, { features: [drag()] }),
+    );
+    // @ts-expect-error the rectangle is the selection feature's
+    bare.get("selection-rect");
 }
 
 export function attributes(engine: FlowEngine): void {
