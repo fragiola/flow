@@ -261,6 +261,39 @@ export function pair(): { nodes: FlowNode[]; edges: FlowEdge[] } {
     };
 }
 
+/**
+ * Two nodes declaring their handles (`a` sized, its source on the right; `b` with an initial size,
+ * its target on the left) and an edge `ab` between them: what a server render draws.
+ */
+export function declared(): { nodes: FlowNode[]; edges: FlowEdge[] } {
+    return {
+        nodes: [
+            task("a", 0, 0, {
+                handles: [
+                    {
+                        type: "source",
+                        position: "right",
+                        x: 95,
+                        y: 15,
+                        width: 10,
+                        height: 10,
+                    },
+                ],
+            }),
+            {
+                id: "b",
+                type: "task",
+                position: { x: 300, y: 100 },
+                data: {},
+                initialWidth: 120,
+                initialHeight: 60,
+                handles: [{ type: "target", position: "left", x: 0, y: 30 }],
+            } as FlowNode,
+        ],
+        edges: [{ id: "ab", source: "a", target: "b" } as FlowEdge],
+    };
+}
+
 /** The element of a part (and an id). */
 export function part(
     container: ParentNode,
