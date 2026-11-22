@@ -223,6 +223,7 @@ export class ConnectSession {
                     to !== undefined,
                     "keyboard",
                     this.keyboardDrop(source, to),
+                    true,
                 );
             },
             cancel: () => {
@@ -234,6 +235,7 @@ export class ConnectSession {
                     false,
                     "keyboard",
                     this.keyboardDrop(source, to),
+                    false,
                 );
             },
             open: () => open,
@@ -384,21 +386,25 @@ export class ConnectSession {
                         }
                     }
                 }
-                this.cancelled(start, to !== undefined, "pointer", {
-                    to,
-                    client: drop,
-                    point: this.host.toFlow(drop),
-                });
+                this.cancelled(
+                    start,
+                    to !== undefined,
+                    "pointer",
+                    { to, client: drop, point: this.host.toFlow(drop) },
+                    true,
+                );
             },
             cancel: () => {
                 if (!active) return;
                 const to = this.state?.to;
                 finish();
-                this.cancelled(start, false, "pointer", {
-                    to,
-                    client: last,
-                    point: this.host.toFlow(last),
-                });
+                this.cancelled(
+                    start,
+                    false,
+                    "pointer",
+                    { to, client: last, point: this.host.toFlow(last) },
+                    false,
+                );
             },
             active: () => active,
         };
@@ -406,15 +412,18 @@ export class ConnectSession {
 
     /**
      * Tells a connection ended without an edge, with where it ended: the handle it was over (if
-     * any) and the drop point, as a client point and a flow point.
+     * any) and the drop point, as a client point and a flow point; `dropped` when it was released
+     * (or confirmed), not cancelled (Escape, the lock, a `pointercancel`).
      */
     private cancelled(
         start: ConnectStart,
         refused: boolean,
         input: MoveSource,
         at: { to: FlowHandle | undefined; client: XY; point: XY },
+        dropped: boolean,
     ): void {
         const drop = {
+            dropped,
             from: endOf(start.from),
             to: at.to ? endOf(at.to) : undefined,
             client: at.client,

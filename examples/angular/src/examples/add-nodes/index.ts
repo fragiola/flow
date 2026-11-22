@@ -166,7 +166,8 @@ export default class AddNodes {
         event: FlowEngineEventOf<"connect-cancel">,
     ): void {
         const model = this.flow.current?.model;
-        if (!model || event.to || event.input !== "pointer") return;
+        if (!model || !event.dropped || event.to || event.input !== "pointer")
+            return;
         count += 1;
         const nodeId = `square-${count}`;
         model.run("batch", {

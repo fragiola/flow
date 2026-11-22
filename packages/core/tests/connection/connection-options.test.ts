@@ -176,6 +176,7 @@ describe("a connection's cancel tells where it ended", () => {
             type: "connect-cancel",
             refused: false,
             input: "pointer",
+            dropped: true,
             from: { nodeId: "a", handleId: "out", type: "source" },
             to: undefined,
             client: { x: 400, y: 500 },
@@ -194,6 +195,8 @@ describe("a connection's cancel tells where it ended", () => {
         key(flow.root, "Escape");
         expect(flow.events.at(-1)).toMatchObject({
             type: "connect-cancel",
+            // cancelled, not dropped: no node should be added there
+            dropped: false,
             client: { x: 150, y: 300 },
             point: { x: 150, y: 300 },
         });
@@ -272,6 +275,7 @@ describe("reconnectable: source | target", () => {
             type: "reconnect-cancel",
             edgeId: "e",
             end: "target",
+            dropped: true,
             refused: false,
             from: { nodeId: "a", handleId: "out", type: "source" },
             to: undefined,
@@ -345,5 +349,19 @@ describe("reconnectable: source | target", () => {
         expect(both.engine.is("edge-reconnecting", { edgeId: "e" })).toBe(
             false,
         );
+        unmountAll();
+        // the lock turned on during a reconnection stops it, and its drop reconnects nothing
+        const moving = flow(true);
+        pointer(moving.edge("e"), "pointerdown", at(293, 25));
+        pointer(moving.root, "pointermove", at(298, 222));
+        expect(moving.engine.is("edge-reconnecting", { edgeId: "e" })).toBe(
+            true,
+        );
+        moving.engine.run("set-interactive", { connect: false });
+        expect(moving.engine.is("edge-reconnecting", { edgeId: "e" })).toBe(
+            false,
+        );
+        pointer(moving.root, "pointerup", at(298, 222));
+        expect(moving.model.get("edge-by", { id: "e" })?.target).toBe("b");
     });
 });

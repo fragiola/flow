@@ -257,6 +257,7 @@ describe("drawing a connection", () => {
             type: "connect-cancel",
             refused: false,
             input: "pointer",
+            dropped: true,
         });
         expect(flow.model.get("all-edges")).toEqual([]);
         expect(flow.commits).toEqual([]);

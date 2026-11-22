@@ -229,7 +229,8 @@ may, to style the difference.
 A connection that ends over no handle is told by `onConnectCancel` (Vue `@connect-cancel`, Svelte
 `onconnectcancel`, Angular `(connectCancel)`), with the handle it came from (`from`), the handle
 it was over (`to`, none here) and the drop point, as a client point (`client`) and a flow point
-(`point`): what "drop a connection on the canvas to add a node" needs.
+(`point`): what "drop a connection on the canvas to add a node" needs. `dropped` is `false` when
+the connection was cancelled instead (Escape, the lock, a `pointercancel`): no node then.
 
 <Framework name="react">
 
@@ -237,7 +238,7 @@ it was over (`to`, none here) and the drop point, as a client point (`client`) a
 <Flow.Root
     features={features}
     onConnectCancel={(event) => {
-        if (event.to || event.input !== "pointer") return;
+        if (!event.dropped || event.to || event.input !== "pointer") return;
         const added = model.run("node.add", { type: "task", position: event.point, data: {} });
         if (!added.ok) return;
         const { nodeId } = added.value;
@@ -259,7 +260,7 @@ it was over (`to`, none here) and the drop point, as a client point (`client`) a
 <Framework name="vue">
 
 ```vue
-<!-- addAt(event): if (!event.to) model.run("node.add", { …, position: event.point }) -->
+<!-- addAt(event): if (event.dropped && !event.to) model.run("node.add", { …, position: event.point }) -->
 <Flow.Root :model="model" @connect-cancel="addAt">
     <!-- … -->
 </Flow.Root>
@@ -270,7 +271,7 @@ it was over (`to`, none here) and the drop point, as a client point (`client`) a
 <Framework name="svelte">
 
 ```svelte
-<!-- addAt(event): if (!event.to) model.run("node.add", { …, position: event.point }) -->
+<!-- addAt(event): if (event.dropped && !event.to) model.run("node.add", { …, position: event.point }) -->
 <Flow.Root {model} onconnectcancel={addAt}>
     <!-- … -->
 </Flow.Root>
@@ -281,7 +282,7 @@ it was over (`to`, none here) and the drop point, as a client point (`client`) a
 <Framework name="angular">
 
 ```html
-<!-- addAt(event): if (!event.to) model.run("node.add", { …, position: event.point }) -->
+<!-- addAt(event): if (event.dropped && !event.to) model.run("node.add", { …, position: event.point }) -->
 <div flowRoot [model]="model" (connectCancel)="addAt($event)">
     <!-- … -->
 </div>

@@ -22,8 +22,11 @@ export interface ConnectionEnd {
  * for a reconnection, the edge's fixed end), the handle it was over (`to`, none when it was over
  * nothing), and the drop point as a client point (`clientX`, `clientY`: a new node goes there) and
  * as a flow point. A keyboard connection's points are its target's (or its start's) centre.
+ * `dropped` tells a release (or a keyboard confirm) from a cancel (Escape, the lock turning
+ * `connect` off, a `pointercancel`): only a drop should add a node where it ended.
  */
 export interface ConnectionDrop {
+    readonly dropped: boolean;
     readonly from: ConnectionEnd;
     readonly to: ConnectionEnd | undefined;
     readonly client: XY;

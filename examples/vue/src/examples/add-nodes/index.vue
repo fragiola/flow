@@ -84,7 +84,8 @@ function addAtCentre(shape: Shape, event: MouseEvent) {
 /** A connection dropped over no handle: a new task there, joined to its start. */
 function onConnectCancel(event: FlowEngineEventOf<"connect-cancel">) {
     const model = flow.value?.model;
-    if (!model || event.to || event.input !== "pointer") return;
+    if (!model || !event.dropped || event.to || event.input !== "pointer")
+        return;
     count += 1;
     const nodeId = `square-${count}`;
     model.run("batch", {

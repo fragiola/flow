@@ -391,10 +391,10 @@ viewport from it.
 | `"connect-start"` | `nodeId`, `handleId`, `handleType`, `input` | a connection started from a handle (`connection()`); `input` (a `MoveSource`): `"pointer"` (a drag or a tap) or `"keyboard"` (Enter on a focused handle, with `keyboard()`) |
 | `"connect-target"` | `nodeId`, `handleId`, `handleType`, `index`, `count` | a keyboard connection points at another target: the `index`-th of the `count` handles the model accepts, nearest first (`index` -1 and no handle when it accepts none), for your live region |
 | `"connect"` | `edgeId`, `source`, `target`, `input` | a connection was dropped on a handle (or Enter chose it): an edge was added |
-| `"connect-cancel"` | `refused`, `input`, `from`, `to`, `client`, `point` | a connection ended without an edge; `refused`: on a handle `model.can("edge.add")` refused; where it ended (`ConnectionDrop`) |
+| `"connect-cancel"` | `refused`, `input`, `dropped`, `from`, `to`, `client`, `point` | a connection ended without an edge; `refused`: on a handle `model.can("edge.add")` refused; `dropped`: released (or confirmed), not cancelled by Escape, the lock or a `pointercancel`; where it ended (`ConnectionDrop`) |
 | `"reconnect-start"` | `edgeId`, `end` | an edge's end was grabbed (`reconnection()`) |
 | `"reconnect"` | `edgeId`, `source`, `target` | an edge was reconnected |
-| `"reconnect-cancel"` | `edgeId`, `end`, `refused`, `from`, `to`, `client`, `point` | a reconnection ended with the edge as it was; `from` is the edge's fixed end |
+| `"reconnect-cancel"` | `edgeId`, `end`, `refused`, `dropped`, `from`, `to`, `client`, `point` | a reconnection ended with the edge as it was (`dropped` as for `connect-cancel`); `from` is the edge's fixed end |
 | `"resize-start"` | `nodeId`, `width`, `height` | a resize started (`resize()`), at the node's size then; its steps are `node.resize` commands run as `transient` (`model.subscribe`, `onNodesChange`) |
 | `"resize-cancel"` | `nodeId` | a resize was cancelled: the node is back at its size |
 | `"resize"` | `nodeId`, `width`, `height`, `source` | a node was resized (`resize()`): by a drag (`source: "pointer"`), or by the arrows on a focused resize handle (`"keyboard"`, with `keyboard()`) |
