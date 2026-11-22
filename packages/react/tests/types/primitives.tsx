@@ -7,6 +7,13 @@ import {
     type FlowNode,
     type RenderedProps,
     useFlow,
+    useFlowStore,
+    useInternalNode,
+    useKeyPress,
+    useNodeConnections,
+    useNodeId,
+    useNodesData,
+    useOnViewportChange,
 } from "../../src/index";
 
 interface Types {
@@ -79,4 +86,32 @@ export function Hooks() {
     // @ts-expect-error: no such command
     bare.model.run("node.fly", {});
     return null;
+}
+
+export function SelectingHooks() {
+    const count: number = useFlowStore<number, Types, typeof features>(
+        ({ model, engine }) =>
+            model.get("all-nodes").length + engine.get("viewport").zoom,
+    );
+    const one = useNodesData<Types>("a");
+    if (one?.type === "task") {
+        const title: string = one.data.title;
+        void title;
+    }
+    const many = useNodesData<Types>(["a", "b"]);
+    const first: string | undefined = many[0]?.id;
+    const connections = useNodeConnections({ handleId: "in", type: "target" });
+    const edgeId: string | undefined = connections[0]?.edgeId;
+    // @ts-expect-error a connection's type is source or target
+    useNodeConnections({ type: "in" });
+    const internal = useInternalNode<Types>("a");
+    const width: number | undefined = internal?.rect.width;
+    const pressed: boolean = useKeyPress(["Meta+s", "Control+s"], {
+        target: null,
+    });
+    const id: string | null = useNodeId();
+    useOnViewportChange({
+        onEnd: (viewport, gesture: boolean) => void [viewport.zoom, gesture],
+    });
+    return <>{[count, first, edgeId, width, pressed, id].join()}</>;
 }
