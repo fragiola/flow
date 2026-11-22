@@ -29,13 +29,24 @@ const HANDLE_STYLE: React.CSSProperties = { position: "absolute" };
  * your `style` may place it elsewhere on the node. Give it its size and look.
  */
 export function Handle(props: HandleProps) {
-    const { type, side, handleId, connectable, nodeId, children, ...rest } =
-        props;
+    const {
+        type,
+        side,
+        handleId,
+        connectable,
+        connectableStart,
+        connectableEnd,
+        nodeId,
+        children,
+        ...rest
+    } = props;
     const { state, props: own } = useHandle({
         type,
         side,
         handleId,
         connectable,
+        connectableStart,
+        connectableEnd,
         nodeId,
     });
     const { ref, ...attributes } = own;

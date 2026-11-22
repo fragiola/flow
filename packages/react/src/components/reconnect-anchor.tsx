@@ -24,7 +24,8 @@ export interface ReconnectAnchorProps
 
 /**
  * An edge end's grab area (`data-flow-part="reconnect-anchor"`, `data-end`): an SVG circle at the
- * end, inside `Flow.Edge`. With `reconnection()`, a press on it moves that end to another handle.
+ * end, inside `Flow.Edge`. With `reconnection()`, a press on it moves that end to another handle;
+ * an end its edge's `reconnectable` keeps fixed (`false`, or the other end's name) draws none.
  * Transparent by default; give it its radius (`r`, default 10) and look.
  */
 export function ReconnectAnchor(props: ReconnectAnchorProps) {
@@ -40,10 +41,12 @@ export function ReconnectAnchor(props: ReconnectAnchorProps) {
                       end,
                   }),
                   reconnecting: engine.is("edge-reconnecting", { edgeId }),
+                  // `reconnectable: "source"` (or `"target"`, or false): no anchor at the other end
+                  movable: model.is("edge-reconnectable", { edgeId, end }),
               }
             : undefined,
     );
-    if (!path || !view) return null;
+    if (!path || !view?.movable) return null;
     return (
         <ReconnectAnchorElement
             {...rest}

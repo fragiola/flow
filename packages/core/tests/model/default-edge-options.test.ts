@@ -64,15 +64,16 @@ describe("defaultEdgeOptions", () => {
         const model = createFlowModel(nodes(), {
             defaultEdgeOptions: { type: "smoothstep", deletable: false },
         });
-        const wanted = [{ id: "e", source: "a", target: "b", data: {} }];
+        const edge = { id: "e", source: "a", target: "b", data: {} };
+        const wanted = [edge];
         const first = model.get("commands-to", { edges: wanted });
         expect(first.map((command) => command.command)).toEqual(["edge.add"]);
-        model.run("batch", { commands: first });
+        model.run("batch", { commands: [...first] });
         expect(model.get("commands-to", { edges: wanted })).toEqual([]);
         // what the app gives still wins over the defaults
         expect(
             model.get("commands-to", {
-                edges: [{ ...wanted[0], deletable: true }],
+                edges: [{ ...edge, deletable: true }],
             }),
         ).toEqual([
             {

@@ -4,10 +4,13 @@ import {
     type CreateId,
     createFlowEngine,
     createFlowModel,
+    type DefaultEdgeOptions,
+    ENGINE_EVENT_CALLBACKS,
     type FitViewPayload,
     type FlowEdge,
     type FlowEdgeInput,
     type FlowEngine,
+    type FlowEngineEventOf,
     type FlowEngineOptions,
     type FlowFeatures,
     type FlowModel,
@@ -67,13 +70,52 @@ export type RootEngineProps = Pick<
     | "nodeExtent"
     | "elevateNodesOnSelect"
     | "elevateEdgesOnSelect"
+    | "paneClickDistance"
+    | "nodeClickDistance"
+    | "preventScrolling"
+    | "nodesFocusable"
+    | "edgesFocusable"
 >;
+
+type Callbacks = typeof ENGINE_EVENT_CALLBACKS;
+
+/**
+ * The root's event callbacks, one per engine event (`ENGINE_EVENT_CALLBACKS`): `onNodeClick`,
+ * `onMoveStart`, `onConnectCancel`, … each called with the event.
+ */
+export type RootEventProps = {
+    [K in keyof Callbacks as `on${Callbacks[K]}`]?:
+        | ((event: FlowEngineEventOf<K>) => void)
+        | undefined;
+};
+
+/** The callback props' names, from the core's table. */
+const CALLBACK_PROPS = Object.entries(ENGINE_EVENT_CALLBACKS).map(
+    ([type, name]) => [type, `on${name}`] as const,
+);
+const CALLBACK_BY_TYPE: ReadonlyMap<string, string> = new Map(CALLBACK_PROPS);
+
+/** Splits the event callbacks off a root's other props. */
+function splitCallbacks<P extends object>(
+    props: P,
+): [Record<string, unknown>, P] {
+    const callbacks: Record<string, unknown> = {};
+    const rest = { ...props } as Record<string, unknown>;
+    for (const [, name] of CALLBACK_PROPS) {
+        if (name in rest) {
+            callbacks[name] = rest[name];
+            delete rest[name];
+        }
+    }
+    return [callbacks, rest as P];
+}
 
 export interface RootProps<
     T extends FlowTypes = AnyTypes,
     F extends FlowFeatures = readonly [],
 > extends DivPrimitiveProps<RootState>,
-        RootEngineProps {
+        RootEngineProps,
+        RootEventProps {
     /**
      * the flow model. Its middleware (`model.use`) sees every command the flow runs, and its
      * listeners (`model.subscribe`) every change. Give it, or let the root create one from
@@ -104,6 +146,11 @@ export interface RootProps<
     features?: F | undefined;
     /** the id generator of the model the root creates (read once, at mount) */
     createId?: CreateId | undefined;
+    /**
+     * the fields every `edge.add` of the model the root creates fills in where it leaves them out
+     * (read once, at mount: the model option `defaultEdgeOptions`)
+     */
+    defaultEdgeOptions?: DefaultEdgeOptions<T> | undefined;
     /** controlled viewport: a new value is set on the engine (`set-viewport`) */
     viewport?: Viewport | undefined;
     /** the viewport the flow starts at (read once, at mount); default `{ x: 0, y: 0, zoom: 1 }` */
@@ -176,7 +223,8 @@ const ROOT_STYLE: React.CSSProperties = {
 export function Root<
     T extends FlowTypes = AnyTypes,
     F extends FlowFeatures = readonly [],
->(props: RootProps<T, F>) {
+>(allProps: RootProps<T, F>) {
+    const [callbacks, props] = splitCallbacks(allProps);
     const {
         model: modelProp,
         defaultNodes,
@@ -187,6 +235,7 @@ export function Root<
         onEdgesChange,
         features,
         createId,
+        defaultEdgeOptions,
         viewport,
         defaultViewport,
         onViewportChange,
@@ -214,6 +263,11 @@ export function Root<
         nodeExtent,
         elevateNodesOnSelect,
         elevateEdgesOnSelect,
+        paneClickDistance,
+        nodeClickDistance,
+        preventScrolling,
+        nodesFocusable,
+        edgesFocusable,
         children,
         ...rest
     } = props;
@@ -226,7 +280,7 @@ export function Root<
                       nodes: [...(nodes ?? defaultNodes ?? [])],
                       edges: [...(edges ?? defaultEdges ?? [])],
                   } as never,
-                  { features, createId },
+                  { features, createId, defaultEdgeOptions },
               ),
     );
     const typed = (modelProp ?? ownModel) as FlowModel<T, F>;
@@ -265,6 +319,11 @@ export function Root<
         nodeExtent,
         elevateNodesOnSelect,
         elevateEdgesOnSelect,
+        paneClickDistance,
+        nodeClickDistance,
+        preventScrolling,
+        nodesFocusable,
+        edgesFocusable,
     };
     const engineKey = optionsKey(engineProps);
     // the callbacks and the creation options are read when needed: a new function each render
@@ -273,6 +332,7 @@ export function Root<
         onNodesChange,
         onEdgesChange,
         onViewportChange,
+        callbacks,
         engineProps,
         start: viewport ?? defaultViewport ?? DEFAULT_VIEWPORT,
         fitView,
@@ -282,6 +342,7 @@ export function Root<
         onNodesChange,
         onEdgesChange,
         onViewportChange,
+        callbacks,
         engineProps,
     };
 
@@ -312,7 +373,12 @@ export function Root<
                     event.viewport,
                     event.gesture,
                 );
+                return;
             }
+            // the event's callback (`onNodeClick`, `onMoveStart`, …), the latest one given
+            const name = CALLBACK_BY_TYPE.get(event.type);
+            const callback = name ? latest.current.callbacks[name] : undefined;
+            if (typeof callback === "function") callback(event);
         });
         return () => {
             stop();

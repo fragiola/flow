@@ -105,6 +105,11 @@ export {
     type PanOnScrollMode,
 } from "./engine/create-flow-engine";
 export type { PathOptions } from "./engine/edge-geometry";
+export {
+    type CallbackEventType,
+    ENGINE_EVENT_CALLBACKS,
+    type EventCallbackName,
+} from "./engine/event-callbacks";
 export type {
     ConnectionDrop,
     ConnectionEnd,

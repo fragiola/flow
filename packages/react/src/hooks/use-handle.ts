@@ -19,6 +19,10 @@ export interface UseHandleOptions {
     handleId?: string | undefined;
     /** whether a connection may start or end here; default true */
     connectable?: boolean | undefined;
+    /** whether a connection may start here (a drag, a tap, a key); default true */
+    connectableStart?: boolean | undefined;
+    /** whether a connection may end here (be its target); default true */
+    connectableEnd?: boolean | undefined;
     /** its node; default the enclosing `Flow.Node`'s */
     nodeId?: string | undefined;
 }
@@ -31,6 +35,10 @@ export interface HandleState {
     readonly side: HandleSide;
     /** a connection may start or end here (its flag and its node's): `data-connectable` */
     readonly connectable: boolean;
+    /** a connection may start here: `data-connectable-start` */
+    readonly connectableStart: boolean;
+    /** a connection may end here: `data-connectable-end` */
+    readonly connectableEnd: boolean;
     /** the connection under way starts here (`connection()`): `data-connecting` */
     readonly connecting: boolean;
     /** the connection under way would end here and be accepted: `data-valid` */
@@ -56,10 +64,33 @@ export interface UseHandleResult {
 export function useHandle(options: UseHandleOptions): UseHandleResult {
     const { model, engine } = useFlowContext("useHandle");
     const nodeId = useNodeId("Handle", options.nodeId);
-    const { type, side, handleId, connectable } = options;
+    const {
+        type,
+        side,
+        handleId,
+        connectable,
+        connectableStart,
+        connectableEnd,
+    } = options;
     const registration = React.useMemo<HandleRegistration>(
-        () => ({ nodeId, handleId, type, side, connectable }),
-        [nodeId, handleId, type, side, connectable],
+        () => ({
+            nodeId,
+            handleId,
+            type,
+            side,
+            connectable,
+            connectableStart,
+            connectableEnd,
+        }),
+        [
+            nodeId,
+            handleId,
+            type,
+            side,
+            connectable,
+            connectableStart,
+            connectableEnd,
+        ],
     );
     const attributes = useFlowValue(model, engine, () =>
         engine
@@ -85,6 +116,9 @@ export function useHandle(options: UseHandleOptions): UseHandleResult {
             type,
             side,
             connectable: attributes["data-connectable"] !== undefined,
+            connectableStart:
+                attributes["data-connectable-start"] !== undefined,
+            connectableEnd: attributes["data-connectable-end"] !== undefined,
             connecting: attributes["data-connecting"] !== undefined,
             valid: attributes["data-valid"] !== undefined,
             invalid: attributes["data-invalid"] !== undefined,
