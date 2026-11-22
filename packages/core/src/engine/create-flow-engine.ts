@@ -42,10 +42,12 @@ import type {
 } from "../features/types";
 import {
     boundsOf,
+    contains,
     cornerInside,
     intersectionOf,
     nodeBox,
     overlaps,
+    sharesArea,
 } from "../geometry/rect";
 import type { EdgePath, Rect, Viewport } from "../geometry/types";
 import {
@@ -540,6 +542,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                     Array.isArray(nodeIds) ? nodeIds : undefined,
                 );
             },
+            "intersecting-nodes": (p) => this.intersectingNodes(p),
             "viewport-for-bounds": (p) => this.viewportForBoundsRead(p),
             "screen-to-flow": (p) => {
                 const point = pointOf(p);
@@ -1159,6 +1162,41 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 return rect ? [rect] : [];
             }),
         );
+    }
+
+    /**
+     * `intersecting-nodes`: the shown nodes of known size whose box shares area with a node's box
+     * or a rectangle (`partial: false`: lies inside it), the node itself left out.
+     */
+    private intersectingNodes(payload: unknown): readonly FlowNode[] {
+        const record = payloadRecord(payload);
+        const nodeId =
+            typeof record.nodeId === "string" ? record.nodeId : undefined;
+        const rect = payloadRecord(record.rect);
+        const area =
+            nodeId !== undefined
+                ? this.knownRect(nodeId)
+                : finite(rect.x) &&
+                    finite(rect.y) &&
+                    finite(rect.width) &&
+                    finite(rect.height) &&
+                    rect.width >= 0 &&
+                    rect.height >= 0
+                  ? {
+                        x: rect.x,
+                        y: rect.y,
+                        width: rect.width,
+                        height: rect.height,
+                    }
+                  : undefined;
+        if (!area) return [];
+        const partial = record.partial !== false;
+        return this.model.get("all-nodes").filter((node) => {
+            if (node.id === nodeId || node.hidden === true) return false;
+            const box = this.knownRect(node.id);
+            if (!box) return false;
+            return partial ? sharesArea(box, area) : contains(area, box);
+        });
     }
 
     /** A handle with its absolute centre (once it and its node are measured). */

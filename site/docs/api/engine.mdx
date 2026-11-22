@@ -209,6 +209,7 @@ the result is the viewport it ends at (zoom limits and extent kept), and every f
 | `"edge-path-by"` | `{ edgeId }` | its `EdgePath` (path, label point, ends and sides), undefined until both nodes have a size; an app type gets the bezier |
 | `"node-rect-by"` | `{ nodeId }` | its absolute box (size 0 until measured or given) |
 | `"nodes-bounds"` | `{ nodeIds? }` | the box of the nodes (or some); none without a node |
+| `"intersecting-nodes"` | `IntersectingNodesPayload` | the nodes whose box (measured or given) shares some area with a node's box or a flow rectangle (`partial: false`: lies wholly inside it), in the document's order; hidden nodes, nodes of unknown size and the node itself are left out |
 | `"viewport-for-bounds"` | `ViewportForBoundsPayload` | the viewport that frames a flow rectangle in the root, as `fit-view` would set it (padding, zoom limits and translate extent kept); undefined while the root has no size |
 | `"screen-to-flow"` | `XY` | a client point as a flow point (a drop's position) |
 | `"flow-to-screen"` | `XY` | a flow point as a client point |
@@ -223,6 +224,14 @@ the result is the viewport it ends at (zoom limits and extent kept), and every f
 | `"dragging-node-ids"` | none | the nodes being dragged (`drag()`) |
 | `"connection"` | none | the `Connection` being drawn, or null (`connection()`; `undefined` without it) |
 | `"minimap-view"` | `{ width, height }` | what a minimap of that many pixels draws (`minimap()`) |
+
+`IntersectingNodesPayload`:
+
+| field | type | description |
+| --- | --- | --- |
+| `nodeId` | `string` | the node whose box the others are compared with (it is left out); wins over `rect` |
+| `rect` | `Rect` | a rectangle in absolute flow coordinates, without `nodeId` |
+| `partial` | `boolean` | any shared area counts (default `true`); `false`: only a node wholly inside |
 
 `ViewportForBoundsPayload`:
 

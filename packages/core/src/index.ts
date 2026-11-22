@@ -127,6 +127,7 @@ export type {
     EngineIsMap,
     EngineIsPayload,
     FitViewPayload,
+    IntersectingNodesPayload,
     MinimapView,
     NodeToolbarPayload,
     NodeToolbarPosition,

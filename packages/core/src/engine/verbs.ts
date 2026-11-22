@@ -40,6 +40,19 @@ export interface ViewportForBoundsPayload {
     maxZoom?: number | undefined;
 }
 
+/**
+ * What `intersecting-nodes` takes: a node (its box) or a flow rectangle, and whether a node that
+ * only overlaps it counts.
+ */
+export interface IntersectingNodesPayload {
+    /** the node whose box the others are compared with (it is left out); wins over `rect` */
+    nodeId?: string | undefined;
+    /** a rectangle in absolute flow coordinates, without `nodeId` */
+    rect?: Rect | undefined;
+    /** any shared area counts (`true`, the default); `false`: only a node wholly inside */
+    partial?: boolean | undefined;
+}
+
 /** A zoom by a step around a point (`zoom-in`, `zoom-out`). */
 export interface ZoomStepPayload {
     /** the factor; default the engine's `zoomStep` (1.2) */
@@ -257,6 +270,15 @@ export interface EngineGetMap<T extends FlowTypes = AnyTypes> {
     "viewport-for-bounds": {
         payload: ViewportForBoundsPayload;
         result: Viewport | undefined;
+    };
+    /**
+     * the nodes whose box (measured or given) shares some area with a node's box or a rectangle
+     * (`partial: false`: lies wholly inside it), in the document's order; hidden nodes, nodes of
+     * unknown size and the node itself are left out
+     */
+    "intersecting-nodes": {
+        payload: IntersectingNodesPayload;
+        result: readonly FlowNode<T>[];
     };
     /** a client point (a pointer's `clientX`, `clientY`) as a flow point */
     "screen-to-flow": { payload: XY; result: XY };
