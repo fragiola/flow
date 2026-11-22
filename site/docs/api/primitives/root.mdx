@@ -342,7 +342,7 @@ The callbacks are `RootEventProps`: one per [engine event](/docs/api/engine#even
 `viewport-change` (`onViewportChange` has its own), named from the core's `ENGINE_EVENT_CALLBACKS`
 (a `CallbackEventType` to its `EventCallbackName`), each called with the event (its
 `FlowEngineEventOf<K>`), the latest one given. The names follow React Flow's callbacks; Vue emits
-them in kebab-case (`@node-click`), Svelte takes them lowercase (`onnodeclick`), Angular as outputs
+them camelCase (`nodeClick`: `@node-click` in a template, `onNodeClick` in `h()` or TSX), Svelte takes them lowercase (`onnodeclick`), Angular as outputs
 of `flowRoot` (`(nodeClick)`).
 
 <Framework name="react">

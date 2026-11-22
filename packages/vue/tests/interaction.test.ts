@@ -1,8 +1,9 @@
 // The interaction options and gesture events of #33 in Vue (React's `tests/interaction.test.tsx`):
 // the new engine options and `defaultEdgeOptions` as root props, one event per engine event
-// (`ENGINE_EVENT_CALLBACKS` in kebab-case: `@node-click`, `@move-start`, `@init`, …), `Handle`'s
-// `connectable-start` / `connectable-end`, the Controls' lock switching dragging, connecting and
-// selecting, and a reconnect anchor drawn only at an end that may move.
+// (`ENGINE_EVENT_CALLBACKS`, its first letter lowercased: `nodeClick`, `moveStart`, `init`, …;
+// `@node-click` in a template), `Handle`'s `connectable-start` / `connectable-end`, the Controls'
+// lock switching dragging, connecting and selecting, and a reconnect anchor drawn only at an end
+// that may move.
 import { ENGINE_EVENT_CALLBACKS, type FlowEdge } from "@fragiola/flow";
 import { connection } from "@fragiola/flow/connection";
 import { drag as dragFeature } from "@fragiola/flow/drag";
@@ -25,25 +26,21 @@ import {
 beforeEach(installLayout);
 
 describe("the root's events", () => {
-    it("has one per engine event, named from the core's table in kebab-case", () => {
+    it("has one per engine event, named from the core's table (the callback, its first letter lowercased)", () => {
         const emits = (Flow.Root as unknown as { emits: string[] }).emits;
         expect(emits).toEqual([
             "update:nodes",
             "update:edges",
             "update:viewport",
-            ...Object.values(ENGINE_EVENT_CALLBACKS).map((name) =>
-                name.replace(
-                    /[A-Z]/g,
-                    (letter, index: number) =>
-                        `${index > 0 ? "-" : ""}${letter.toLowerCase()}`,
-                ),
+            ...Object.values(ENGINE_EVENT_CALLBACKS).map(
+                (name) => `${name[0]?.toLowerCase()}${name.slice(1)}`,
             ),
         ]);
-        expect(emits).toContain("node-click");
-        expect(emits).toContain("move-start");
+        expect(emits).toContain("nodeClick");
+        expect(emits).toContain("moveStart");
         expect(emits).toContain("init");
-        expect(emits).toContain("connect-cancel");
-        expect(emits).toContain("resize-end");
+        expect(emits).toContain("connectCancel");
+        expect(emits).toContain("resizeEnd");
         expect(emits).toContain("delete");
     });
 
@@ -62,7 +59,7 @@ describe("the root's events", () => {
                 onNodeClick: listener.value,
                 onInit,
                 onPaneClick,
-                "onMove-start": onMoveStart,
+                onMoveStart,
                 onMoveEnd,
             }),
         );
@@ -72,7 +69,7 @@ describe("the root's events", () => {
         await settle();
         const root = part(container, "root");
         expect(root.getAttribute("onNodeClick")).toBeNull();
-        expect(root.getAttribute("onnode-click")).toBeNull();
+        expect(root.getAttribute("onnodeclick")).toBeNull();
         await drag(part(container, "node", "a"), root, [
             { clientX: 10, clientY: 10 },
         ]);

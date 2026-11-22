@@ -2021,8 +2021,9 @@ Epic #34):
   each engine event but `viewport-change` to a name after `on` (`NodeClick`), React Flow's where it
   has one (`MoveStart`, `Init` for `ready`, `SelectionStart` / `SelectionEnd` for the box,
   `ConnectCancel` for React Flow's `onConnectEnd` with its connection state, `ResizeEnd` for
-  `resize`, `Delete` for `remove`). React: `onNodeClick`; Vue: the emit `node-click`
-  (`RootEventEmits`, in `ROOT_EMITS`; an `h()` call types it as `"onNode-click"`); Svelte:
+  `resize`, `Delete` for `remove`). React: `onNodeClick`; Vue: the emit `nodeClick`
+  (`RootEventEmits`, in `ROOT_EMITS`, declared camelCase so an `h()` call or TSX types `onNodeClick`;
+  a template writes `@node-click`); Svelte:
   `onnodeclick`, lowercase as the adapter's other callbacks (`onnodeschange`), not the Epic's
   `onNodeClick`; Angular: the output `nodeClick`, declared one by one (a type-level map and a test
   of `ɵdir.outputs` keep them equal to the table; `moveStart` / `moveEnd` have their types written

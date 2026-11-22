@@ -414,7 +414,7 @@ viewport from it.
 `FlowPointerInfo` (`point`, `client`, `event`) is what the tap, double-click and context-menu
 events share; `FlowEngineEventOf<K>` is the event of one type. `ENGINE_EVENT_CALLBACKS` maps each
 event but `viewport-change` (a `CallbackEventType`) to the name of its root callback in every
-adapter (an `EventCallbackName`: `NodeClick` is React's `onNodeClick`, Vue's `@node-click`,
+adapter (an `EventCallbackName`: `NodeClick` is React's `onNodeClick`, Vue's `nodeClick` (`@node-click`),
 Svelte's `onnodeclick`, Angular's `(nodeClick)`; see [Root](/docs/api/primitives/root#props)).
 
 The engine tells taps from its own gestures: the pointer is captured on the root at every press,

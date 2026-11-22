@@ -120,7 +120,7 @@ Every part takes the props of its React page (for example [Root](/docs/api/primi
 | `v-model:nodes` | `Flow.Root` | `nodes` and `update:nodes`: the model's nodes after every command that changes them (a drag step too) |
 | `v-model:edges` | `Flow.Root` | `edges` and `update:edges`: the model's edges after every command that changes them |
 | `v-model:viewport` | `Flow.Root` | `viewport` and `update:viewport`: every viewport change, `(viewport, gesture)`, `gesture` true for a pan, a zoom or a pinch |
-| `@node-click`, `@move-start`, … | `Flow.Root` | one event per [root callback](/docs/api/primitives/root#props), in kebab-case (`@init`, `@node-click`, `@pane-context-menu`, `@connect-cancel`, `@resize-end`, `@delete`, …), with the engine event; typed by `RootEventEmits` |
+| `@node-click`, `@move-start`, … | `Flow.Root` | one event per [root callback](/docs/api/primitives/root#props), declared camelCase (`init`, `nodeClick`, `paneContextMenu`, `connectCancel`, `resizeEnd`, `delete`, …): `@node-click` in a template, `onNodeClick` in `h()` or TSX; with the engine event; typed by `RootEventEmits` |
 
 | slot | of | receives |
 | --- | --- | --- |

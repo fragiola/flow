@@ -175,22 +175,13 @@ export interface RootSlots extends RenderSlot<RootState> {
 
 type Callbacks = typeof ENGINE_EVENT_CALLBACKS;
 
-/** The rest of a name in kebab-case: each capital becomes `-` and its lower case. */
-type KebabTail<S extends string> = S extends `${infer C}${infer R}`
-    ? `${C extends Lowercase<C> ? C : `-${Lowercase<C>}`}${KebabTail<R>}`
-    : S;
-
-/** A callback's name (`NodeClick`) in kebab-case: its Vue event (`node-click`). */
-type KebabCase<S extends string> = S extends `${infer C}${infer R}`
-    ? `${Lowercase<C>}${KebabTail<R>}`
-    : S;
-
 /**
- * The root's engine events, one per entry of `ENGINE_EVENT_CALLBACKS`, named in kebab-case
- * (`@node-click`, `@move-start`, `@init`, `@connect-cancel`, …), each emitted with the event.
+ * The root's engine events, one per entry of `ENGINE_EVENT_CALLBACKS`, named by the callback with
+ * its first letter lowercased (`nodeClick`, `moveStart`, `init`, `connectCancel`, …), each emitted
+ * with the event: `@node-click` in a template, `onNodeClick` in `h()` or TSX.
  */
 export type RootEventEmits = {
-    [K in keyof Callbacks as KebabCase<Callbacks[K]>]: (
+    [K in keyof Callbacks as Uncapitalize<Callbacks[K]>]: (
         event: FlowEngineEventOf<K>,
     ) => void;
 };
@@ -208,20 +199,14 @@ export type RootEmits<T extends FlowTypes = AnyTypes> = {
     "update:viewport": (viewport: Viewport, gesture: boolean) => void;
 } & RootEventEmits;
 
-/** A callback's name (`NodeClick`) as its Vue event (`node-click`). */
-function kebabCase(name: string): string {
-    return name.replace(
-        /[A-Z]/g,
-        (letter, index: number) =>
-            `${index > 0 ? "-" : ""}${letter.toLowerCase()}`,
-    );
-}
-
-/** Each engine event's Vue event, from the core's table (`node-click` → `node-click`, `ready` → `init`). */
+/** Each engine event's Vue event, from the core's table (`node-click` → `nodeClick`, `ready` → `init`). */
 const EVENT_EMITS: ReadonlyMap<string, keyof RootEventEmits> = new Map(
     Object.entries(ENGINE_EVENT_CALLBACKS).map(
         ([type, name]) =>
-            [type, kebabCase(name) as keyof RootEventEmits] as const,
+            [
+                type,
+                `${name[0]?.toLowerCase()}${name.slice(1)}` as keyof RootEventEmits,
+            ] as const,
     ),
 );
 
@@ -468,7 +453,7 @@ const RootFlow = definePrimitive<AnyRootProps, RootSlots, RootEmits<AnyTypes>>(
                         emit("update:viewport", event.viewport, event.gesture);
                         return;
                     }
-                    // the event's own (`node-click`, `move-start`, …): Vue calls the listener given now
+                    // the event's own (`nodeClick`, `moveStart`, …): Vue calls the listener given now
                     const name = EVENT_EMITS.get(event.type);
                     if (name) emit(name, event);
                 }),
