@@ -17,7 +17,8 @@ import { styles } from "./styles";
 
 // `resize()` and `NodeResizer`: a handle on each corner and side of the node; dragging one resizes
 // the node (`node.resize`, its `width` and `height` written to the document). Each resizer has its
-// own limits over the feature's; the photo keeps its aspect ratio. The handles show while the node
+// own limits over the feature's; the photo keeps its aspect ratio, and the banner's resizer moves
+// only its width (`direction="horizontal"`), from its two sides. The handles show while the node
 // is selected (a style on the node's `data-selected`). With `keyboard()` each handle takes focus:
 // Tab to one and use the arrows (Shift for a bigger step); each has its own name, the default
 // handles have none.
@@ -26,6 +27,7 @@ interface Types extends FlowTypes {
     readonly nodes: {
         note: { label: string; text: string; limits: string };
         photo: { label: string };
+        banner: { label: string };
     };
 }
 
@@ -58,7 +60,18 @@ const nodes: FlowNodeInput<Types>[] = [
         height: 120,
         data: { label: "Photo (4:3, keeps its ratio)" },
     },
+    {
+        id: "banner",
+        type: "banner",
+        position: { x: 0, y: 170 },
+        width: 420,
+        height: 64,
+        data: { label: "Banner (resizes across only)" },
+    },
 ];
+
+/** The two sides a horizontal resizer moves, each named. */
+const SIDES = ["left", "right"] as const;
 
 /** Every corner and side, each named: with `keyboard()` a handle takes focus. */
 function Handles({ nodeId }: { nodeId: string }) {
@@ -94,6 +107,17 @@ function renderNode(node: FlowNode<Types>) {
                         <Handles nodeId={node.id} />
                     </NodeResizer>
                 </>
+            ) : node.type === "banner" ? (
+                <NodeResizer direction="horizontal" className={styles.resizer}>
+                    {SIDES.map((position) => (
+                        <ResizeHandle
+                            key={position}
+                            position={position}
+                            aria-label={`Resize ${node.id}: ${position}`}
+                            className={styles.resizeHandle}
+                        />
+                    ))}
+                </NodeResizer>
             ) : (
                 <>
                     <div
