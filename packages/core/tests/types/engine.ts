@@ -9,10 +9,12 @@ import {
 } from "../../src/engine/create-flow-engine";
 import type { FlowEngineEventOf } from "../../src/engine/events";
 import type { Connection } from "../../src/engine/verbs";
+import { watchKeyPress } from "../../src/engine/watch-key-press";
 import type { EdgePath, Rect, Viewport } from "../../src/geometry/types";
 import { minimap } from "../../src/minimap/minimap";
 import { createFlowModel } from "../../src/model/create-flow-model";
 import { selection } from "../../src/selection/selection";
+import { sameFlowValue } from "../../src/state/same-flow-value";
 
 function use(_value: unknown): void {}
 
@@ -165,6 +167,29 @@ export function selectionRect(): void {
     );
     // @ts-expect-error the rectangle is the selection feature's
     bare.get("selection-rect");
+    const internal = bare.get("internal-node-by", { nodeId: "a" });
+    if (internal) {
+        use([
+            internal.node.id,
+            internal.rect.width,
+            internal.absolutePosition.x,
+            internal.measured,
+            internal.zIndex,
+            internal.handles.length,
+        ]);
+    }
+    bare.subscribe((event) => {
+        if (event.type === "minimap-click")
+            use([event.point.x, event.client.y]);
+    });
+    const stop: () => void = watchKeyPress(
+        document,
+        ["Meta+s", "Shift"],
+        (pressed: boolean) => use(pressed),
+    );
+    stop();
+    const same: boolean = sameFlowValue({ a: [1] }, { a: [1] });
+    use(same);
 }
 
 export function attributes(engine: FlowEngine): void {

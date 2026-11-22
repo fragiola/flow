@@ -158,4 +158,56 @@ describe("the minimap", () => {
             zoomStep: 10,
         });
     });
+
+    it("takes a minimap part's inversePan and zoomStep over the feature's, until it clears them", () => {
+        const flow = mount(json(), { features: [minimap()], sizes });
+        const element = minimapElement(flow.root);
+        flow.engine.adapter.setPartOptions("minimap", "", {
+            inversePan: true,
+            zoomStep: 30,
+        });
+        pointer(element, "pointerdown", { clientX: 650, clientY: 525 });
+        expect(flow.engine.get("viewport")).toEqual({ x: 0, y: 0, zoom: 1 });
+        pointer(flow.root, "pointermove", { clientX: 660, clientY: 525 });
+        expect(flow.engine.get("viewport")).toEqual({ x: 50, y: 0, zoom: 1 });
+        pointer(flow.root, "pointerup", { clientX: 660, clientY: 525 });
+        wheel(element, { deltaY: -50, clientX: 700, clientY: 500 });
+        expect(flow.engine.get("viewport").zoom).toBeCloseTo(
+            Math.exp(150 / 600),
+        );
+        flow.engine.adapter.setPartOptions("minimap", "", null);
+        const before = flow.engine.get("viewport").zoom;
+        wheel(element, { deltaY: -50, clientX: 700, clientY: 500 });
+        expect(flow.engine.get("viewport").zoom / before).toBeCloseTo(
+            Math.exp(50 / 600),
+        );
+    });
+
+    it("tells a tap on it as minimap-click with the flow point under it, pannable or not", () => {
+        for (const pannable of [true, false]) {
+            const flow = mount(json(), {
+                features: [minimap({ pannable })],
+                sizes,
+            });
+            const element = minimapElement(flow.root);
+            const events: unknown[] = [];
+            flow.engine.subscribe((event) => {
+                if (event.type === "minimap-click") {
+                    events.push({ point: event.point, client: event.client });
+                }
+            });
+            pointer(element, "pointerdown", { clientX: 650, clientY: 525 });
+            pointer(flow.root, "pointerup", { clientX: 651, clientY: 525 });
+            // the view box at the press: (-100, -75), 5 units a pixel
+            expect(events, `pannable ${pannable}`).toEqual([
+                { point: { x: 155, y: 300 }, client: { x: 651, y: 525 } },
+            ]);
+            // a drag is no click
+            pointer(element, "pointerdown", { clientX: 650, clientY: 525 });
+            pointer(flow.root, "pointermove", { clientX: 690, clientY: 525 });
+            pointer(flow.root, "pointerup", { clientX: 690, clientY: 525 });
+            expect(events).toHaveLength(1);
+            unmountAll();
+        }
+    });
 });
