@@ -1,8 +1,10 @@
 // #36: the parts' new props (the minimap's inversePan, zoomStep and onclick, the resizer's
 // direction, the fit-view button's framing, the edge toolbar's point and alignment), the
 // rectangle around a box selection (`Flow.NodesSelection`) and the root's selection-drag
-// callbacks (React's tests/part-options.test.tsx).
+// callbacks (React's tests/part-options.test.tsx); #40: the rectangle's keyboard and
+// `ResizeHandle`'s direction and variant.
 import { drag as dragFeature } from "@fragiola/flow/drag";
+import { keyboard } from "@fragiola/flow/keyboard";
 import { minimap } from "@fragiola/flow/minimap";
 import { resize } from "@fragiola/flow/resize";
 import { selection } from "@fragiola/flow/selection";
@@ -19,6 +21,7 @@ import {
     click,
     drag,
     installLayout,
+    key,
     pair,
     part,
     pointer,
@@ -235,5 +238,71 @@ describe("Flow.NodesSelection", () => {
         expect(part(container, "nodes-selection").style.transform).toBe(
             "translate(50px, 35px)",
         );
+    });
+});
+
+describe("Flow.NodesSelection with keyboard()", () => {
+    it("takes focus, and the arrows on it move the selection", async () => {
+        const { container } = await render(PartOptionsFlow, {
+            features: [selection({ rect: "always" }), keyboard({ step: 5 })],
+            defaultNodes: [
+                task("a", 0, 0, { selected: true }),
+                task("b", 200, 100, { selected: true }),
+            ],
+            defaultViewport: { x: 0, y: 0, zoom: 1 },
+            nodesSelection: true,
+        });
+        const rect = part(container, "nodes-selection");
+        expect(rect.getAttribute("tabindex")).toBe("0");
+        rect.focus();
+        expect(document.activeElement).toBe(rect);
+        await key(rect, "ArrowRight");
+        expect(part(container, "node", "a").style.transform).toBe(
+            "translate(5px, 0px)",
+        );
+        expect(part(container, "node", "b").style.transform).toBe(
+            "translate(205px, 100px)",
+        );
+    });
+});
+
+describe("ResizeHandle direction and variant", () => {
+    it("gives data-direction and data-variant, a corner's line ignored", async () => {
+        const { container } = await render(PartOptionsFlow, {
+            features: [resize()],
+            defaultNodes: [task("a")],
+            resizer: {},
+            handles: [
+                { position: "right", variant: "line" },
+                { position: "top-left", variant: "line" },
+                { position: "bottom", direction: "vertical" },
+            ],
+        });
+        const at = (position: string) =>
+            container.querySelector(
+                `[data-position="${position}"]`,
+            ) as HTMLElement;
+        expect(at("right").getAttribute("data-variant")).toBe("line");
+        expect(at("right").hasAttribute("data-direction")).toBe(false);
+        expect(at("top-left").getAttribute("data-variant")).toBe("handle");
+        expect(at("bottom").getAttribute("data-variant")).toBe("handle");
+        expect(at("bottom").getAttribute("data-direction")).toBe("vertical");
+    });
+
+    it("moves only its own direction's sides, over the resizer's", async () => {
+        const { container } = await render(PartOptionsFlow, {
+            features: [resize()],
+            defaultNodes: [task("a")],
+            defaultViewport: { x: 0, y: 0, zoom: 1 },
+            resizer: { direction: "vertical" },
+            handles: [{ position: "bottom-right", direction: "horizontal" }],
+        });
+        await drag(part(container, "resize-handle"), part(container, "root"), [
+            { clientX: 100, clientY: 40 },
+            { clientX: 130, clientY: 70 },
+        ]);
+        const node = part(container, "node", "a");
+        expect(node.style.width).toBe("130px");
+        expect(node.style.height).toBe("40px");
     });
 });

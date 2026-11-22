@@ -1,8 +1,10 @@
 // @vitest-environment node
 import { type FlowEdge, type FlowNode, staticGeometry } from "@fragiola/flow";
+import { resize } from "@fragiola/flow/resize";
 import { selection } from "@fragiola/flow/selection";
 import { render } from "svelte/server";
 import { describe, expect, it } from "vitest";
+import PartOptionsFlow from "./fixtures/part-options-flow.svelte";
 import TestFlow from "./fixtures/test-flow.svelte";
 import { pair, task } from "./flow";
 
@@ -125,5 +127,30 @@ describe("a render with no engine", () => {
         const basic = serverRender({ ...props, zIndexMode: "basic" });
         expect(basic).not.toContain("edges-layer");
         expect(basic).toContain("isolation: isolate");
+    });
+});
+
+describe("a resize handle with no engine (#40)", () => {
+    it("carries its data-variant and data-direction", () => {
+        const body = render(PartOptionsFlow, {
+            // the features are not inferred through the fixture's props
+            props: {
+                features: [resize()],
+                defaultNodes: [task("a")],
+                resizer: {},
+                handles: [
+                    { position: "right", variant: "line" },
+                    { position: "top-left", variant: "line" },
+                    { position: "bottom", direction: "vertical" },
+                ],
+            } as never,
+        }).body;
+        expect(body).toContain('data-position="right" data-variant="line"');
+        expect(body).toContain(
+            'data-position="top-left" data-variant="handle"',
+        );
+        expect(body).toContain(
+            'data-position="bottom" data-variant="handle" data-direction="vertical"',
+        );
     });
 });
