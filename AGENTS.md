@@ -290,7 +290,7 @@ microtask queue. It changes the flow only through `model.run`.
 
 | folder | holds |
 | --- | --- |
-| `src/geometry/` | the path helpers (`bezierPath`, `simpleBezierPath` (#27), `smoothStepPath`, `stepPath`, `straightPath`, each with its label point, written from the geometry), rectangles, the viewport's math, `viewportForBounds` (#27: the framing `fit-view` uses, exported) |
+| `src/geometry/` | the path helpers (`bezierPath`, `simpleBezierPath` (#27), `smoothStepPath`, `stepPath`, `straightPath`, each with its label point, written from the geometry; #35: the step turn's `stepPosition`, `centerX`, `centerY`, bezier's `labelOffset`, `edgeCenter`), rectangles, the viewport's math, `viewportForBounds` (#27: the framing `fit-view` uses, exported) |
 | `src/attributes/` | the part attribute names and `partAttributes` (D11) |
 | `src/engine/` | `createFlowEngine`, the key registry (`verbs.ts`), the adapter contract (`adapter.ts`), events (`events.ts`), measurement, the press target (`dom.ts`), edge geometry, the background pattern, the toolbar positions (`node-toolbar.ts`, `edge-toolbar.ts`), node moves shared by drag and keyboard, the one structural style writer, the viewport animation (`viewport-animation.ts`), the auto-pan step (`auto-pan.ts`) |
 | `src/connect-session/` | the connection under way, shared by `connection()` and `reconnection()` through `host.shared` (no entry; the bundle guard counts it as both features' code) |
@@ -320,7 +320,9 @@ takes each of them (the four adapters' roots take the new ones in #25 and #33).
 **Actions** (`engine.run`; `can`/`check` are their dry runs): `set-viewport { x?, y?, zoom? }`,
 `pan-by { x, y }` (pixels), `zoom-in` / `zoom-out { step?, around? }` (refused at the limit: a
 Controls button's disabled state is `!engine.can("zoom-in")`), `zoom-to { zoom, around? }`,
-`fit-view { padding? 0.1, nodeIds?, minZoom?, maxZoom? }` (refused before a size is known),
+`fit-view { padding? 0.1, nodeIds?, minZoom?, maxZoom? }` (refused before a size is known;
+#35: `padding` a share, `"<n>px"` or `{ top?, right?, bottom?, left? }` of them, a plain number
+unchanged; `includeHidden` fits hidden nodes of known size too),
 `center-on { x, y, zoom? }`, `focus-node { nodeId }`, `set-interactive { interactive?, drag?,
 connect?, select?, reconnect? }` (gestures and keys stop changing the flow, all of them or one
 kind, pan and zoom stay; #32: the per-kind switches, its result every switch; #33: the Controls'
@@ -347,15 +349,18 @@ structural `z-index`), `handles-by { nodeId }`, `background-pattern { variant?, 
 (one SVG pattern tile on the screen: dots, lines, cross), `node-toolbar-by { nodeId | nodeIds, side?,
 align?, offset? }` (a root-relative anchor outside the zoom; #27: `nodeIds` stands beside their
 bounds), `edge-toolbar-by { edgeId, position?: "label" | "source" | "target", offset?: XY }` (#27:
-the edge's point on the screen, the toolbar's centre there, undefined until it is drawn),
+the edge's point on the screen, the toolbar's centre there, undefined until it is drawn; #35:
+`point?: XY` a flow point over `position`, `alignX` / `alignY` start/center/end set the anchors),
 `intersecting-nodes { nodeId } | { rect }, partial?` (#27: the shown nodes of known size sharing
 area with it, `partial: false` wholly inside, the node itself left out), `viewport-for-bounds
 { bounds, padding?, minZoom?, maxZoom? }` (#27: what `fit-view` would set, undefined without a root
-size); features: `selection-box` (selection),
+size; #35: `fit-view`'s padding forms); features: `selection-box` (selection),
 `dragging-node-ids` (drag), `connection` (connection: `from`, `fromPoint`, `toPoint`, `toSide`,
 `to`, `status` valid/invalid/null, `path`, `reconnecting`), `minimap-view { width, height }`
 (minimap: `viewBox`, `viewBoxAttribute`, `scale`, `nodes`, `view`, `maskPath` for
-`fill-rule="evenodd"`). **Questions** (`engine.is`): `interactive`, `interactive-by { kind }` (#32), `ready` (#32),
+`fill-rule="evenodd"`), `minimap-point-to-flow { client }` (#35: a client point on the minimap
+under it, else the first, as a flow point; undefined without a sized minimap). `edge-path-by`
+merges the edge's `pathOptions` over the engine's (#35). **Questions** (`engine.is`): `interactive`, `interactive-by { kind }` (#32), `ready` (#32),
 `panning`, `node-measured`;
 `box-selecting`; `dragging`, `node-dragging`; `resizing`, `node-resizing`; `connecting`;
 `edge-reconnecting`; `node-focusable`, `edge-focusable` (keyboard: the adapter sets `tabindex="0"`).
@@ -1532,7 +1537,11 @@ its reason.
   for none), `connection({ clickToConnect: false })`. #32 extended them: `drag({ selectOnDrag: true
   })`, `connection({ threshold: 1, lineType: "bezier" })`, `keyboard({ panOnFocus: true,
   beforeDelete })`; the model option `defaultEdgeOptions`; the document's `focusable` flag (nodes,
-  edges) and `reconnectable: boolean | "source" | "target"`.
+  edges) and `reconnectable: boolean | "source" | "target"`. #35 extended them: `minimap({
+  inversePan: false, zoomStep: 10 })` (10: the flow's wheel rate), `resize({ snap })` (`{ x, y }`,
+  pointer only, independent of drag's `snapGrid`), a resizer's own `direction: "horizontal" |
+  "vertical"` (`setPartOptions`; no kept ratio with it); the edge's `pathOptions` (replaced by a
+  controlled sync when they change) and its `animated` flag (`edge.set-flags`, `data-animated`).
 
 Decisions of the engine (#3):
 
