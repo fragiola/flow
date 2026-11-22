@@ -83,6 +83,7 @@ export {
 export { useEdges } from "./runes/use-edges.svelte.js";
 export { type UseFlowResult, useFlow } from "./runes/use-flow.svelte.js";
 export { useFlowRef } from "./runes/use-flow-ref.svelte.js";
+export { useFlowStore } from "./runes/use-flow-store.svelte.js";
 export {
     type HandleElementProps,
     type HandleState,
@@ -90,13 +91,28 @@ export {
     type UseHandleResult,
     useHandle,
 } from "./runes/use-handle.svelte.js";
+export { useInternalNode } from "./runes/use-internal-node.svelte.js";
+export {
+    type UseKeyPressOptions,
+    useKeyPress,
+} from "./runes/use-key-press.svelte.js";
 export {
     type NodeElementProps,
     type NodeState,
     type UseNodeResult,
     useNode,
 } from "./runes/use-node.svelte.js";
+export {
+    type UseNodeConnectionsOptions,
+    useNodeConnections,
+} from "./runes/use-node-connections.svelte.js";
+export { useNodeId } from "./runes/use-node-id.svelte.js";
 export { useNodes } from "./runes/use-nodes.svelte.js";
+export { useNodesData } from "./runes/use-nodes-data.svelte.js";
+export {
+    type UseOnViewportChangeOptions,
+    useOnViewportChange,
+} from "./runes/use-on-viewport-change.svelte.js";
 export {
     type FlowSelection,
     useSelection,

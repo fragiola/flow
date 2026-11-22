@@ -58,6 +58,11 @@ export function setFlowContext(value: FlowContextValue): void {
     setContext(FLOW, value);
 }
 
+/** The context of the enclosing `Flow.Root`, or none outside one (a rune that works without it). */
+export function findFlowContext(): FlowContextValue | undefined {
+    return hasContext(FLOW) ? getContext<FlowContextValue>(FLOW) : undefined;
+}
+
 export function useFlowContext(part: string): FlowContextValue {
     const context = hasContext(FLOW)
         ? getContext<FlowContextValue>(FLOW)
@@ -85,6 +90,11 @@ export function useEdgeLabelLayer(): EdgeLabelLayerValue | undefined {
     return hasContext(EDGE_LABEL_LAYER)
         ? getContext<EdgeLabelLayerValue>(EDGE_LABEL_LAYER)
         : undefined;
+}
+
+/** The enclosing `Flow.Node`'s context, or none outside one. */
+export function findNodeContext(): NodeContextValue | undefined {
+    return hasContext(NODE) ? getContext<NodeContextValue>(NODE) : undefined;
 }
 
 /**
