@@ -1,6 +1,12 @@
 import { batch } from "./batch";
 import type { CommandDefinition } from "./define";
-import { edgeAdd, edgeRemove, edgeSetData, edgeSetFlags } from "./edge";
+import {
+    edgeAdd,
+    edgeRemove,
+    edgeSetData,
+    edgeSetFlags,
+    edgeSetZIndex,
+} from "./edge";
 import {
     nodeAdd,
     nodeMove,
@@ -8,6 +14,7 @@ import {
     nodeResize,
     nodeSetData,
     nodeSetFlags,
+    nodeSetZIndex,
 } from "./node";
 import type { CommandName } from "./types";
 
@@ -23,10 +30,12 @@ export const CORE_COMMANDS: readonly CommandDefinition[] = [
     nodeResize,
     nodeSetData,
     nodeSetFlags,
+    nodeSetZIndex,
     edgeAdd,
     edgeRemove,
     edgeSetData,
     edgeSetFlags,
+    edgeSetZIndex,
     batch,
 ] as const satisfies readonly {
     readonly name: CommandName;

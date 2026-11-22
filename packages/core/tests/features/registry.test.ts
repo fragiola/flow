@@ -112,7 +112,7 @@ describe("the feature registry", () => {
     it("lists every feature's commands with the feature they come with", () => {
         const model = createFlowModel(undefined, { features: ALL() });
         const commands = model.get("commands");
-        expect(commands).toHaveLength(16);
+        expect(commands).toHaveLength(18);
         expect(
             commands.find((info) => info.name === "selection.set")?.feature,
         ).toBe("selection");

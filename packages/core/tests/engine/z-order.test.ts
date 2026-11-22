@@ -161,7 +161,7 @@ describe("zIndex in the document", () => {
         }
     });
 
-    it("changed by controlled props, replaces the entity", () => {
+    it("changed by controlled props, is set in place (node.set-z-index, edge.set-z-index)", () => {
         const model = createFlowModel(
             flowOf(
                 { a: [0, 0], b: [10, 0] },
@@ -175,11 +175,34 @@ describe("zIndex in the document", () => {
             .get("all-edges")
             .map((edge) => ({ ...edge, zIndex: 1 }));
         const commands = model.get("commands-to", { nodes, edges });
+        expect(commands).toEqual([
+            {
+                command: "node.set-z-index",
+                payload: { nodeId: "a", zIndex: 4 },
+            },
+            {
+                command: "edge.set-z-index",
+                payload: { edgeId: "ab", zIndex: 1 },
+            },
+        ]);
         expect(model.run("batch", { commands: [...commands] }).ok).toBe(true);
         expect(model.get("node-by", { id: "a" })?.zIndex).toBe(4);
         expect(model.get("edge-by", { id: "ab" })?.zIndex).toBe(1);
         expect(
             model.get("commands-to", { nodes, edges: model.get("all-edges") }),
         ).toEqual([]);
+        // null puts the default back; a missing entity or a fraction is refused
+        expect(
+            model.run("node.set-z-index", { nodeId: "a", zIndex: null }).ok,
+        ).toBe(true);
+        expect(model.get("node-by", { id: "a" })).not.toHaveProperty("zIndex");
+        const code = (result: { ok: boolean; error?: { code: string } }) =>
+            result.error?.code;
+        expect(
+            code(model.run("edge.set-z-index", { edgeId: "zz", zIndex: 1 })),
+        ).toBe("not_found");
+        expect(
+            code(model.run("node.set-z-index", { nodeId: "a", zIndex: 1.5 })),
+        ).toBe("invalid_payload");
     });
 });

@@ -104,6 +104,10 @@ export interface CommandMap<T extends FlowTypes = AnyTypes> {
         result: { nodeId: string };
     };
     "node.set-flags": { payload: NodeFlagsPayload; result: { nodeId: string } };
+    "node.set-z-index": {
+        payload: { nodeId: string; zIndex: number | null };
+        result: { nodeId: string };
+    };
     "node.set-parent": {
         payload: {
             nodeId: string;
@@ -124,6 +128,10 @@ export interface CommandMap<T extends FlowTypes = AnyTypes> {
         result: { edgeId: string };
     };
     "edge.set-flags": { payload: EdgeFlagsPayload; result: { edgeId: string } };
+    "edge.set-z-index": {
+        payload: { edgeId: string; zIndex: number | null };
+        result: { edgeId: string };
+    };
     "selection.set": {
         payload: {
             nodeIds?: string[];

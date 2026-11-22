@@ -8,6 +8,7 @@ import type {
     edgeRemove,
     edgeSetData,
     edgeSetFlags,
+    edgeSetZIndex,
 } from "../../src/commands/edge";
 import type {
     nodeAdd,
@@ -16,6 +17,7 @@ import type {
     nodeResize,
     nodeSetData,
     nodeSetFlags,
+    nodeSetZIndex,
 } from "../../src/commands/node";
 import type {
     CommandName,
@@ -69,12 +71,14 @@ export type SchemasMatchTypes = [
     Check<"node.resize", typeof nodeResize>,
     Check<"node.set-data", typeof nodeSetData>,
     Check<"node.set-flags", typeof nodeSetFlags>,
+    Check<"node.set-z-index", typeof nodeSetZIndex>,
     Check<"node.set-parent", typeof nodeSetParent>,
     Check<"edge.add", typeof edgeAdd>,
     Check<"edge.remove", typeof edgeRemove>,
     Check<"edge.reconnect", typeof edgeReconnect>,
     Check<"edge.set-data", typeof edgeSetData>,
     Check<"edge.set-flags", typeof edgeSetFlags>,
+    Check<"edge.set-z-index", typeof edgeSetZIndex>,
     Check<"selection.set", typeof selectionSet>,
     Check<"selection.clear", typeof selectionClear>,
     Check<"selection.remove", typeof selectionRemove>,

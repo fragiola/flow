@@ -1,7 +1,11 @@
 // The core's edge commands (D6). An edge joins two existing, connectable nodes, and no second edge
 // joins the same handles in the same direction; a middleware decides the app's own rules (D7:
 // `model.can("edge.add", …)` is a connection's validity).
-import { edgeFlagProperties, edgeSchema } from "../document/document-schema";
+import {
+    edgeFlagProperties,
+    edgeSchema,
+    zIndexSchema,
+} from "../document/document-schema";
 import { edgeFlag } from "../document/flags";
 import type { FlowEdge } from "../document/types";
 import { cloneJson } from "../state/clone-json";
@@ -128,6 +132,38 @@ export const edgeSetFlags = defineCommand({
         }
         draft.putEdge({ ...edge, ...flags });
         features.flagsChanged(draft, "edge", edgeId);
+        return ok({ edgeId });
+    },
+});
+
+export const edgeSetZIndex = defineCommand({
+    name: "edge.set-z-index",
+    description:
+        "Sets an edge's `zIndex`, its place in the edges' drawing order (null: the default, 0), in place.",
+    payloadSchema: {
+        type: "object",
+        properties: {
+            edgeId,
+            zIndex: {
+                anyOf: [zIndexSchema, { type: "null" }],
+                description:
+                    "its place in its layer's stacking order (an integer); null: back to the default, 0",
+            },
+        },
+        required: ["edgeId", "zIndex"],
+        additionalProperties: false,
+    },
+    resultSchema: edgeIdResult,
+    transient: false,
+    reduce: ({ edgeId, zIndex }, { draft }) => {
+        const edge = findEdge(draft, edgeId, "/edgeId");
+        if (isFailure(edge)) {
+            return edge;
+        }
+        const { zIndex: _was, ...rest } = edge;
+        draft.putEdge(
+            (zIndex === null ? rest : { ...rest, zIndex }) as typeof edge,
+        );
         return ok({ edgeId });
     },
 });

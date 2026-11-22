@@ -5,6 +5,7 @@ import {
     nodeFlagProperties,
     nodeSchema,
     xySchema,
+    zIndexSchema,
 } from "../document/document-schema";
 import { nodeFlag } from "../document/flags";
 import type { FlowNode } from "../document/types";
@@ -269,6 +270,38 @@ export const nodeSetFlags = defineCommand({
         }
         draft.putNode({ ...node, ...flags });
         features.flagsChanged(draft, "node", nodeId);
+        return ok({ nodeId });
+    },
+});
+
+export const nodeSetZIndex = defineCommand({
+    name: "node.set-z-index",
+    description:
+        "Sets a node's `zIndex`, its place in the nodes' stacking order (null: the default, 0), in place: its edges and measurements stay.",
+    payloadSchema: {
+        type: "object",
+        properties: {
+            nodeId,
+            zIndex: {
+                anyOf: [zIndexSchema, { type: "null" }],
+                description:
+                    "its place in its layer's stacking order (an integer); null: back to the default, 0",
+            },
+        },
+        required: ["nodeId", "zIndex"],
+        additionalProperties: false,
+    },
+    resultSchema: nodeIdResult,
+    transient: false,
+    reduce: ({ nodeId, zIndex }, { draft }) => {
+        const node = findNode(draft, nodeId, "/nodeId");
+        if (isFailure(node)) {
+            return node;
+        }
+        const { zIndex: _was, ...rest } = node;
+        draft.putNode(
+            (zIndex === null ? rest : { ...rest, zIndex }) as typeof node,
+        );
         return ok({ nodeId });
     },
 });
