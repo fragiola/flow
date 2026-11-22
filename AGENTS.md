@@ -293,7 +293,7 @@ microtask queue. It changes the flow only through `model.run`.
 
 | folder | holds |
 | --- | --- |
-| `src/geometry/` | the path helpers (`bezierPath`, `simpleBezierPath` (#27), `smoothStepPath`, `stepPath`, `straightPath`, each with its label point, written from the geometry; #35: the step turn's `stepPosition`, `centerX`, `centerY`, bezier's `labelOffset`, `edgeCenter`), rectangles, the viewport's math, `viewportForBounds` (#27: the framing `fit-view` uses, exported) |
+| `src/geometry/` | the path helpers (`bezierPath`, `simpleBezierPath` (#27), `smoothStepPath`, `stepPath`, `straightPath`, each with its label point, written from the geometry; #35: the step turn's `stepPosition`, `centerX`, `centerY`, bezier's `labelOffset`, `edgeCenter`), rectangles, the viewport's math, `viewportForBounds` (#27: the framing `fit-view` uses, exported); #38: the pure, engine-free geometry the engine and the adapters' first render share: `node-layout.ts` (a node's origin, absolute position and box through `nodeBox`, parameterised by a size lookup: the engine's fixed ?? measured ?? initial, the static fixed ?? initial; the declared handles and `matchHandle`), `edge-geometry.ts` (edge ends and `pathOf`, moved from `src/engine/` with a handle type of its own), `z-order.ts` (`ZIndexMode`, the stack values, the drawing order, `renderLayers`), `static-geometry.ts` (`staticGeometry`). No DOM global and nothing from `src/engine/`: `tests/guard.test.ts` checks it |
 | `src/attributes/` | the part attribute names and `partAttributes` (D11) |
 | `src/engine/` | `createFlowEngine`, the key registry (`verbs.ts`), the adapter contract (`adapter.ts`), events (`events.ts`), measurement, the press target (`dom.ts`), edge geometry, the background pattern, the toolbar positions (`node-toolbar.ts`, `edge-toolbar.ts`), node moves shared by drag and keyboard, the one structural style writer, the viewport animation (`viewport-animation.ts`), the auto-pan step (`auto-pan.ts`) |
 | `src/connect-session/` | the connection under way, shared by `connection()` and `reconnection()` through `host.shared` (no entry; the bundle guard counts it as both features' code) |
@@ -308,13 +308,18 @@ gesture starts; `null` none), `panOnScroll` false, `panOnScrollMode` `"free"` (`
 on Apple platforms, Control elsewhere, from the root window's `navigator`; with `panOnScroll`, the
 wheel zooms while it is held; `null` none), `zoomOnScroll` true, `zoomOnPinch` true,
 `zoomOnDoubleClick` true, `zoomStep` 1.2, `fitView` (true or `fit-view`'s payload: once every
-visible node is measured), `interactive` true, `onlyRenderVisible` false, `pathOptions`
+visible node is measured; #38: a node's `initialWidth` / `initialHeight` count as known until it is
+measured, and the fit is not redone when the measured sizes differ), `interactive` true, `onlyRenderVisible` false, `pathOptions`
 (`curvature` 0.5, `borderRadius` 5, `offset` 20), `autoPan` true (`AutoPanOptions` `{ speed: 10,
 margin: 30 }`: pixels a frame at the edge, pixels from the edge it starts at), `easing` (a cubic
 ease in and out; `ViewportEasing`), `nodeOrigin` `{ x: 0, y: 0 }` (#24: the point of a node's box
 its position stands at, as shares of its size, for the nodes on the flow), `nodeExtent` (#24: a
 flow `Rect` every node's box stays inside when dragged, moved by the arrows or resized),
-`elevateNodesOnSelect` true, `elevateEdgesOnSelect` false (#24), and #32's `paneClickDistance` 3,
+`elevateNodesOnSelect` true, `elevateEdgesOnSelect` false (#24; #38: true by default in `zIndexMode`
+`"auto"`, an explicit value honoured), `zIndexMode` `"auto"` (#38: `"basic"` today's order, every
+edge below every node; `"auto"` an edge at least as high as its ends' stack values (without their
+selection raise) when one of them has a parent, plus the raise when selected; `"manual"` only the
+`zIndex` values), and #32's `paneClickDistance` 3,
 `nodeClickDistance` 3 (the tap distances on the pane and on anything else), `preventScrolling` true
 (the wheel over the flow never scrolls the page), `nodesFocusable` true, `edgesFocusable` true, and
 `autoPan`'s per-gesture switches (`{ node, connect, selection, resize }`). `adapter.setOptions`
@@ -347,8 +352,10 @@ source, sourceSide, target, targetSide }`, undefined until both nodes have a siz
 the bezier), `node-rect-by { nodeId }` (absolute, size 0 until known), `nodes-bounds { nodeIds? }`,
 `screen-to-flow`, `flow-to-screen`, `visible-nodes` (in view, plus the unmeasured),
 `visible-edges`, `drawn-edges` (#24: the edges to draw in drawing order, shown and with measured
-nodes, in view with `onlyRenderVisible`, by z-order), `node-z-index-by { nodeId }` (#24: the node's
-structural `z-index`), `handles-by { nodeId }`, `background-pattern { variant?, gap?, size?, offset? }`
+nodes, in view with `onlyRenderVisible`, by z-order; #38: by the `zIndexMode`'s edge value, document
+order among equals), `node-z-index-by { nodeId }` (#24: the node's structural `z-index`; #38: its
+rank, negative, while there are several render levels), `render-layers` (#38: `RenderLayer[]`
+`{ level, zIndex, nodeIds, edgeIds }`, see below), `handles-by { nodeId }`, `background-pattern { variant?, gap?, size?, offset? }`
 (one SVG pattern tile on the screen: dots, lines, cross), `node-toolbar-by { nodeId | nodeIds, side?,
 align?, offset? }` (a root-relative anchor outside the zoom; #27: `nodeIds` stands beside their
 bounds), `edge-toolbar-by { edgeId, position?: "label" | "source" | "target", offset?: XY }` (#27:
@@ -404,10 +411,11 @@ calls its callback only when `element` is its own; the root captures the pointer
 - `attachViewport(element | null)`: the engine writes `transform` and `transform-origin` on it; the
   framework never renders a transform there (D4). Nodes render inside it at their absolute
   position: `node-rect-by`'s `x`, `y` as a structural `transform: translate(x, y)` (its
-  `nodeOrigin` applied: the core is the one source of a node's place), `node-z-index-by` as its
+  origin applied, #38: its own `origin` or the engine's `nodeOrigin`: the core is the one source of
+  a node's place), `node-z-index-by` as its
   structural `z-index` (#24), flat (a child is not nested in its parent's element), and the
   document's `width`/`height` when given (a resize writes them). Edges are drawn in `drawn-edges`'
-  order (#24): an SVG's order is its drawing order.
+  order (#24): an SVG's order is its drawing order; #38: by render level, below.
 - `registerNode(nodeId, element | null)` (observed: its `offsetWidth`/`offsetHeight`),
   `registerHandle({ nodeId, handleId?, type, side, connectable?, connectableStart?,
   connectableEnd? }, element | null)` (D8: its centre relative to its node, from the client rects
@@ -418,12 +426,20 @@ calls its callback only when `element` is its own; the root captures the pointer
   (`dom.ts`), so every part must carry them: `root`, `viewport`, `nodes`, `edges`, `background` are
   the pane; `node`; `handle`; `edge`/`edge-path`/`edge-label`; `reconnect-anchor { edgeId, end }`
   (`data-end`: an edge end's grab area, drawn above the handles); `resize-handle { nodeId,
-  position }` (`data-position`: `top-left` … `left`, inside the node's element); `minimap`,
+  position, direction?, variant? }` (`data-position`: `top-left` … `left`, inside the node's
+  element; #38: `data-direction`, the handle's own direction, read at the press or the key and
+  winning over its resizer's, and `data-variant` `handle` or `line`, `line` on a side only, a
+  styling marker; `resizeHandleAttributes` without an engine); `edges-layer { level }` (#38:
+  `data-level`, one render level's wrapper, `edgesLayerAttributes` without an engine; a press on it
+  is the pane's); `minimap`,
   `minimap-node`, `minimap-mask`; `nodes-selection` (#35, no payload: the rectangle around the
   selection, rendered in the viewport at `selection-rect` as a structural `transform:
   translate(x, y)`, `width`, `height` when non-null; a press drags the selection with `drag()`'s
   own gesture, led by its first draggable node, so threshold, snap, extent and auto-pan are a node
-  drag's; `data-dragging` while it drags; a context menu is the selection's); anything else (`controls`, `toolbar`, `panel`) is left alone
+  drag's; `data-dragging` while it drags; a context menu is the selection's; #38: with `keyboard()`
+  its record holds `tabindex: "0"` and its keys are a focused selected node's, the arrows moving
+  the selection (`step`, `fastStep`, extents, snap off), a delete key removing it, Escape clearing
+  it, Enter and Space nothing; the app names it); anything else (`controls`, `toolbar`, `panel`) is left alone
   (a `toolbar`'s record takes `{ nodeId }`, or since #27 `{ edgeId }` for an edge's, as its
   `data-flow-id`, and nothing for several nodes'). With `keyboard()` and `connection()`, a
   connectable `handle`'s record holds `tabindex: "0"`; with `keyboard()` and `resize()`, every
@@ -448,6 +464,52 @@ calls its callback only when `element` is its own; the root captures the pointer
   `sameFlowValue(a, b)` (arrays and plain records compared deep, the rest by identity).
 - `settings.onlyRenderVisible`: render `visible-nodes` instead of every node (the edges' list,
   `drawn-edges`, applies it itself: #25's adapters render it and filter nothing).
+- `refocus(element)` (#38): an element whose part and id (`data-flow-part`, `data-flow-id`) were
+  the last focused in the flow (the engine remembers them from the root's `focusin`, and forgets a
+  blurred one) is focused again (`preventScroll`) when focus was lost (the owner document's active
+  element is its body or none). Each adapter's `Flow.Edge` calls it on mount: an edge that moves
+  to another render level's SVG is remounted (React, Vue, Svelte) or moved (Angular), which drops
+  focus.
+
+**Declared geometry (#38).** Node fields, with their schemas (the schema test keeps them equal to
+the types): `width` / `height` (fixed, over the measured size, as before), `initialWidth` /
+`initialHeight` (>= 0, used until measured), `handles?: DeclaredHandle[]` (`{ id?, type, position,
+x, y, width? = 0, height? = 0 }`, the box relative to the node box's top-left corner; its point is
+the box's centre, the point the engine measures for a rendered handle; used only until a handle of
+that node, type and id is measured: measured handles always win; matched by the engine's
+`handleOf` rule), `sourcePosition` / `targetPosition` (the default end's side when no handle gives
+one; bottom / top stay the defaults) and `origin` (an `XY` over `nodeOrigin` for that node,
+exactly where `nodeOrigin` applies: a child keeps its top-left corner in its parent, a parent's
+origin moves its box and so its children). The engine falls back to the same pure helpers until a
+node is measured; `node-measured` stays measured or fixed (not initial). `staticGeometry(flow,
+options?)` (`{ nodeOrigin, pathOptions, zIndexMode, elevateNodesOnSelect, elevateEdgesOnSelect }`)
+returns frozen plain data, `{ nodeRects, nodeZIndexes, edgePaths, drawnEdges, layers }` keyed by
+id, as the engine's reads give them before anything is measured.
+
+**The SSR rule (#38, #39).** The server's geometry and the first client render are the same pure
+function of the same inputs: while `engine` is null, each adapter computes `staticGeometry(<the
+model's document>, <the root's nodeOrigin, pathOptions, zIndexMode, elevate…>)` once per
+document/options change, shares it through its context, and its `Edges` / `Edge` / `EdgePath`
+draw `layers` and `edgePaths[id]` (with `partAttributes`), its `Node` stands at `nodeRects[id]`
+with `nodeZIndexes[id]`. No hydration mismatch, and no jump when the measured geometry equals the
+declared one. Edge labels are not in the server HTML (they portal once mounted).
+
+**Render layers (#38, #39).** `render-layers`: with `"basic"`, or no edge value above the lowest
+shown node value, ONE level `{ level: 0, zIndex: undefined, nodeIds: all shown, edgeIds:
+drawn-edges }` and `node-z-index-by` unchanged: today's DOM. Otherwise the thresholds T are the
+sorted distinct edge values above the lowest node value, levels 0..|T|: an edge of value T[j-1] is
+level j (others 0), a node's level is how many thresholds are <= its value (an edge at a node's
+value stays below it). The structural z-indexes are then ranks in the order level 0 edges, level
+0 nodes by value, level 1 edges, …, each rank r of M mapped to r - M (negative), so what the app
+renders after the layers (connection line, selection box, `nodes-selection`) stays above. The
+rendering decision: **nodes never change wrapper** (a move would remount them in every framework,
+losing state, focus, measurement, a gesture under way); `Flow.Edges` with one level is today's
+DOM, with several one `edges-layer` wrapper per level (`data-level`, structural position absolute,
+top/left 0, 100 %, overflow visible, pointer-events none, `z-index` the level's) holding that
+level's `svg` `edges` and its edges' labels; `Flow.Nodes` drops its `isolation: isolate` while
+there are several levels, so the node ranks interleave with the edge layers in the viewport's
+stacking context. App CSS must not make the nodes or edges layer a stacking context (opacity,
+transform, filter, isolation, z-index), or the layering breaks (`concepts/nodes-and-edges.mdx`).
 
 ## The React adapter (Issue #5)
 
