@@ -430,7 +430,7 @@ engine's state attributes from `engine.adapter.attributes(part, payload)`):
 | `Viewport` | `div` `viewport` | `attachViewport`: the engine writes its transform, React never does |
 | `Nodes` | `div` `nodes` | children function per node not hidden (`visible-nodes` with `onlyRenderVisible`), keyed by id; `isolation: isolate` (#25: the nodes' `z-index` stays inside the layer) |
 | `Node` | `div` `node` | `registerNode`; `transform: translate(x, y)` from `node-rect-by` (its `nodeOrigin` applied), `z-index` from `node-z-index-by` (#25), the document's `width`/`height`; `tabIndex` from `node-focusable` |
-| `Handle` | `div` `handle` | `registerHandle({ nodeId, handleId, type, side, connectable })`; centred on its side by default (a style may move it) |
+| `Handle` | `div` `handle` | `registerHandle({ nodeId, handleId, type, side, connectable })`; centred on its side by default (a style may move it); the engine's record, `tabindex` as `tabIndex` (#28: with `keyboard()` + `connection()`) |
 | `Edges` | `div` + `svg` `edges` | children function per edge of `drawn-edges`, in its order (#25: shown, measured, by z-order); the `div` is the HTML layer labels portal into |
 | `Edge` | `g` `edge` | default child `EdgePath`; `pointer-events: visibleStroke`; `tabIndex` from `edge-focusable` |
 | `EdgePath` | `path` `edge-path` | `d` from `edge-path-by` (a `d` of your own draws an app type), `fill="none"` |
@@ -442,11 +442,12 @@ engine's state attributes from `engine.adapter.attributes(part, payload)`):
 | `Controls` | `div` `controls` | a group for the buttons |
 | `ZoomIn`, `ZoomOut`, `FitView` | `button` `zoom-in`, `zoom-out`, `fit-view` | run their action (with their `duration` prop, #25); `disabled` / `data-disabled` while `!engine.can(...)` |
 | `ToggleInteractive` | `button` `toggle-interactive` | `set-interactive`; `aria-pressed` while locked, `data-interactive` |
-| `NodeToolbar` | `div` `toolbar` | portal into the root at `node-toolbar-by` (outside the zoom); `open`, default while its node is selected |
+| `NodeToolbar` | `div` `toolbar` | portal into the root at `node-toolbar-by` (outside the zoom); `open`, default while its node is selected; #28: `nodeIds` (not empty: beside their bounds, no enclosing node needed, no `data-flow-id`, shown while every one is selected) |
+| `EdgeToolbar` | `div` `toolbar` | #28: portal into the root at `edge-toolbar-by` (outside the zoom, its centre on the point); `edgeId` (default the enclosing `Edge`'s), `position` (`"label"` / `"source"` / `"target"`), `offset` (`XY`), `open`, default while its edge is selected; `data-flow-id` its edge's id |
 | `MiniMap` (`/minimap`) | `svg` `minimap` | `width` × `height` (200 × 150), `minimap-view`; children default: a `MiniMapNode` per node and the `MiniMapMask` |
 | `MiniMapNode`, `MiniMapMask` | `rect` `minimap-node`, `path` `minimap-mask` | a node's box; the mask (`fill-rule="evenodd"`) |
 | `NodeResizer` (`/resize`) | `div` `resizer` | `setPartOptions("resizer", nodeId, { minWidth, … })`; default children: a `ResizeHandle` at each corner and side |
-| `ResizeHandle` | `div` `resize-handle` | `data-position`; placed on its corner or along its side |
+| `ResizeHandle` | `div` `resize-handle` | `data-position`; placed on its corner or along its side; #28: the engine's record (`resize-handle { nodeId, position }`: `tabindex` with `keyboard()` + `resize()`, as `tabIndex`) |
 
 **Root props:** `model`, or `defaultNodes` / `defaultEdges` (read once) and the controlled `nodes` /
 `edges` with `onNodesChange` / `onEdgesChange`; `features` and `createId` (read once: a changed
@@ -530,6 +531,17 @@ Decisions of the adapter (#5):
   (`tests/options.test.tsx`: `vi.mock` of the core's `createFlowEngine`, its frozen engine and
   adapter inherited by a wrapper that records `setOptions` and `run`).
 
+Decisions of the toolbars and keyboard handles in React (#28, Epic #29; what the four adapters
+share is under [Decisions taken during implementation](#decisions-taken-during-implementation)):
+
+- **`attributeProps` (`utils/use-render.ts`) is the one place an engine record becomes props**:
+  the core gives DOM names, React takes `tabindex` as `tabIndex` (a number; the lowercase name
+  warns in React 19). `useHandle`'s `props` and `ResizeHandle` go through it (tested: no
+  `console.error` with `keyboard()`); `Node` and `Edge` keep their `tabIndex` from
+  `node-focusable` / `edge-focusable`.
+- **`EdgeToolbar` portals from inside the SVG `Edge`**: `createPortal` takes the container's
+  namespace, so its `div` is HTML (no layer needed, unlike Vue).
+
 For the playground and examples (#6, see [The playground and the examples](#the-playground-and-the-examples-issue-6)): wrap the flow in a sized element (the root fills it); put
 `Edges` before `Nodes` inside `Viewport`, and `Background`, `SelectionBox`, `Controls`, `MiniMap`
 outside it; give nodes `user-select: none`; style through `[data-flow-part]` and the state
@@ -538,7 +550,7 @@ attributes (`data-selected`, `data-dragging`, `data-connecting`, `data-valid` / 
 
 ## The Vue adapter (Issue #9)
 
-`@fragiola/flow-vue` is the React adapter in Vue 3.5: the same 24 primitives (the 19 of `Flow`,
+`@fragiola/flow-vue` is the React adapter in Vue 3.5: the same 25 primitives (the 20 of `Flow`,
 `MiniMap`, `MiniMapNode`, `MiniMapMask` on `/minimap`, `NodeResizer`, `ResizeHandle` on
 `/resize`), in files of the same names (`components/<name>.ts`, `minimap/`, `resize/`:
 `tests/index.test.ts` compares them with React's), the same elements, part names, state
@@ -565,7 +577,7 @@ the smoke app's single-file component needs `vue-tsc` (TypeScript 6).
 | children functions (`Nodes`, `Edges`, `ConnectionLine`, `MiniMap`) | the default scoped slot: `v-slot="{ node }"`, `{ edge }`, `{ connection }`, `{ view }` |
 | `children` of a part | its default slot, given `{ state }` |
 | `className` / `style` functions of the state | `class` / `style` values only (see below); the state through the slots and the `data-*` |
-| `ref` | a template ref: the component, its `$el` the element (`EdgeLabel`, `NodeToolbar`: their element renders elsewhere, reach it through the `render` slot) |
+| `ref` | a template ref: the component, its `$el` the element (`EdgeLabel`, `NodeToolbar`, `EdgeToolbar`: their element renders elsewhere, reach it through the `render` slot) |
 | `nodes` + `onNodesChange`, `edges` + `onEdgesChange` | `v-model:nodes`, `v-model:edges` (`update:nodes`, `update:edges`) |
 | `viewport` + `onViewportChange(viewport, gesture)` | `v-model:viewport` (`update:viewport`, `(viewport, gesture)`) |
 | `flowRef={ref}`, `ref.current` | `:flow-ref="flow"`, `flow.value` (reactive, `markRaw`, Tree's) |
@@ -634,6 +646,13 @@ Decisions of the Vue adapter (#9):
   mutated in place (`origin.x = 1`) is not seen, as `pathOptions` / `translateExtent`; give a
   new object.
   The node's `z-index`, the node origin and `drawn-edges` are React's (#25 there).
+- **`EdgeToolbar` inside `Flow.Edges` renders from the edges' HTML layer** (#28): written in the
+  edge's SVG slot, a `Teleport` would keep the SVG namespace (`button` and `div` created as SVG
+  elements), so it registers a render function in the label layer (`EdgeLabelLayerKey`, its
+  entry keyed `toolbar-<n>`: the entries' `key` became `number | string`), and that render is a
+  `Teleport` to the root from the HTML layer. Outside `Flow.Edges` (with an `edgeId`) it is a
+  `Teleport` where it is written. `nodeIds` and `offset` are spread / passed plain (a reactive
+  array reaches the engine as a copy).
 - **Known limits:** jsdom lays nothing out, so the tests stub the layout (`tests/flow.ts`,
   React's); the gestures' real feel is the Vue examples' shared Playwright specs (#10), which
   needed no adapter fix.
@@ -641,7 +660,7 @@ Decisions of the Vue adapter (#9):
 ## The Svelte adapter (Issue #12)
 
 `@fragiola/flow-svelte` is the React adapter in Svelte 5 (runes mode), the first Svelte adapter of
-the ecosystem: the same 24 primitives (the 19 of `Flow`, `MiniMap`, `MiniMapNode`, `MiniMapMask` on
+the ecosystem: the same 25 primitives (the 20 of `Flow`, `MiniMap`, `MiniMapNode`, `MiniMapMask` on
 `/minimap`, `NodeResizer`, `ResizeHandle` on `/resize`), in files of React's names
 (`components/<name>.svelte`, `minimap/`, `resize/`: `tests/index.test.ts` compares them), the same
 elements, part names, state attributes, structural styles, props and state fields, over the same
@@ -768,6 +787,11 @@ Decisions of the Svelte adapter (#12):
   `ZoomIn`, `ZoomOut`, `FitView` take `duration`. The node's `z-index` is in its structural style
   string (`useNode`'s `props.style`, `elementProps`' `structural`), so a consumer's `style`
   (`z-index` included) never replaces it (tested). The node origin and `drawn-edges` are React's.
+- **`EdgeToolbar` mounts into the root through `utils/portal.svelte`** (#28), as `NodeToolbar`:
+  its `div` is written in its own component (HTML), so the edge's SVG around it does not matter.
+  `nodeIds` and `offset` go through `plain` (a `$state` proxy never reaches the engine).
+  `NodeToolbar` calls `useNodeId`'s getter only without `nodeIds`, so several nodes' toolbar needs
+  no enclosing node.
 - **`ref` has no fallback** (`ref = $bindable()`): Svelte refuses `bind:ref={undefined}` on a prop
   with a fallback, and `let el = $state()` is the common app code.
 - **Biome does not read `.svelte` files** (not in its `includes`); `svelte-check
@@ -781,7 +805,7 @@ Decisions of the Svelte adapter (#12):
 ## The Angular adapter (Issue #15)
 
 `@fragiola/flow-angular` is the React adapter in Angular 22 (signals, standalone, zoneless,
-OnPush by default), in the ecosystem's Angular way (Splitter's, Tree's, Data Grid's): the same 24
+OnPush by default), in the ecosystem's Angular way (Splitter's, Tree's, Data Grid's): the same 25
 primitives as **attribute directives on the app's own elements** (`<div flowRoot>`,
 `<div [flowNode]="node">`, `<svg:g [flowEdge]="edge">`, `<button flowZoomIn>`), in files of React's
 base names with Angular's suffix (`src/lib/directives/<name>.directive.ts`, `src/minimap/`,
@@ -808,7 +832,7 @@ and the eight feature entries as ng-packagr secondary entry points (`/minimap` a
 
 | React | Angular |
 | --- | --- |
-| `<Flow.Root …>` and every part | the part's directive on the app's element: `flowRoot`, `flowViewport`, `flowNodes`, `flowNode`, `flowHandle`, `flowEdges`, `flowEdge`, `flowEdgePath`, `flowEdgeLabel`, `flowReconnectAnchor`, `flowConnectionLine`, `flowSelectionBox`, `flowBackground`, `flowControls`, `flowZoomIn`, `flowZoomOut`, `flowFitView`, `flowToggleInteractive`, `flowNodeToolbar`, `flowMiniMap`, `flowMiniMapNode`, `flowMiniMapMask`, `flowNodeResizer`, `flowResizeHandle` |
+| `<Flow.Root …>` and every part | the part's directive on the app's element: `flowRoot`, `flowViewport`, `flowNodes`, `flowNode`, `flowHandle`, `flowEdges`, `flowEdge`, `flowEdgePath`, `flowEdgeLabel`, `flowReconnectAnchor`, `flowConnectionLine`, `flowSelectionBox`, `flowBackground`, `flowControls`, `flowZoomIn`, `flowZoomOut`, `flowFitView`, `flowToggleInteractive`, `flowNodeToolbar`, `flowEdgeToolbar` (#28), `flowMiniMap`, `flowMiniMapNode`, `flowMiniMapMask`, `flowNodeResizer`, `flowResizeHandle` |
 | `render={<section />}`, `render={(props, state) => …}` | not applicable: the app writes its own element and puts the directive on it |
 | the children functions of `Nodes`, `Edges` | `<ng-template flowNodesItem let-node>` inside `[flowNodes]` (or `*flowNodesItem="let node"`), `<ng-template flowEdgesItem let-edge>` inside `[flowEdges]` (its elements with the `svg:` prefix); `[flowNodesItem]="model"` types the node by the registry (`ngTemplateContextGuard`) |
 | the children functions of `ConnectionLine`, `MiniMap` | the app's elements inside them, reading `#line="flowConnectionLine"`'s `line.state()?.connection` or `#map="flowMiniMap"`'s `map.state().view` |
@@ -905,6 +929,13 @@ Decisions of the Angular adapter (#15):
   part writing its DOM from its own subscription (a control button's click wrote `disabled`
   directly, #16's first fix); refused: one place, and the direct write could leave a button
   disabled when the app's `(click)` undid the limit in the same task (#16's review).
+- **`flowEdgeToolbar` is written `<xhtml:div flowEdgeToolbar>` inside `[flowEdge]`** (#28), as an
+  edge label, and moved into the root (`bindPresence`, in the document only while shown);
+  `[offset]` takes an `XY`, `open` a bare attribute. `flowNodeToolbar`'s `[nodeIds]` makes the
+  enclosing node optional: `partOwnerId` takes a `needed` getter (false while `nodeIds` is not
+  empty), so no "must be used inside [flowNode]" error. Resize handles (the app's and the
+  resizer's default ones) bind the engine's `resize-handle` record (`bindResizeHandle(element,
+  context, nodeId, position)`), as handles already did.
 - **The viewport and gesture options (#25)** are React's root props as inputs of `flowRoot`
   under React's names (`[autoPan]`, `[panOnDrag]="[1, 2]"`, `panActivationKey`,
   `panOnScrollMode`, `panOnScrollSpeed`, `zoomActivationKey`, `[easing]`, `[nodeOrigin]`,
@@ -1762,3 +1793,37 @@ Decisions of the graph and geometry helpers, the toolbars and the keyboard flows
 - **Known limits:** a keyboard connection's targets are fixed at its start (a handle registered
   meanwhile is not offered); it does not scroll the target into view; reconnection has no keyboard
   path; a pointer press while it waits only cancels it (the press does nothing else).
+
+Decisions of the toolbars and keyboard handles in the adapters (#28, Epic #29):
+
+- **`EdgeToolbar` is `NodeToolbar`'s mechanism** (part `toolbar`, file `edge-toolbar.*` in every
+  adapter, Angular `FlowEdgeToolbarDirective` / `flowEdgeToolbar` in `FLOW`), placed outside the
+  zoom at `edge-toolbar-by` with `translate(x, y) translate(-50%, -50%)` (the anchor's 0.5), so it
+  follows pan, zoom and node moves from the engine's notifications. Props / inputs: `edgeId`
+  (default the enclosing edge's), `position` (`"label"` default, `"source"`, `"target"`), `offset`
+  (`XY`, screen pixels), `open` (default: while its edge is selected, `edge-selected`; an explicit
+  value wins). No hook / rune / injection function: `NodeToolbar` has none either.
+- **Its state names the prop's point `position` and the anchor `anchor`**: `{ edgeId, position,
+  anchor: EdgeToolbarPosition }`. `NodeToolbarState.position` is its anchor, but on the edge
+  toolbar `position` is a prop (the core payload's name), and one name with two meanings on one
+  part was refused.
+- **`NodeToolbar`'s `nodeIds`**: when not empty it wins over `nodeId` (the core's rule), needs no
+  enclosing node, carries no `data-flow-id` (`attributes("toolbar", {})`), and is shown by default
+  while **every** listed node is selected (an app passing the selection's ids shows it for the
+  selection; a list partly selected hides it); its state gained `nodeIds` (the nodes it stands
+  beside, `[nodeId]` for one) and `nodeId` became `string | undefined`. Alternative: shown while
+  any is selected; refused, a toolbar acting on several nodes would show for a selection it does
+  not match.
+- **Handles and resize handles spread the engine's record** (`attributes("handle", …)`,
+  `attributes("resize-handle", { nodeId, position })`), so `tabindex="0"` reaches them only with
+  `keyboard()` and their feature (each adapter's `tests/toolbars.test.*`, both ways); before #28
+  the resize handles spread a static record. Their state attributes follow the engine's
+  notifications, so a keyboard connection's `data-connecting` / `data-valid` move with Tab (tested
+  end to end in each adapter: Enter, Tab, Enter adds the edge; an arrow on a focused resize handle
+  resizes). No adapter handles or stops a key: the engine listens on the root.
+- **`simplebezier` needs no adapter code**: the default `EdgePath` takes `d` from `edge-path-by`;
+  each adapter's test draws one. No adapter enumerates the built-in types.
+- **Parity tests**: each adapter's `index.test` lists `EdgeToolbar` among the primitives (Angular
+  `FlowEdgeToolbarDirective`), its contract test has an edge-toolbar case on part `toolbar`
+  (`slot: "edge-toolbar"`, `open`), and `site/tests/docs-reference.test.ts` maps the new module to
+  `api/primitives/edge-toolbar.mdx`.
