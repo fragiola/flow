@@ -75,6 +75,7 @@ export type RootEngineProps = Pick<
     | "preventScrolling"
     | "nodesFocusable"
     | "edgesFocusable"
+    | "zIndexMode"
 >;
 
 type Callbacks = typeof ENGINE_EVENT_CALLBACKS;
@@ -268,6 +269,7 @@ export function Root<
         preventScrolling,
         nodesFocusable,
         edgesFocusable,
+        zIndexMode,
         children,
         ...rest
     } = props;
@@ -324,6 +326,7 @@ export function Root<
         preventScrolling,
         nodesFocusable,
         edgesFocusable,
+        zIndexMode,
     };
     const engineKey = optionsKey(engineProps);
     // the callbacks and the creation options are read when needed: a new function each render
