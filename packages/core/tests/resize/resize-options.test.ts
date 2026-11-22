@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // The resize feature's `snap` (the moved sides land on its grid, independent of the drag
 // feature's) and a resizer's `direction` (only widths and x, or only heights and y, from a corner
-// handle as from a side one).
+// handle as from a side one); a handle's own direction (`data-direction`, #40) over its resizer's.
 import { afterEach, describe, expect, it } from "vitest";
 import { drag } from "../../src/drag/drag";
 import { keyboard } from "../../src/keyboard/keyboard";
@@ -210,6 +210,125 @@ describe("resizer direction", () => {
             y: 100,
             width: 104,
             height: 50,
+        });
+    });
+});
+
+describe("a handle's own direction", () => {
+    const handleWith = (
+        node: HTMLElement,
+        position: string,
+        direction: string,
+    ) => {
+        const element = resizeHandle(node, position);
+        element.setAttribute("data-direction", direction);
+        return element;
+    };
+
+    it("wins over the resizer's for a press, read when it starts", () => {
+        const flow = mount(flowOf({ n: [100, 100] }), {
+            features: [resize()],
+            sizes: { n: [100, 50] },
+        });
+        flow.engine.adapter.setPartOptions("resizer", "n", {
+            direction: "vertical",
+        });
+        // a horizontal corner on a vertical resizer moves only the width
+        dragOn(
+            handleWith(flow.node("n"), "bottom-right", "horizontal"),
+            flow.root,
+            [
+                { clientX: 200, clientY: 150 },
+                { clientX: 230, clientY: 170 },
+            ],
+        );
+        expect(box(flow, "n")).toEqual({
+            x: 100,
+            y: 100,
+            width: 130,
+            height: 50,
+        });
+        // a handle without one keeps the resizer's
+        dragOn(resizeHandle(flow.node("n"), "bottom-right"), flow.root, [
+            { clientX: 230, clientY: 150 },
+            { clientX: 260, clientY: 170 },
+        ]);
+        expect(box(flow, "n")).toEqual({
+            x: 100,
+            y: 100,
+            width: 130,
+            height: 70,
+        });
+    });
+
+    it("applies without a resizer direction, and an unknown value is ignored", () => {
+        const flow = mount(flowOf({ n: [100, 100] }), {
+            features: [resize()],
+            sizes: { n: [100, 50] },
+        });
+        dragOn(handleWith(flow.node("n"), "top-left", "vertical"), flow.root, [
+            { clientX: 100, clientY: 100 },
+            { clientX: 80, clientY: 90 },
+        ]);
+        expect(box(flow, "n")).toEqual({
+            x: 100,
+            y: 90,
+            width: 100,
+            height: 60,
+        });
+        dragOn(
+            handleWith(flow.node("n"), "bottom-right", "diagonal"),
+            flow.root,
+            [
+                { clientX: 200, clientY: 150 },
+                { clientX: 210, clientY: 160 },
+            ],
+        );
+        expect(box(flow, "n")).toEqual({
+            x: 100,
+            y: 90,
+            width: 110,
+            height: 70,
+        });
+    });
+
+    it("wins over the resizer's for the arrows", () => {
+        const flow = mount(flowOf({ n: [100, 100] }), {
+            features: [keyboard({ step: 4 }), resize()],
+            sizes: { n: [100, 50] },
+        });
+        flow.engine.adapter.setPartOptions("resizer", "n", {
+            direction: "horizontal",
+        });
+        const handle = handleWith(flow.node("n"), "bottom-right", "vertical");
+        // across the handle's own direction: not the resizer's key
+        expect(key(handle, "ArrowRight").defaultPrevented).toBe(false);
+        expect(flow.commits).toEqual([]);
+        expect(key(handle, "ArrowDown").defaultPrevented).toBe(true);
+        expect(box(flow, "n")).toEqual({
+            x: 100,
+            y: 100,
+            width: 100,
+            height: 54,
+        });
+    });
+
+    it("is in the handle's record with its variant", () => {
+        const flow = mount(flowOf({ n: [100, 100] }), {
+            features: [resize()],
+        });
+        expect(
+            flow.engine.adapter.attributes("resize-handle", {
+                nodeId: "n",
+                position: "right",
+                direction: "horizontal",
+                variant: "line",
+            }),
+        ).toEqual({
+            "data-flow-part": "resize-handle",
+            "data-position": "right",
+            "data-variant": "line",
+            "data-direction": "horizontal",
         });
     });
 });
