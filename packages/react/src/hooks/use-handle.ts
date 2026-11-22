@@ -6,7 +6,7 @@ import {
     partAttributes,
 } from "@fragiola/flow";
 import * as React from "react";
-import { useFlowContext, useNodeId } from "../context";
+import { useFlowContext, usePartNodeId } from "../context";
 import { type AttributeProps, attributeProps } from "../utils/use-render";
 import { useFlowValue } from "./internal";
 
@@ -63,7 +63,7 @@ export interface UseHandleResult {
  */
 export function useHandle(options: UseHandleOptions): UseHandleResult {
     const { model, engine } = useFlowContext("useHandle");
-    const nodeId = useNodeId("Handle", options.nodeId);
+    const nodeId = usePartNodeId("Handle", options.nodeId);
     const {
         type,
         side,

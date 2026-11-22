@@ -129,6 +129,120 @@ when it would be the first element of an `@for`'s view.
 
 </Framework>
 
+## Grab, wheel speed and clicks
+
+By default a press on the minimap centres the view there and a drag moves the view with the
+pointer. `inversePan` makes a drag move the view the other way, as grabbing the flow itself, and a
+press then does not centre it. `zoomStep` sets how fast its wheel zooms (`10`, the default, is the
+flow's own wheel; `20` twice as fast). Both default to `minimap()`'s options, and are sent to the
+engine as the minimap's part options (`engine.adapter.setPartOptions("minimap", "", …)`): one set
+per root, so several minimaps on one root share one set of options: the last to set them wins, and
+removing one of them clears them (the others fall back to `minimap()`'s options until they set
+theirs again).
+
+A tap on the minimap (a press released without dragging) is the engine's `minimap-click`, with the
+flow point under the pointer on that minimap: centre the view there with an animation, add a node
+there. The event names the tapped minimap (`element`), so with several minimaps on one root only
+the tapped one's callback runs. The root
+captures the pointer at every press, so a DOM `click` listener on the minimap's element hears
+nothing: use the minimap's own callback.
+
+<Framework name="react">
+
+```tsx title="map.tsx"
+import { useFlow } from "@fragiola/flow-react";
+import { MiniMap } from "@fragiola/flow-react/minimap";
+
+/** Rendered inside Flow.Root: grab the map to move the flow, tap it to glide there. */
+export function Map() {
+    const { engine } = useFlow();
+    return (
+        <MiniMap
+            inversePan
+            zoomStep={20}
+            onClick={(_event, point) => engine.run("center-on", { ...point, duration: 300 })}
+            role="img"
+            aria-label="Minimap"
+        />
+    );
+}
+```
+
+`onClick(event, point)` gets the DOM `MouseEvent` and the flow point.
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="map.vue"
+<script setup lang="ts">
+import { useFlow } from "@fragiola/flow-vue";
+import { MiniMap } from "@fragiola/flow-vue/minimap";
+
+// rendered inside Flow.Root: grab the map to move the flow, tap it to glide there
+const { engine } = useFlow();
+</script>
+
+<template>
+    <MiniMap
+        inverse-pan
+        :zoom-step="20"
+        role="img"
+        aria-label="Minimap"
+        @click="(_event, point) => engine.run('center-on', { ...point, duration: 300 })"
+    />
+</template>
+```
+
+In Vue, `@click` is the minimap's own event, `(event, point)`, not the DOM's.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="map.svelte"
+<script lang="ts">
+    import { useFlow } from "@fragiola/flow-svelte";
+    import { MiniMap } from "@fragiola/flow-svelte/minimap";
+
+    // rendered inside Flow.Root: grab the map to move the flow, tap it to glide there
+    const flow = useFlow();
+</script>
+
+<MiniMap
+    inversePan
+    zoomStep={20}
+    role="img"
+    aria-label="Minimap"
+    onclick={(_event, point) => flow.engine.run("center-on", { ...point, duration: 300 })}
+/>
+```
+
+In Svelte, `onclick` is the minimap's own callback, `(event, point)`, not the DOM's.
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<!-- inside [flowRoot]; glide(point) runs engine.run("center-on", { ...point, duration: 300 }) -->
+<svg
+    flowMiniMap
+    inversePan
+    [zoomStep]="20"
+    role="img"
+    aria-label="Minimap"
+    (minimapClick)="glide($event.point)"
+></svg>
+```
+
+In Angular, the `minimapClick` output emits the whole `minimap-click` event:
+`{ element, point, client, event }` (the tapped minimap, the flow point, the client point and the
+DOM event). A `(click)` on
+the element hears nothing.
+
+</Framework>
+
 ## Props
 
 `MiniMapProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and
@@ -138,6 +252,9 @@ every SVG attribute of an `svg` but `children`.
 | --- | --- | --- | --- |
 | `width` | `number` | `200` | its width, in pixels |
 | `height` | `number` | `150` | its height, in pixels |
+| `inversePan` | `boolean` | `minimap()`'s (`false`) | a drag moves the view the other way (as grabbing the flow), and a press does not centre it |
+| `zoomStep` | `number` | `minimap()`'s (`10`) | how fast its wheel zooms: 10 is the flow's own wheel, 20 twice as fast |
+| `onClick` | `(event: MouseEvent, point: XY) => void` | none | a tap on it (the engine's `minimap-click`), with the flow point under the pointer on the minimap (Vue: the `click` event; Svelte: `onclick`; Angular: the `minimapClick` output, the whole event) |
 | `children` | `ReactNode \| ((view: MinimapView) => ReactNode)` | a `MiniMapNode` per node, then the `MiniMapMask` | what it draws, in flow coordinates |
 
 ## State

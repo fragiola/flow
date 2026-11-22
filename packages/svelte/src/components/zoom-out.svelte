@@ -40,7 +40,7 @@
         "ZoomOut",
         "zoom-out",
         () => disabled,
-        () => duration,
+        () => ({ duration }),
     );
     const refs = refProps((element) => {
         ref = element as HTMLButtonElement | null;

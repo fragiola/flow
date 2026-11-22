@@ -268,13 +268,90 @@ the view changes. `flowZoomIn`, `flowZoomOut` and `flowFitView` are (their `stat
 | `pan-by` | `{ x, y }`, in pixels |
 | `zoom-in`, `zoom-out` | `{ step?, around?, duration? }`: refused at the limit |
 | `zoom-to` | `{ zoom, around?, duration? }` |
-| `fit-view` | `{ padding?, nodeIds?, minZoom?, maxZoom?, duration? }`: refused before a size is known |
+| `fit-view` | `{ padding?, nodeIds?, includeHidden?, minZoom?, maxZoom?, duration? }`: refused before a size is known ([below](#what-fit-view-frames)) |
 | `center-on` | `{ x, y, zoom?, duration? }`, a flow point |
 | `focus-node` | `{ nodeId }` |
 
 `around` is a point relative to the root, in pixels (default its centre). `Flow.ZoomIn`,
 `Flow.ZoomOut` and `Flow.FitView` are these actions as buttons, disabled while `engine.can` says
 no ([Minimap and controls](/docs/guides/minimap-and-controls)).
+
+## What fit-view frames
+
+`fit-view` frames every node that is not hidden, keeping room around them, within the zoom
+limits. Its options (also the root's `fitView`, and `Flow.FitView`'s props):
+
+- **`padding`**: the room kept free, by default `0.1`. A number is a share of the root's size
+  (`0.1` of its width on the left and on the right, of its height above and below); a `"<n>px"`
+  string is pixels; an object gives each side its own (`{ top: "80px", left: 0.2 }`), a side left
+  out keeping none. Pixels keep a toolbar or a panel over the canvas clear at any root size.
+- **`nodeIds`**: only these nodes (a hidden one among them too, once its size is known).
+- **`includeHidden`**: without `nodeIds`, the hidden nodes of known size are framed too.
+- **`minZoom`**, **`maxZoom`**: the zoom it may pick, within the engine's own limits.
+- **`duration`**: how long it animates, in milliseconds.
+
+<Framework name="react">
+
+```tsx
+// a header 64 px high over the canvas, and a side panel 280 px wide on the right
+<Flow.FitView aria-label="Fit view" padding={{ top: "88px", right: "304px", bottom: 0.05, left: 0.05 }} maxZoom={1.5}>
+    <MaximizeIcon />
+</Flow.FitView>;
+
+engine.run("fit-view", { includeHidden: true, padding: "24px" });
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<!-- a header 64 px high over the canvas, and a side panel 280 px wide on the right -->
+<Flow.FitView
+    aria-label="Fit view"
+    :padding="{ top: '88px', right: '304px', bottom: 0.05, left: 0.05 }"
+    :max-zoom="1.5"
+>
+    <MaximizeIcon />
+</Flow.FitView>
+```
+
+In Vue, the props are kebab-case in a template: `:node-ids`, `include-hidden`, `:min-zoom`.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<!-- a header 64 px high over the canvas, and a side panel 280 px wide on the right -->
+<Flow.FitView aria-label="Fit view" padding={{ top: "88px", right: "304px", bottom: 0.05, left: 0.05 }} maxZoom={1.5}>
+    <MaximizeIcon />
+</Flow.FitView>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<!-- a header 64 px high over the canvas, and a side panel 280 px wide on the right -->
+<button
+    flowFitView
+    aria-label="Fit view"
+    [padding]="{ top: '88px', right: '304px', bottom: 0.05, left: 0.05 }"
+    [maxZoom]="1.5"
+>
+    <svg lucideMaximize aria-hidden="true"></svg>
+</button>
+```
+
+In Angular, they are `flowFitView`'s inputs: `[nodeIds]`, `includeHidden`, `[minZoom]`.
+
+</Framework>
+
+A prop of `Flow.FitView` left out is left out of its action, so the engine's default applies. The
+same payload frames the flow once it is measured with the root's `fitView`
+(`fitView={{ padding: "40px" }}`), and `viewport-for-bounds` takes the same `padding` forms.
 
 ## Frame an area
 

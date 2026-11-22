@@ -46,6 +46,16 @@ export interface FlowPointerInfo {
     readonly event: MouseEvent;
 }
 
+/** A step of a drag of the rectangle around the selection: the dragged nodes and the pointer. */
+export interface SelectionDragStep {
+    /** the nodes it drags (the selection's draggable ones) */
+    readonly nodeIds: readonly string[];
+    /** the pointer's client point (`clientX`, `clientY`) */
+    readonly client: XY;
+    /** the pointer's flow point */
+    readonly point: XY;
+}
+
 /** A viewport change of a gesture or an animation, at its start or its end. */
 interface ViewportMove {
     readonly viewport: Viewport;
@@ -94,6 +104,15 @@ export type FlowEngineEvent =
           readonly type: "pane-click";
       } & FlowPointerInfo)
     | ({
+          /**
+           * a tap on a minimap (`minimap()`): `point` is the flow point under it on the minimap
+           * (`minimap-point-to-flow`), not the one behind it in the root; `element` is the
+           * tapped minimap (its `data-flow-part="minimap"` element), as an app may draw several
+           */
+          readonly type: "minimap-click";
+          readonly element: Element;
+      } & FlowPointerInfo)
+    | ({
           /** a double click whose two presses were taps on a node */
           readonly type: "node-double-click";
           readonly nodeId: string;
@@ -122,7 +141,10 @@ export type FlowEngineEvent =
           readonly type: "pane-context-menu";
       } & FlowPointerInfo)
     | ({
-          /** a context menu on a selected node while several nodes are selected: the selection's */
+          /**
+           * a context menu on a selected node while several nodes are selected, or on the
+           * rectangle around the selection (the `nodes-selection` part): the selection's
+           */
           readonly type: "selection-context-menu";
           readonly nodeIds: readonly string[];
           readonly edgeIds: readonly string[];
@@ -138,6 +160,21 @@ export type FlowEngineEvent =
           readonly nodeIds: readonly string[];
           readonly source: MoveSource;
       }
+    | ({
+          /**
+           * a drag of the rectangle around the selection (the `nodes-selection` part, `drag()`)
+           * started (instead of `drag-start`): its nodes, where the pointer is
+           */
+          readonly type: "selection-drag-start";
+      } & SelectionDragStep)
+    | ({
+          /** the rectangle's drag moved its nodes (each step, auto-pan's included) */
+          readonly type: "selection-drag";
+      } & SelectionDragStep)
+    | ({
+          /** the rectangle's drag dropped its nodes (after their `nodes-move`) */
+          readonly type: "selection-drag-end";
+      } & SelectionDragStep)
     | {
           /** a drag was cancelled: its nodes went back */
           readonly type: "drag-cancel";

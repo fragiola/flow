@@ -62,6 +62,20 @@ export function typedData(): void {
     });
     model.run("edge.add", { source: "a", target: "b", type: "smoothstep" });
     model.run("edge.add", { source: "a", target: "b", type: "simplebezier" });
+    model.run("edge.add", {
+        source: "a",
+        target: "b",
+        type: "smoothstep",
+        animated: true,
+        pathOptions: { stepPosition: 0.25, borderRadius: 8 },
+    });
+    model.run("edge.set-flags", { edgeId: "e", animated: false });
+    model.run("edge.add", {
+        source: "a",
+        target: "b",
+        // @ts-expect-error a path option the built-in paths do not read
+        pathOptions: { wobble: 1 },
+    });
     // @ts-expect-error: a dependency's weight is a number
     model.run("edge.add", {
         source: "a",
@@ -82,6 +96,22 @@ export function typedData(): void {
     use(model.get("outgoers-by", { nodeId: "a" }).length);
     // @ts-expect-error the neighbours of a node, by its id
     model.get("outgoers-by", { id: "a" });
+    // a node's data narrows by its type; its connections name their ends
+    for (const entry of model.get("nodes-data-by", { nodeIds: ["a"] })) {
+        if (entry.type === "task") use(entry.data.title);
+    }
+    for (const connection of model.get("node-connections-by", {
+        nodeId: "a",
+        handleType: "target",
+    })) {
+        const ends: [string, string | undefined] = [
+            connection.edgeId,
+            connection.targetHandle,
+        ];
+        use(ends);
+    }
+    // @ts-expect-error a handle type is source or target
+    model.get("node-connections-by", { nodeId: "a", handleType: "in" });
 }
 
 export function results(model: FlowModel): void {

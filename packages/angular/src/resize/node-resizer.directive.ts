@@ -1,4 +1,5 @@
 import { computed, Directive, effect, input, type Signal } from "@angular/core";
+import type { ResizeDirection } from "@fragiola/flow/resize";
 import {
     ɵbindAttributes as bindAttributes,
     ɵbindStructuralStyle as bindStructuralStyle,
@@ -39,6 +40,11 @@ export class FlowNodeResizerDirective {
     readonly keepAspectRatio = input(undefined, {
         transform: optionalBoolean,
     });
+    /**
+     * the sides its handles move: `"horizontal"` only the width (and x), `"vertical"` only the
+     * height (and y); default both. A corner then moves its one dimension
+     */
+    readonly direction = input<ResizeDirection | undefined>(undefined);
 
     private readonly context = injectFlowContext("[flowNodeResizer]");
     private readonly id = partOwnerId(
@@ -88,6 +94,7 @@ export class FlowNodeResizerDirective {
                     maxWidth: this.maxWidth(),
                     maxHeight: this.maxHeight(),
                     keepAspectRatio: this.keepAspectRatio(),
+                    direction: this.direction(),
                 }).filter(([, value]) => value !== undefined),
             );
             engine.adapter.setPartOptions("resizer", nodeId, options);

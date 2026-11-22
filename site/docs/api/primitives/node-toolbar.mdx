@@ -115,6 +115,44 @@ and `injectFlow` keep working there.
 
 A toolbar has no role: give it `role="toolbar"` and a label when it holds several buttons.
 
+## Side and alignment
+
+`side` is the node's side the toolbar stands on, and `align` where along it: `"start"` (the left
+of a top or bottom side, the top of a left or right one), `"center"` (the default) or `"end"`.
+`offset` is the gap in pixels. A toolbar below a node, flush with its right edge:
+
+<Framework name="react">
+
+```tsx
+<Flow.NodeToolbar side="bottom" align="end" offset={6}>…</Flow.NodeToolbar>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.NodeToolbar side="bottom" align="end" :offset="6">…</Flow.NodeToolbar>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.NodeToolbar side="bottom" align="end" offset={6}>…</Flow.NodeToolbar>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowNodeToolbar side="bottom" align="end" [offset]="6">…</div>
+```
+
+</Framework>
+
 ## Props
 
 `NodeToolbarProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and

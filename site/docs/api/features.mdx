@@ -137,7 +137,7 @@ factory returns a frozen object with its resolved `options`.
 selects a node or an edge (replacing the selection), a modifier click toggles it in the selection,
 a plain click on the pane clears it, and Shift + drag on the pane draws a selection box. It owns the `selected` field of nodes and edges, the commands `selection.set`,
 `selection.clear` and `selection.remove`, the keys `"selected-nodes"`, `"selected-edges"`,
-`"node-selected"`, `"edge-selected"`, and on the engine `"selection-box"` and `"box-selecting"`.
+`"node-selected"`, `"edge-selected"`, and on the engine `"selection-box"`, `"selection-rect"` and `"box-selecting"`.
 
 `SelectionOptions`:
 
@@ -148,6 +148,7 @@ a plain click on the pane clears it, and Shift + drag on the pane draws a select
 | `boxOnDrag` | `boolean` | `false` | any drag on the pane draws a box (instead of panning); otherwise the box key + drag |
 | `multiKey` | `SelectionKey` | `["Meta", "Control", "Shift"]` | held, a click toggles a node or an edge in the selection (with `multiple`); `null` for none |
 | `boxKey` | `SelectionKey` | `"Shift"` | held, a drag on the pane draws a selection box; `null` for none (only `boxOnDrag` then) |
+| `rect` | `SelectionRectMode` | `"box"` | when the rectangle around the selected nodes (`selection-rect`, the `nodes-selection` part) shows: after a box selected two or more, until the selection changes otherwise (`"box"`), or whenever two or more are selected (`"always"`) |
 
 `SelectionKey` is a key (`KeyboardEvent.key` or `.code`; `Meta`, `Control`, `Alt` and `Shift`
 read from the pointer event), several (any of them held), or `null`.
@@ -207,7 +208,10 @@ adds `"edge-reconnecting"` to the engine.
 `ResizeHandle` resizes its node from that corner or side, with `transient` `node.resize` steps
 (the core's command) and a final one. The entry adds `NodeResizer` and `ResizeHandle` (see
 [NodeResizer](/docs/api/primitives/node-resizer)), the engine `"resizing"` and `"node-resizing"`.
-A `NodeResizer`'s own limits override these for its node.
+A `NodeResizer`'s own limits override these for its node, and its own `direction` (a
+`ResizeDirection`: `"horizontal"` moves only widths and x, `"vertical"` only heights and y, from a
+corner handle as from a side one, with no kept ratio; none: both) is given the same way
+(`engine.adapter.setPartOptions("resizer", nodeId, { direction })`).
 
 `ResizeOptions`:
 
@@ -218,6 +222,7 @@ A `NodeResizer`'s own limits override these for its node.
 | `maxWidth` | `number` | none | the largest width |
 | `maxHeight` | `number` | none | the largest height |
 | `keepAspectRatio` | `boolean` | `false` | a resize keeps the node's width-to-height ratio |
+| `snap` | `{ x, y }` | none | the grid, in flow units, the sides a pointer moves snap to (sizes and positions land on it); the drag feature's `snapGrid` is its own (an arrow key's step is never snapped) |
 
 ## `subflows()`
 
@@ -260,7 +265,8 @@ with Shift) in one `node.resize` step, within the resizer's limits (a `"resize"`
 ## `minimap()`
 
 `minimap(options?)` from `@fragiola/flow-react/minimap` returns a `MinimapFeature`: the engine's
-`"minimap-view"` (what a minimap of a size draws), and pan and zoom from the minimap. The entry adds
+`"minimap-view"` (what a minimap of a size draws), `"minimap-point-to-flow"` (a client point on
+it as a flow point: a click's), and pan and zoom from the minimap. The entry adds
 `MiniMap`, `MiniMapNode` and `MiniMapMask` (see [MiniMap](/docs/api/primitives/mini-map)).
 
 `MinimapOptions`:
@@ -270,6 +276,8 @@ with Shift) in one `node.resize` step, within the resizer's limits (a `"resize"`
 | `pannable` | `boolean` | `true` | a press or a drag on the minimap pans the viewport |
 | `zoomable` | `boolean` | `true` | the wheel over the minimap zooms the viewport |
 | `padding` | `number` | `0.1` | the share of the minimap's size kept free around the nodes and the view, on every side |
+| `inversePan` | `boolean` | `false` | a drag on the minimap moves the view the other way from the pointer (as grabbing the flow); a press does not centre the view then |
+| `zoomStep` | `number` | `10` | how fast the wheel over the minimap zooms: `10` is the flow's own wheel, `20` twice as fast; a value that is not a finite number above `0` counts as the default (a part's as none) |
 
 ## Who owns what
 

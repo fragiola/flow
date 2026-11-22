@@ -2,6 +2,7 @@ import { Directive, input, type Signal } from "@angular/core";
 import {
     type ControlButtonState,
     controlButton,
+    givenPayload,
 } from "../inject/control-button";
 import { optionalBoolean, optionalNumber } from "../utils/helpers";
 
@@ -25,7 +26,7 @@ export class FlowZoomInDirective {
         "zoom-in",
         "zoom-in",
         this.disabled,
-        this.duration,
+        () => givenPayload({ duration: this.duration() }),
     );
 
     /** the button's state (`#b="flowZoomIn"`, then `b.state().disabled`) */

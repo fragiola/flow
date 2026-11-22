@@ -12,6 +12,12 @@ export interface BezierPathOptions extends PathEnds {
     readonly curvature?: number | undefined;
 }
 
+/** What {@link bezierPath} returns: its path, its label point and how far that lies from the source. */
+export interface BezierPathResult extends PathResult {
+    /** the distance across (x) and down (y) from the source to the label point, both positive */
+    readonly labelOffset: XY;
+}
+
 /** The least distance a control point stands out from its end, in flow units. */
 const MIN_REACH = 20;
 
@@ -32,10 +38,10 @@ function controlPoint(
 }
 
 /**
- * A bezier edge's path from `source` to `target`, and its label point (the curve's middle,
- * `t = 0.5`).
+ * A bezier edge's path from `source` to `target`, its label point (the curve's middle,
+ * `t = 0.5`) and that point's offset from the source.
  */
-export function bezierPath(options: BezierPathOptions): PathResult {
+export function bezierPath(options: BezierPathOptions): BezierPathResult {
     const { source, target, sourceSide, targetSide } = options;
     const curvature = options.curvature ?? 0.5;
     const c1 = controlPoint(source, sourceSide, target, curvature);
@@ -48,5 +54,9 @@ export function bezierPath(options: BezierPathOptions): PathResult {
     return {
         path: `M${formatPoint(source)} C${formatPoint(c1)} ${formatPoint(c2)} ${formatPoint(target)}`,
         label,
+        labelOffset: {
+            x: Math.abs(label.x - source.x),
+            y: Math.abs(label.y - source.y),
+        },
     };
 }

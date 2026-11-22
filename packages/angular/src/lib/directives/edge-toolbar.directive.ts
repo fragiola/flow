@@ -14,7 +14,7 @@ export interface EdgeToolbarState {
     readonly edgeId: string;
     /** the point of the edge it stands at */
     readonly position: "label" | "source" | "target";
-    /** where it is anchored (its centre), in pixels relative to the root */
+    /** where it is anchored (its `alignX` / `alignY` point), in pixels relative to the root */
     readonly anchor: EdgeToolbarPosition;
 }
 
@@ -27,10 +27,10 @@ interface ToolbarView {
  * A toolbar on an edge (`data-flow-part="toolbar"`, `data-flow-id` its edge's id), on the app's
  * HTML element, written inside `[flowEdge]` with the `xhtml:` prefix (`<xhtml:div
  * flowEdgeToolbar>`: the edge is SVG, the toolbar HTML) and moved into `[flowRoot]` (outside the
- * zoom), centred at the point `edge-toolbar-by` gives (the edge's label point or one of its ends),
- * so it keeps its size at any zoom. It is in the document only while it is shown (`open`; by
- * default while its edge is selected). Presses and the wheel over it are left to it. It holds only
- * what the app writes (its buttons).
+ * zoom), at the point `edge-toolbar-by` gives (the edge's label point, one of its ends or its
+ * `point`; centred unless `alignX` / `alignY` say otherwise), so it keeps its size at any zoom. It
+ * is in the document only while it is shown (`open`; by default while its edge is selected).
+ * Presses and the wheel over it are left to it. It holds only what the app writes (its buttons).
  */
 @Directive({ selector: "[flowEdgeToolbar]", exportAs: "flowEdgeToolbar" })
 export class FlowEdgeToolbarDirective {
@@ -40,8 +40,14 @@ export class FlowEdgeToolbarDirective {
     readonly position = input<"label" | "source" | "target" | undefined>(
         undefined,
     );
+    /** a flow point it stands at instead (absolute flow coordinates); wins over `position` */
+    readonly point = input<XY | undefined>(undefined);
     /** a screen offset from that point, in pixels; default `{ x: 0, y: 0 }` */
     readonly offset = input<XY | undefined>(undefined);
+    /** which of its edges goes at the point across: its left (`"start"`), centre (default) or right */
+    readonly alignX = input<"start" | "center" | "end" | undefined>(undefined);
+    /** which of its edges goes at the point down: its top (`"start"`), centre (default) or bottom */
+    readonly alignY = input<"start" | "center" | "end" | undefined>(undefined);
     /** whether it is shown; default while its edge is selected (`selection()`) */
     readonly open = input(undefined, { transform: optionalBoolean });
 
@@ -67,7 +73,10 @@ export class FlowEdgeToolbarDirective {
             const anchor = engine.get("edge-toolbar-by", {
                 edgeId,
                 position: this.position() ?? "label",
+                point: this.point(),
                 offset: this.offset(),
+                alignX: this.alignX(),
+                alignY: this.alignY(),
             });
             return anchor
                 ? {

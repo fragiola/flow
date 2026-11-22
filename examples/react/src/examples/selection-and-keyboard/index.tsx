@@ -18,8 +18,9 @@ import { styles } from "./styles";
 // Enter or Space selects, the arrows move the selection (Shift for a bigger step), Delete removes
 // it and Escape clears it. With `connection()` too, Tab also reaches the handles: Enter on one
 // starts a connection, Tab (or the arrows) points at the next handle that accepts it, Enter draws
-// the edge and Escape cancels. The package names nothing: each node, handle and edge gets its name
-// here.
+// the edge and Escape cancels. A box around two or more nodes leaves a rectangle around them
+// (`Flow.NodesSelection`): dragging it moves the whole selection. The package names nothing: each
+// node, handle and edge gets its name here.
 
 interface Types extends FlowTypes {
     readonly nodes: { task: { label: string } };
@@ -141,12 +142,13 @@ export default function SelectionAndKeyboard() {
                 <Flow.Edges<Types>>{renderEdge}</Flow.Edges>
                 <Flow.Nodes<Types>>{renderNode}</Flow.Nodes>
                 <Flow.ConnectionLine className={styles.connection} />
+                <Flow.NodesSelection className={styles.nodesSelection} />
             </Flow.Viewport>
             <Flow.SelectionBox className={styles.box} />
             <SelectionStatus />
             <p className={styles.hint}>
-                Shift + drag draws a box · Tab, arrows, Delete, Escape · Enter
-                on a handle connects
+                Shift + drag draws a box, drag its rectangle to move it · Tab,
+                arrows, Delete, Escape · Enter on a handle connects
             </p>
         </Flow.Root>
     );

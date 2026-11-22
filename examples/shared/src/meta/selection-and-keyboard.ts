@@ -3,7 +3,7 @@ import type { ExampleMeta } from "../meta-types";
 export default {
     title: "Selection and keyboard",
     description:
-        "Click, Shift-click and box-select nodes and edges; Tab through them, move them with the arrows, delete them, and connect handles with Enter.",
+        "Click, Shift-click and box-select nodes and edges, and drag a box selection by its rectangle; Tab through them, move them with the arrows, delete them, and connect handles with Enter.",
     level: "interaction",
     order: 1,
     features: [
@@ -11,6 +11,7 @@ export default {
         "keyboard()",
         "keyboard connection",
         "Flow.SelectionBox",
+        "Flow.NodesSelection",
         "useSelection",
         "selection.remove",
     ],

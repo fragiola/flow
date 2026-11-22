@@ -51,6 +51,7 @@ import {
 } from "../geometry/rect";
 import type { EdgePath, Rect, Viewport } from "../geometry/types";
 import {
+    isFitPadding,
     type ViewportForBoundsOptions,
     viewportForBounds,
 } from "../geometry/viewport-for-bounds";
@@ -105,6 +106,7 @@ import type {
     EngineIsKey,
     EngineIsPayload,
     FitViewPayload,
+    InternalNode,
     NodeToolbarPayload,
     ZoomStepPayload,
 } from "./verbs";
@@ -661,12 +663,10 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             "drawn-edges": () => this.drawnEdges(),
             "node-z-index-by": (p) =>
                 this.nodeZ(String(payloadRecord(p).nodeId)),
-            "handles-by": (p) => {
-                const nodeId = String(payloadRecord(p).nodeId);
-                return this.measurements
-                    .handlesOf(nodeId)
-                    .map((handle) => this.placed(handle));
-            },
+            "handles-by": (p) =>
+                this.handlesOf(String(payloadRecord(p).nodeId)),
+            "internal-node-by": (p) =>
+                this.internalNode(String(payloadRecord(p).nodeId)),
             "background-pattern": (p) =>
                 backgroundPattern(
                     this.current,
@@ -701,6 +701,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 return path
                     ? edgeToolbarPosition(path, this.current, {
                           ...request,
+                          point: pointOf(request.point),
                           offset: pointOf(request.offset),
                       })
                     : undefined;
@@ -987,11 +988,21 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     ): CommandResult<unknown> {
         const duration = durationOf(payload);
         if (typeof duration !== "number") return duration;
+        if (payload.padding !== undefined && !isFitPadding(payload.padding)) {
+            return fail(
+                "invalid_payload",
+                'padding must be a number, a "<n>px" string, or { top, right, bottom, left } of them',
+                "/padding",
+            );
+        }
         const size = this.rootSize();
         if (size.width <= 0 || size.height <= 0) {
             return fail("refused", "the root has no size yet");
         }
-        const bounds = this.boundsOf(payload.nodeIds);
+        const bounds = this.boundsOf(
+            payload.nodeIds,
+            payload.includeHidden === true,
+        );
         if (!bounds) return fail("refused", "no node has a size yet");
         return this.apply(
             this.framing(bounds, size, payload),
@@ -1044,7 +1055,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                     },
                     size,
                     {
-                        padding: finite(record.padding)
+                        padding: isFitPadding(record.padding)
                             ? record.padding
                             : undefined,
                         minZoom: finite(record.minZoom)
@@ -1227,6 +1238,31 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         return parent ? this.boxOf(parent) : TOP_LEFT;
     }
 
+    /** A node's registered handles, placed. */
+    private handlesOf(nodeId: string): readonly FlowHandle[] {
+        return this.measurements
+            .handlesOf(nodeId)
+            .map((handle) => this.placed(handle));
+    }
+
+    /** A node as the engine knows it on screen (`internal-node-by`). */
+    private internalNode(nodeId: string): InternalNode | undefined {
+        const node = this.node(nodeId);
+        if (!node) return undefined;
+        const rect = this.boxOf(node);
+        return {
+            id: node.id,
+            node,
+            absolutePosition: this.model.get("absolute-position-by", {
+                nodeId,
+            }) ?? { x: rect.x, y: rect.y },
+            rect,
+            measured: this.sizeOf(node) !== undefined,
+            zIndex: this.nodeZ(nodeId),
+            handles: this.handlesOf(nodeId),
+        };
+    }
+
     /** A node's absolute box, its size zero until known. */
     private nodeRect(nodeId: string): Rect | undefined {
         const node = this.node(nodeId);
@@ -1364,12 +1400,13 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     private boundsOf(
         nodeIds: readonly unknown[] | undefined,
+        includeHidden = false,
     ): Rect | undefined {
         const ids =
             nodeIds?.filter((id): id is string => typeof id === "string") ??
             this.model
                 .get("all-nodes")
-                .filter((node) => node.hidden !== true)
+                .filter((node) => includeHidden || node.hidden !== true)
                 .map((node) => node.id);
         return boundsOf(
             ids.flatMap((id) => {
@@ -1462,8 +1499,12 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             handle: (nodeId, type, handleId) =>
                 this.handleOf(nodeId, type, handleId),
         });
+        // the edge's own path options over the engine's
         return ends
-            ? pathOf(edge.type, ends, this.options.pathOptions ?? {})
+            ? pathOf(edge.type, ends, {
+                  ...this.options.pathOptions,
+                  ...edge.pathOptions,
+              })
             : undefined;
     }
 
@@ -2103,22 +2144,27 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     /**
      * Tells the app a tap, a double click or a context menu on a node, an edge or the pane
-     * (`node-click`, `edge-double-click`, `pane-context-menu`, …); several selected nodes take a
-     * context menu as the selection's (`selection-context-menu`).
+     * (`node-click`, `edge-double-click`, `pane-context-menu`, …); several selected nodes, and the
+     * rectangle around the selection (`nodes-selection`), take a context menu as the selection's
+     * (`selection-context-menu`).
      */
     private emitPointer(
         what: "click" | "double-click" | "context-menu",
         target: PressTarget,
         event: MouseEvent,
     ): void {
-        const on = tapOn(target);
-        if (!on) return;
         const client = { x: event.clientX, y: event.clientY };
         const info: FlowPointerInfo = {
             point: this.toFlow(client),
             client,
             event,
         };
+        if (target.kind === "nodes-selection") {
+            if (what === "context-menu") this.emitSelectionMenu(info);
+            return;
+        }
+        const on = tapOn(target);
+        if (!on) return;
         if (on.kind === "pane") {
             this.emit({ type: `pane-${what}`, ...info });
             return;
@@ -2136,20 +2182,27 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 nodes.length > 1 &&
                 nodes.some((node) => node.id === on.nodeId)
             ) {
-                const edges =
-                    (this.model.get("selected-edges") as
-                        | readonly FlowEdge[]
-                        | undefined) ?? [];
-                this.emit({
-                    type: "selection-context-menu",
-                    nodeIds: nodes.map((node) => node.id),
-                    edgeIds: edges.map((edge) => edge.id),
-                    ...info,
-                });
+                this.emitSelectionMenu(info);
                 return;
             }
         }
         this.emit({ type: `node-${what}`, nodeId: on.nodeId, ...info });
+    }
+
+    /** Tells the app a context menu on the selection (`selection-context-menu`). */
+    private emitSelectionMenu(info: FlowPointerInfo): void {
+        const ids = (key: "selected-nodes" | "selected-edges") =>
+            (
+                (this.model.get(key) as
+                    | readonly (FlowNode | FlowEdge)[]
+                    | undefined) ?? []
+            ).map((item) => item.id);
+        this.emit({
+            type: "selection-context-menu",
+            nodeIds: ids("selected-nodes"),
+            edgeIds: ids("selected-edges"),
+            ...info,
+        });
     }
 
     private pointerLost(event: PointerEvent): void {
@@ -2445,6 +2498,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                         : this.model.get("edge-by", { id: edgeId });
                 into[ID_ATTRIBUTE] = edgeId;
                 into["data-selected"] = flag(edge?.selected === true);
+                into["data-animated"] = flag(edge?.animated === true);
                 break;
             }
             case "handle": {

@@ -1,4 +1,5 @@
 <script module lang="ts">
+    import type { ResizeDirection } from "@fragiola/flow/resize";
     import type { Snippet } from "svelte";
     import type { DivPrimitiveProps } from "../utils/render.js";
 
@@ -19,6 +20,11 @@
         maxHeight?: number | undefined;
         /** this node keeps its aspect ratio, over `resize()`'s */
         keepAspectRatio?: boolean | undefined;
+        /**
+         * the sides its handles move: `"horizontal"` only the width (and x), `"vertical"` only the
+         * height (and y); default both. A corner then moves its one dimension
+         */
+        direction?: ResizeDirection | undefined;
         /** its handles; default a `ResizeHandle` at each corner and side */
         children?: Snippet<[{ state: NodeResizerState }]> | undefined;
     }
@@ -37,7 +43,7 @@
     only when the node should be resizable (while it is selected, say).
 -->
 <script lang="ts">
-    import { useFlowContext, useNodeId } from "../context.js";
+    import { useFlowContext, usePartNodeId } from "../context.js";
     import { flowValue } from "../runes/internal.svelte.js";
     import {
         elementProps,
@@ -53,6 +59,7 @@
         maxWidth,
         maxHeight,
         keepAspectRatio,
+        direction,
         children,
         render,
         class: className,
@@ -61,7 +68,7 @@
         ...rest
     }: NodeResizerProps = $props();
 
-    const nodeIdOf = useNodeId("NodeResizer", () => nodeIdProp);
+    const nodeIdOf = usePartNodeId("NodeResizer", () => nodeIdProp);
     const nodeId = $derived(nodeIdOf());
     const context = useFlowContext("NodeResizer");
     // this node's limits, on the engine while it is there
@@ -75,6 +82,7 @@
                 maxWidth,
                 maxHeight,
                 keepAspectRatio,
+                direction,
             }).filter(([, value]) => value !== undefined),
         );
         if (!engine) return;

@@ -12,6 +12,8 @@ import type {
     FlowNode,
     FlowNodeInput,
     FlowTypes,
+    NodeDataOf,
+    NodeTypeOf,
     XY,
 } from "../document/types";
 
@@ -26,6 +28,30 @@ export type QueryArgs<P> = NoPayload extends P ? [payload?: P] : [payload: P];
 
 /** Which end of an edge a handle is: where it starts (`source`) or ends (`target`). */
 export type HandleType = "source" | "target";
+
+/**
+ * An edge at a node, as the connection it makes: its id and its two ends (`node-connections-by`,
+ * what `useNodeConnections` gives).
+ */
+export interface NodeConnection {
+    readonly edgeId: string;
+    readonly source: string;
+    readonly sourceHandle: string | undefined;
+    readonly target: string;
+    readonly targetHandle: string | undefined;
+}
+
+/**
+ * A node's id, type and data (`nodes-data-by`, what `useNodesData` gives): a union over the
+ * registry's node types, so `type` narrows `data`.
+ */
+export type NodeData<T extends FlowTypes = AnyTypes> = {
+    [K in NodeTypeOf<T>]: {
+        readonly id: string;
+        readonly type: K;
+        readonly data: NodeDataOf<T, K>;
+    };
+}[NodeTypeOf<T>];
 
 /** What `model.get(key, payload)` reads: each key's payload and result. */
 export interface ModelGetMap<T extends FlowTypes = AnyTypes> {
@@ -48,6 +74,23 @@ export interface ModelGetMap<T extends FlowTypes = AnyTypes> {
             handleId?: string | undefined;
         };
         result: readonly FlowEdge<T>[];
+    };
+    /**
+     * the connections at a node: `node-edges-by`'s edges (with the same `handleType` and
+     * `handleId`), each as its id and its ends, in the document's order
+     */
+    "node-connections-by": {
+        payload: {
+            nodeId: string;
+            handleType?: HandleType | undefined;
+            handleId?: string | undefined;
+        };
+        result: readonly NodeConnection[];
+    };
+    /** the id, type and data of each of the nodes, in the order asked; an unknown id is left out */
+    "nodes-data-by": {
+        payload: { nodeIds: readonly string[] };
+        result: readonly NodeData<T>[];
     };
     /** the edges that touch any of the nodes (an edge between two of them once) */
     "connected-edges-by": {

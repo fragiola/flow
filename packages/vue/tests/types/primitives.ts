@@ -8,9 +8,18 @@ import {
     type NodeState,
     typedFlow,
     useFlow,
+    useFlowStore,
+    useInternalNode,
+    useKeyPress,
     useNode,
+    useNodeConnections,
+    useNodeId,
+    useNodesData,
+    useOnViewportChange,
     useViewport,
 } from "../../src/index";
+import { MiniMap } from "../../src/minimap/index";
+import { NodeResizer } from "../../src/resize/index";
 
 interface Types {
     readonly nodes: { task: { title: string }; note: { text: string } };
@@ -98,4 +107,61 @@ export function composables() {
         return [zoom, title];
     }
     return [zoom];
+}
+
+export function selectingComposables() {
+    const count: number = useFlowStore<number, Types, typeof features>(
+        ({ model, engine }) =>
+            model.get("all-nodes").length + engine.get("viewport").zoom,
+    ).value;
+    const one = useNodesData<Types>("a").value;
+    if (one?.type === "task") {
+        const title: string = one.data.title;
+        void title;
+    }
+    const many = useNodesData<Types>(() => ["a", "b"]).value;
+    const first: string | undefined = many[0]?.id;
+    const connections = useNodeConnections({
+        handleId: "in",
+        type: "target",
+    }).value;
+    const edgeId: string | undefined = connections[0]?.edgeId;
+    // @ts-expect-error a connection's type is source or target
+    useNodeConnections({ type: "in" });
+    const internal = useInternalNode<Types>("a").value;
+    const width: number | undefined = internal?.rect.width;
+    const pressed: boolean = useKeyPress(["Meta+s", "Control+s"], {
+        target: null,
+    }).value;
+    const id: string | null = useNodeId().value;
+    useOnViewportChange({
+        onEnd: (viewport, gesture: boolean) => void [viewport.zoom, gesture],
+    });
+    return [count, first, edgeId, width, pressed, id].join();
+}
+
+export function partProps() {
+    return [
+        h(MiniMap, {
+            inversePan: true,
+            zoomStep: 20,
+            onClick: (event: MouseEvent, point) => void [event.button, point.x],
+        }),
+        h(NodeResizer, { direction: "horizontal" }),
+        // @ts-expect-error a resizer's direction is horizontal or vertical
+        h(NodeResizer, { direction: "diagonal" }),
+        h(Flow.FitView, {
+            nodeIds: ["a"],
+            padding: { top: "10px" },
+            includeHidden: true,
+            minZoom: 0.5,
+            maxZoom: "2",
+        }),
+        h(Flow.EdgeToolbar, {
+            point: { x: 0, y: 0 },
+            alignX: "start",
+            alignY: "end",
+        }),
+        h(Flow.NodesSelection, { as: "section" }),
+    ];
 }

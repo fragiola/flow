@@ -1,14 +1,16 @@
-import { type MinimapView, partAttributes } from "@fragiola/flow";
-import { h, provide } from "vue";
+import { type MinimapView, partAttributes, type XY } from "@fragiola/flow";
+import { h, provide, watchEffect } from "vue";
 import { useFlowValue } from "../composables/internal";
 import { MiniMapKey, useFlowContext } from "../context";
 import {
     definePrimitive,
     type FlowComponent,
+    NUMBER_PROP,
+    numberProp,
     type PrimitiveProps,
     type SlotFunction,
 } from "../utils/primitive";
-import { px, type RenderSlot, renderElement } from "../utils/render";
+import { px, type RenderSlot, renderElement, toElement } from "../utils/render";
 import { MiniMapMask } from "./mini-map-mask";
 import { MiniMapNode } from "./mini-map-node";
 
@@ -22,7 +24,26 @@ export interface MiniMapProps extends PrimitiveProps {
     width?: number | undefined;
     /** its height, in pixels; default 150 */
     height?: number | undefined;
+    /**
+     * a drag on it moves the view the other way (as grabbing the flow), and a press does not
+     * centre the view; default `minimap()`'s `inversePan`
+     */
+    inversePan?: boolean | undefined;
+    /**
+     * how fast its wheel zooms: 10 is the flow's own wheel, 20 twice as fast; default
+     * `minimap()`'s `zoomStep`. The attribute's text is its number (`zoom-step="20"`)
+     */
+    zoomStep?: number | `${number}` | undefined;
 }
+
+export type MiniMapEmits = {
+    /**
+     * a tap on it (`minimap-click`), with the flow point under the pointer on the minimap: center
+     * the view there, add a node there (`@click`; the root captures the pointer, so a DOM click
+     * never reaches the minimap)
+     */
+    click: (event: MouseEvent, point: XY) => void;
+};
 
 export interface MiniMapSlots extends RenderSlot<MiniMapState> {
     /**
@@ -47,12 +68,48 @@ const EMPTY_VIEW: MinimapView = Object.freeze({
  * and its wheel zooms the flow. Inside `Flow.Root`, outside `Flow.Viewport`; place it with your
  * style.
  */
-export const MiniMap: FlowComponent<MiniMapProps, MiniMapSlots> =
-    definePrimitive<MiniMapProps, MiniMapSlots>(
+export const MiniMap: FlowComponent<MiniMapProps, MiniMapSlots, MiniMapEmits> =
+    definePrimitive<MiniMapProps, MiniMapSlots, MiniMapEmits>(
         "MiniMap",
-        ["width", "height", "as"],
-        (props, { attrs, slots }) => {
+        ["width", "height", "inversePan", "zoomStep", "as"],
+        (props, { attrs, slots, emit }) => {
             const context = useFlowContext("MiniMap");
+            // its options over `minimap()`'s, one set for the root's minimaps (the engine's part
+            // options), set again when one changes, cleared when it goes
+            watchEffect((onCleanup) => {
+                const engine = context.engine.value;
+                if (!engine) return;
+                const options = Object.fromEntries(
+                    Object.entries({
+                        inversePan: props.inversePan,
+                        zoomStep: numberProp(props.zoomStep),
+                    }).filter(([, value]) => value !== undefined),
+                );
+                engine.adapter.setPartOptions("minimap", "", options);
+                onCleanup(() =>
+                    engine.adapter.setPartOptions("minimap", "", null),
+                );
+            });
+            // its taps (`minimap-click` on its own element: the root may draw several minimaps),
+            // to the listener given now
+            let own: Element | null = null;
+            const ownRef = (value: unknown) => {
+                own = toElement(value);
+            };
+            watchEffect((onCleanup) => {
+                const engine = context.engine.value;
+                if (!engine) return;
+                const stop = engine.subscribe((event) => {
+                    if (
+                        event.type === "minimap-click" &&
+                        own !== null &&
+                        event.element === own
+                    ) {
+                        emit("click", event.event, event.point);
+                    }
+                });
+                onCleanup(stop);
+            });
             const width = () => props.width ?? 200;
             const height = () => props.height ?? 150;
             const view = useFlowValue(
@@ -94,6 +151,7 @@ export const MiniMap: FlowComponent<MiniMapProps, MiniMapSlots> =
                     attrs,
                     render: slots.render,
                     state: { view: current },
+                    ref: ownRef,
                     props: {
                         ...attributes.value,
                         viewBox: current.viewBoxAttribute,
@@ -115,5 +173,10 @@ export const MiniMap: FlowComponent<MiniMapProps, MiniMapSlots> =
                               ],
                 });
             };
+        },
+        {
+            booleans: ["inversePan"],
+            types: { zoomStep: NUMBER_PROP },
+            emits: ["click"],
         },
     );

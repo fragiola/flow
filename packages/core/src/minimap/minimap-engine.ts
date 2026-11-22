@@ -2,7 +2,8 @@
 // (`minimap-view`: the nodes, what the root shows, and the mask around it, in a view box fitted to
 // the minimap's aspect), a press or a drag on it that centres the view on the pressed point
 // (`pannable`), and the wheel over it that zooms the flow around the root's centre (`zoomable`).
-import type { FlowNode } from "../document/types";
+import { PART_ATTRIBUTE } from "../attributes/part-attributes";
+import type { FlowNode, XY } from "../document/types";
 import type { MinimapView } from "../engine/verbs";
 import { WHEEL_RATE } from "../engine/wheel-rate";
 import type { FeatureEngine, FeatureEngineHost } from "../features/types";
@@ -80,13 +81,89 @@ export function minimapView(
     };
 }
 
+/** A client point on a minimap element of `box` as a flow point, through its view box. */
+function pointOn(box: DOMRect, viewBox: Rect, client: XY): XY {
+    return {
+        x: viewBox.x + ((client.x - box.left) / box.width) * viewBox.width,
+        y: viewBox.y + ((client.y - box.top) / box.height) * viewBox.height,
+    };
+}
+
+/** Whether a client point lies in an element's box. */
+function contains(box: DOMRect, client: XY): boolean {
+    return (
+        client.x >= box.left &&
+        client.x <= box.left + box.width &&
+        client.y >= box.top &&
+        client.y <= box.top + box.height
+    );
+}
+
+/** A zoom step that is a finite number above 0 as given, anything else as none. */
+export function zoomStepOf(value: unknown): number | undefined {
+    return typeof value === "number" && Number.isFinite(value) && value > 0
+        ? value
+        : undefined;
+}
+
+/**
+ * The options a minimap part gave (`engine.adapter.setPartOptions("minimap", "", { inversePan,
+ * zoomStep })`: the `MiniMap` primitive's props) over the feature's: one set for the root's
+ * minimaps.
+ */
+function effective(
+    host: FeatureEngineHost,
+    options: MinimapOptions,
+): { inversePan: boolean; zoomStep: number } {
+    const own = host.partOptions("minimap", "") ?? {};
+    return {
+        inversePan:
+            typeof own.inversePan === "boolean"
+                ? own.inversePan
+                : options.inversePan,
+        zoomStep: zoomStepOf(own.zoomStep) ?? options.zoomStep,
+    };
+}
+
 /** The engine side of `minimap()`. */
 export function minimapEngine(
     host: FeatureEngineHost,
     options: MinimapOptions,
 ): FeatureEngine {
+    let root: Element | undefined;
     return {
+        attached: (element) => {
+            root = element;
+        },
+        detached: () => {
+            root = undefined;
+        },
         get: {
+            "minimap-point-to-flow": (payload) => {
+                const { client } = (payload ?? {}) as { client?: XY };
+                if (
+                    !root ||
+                    typeof client?.x !== "number" ||
+                    typeof client?.y !== "number"
+                )
+                    return undefined;
+                // the minimap under the point (an app may draw several), else the first
+                const boxes = [
+                    ...root.querySelectorAll(`[${PART_ATTRIBUTE}="minimap"]`),
+                ]
+                    .map((element) => element.getBoundingClientRect())
+                    .filter((box) => box.width > 0 && box.height > 0);
+                const box =
+                    boxes.find((each) => contains(each, client)) ?? boxes[0];
+                if (!box) return undefined;
+                const { viewBox } = minimapView(
+                    host,
+                    box.width,
+                    box.height,
+                    options.padding,
+                );
+                return pointOn(box, viewBox, client);
+            },
             "minimap-view": (payload) => {
                 const { width, height } = payload as {
                     width?: unknown;
@@ -101,14 +178,12 @@ export function minimapEngine(
             },
         },
         pointerdown: (event, target) => {
-            if (
-                target.kind !== "minimap" ||
-                !options.pannable ||
-                !target.element
-            )
-                return undefined;
-            const box = target.element.getBoundingClientRect();
+            const element =
+                target.kind === "minimap" ? target.element : undefined;
+            if (!element) return undefined;
+            const box = element.getBoundingClientRect();
             if (box.width <= 0 || box.height <= 0) return undefined;
+            const { inversePan } = effective(host, options);
             // the view box at the press: a drag keeps it, though the view it shows moves
             const { viewBox } = minimapView(
                 host,
@@ -117,30 +192,62 @@ export function minimapEngine(
                 options.padding,
             );
             const origin = host.viewport();
+            const size = host.rootSize();
+            const pressed = pointOn(box, viewBox, {
+                x: event.clientX,
+                y: event.clientY,
+            });
+            // the view's centre at the press, which an inverse drag moves away from
+            const start = {
+                x: (size.width / 2 - origin.x) / origin.zoom,
+                y: (size.height / 2 - origin.y) / origin.zoom,
+            };
             const centre = (clientX: number, clientY: number) => {
-                const point = {
-                    x:
-                        viewBox.x +
-                        ((clientX - box.left) / box.width) * viewBox.width,
-                    y:
-                        viewBox.y +
-                        ((clientY - box.top) / box.height) * viewBox.height,
-                };
+                const point = pointOn(box, viewBox, {
+                    x: clientX,
+                    y: clientY,
+                });
+                const target = inversePan
+                    ? {
+                          x: start.x - (point.x - pressed.x),
+                          y: start.y - (point.y - pressed.y),
+                      }
+                    : point;
                 const viewport = host.viewport();
                 host.setViewport(
-                    centeredOn(point, viewport.zoom, host.rootSize()),
+                    centeredOn(target, viewport.zoom, host.rootSize()),
                 );
             };
-            centre(event.clientX, event.clientY);
+            // an inverse pan grabs the minimap: the press keeps the view where it is
+            if (options.pannable && !inversePan) {
+                centre(event.clientX, event.clientY);
+            }
             let moved = false;
             return {
                 move: (moving) => {
+                    if (!options.pannable) return;
                     moved = true;
                     centre(moving.clientX, moving.clientY);
                 },
-                end: () => {},
+                end: (released) => {
+                    // a tap (within the tap distance): `minimap-click` at the point under it on
+                    // the pressed minimap, which it names (each minimap keeps only its own taps)
+                    const distance = Math.hypot(
+                        released.clientX - event.clientX,
+                        released.clientY - event.clientY,
+                    );
+                    if (distance > host.tapDistance("node")) return;
+                    const client = { x: released.clientX, y: released.clientY };
+                    host.emit({
+                        type: "minimap-click",
+                        element,
+                        point: pointOn(box, viewBox, client),
+                        client,
+                        event: released,
+                    });
+                },
                 cancel: () => {
-                    host.setViewport(origin);
+                    if (options.pannable) host.setViewport(origin);
                 },
                 active: () => moved,
             };
@@ -153,7 +260,13 @@ export function minimapEngine(
             const size = host.rootSize();
             const scale = event.deltaMode === 1 ? 16 : 1;
             const zoom =
-                viewport.zoom * Math.exp((-event.deltaY * scale) / WHEEL_RATE);
+                viewport.zoom *
+                Math.exp(
+                    (-event.deltaY *
+                        scale *
+                        effective(host, options).zoomStep) /
+                        (10 * WHEEL_RATE),
+                );
             host.setViewport(
                 zoomAround(
                     viewport,

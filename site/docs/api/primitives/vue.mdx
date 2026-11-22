@@ -121,6 +121,7 @@ Every part takes the props of its React page (for example [Root](/docs/api/primi
 | `v-model:edges` | `Flow.Root` | `edges` and `update:edges`: the model's edges after every command that changes them |
 | `v-model:viewport` | `Flow.Root` | `viewport` and `update:viewport`: every viewport change, `(viewport, gesture)`, `gesture` true for a pan, a zoom or a pinch |
 | `@node-click`, `@move-start`, … | `Flow.Root` | one event per [root callback](/docs/api/primitives/root#props), declared camelCase (`init`, `nodeClick`, `paneContextMenu`, `connectCancel`, `resizeEnd`, `delete`, …): `@node-click` in a template, `onNodeClick` in `h()` or TSX; with the engine event; typed by `RootEventEmits` |
+| `@click` | `MiniMap` | React's `onClick(event, point)`: a tap on the minimap (the engine's `minimap-click`), with the flow point under the pointer; typed by `MiniMapEmits`. The root captures the pointer, so this is the minimap's own event, not a DOM click |
 
 | slot | of | receives |
 | --- | --- | --- |
@@ -152,7 +153,14 @@ What differs from React, part by part:
   template `ref` reaches no element: use the `render` slot.
 - **`MiniMap`** and **`NodeResizer`** come from `@fragiola/flow-vue/minimap` and
   `@fragiola/flow-vue/resize`, with `MiniMapNode`, `MiniMapMask`, `ResizeHandle` and
-  `RESIZE_POSITIONS`.
+  `RESIZE_POSITIONS`. `MiniMap` takes `inverse-pan` (a bare attribute) and `zoom-step`, and emits
+  `click`; `NodeResizer` takes `direction`.
+- **`Flow.NodesSelection`** is React's: inside `Flow.Viewport` after `Flow.Nodes`, rendered while
+  `selection-rect` is non-null, its default and `render` slots given `{ rect, dragging }`.
+- **`Flow.FitView`** takes `padding`, `node-ids`, `include-hidden`, `min-zoom`, `max-zoom` beside
+  `duration`; only the given ones reach `fit-view`. `duration`, `min-zoom`, `max-zoom` and the
+  minimap's `zoom-step` take their attribute's text as a number (`max-zoom="1.5"`).
+  **`Flow.EdgeToolbar`** takes `point`, `align-x`, `align-y`.
 
 The props, slots and state of each part are typed by its exports: `RootProps`, `RootEngineProps`,
 `RootSlots`, `RootEmits`, `RootEventEmits`, `RootState`; `ViewportProps`, `ViewportSlots`, `ViewportState`;
@@ -162,11 +170,12 @@ The props, slots and state of each part are typed by its exports: `RootProps`, `
 `EdgeLabelSlots`, `EdgeLabelState`; `EdgeToolbarProps`, `EdgeToolbarSlots`, `EdgeToolbarState`;
 `ReconnectAnchorProps`, `ReconnectAnchorSlots`,
 `ReconnectAnchorState`; `ConnectionLineProps`, `ConnectionLineSlots`, `ConnectionLineState`;
-`SelectionBoxProps`, `SelectionBoxSlots`, `SelectionBoxState`; `NodeToolbarProps`,
+`SelectionBoxProps`, `SelectionBoxSlots`, `SelectionBoxState`; `NodesSelectionProps`,
+`NodesSelectionSlots`, `NodesSelectionState`; `NodeToolbarProps`,
 `NodeToolbarSlots`, `NodeToolbarState`; `ControlsProps`, `ControlsSlots`, `ControlsState`;
 `ZoomInProps`, `ZoomInSlots`; `ZoomOutProps`, `ZoomOutSlots`; `FitViewProps`, `FitViewSlots`;
 `ToggleInteractiveProps`, `ToggleInteractiveSlots`, `ToggleInteractiveState`. On the feature
-entries: `MiniMapProps`, `MiniMapSlots`, `MiniMapState`, `MiniMapNodeProps`, `MiniMapNodeSlots`,
+entries: `MiniMapProps`, `MiniMapSlots`, `MiniMapState`, `MiniMapEmits`, `MiniMapNodeProps`, `MiniMapNodeSlots`,
 `MiniMapNodeState`, `MiniMapMaskProps`, `MiniMapMaskSlots`, `MiniMapMaskState`;
 `NodeResizerProps`, `NodeResizerSlots`, `NodeResizerState`, `ResizeHandleProps`,
 `ResizeHandleSlots`, `ResizeHandleState`, `ResizePosition`.
@@ -187,6 +196,13 @@ prop as a getter (`() => props.node`): read in `setup`, its value would stay the
 | `useNode(node)` | `useNode(nodeOrGetter)`: `UseNodeResult<T>`, `state` (`NodeState<T>`) and `props` (`NodeElementProps`) as computed refs |
 | `useEdge(edge)` | `useEdge(edgeOrGetter)`: `UseEdgeResult<T>`, `state` (`EdgeState<T>`) and `props` (`EdgeElementProps`, with `tabindex`) as computed refs |
 | `useHandle(options)` | `useHandle(optionsOrGetter)`: `UseHandleResult`, `state` (`HandleState`) and `props` (`HandleElementProps`) as computed refs; `UseHandleOptions` as React's |
+| `useFlowStore(selector, equal?)` | the same arguments: a `ComputedRef` of the selected value, which changes only when `equal` (default `Object.is`) says so; the selector runs again on every change of the model and every view change, and when a reactive value it reads changes |
+| `useNodeId()` | `ComputedRef<string \| null>`: the enclosing `Flow.Node`'s id, null outside one |
+| `useNodesData<T>(id)`, `useNodesData<T>(ids)` | the id or the ids as a value, a ref or a getter: `ComputedRef<NodeData<T> \| null>`, `ComputedRef<readonly NodeData<T>[]>` |
+| `useNodeConnections(options?)` | `useNodeConnections(optionsOrGetter?)` (`UseNodeConnectionsOptions`: `id`, `handleId`, `type`): `ComputedRef<readonly NodeConnection[]>`; it throws in `setup` outside a `Flow.Node` without an `id` |
+| `useInternalNode<T>(id)` | the id as a value, a ref or a getter: `ComputedRef<InternalNode<T> \| undefined>` |
+| `useKeyPress(keys, options?)` | the keys and the options (`UseKeyPressOptions`, `target`) as values, refs or getters: a read-only `Ref<boolean>`; the default target is the root element's window |
+| `useOnViewportChange(options)` | the same (`UseOnViewportChangeOptions`: `onStart`, `onChange`, `onEnd`, read at each event; a value, a ref or a getter, `MaybeRefOrGetter`); it renders nothing and stops with the component |
 | `useFlowRef()`, `createFlowRef()` | the same names: a `FlowRef<T, F>` whose `value` is reactive |
 | `ControlButtonState` | the same: the state of `Flow.ZoomIn`, `Flow.ZoomOut` and `Flow.FitView` |
 

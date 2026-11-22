@@ -142,6 +142,8 @@ export function pressTargetOf(
             edgeId: idOf(edge) ?? idOf(part),
         };
     }
+    if (name === "nodes-selection")
+        return { kind: "nodes-selection", element: part };
     if (MINIMAP_PARTS.has(name)) {
         const minimap = part.closest(`[${PART_ATTRIBUTE}="minimap"]`) ?? part;
         return { kind: "minimap", element: minimap };

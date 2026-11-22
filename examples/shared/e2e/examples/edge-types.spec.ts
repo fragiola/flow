@@ -53,3 +53,26 @@ test("every edge is labelled with its type", async ({ page }) => {
         ).toBeVisible();
     }
 });
+
+test("an edge is animated by its flag, and shaped by its own path options", async ({
+    page,
+}) => {
+    await expect(edge(page, "smoothstep")).toHaveAttribute("data-animated", "");
+    await expect(
+        edge(page, "smoothstep").locator('[data-flow-part="edge-path"]'),
+    ).toHaveAttribute("data-animated", "");
+    await expect(edge(page, "bezier")).not.toHaveAttribute("data-animated");
+    // the step turns a quarter of the way down (`stepPosition: 0.25`), not halfway
+    const d =
+        (await edge(page, "step")
+            .locator('[data-flow-part="edge-path"]')
+            .getAttribute("d")) ?? "";
+    const ys = [...d.matchAll(/-?\d+(?:\.\d+)?,(-?\d+(?:\.\d+)?)/g)].map(
+        (match) => Number(match[1]),
+    );
+    const top = Math.min(...ys);
+    const bottom = Math.max(...ys);
+    const turns = ys.filter((y) => y > top + 1 && y < bottom - 1);
+    expect(turns.length).toBeGreaterThan(0);
+    for (const y of turns) expect(y).toBeLessThan((top + bottom) / 2);
+});

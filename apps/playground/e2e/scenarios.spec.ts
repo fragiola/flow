@@ -151,3 +151,48 @@ test("the interaction scenario logs the root's callbacks", async ({ page }) => {
         'node-click {"nodeId":"a"',
     );
 });
+
+test("the selecting hooks scenario follows its values, and the sum re-renders only for its sources", async ({
+    page,
+}) => {
+    await page.goto("/?scenario=api/selecting-hooks");
+    await expect(
+        page.locator('[data-flow-part="node"]:not([data-measured])'),
+    ).toHaveCount(0);
+    await expect(page.getByTestId("node-count")).toHaveText("4");
+    await expect(page.getByTestId("sum-total")).toHaveText("5");
+    await expect(page.getByTestId("sum-sources")).toHaveText("x, y");
+    const renders = async () =>
+        Number(await page.getByTestId("sum-renders").textContent());
+    // z is not connected: changing it does not re-render the sum
+    const before = await renders();
+    await page.getByRole("button", { name: "z + 1" }).click();
+    await expect(page.locator('[data-flow-id="z"]')).toContainText("z = 11");
+    expect(await renders()).toBe(before);
+    await page.getByRole("button", { name: "x + 1" }).click();
+    await expect(page.getByTestId("sum-total")).toHaveText("6");
+    await page.getByRole("button", { name: "connect z" }).click();
+    await expect(page.getByTestId("sum-sources")).toHaveText("x, y, z");
+    await expect(page.getByTestId("sum-total")).toHaveText("17");
+    // the sum's box follows a drag of it
+    const x = Number(await page.getByTestId("sum-x").textContent());
+    const sum = page.locator('[data-flow-part="node"][data-flow-id="sum"]');
+    const from = await center(sum);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(from.x + 40, from.y, { steps: 5 });
+    await page.mouse.up();
+    await expect(page.getByTestId("sum-x")).toHaveText(String(x + 40));
+    // the keys and the viewport
+    await page.keyboard.down("Shift");
+    await expect(page.getByTestId("shift")).toHaveText("held");
+    await page.keyboard.up("Shift");
+    await expect(page.getByTestId("shift")).toHaveText("up");
+    const root = page.locator('[data-flow-part="root"]');
+    const box = await root.boundingBox();
+    await page.mouse.move((box?.x ?? 0) + 200, (box?.y ?? 0) + 420);
+    await page.mouse.wheel(0, -200);
+    await expect
+        .poll(async () => Number(await page.getByTestId("moves").textContent()))
+        .toBeGreaterThan(0);
+});

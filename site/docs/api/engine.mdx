@@ -205,8 +205,9 @@ feature at the moment it would act: no feature is installed again.
 
 | field | type | description |
 | --- | --- | --- |
-| `padding` | `number` | the share of the root's size kept free on every side; default `0.1` |
+| `padding` | `FitPadding` | the room kept free on every side: a number is a share of the root's size, a `"<n>px"` string pixels, `{ top, right, bottom, left }` each side's (a side left out keeps none); default `0.1` |
 | `nodeIds` | `string[]` | only these nodes; default every node that is not hidden |
+| `includeHidden` | `boolean` | without `nodeIds`, the hidden nodes of known size too; default `false` |
 | `minZoom` | `number` | the least zoom it may pick, within the engine's limits (it narrows them, never widens) |
 | `maxZoom` | `number` | the greatest zoom it may pick, within the engine's limits |
 | `duration` | `number` | how long it animates, in milliseconds; default `0`: at once |
@@ -236,14 +237,17 @@ feature at the moment it would act: no feature is installed again.
 | `"visible-edges"` | none | the edges whose ends' box is in view |
 | `"drawn-edges"` | none | the edges to draw, in drawing order: those shown whose nodes are measured (with `onlyRenderVisible`, those in view), by `zIndex` (a selected one raised with `elevateEdgesOnSelect`), the document's order among equals |
 | `"node-z-index-by"` | `{ nodeId }` | a node's structural `z-index` among the nodes: its `zIndex` (a selected node and its descendants raised with `elevateNodesOnSelect`), always above its parent's |
+| `"internal-node-by"` | `{ nodeId }` | a node on screen, an `InternalNode` (`id`, `node`, `absolutePosition`, `rect`, `measured`, `zIndex`, `handles`), undefined for an unknown node: what `useInternalNode` reads |
 | `"handles-by"` | `{ nodeId }` | a node's registered handles (`FlowHandle[]`), with their centres |
 | `"background-pattern"` | `BackgroundPatternPayload` | one tile of a background pattern at the current viewport |
 | `"node-toolbar-by"` | `NodeToolbarPayload` | where a node's toolbar goes, outside the zoom: beside a node, or beside several nodes' bounds (`nodeIds`); undefined until one of them has a size |
-| `"edge-toolbar-by"` | `EdgeToolbarPayload` | where an edge's toolbar goes, outside the zoom (an `EdgeToolbarPosition`): at its label point or one of its ends; undefined until the edge is drawn |
+| `"edge-toolbar-by"` | `EdgeToolbarPayload` | where an edge's toolbar goes, outside the zoom (an `EdgeToolbarPosition`): at its label point, one of its ends or a flow point; undefined until the edge is drawn |
 | `"selection-box"` | none | the box being drawn (a root-relative `SelectionBox`), or null (`selection()`; `undefined` without it) |
+| `"selection-rect"` | none | the flow-space bounds (a `Rect`) of the selected nodes, for the rectangle around them (the `nodes-selection` part, in the viewport): while two or more are selected by a box (`selection({ rect: "always" })`: by anything), until the selection changes otherwise; null otherwise and while a box is drawn (`selection()`) |
 | `"dragging-node-ids"` | none | the nodes being dragged (`drag()`) |
 | `"connection"` | none | the `Connection` being drawn, or null (`connection()`; `undefined` without it) |
 | `"minimap-view"` | `{ width, height }` | what a minimap of that many pixels draws (`minimap()`) |
+| `"minimap-point-to-flow"` | `{ client }` | a client point on the minimap (the one under it, else the first) as a flow point, for a click on it; undefined while no minimap has a size (`minimap()`) |
 
 `IntersectingNodesPayload`:
 
@@ -258,7 +262,7 @@ feature at the moment it would act: no feature is installed again.
 | field | type | description |
 | --- | --- | --- |
 | `bounds` | `Rect` | the flow rectangle to frame |
-| `padding` | `number` | the share of the root's size kept free on every side; default 0.1 |
+| `padding` | `FitPadding` | the room kept free on every side, or each side's, as `fit-view`'s; default 0.1 |
 | `minZoom` | `number` | the least zoom it may pick (within the engine's limits); default the engine's `minZoom` |
 | `maxZoom` | `number` | the greatest zoom it may pick (within the engine's limits); default the engine's `maxZoom` |
 
@@ -268,8 +272,13 @@ render, a thumbnail, a saved view), with no engine. Its `ViewportForBoundsOption
 
 | option | type | description |
 | --- | --- | --- |
-| `padding` | `number` | the share of the root's size kept free on every side; default 0.1 |
+| `padding` | `FitPadding` | the room kept free on every side, or each side's (the bounds centred in what is left); default 0.1 |
 | `minZoom` | `number` | the least zoom it may pick; default 0.5 |
+
+`FitPadding` is a `PaddingValue` for every side, or `{ top?, right?, bottom?, left? }` of them; a
+`PaddingValue` is a number (a share of the root's width for the left and right, of its height for
+the top and bottom) or a `` `${number}px` `` string (pixels). A plain number frames exactly as
+before per-side padding existed.
 | `maxZoom` | `number` | the greatest zoom it may pick; default 2 |
 
 `BackgroundPatternPayload`:
@@ -319,10 +328,13 @@ render, a thumbnail, a saved view), with no engine. Its `ViewportForBoundsOption
 | --- | --- | --- |
 | `edgeId` | `string` | the edge |
 | `position` | `"label" \| "source" \| "target"` | the point of the edge it stands at: its label point (default) or one of its ends |
+| `point` | `XY` | a flow point it stands at instead (absolute flow coordinates); wins over `position` |
 | `offset` | `XY` | a screen offset from that point, in pixels; default `{ x: 0, y: 0 }` |
+| `alignX` | `"start" \| "center" \| "end"` | which of the toolbar's edges goes at the point across: its left, its centre (default) or its right |
+| `alignY` | `"start" \| "center" \| "end"` | the same down: its top, its centre (default) or its bottom |
 
-`EdgeToolbarPosition` is a `NodeToolbarPosition` whose `anchorX` and `anchorY` are `0.5`: the
-toolbar's centre goes to the point. The `toolbar` part's attributes take `{ edgeId }` for an
+`EdgeToolbarPosition` is a `NodeToolbarPosition` whose `anchorX` and `anchorY` follow `alignX` and
+`alignY` (`0`, `0.5` or `1`; `0.5` by default: the toolbar's centre goes to the point). The `toolbar` part's attributes take `{ edgeId }` for an
 edge's toolbar (its `data-flow-id`), `{ nodeId }` for a node's, nothing for several nodes'.
 
 `Connection`, the connection being drawn:
@@ -384,10 +396,12 @@ viewport from it.
 | `"node-click"`, `"edge-click"`, `"pane-click"` | `nodeId` / `edgeId`, `point`, `client`, `event` | a tap: a primary press released within the tap distance (`paneClickDistance`, `nodeClickDistance`) that started no gesture; a press that dragged or panned is none. Told after the selection changed, and while the flow is not interactive too |
 | `"node-double-click"`, `"edge-double-click"`, `"pane-double-click"` | the same | a double click whose two presses were taps; on the pane it also zooms in (`zoomOnDoubleClick`) |
 | `"node-context-menu"`, `"edge-context-menu"`, `"pane-context-menu"` | the same | a context menu (a right click, the menu key); the app calls `event.preventDefault()` to show its own. One a right-button pan keeps out is none |
-| `"selection-context-menu"` | `nodeIds`, `edgeIds`, `point`, `client`, `event` | a context menu on a selected node while several nodes are selected (instead of `node-context-menu`) |
+| `"selection-context-menu"` | `nodeIds`, `edgeIds`, `point`, `client`, `event` | a context menu on a selected node while several nodes are selected (instead of `node-context-menu`), or on the rectangle around the selection (`nodes-selection`) |
 | `"drag-start"` | `nodeIds` | a drag of these nodes started (`drag()`) |
 | `"nodes-move"` | `nodeIds`, `source` | nodes were dropped after a drag, or moved by the arrows; `source` is a `MoveSource`, `"pointer"` or `"keyboard"` |
-| `"drag-cancel"` | `nodeIds` | a drag was cancelled: its nodes went back |
+| `"drag-cancel"` | `nodeIds` | a drag was cancelled: its nodes went back (also the cancel of a drag of the selection rectangle, which has no event of its own) |
+| `"minimap-click"` | `element`, `point`, `client`, `event` (a `FlowPointerInfo`) | a tap on a minimap (`minimap()`), `element` the tapped minimap, `point` the flow point under it on that minimap; not a root callback (the `MiniMap`'s `onClick`) |
+| `"selection-drag-start"`, `"selection-drag"`, `"selection-drag-end"` | `nodeIds`, `client`, `point` (a `SelectionDragStep`) | a press on the rectangle around the selection (`nodes-selection`, `drag()`) dragged the selection, as a node drag (threshold, snap, extent, auto-pan): it started (instead of `drag-start`), moved its nodes (each step), dropped them (after their `nodes-move`); a cancel is `drag-cancel` |
 | `"connect-start"` | `nodeId`, `handleId`, `handleType`, `input` | a connection started from a handle (`connection()`); `input` (a `MoveSource`): `"pointer"` (a drag or a tap) or `"keyboard"` (Enter on a focused handle, with `keyboard()`) |
 | `"connect-target"` | `nodeId`, `handleId`, `handleType`, `index`, `count` | a keyboard connection points at another target: the `index`-th of the `count` handles the model accepts, nearest first (`index` -1 and no handle when it accepts none), for your live region |
 | `"connect"` | `edgeId`, `source`, `target`, `input` | a connection was dropped on a handle (or Enter chose it): an edge was added |
@@ -445,7 +459,7 @@ part attributes, so every adapter behaves the same.
 | `attachViewport(element)` | attaches (or, with `null`, detaches) the viewport element: the engine writes its `transform` and `transform-origin`, the framework never does |
 | `registerNode(nodeId, element)` | registers (or unregisters) a node's element: the engine measures it |
 | `registerHandle(handle, element)` | registers (or unregisters) a handle: the engine measures its centre relative to its node |
-| `setPartOptions(part, id, options)` | options a part's primitive takes (a resizer's `minWidth`, …); `null` drops them |
+| `setPartOptions(part, id, options)` | options a part's primitive takes (a resizer's `minWidth`, …, `direction`; the minimaps' `inversePan` and `zoomStep` under the id `""`, over `minimap()`'s); `null` drops them |
 | `attributes(part, payload?)` | the record to spread on a part: `data-flow-part`, `data-flow-id` and its state |
 | `subscribe(listener)` | the view changed (a `ViewChange`); returns its remover |
 | `getSnapshot()` | a number that changes whenever the view changes |
@@ -510,3 +524,13 @@ The attribute names are constants, and the helpers give the static attributes wi
 `PartAttributes` is a read-only record of them, `MutablePartAttributes` the writable one the engine
 and its features fill. The state attributes each part carries: [State
 attributes](/docs/concepts/state-attributes).
+
+## Helpers for the hooks
+
+What every adapter's hooks share, so they agree: `watchKeyPress(target, keys, onChange)` calls
+`onChange(pressed)` whenever a combo of `keys` (a `KeyPressKeys`: key names joined by `+`, held at
+once, `"Meta+s"`, or a list of combos, any of them; a name is a `KeyboardEvent.key` or `.code`
+without case) starts or stops being held on `target` (a `KeyPressTarget`: a window, a document or
+an element), forgetting the keys on its window's `blur` and on Meta's release, and returns its
+stop. `sameFlowValue(a, b)` tells two reads apart: arrays and plain records compared all the way
+down, anything else by identity.

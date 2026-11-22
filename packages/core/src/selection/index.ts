@@ -5,5 +5,6 @@ export {
     type SelectionFeature,
     type SelectionKey,
     type SelectionOptions,
+    type SelectionRectMode,
     selection,
 } from "./selection";

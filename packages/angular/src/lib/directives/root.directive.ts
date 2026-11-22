@@ -344,6 +344,11 @@ export class FlowRootDirective<
     readonly nodeDragStart = output<FlowEngineEventOf<"drag-start">>();
     readonly nodesMove = output<FlowEngineEventOf<"nodes-move">>();
     readonly nodeDragCancel = output<FlowEngineEventOf<"drag-cancel">>();
+    readonly selectionDragStart =
+        output<FlowEngineEventOf<"selection-drag-start">>();
+    readonly selectionDrag = output<FlowEngineEventOf<"selection-drag">>();
+    readonly selectionDragStop =
+        output<FlowEngineEventOf<"selection-drag-end">>();
     readonly connectStart = output<FlowEngineEventOf<"connect-start">>();
     readonly connectTarget = output<FlowEngineEventOf<"connect-target">>();
     readonly connect = output<FlowEngineEventOf<"connect">>();

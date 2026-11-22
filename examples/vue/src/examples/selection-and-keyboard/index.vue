@@ -14,7 +14,9 @@ import { selection } from "@fragiola/flow-vue/selection";
 // or Space selects, the arrows move the selection (Shift for a bigger step), Delete removes it and
 // Escape clears it. With `connection()` too, Tab also reaches the handles: Enter on one starts a
 // connection, Tab (or the arrows) points at the next handle that accepts it, Enter draws the edge
-// and Escape cancels. The package names nothing: each node, handle and edge gets its name here.
+// and Escape cancels. A box around two or more nodes leaves a rectangle around them
+// (`Flow.NodesSelection`): dragging it moves the whole selection. The package names nothing: each
+// node, handle and edge gets its name here.
 
 export interface Types extends FlowTypes {
     readonly nodes: { task: { label: string } };
@@ -123,11 +125,13 @@ const Flow = typedFlow<Types, typeof features>();
                 </Flow.Node>
             </Flow.Nodes>
             <Flow.ConnectionLine :class="styles.connection" />
+            <Flow.NodesSelection :class="styles.nodesSelection" />
         </Flow.Viewport>
         <Flow.SelectionBox :class="styles.box" />
         <SelectionStatus />
         <p :class="styles.hint">
-            Shift + drag draws a box · Tab, arrows, Delete, Escape · Enter on a handle connects
+            Shift + drag draws a box, drag its rectangle to move it · Tab, arrows, Delete, Escape ·
+            Enter on a handle connects
         </p>
     </Flow.Root>
 </template>

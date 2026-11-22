@@ -17,6 +17,7 @@ import {
     FlowNodesDirective,
     FlowNodesItemDirective,
 } from "./directives/nodes.directive";
+import { FlowNodesSelectionDirective } from "./directives/nodes-selection.directive";
 import { FlowReconnectAnchorDirective } from "./directives/reconnect-anchor.directive";
 import { FlowRootDirective } from "./directives/root.directive";
 import { FlowSelectionBoxDirective } from "./directives/selection-box.directive";
@@ -45,6 +46,7 @@ export const FLOW = [
     FlowEdgeLabelDirective,
     FlowReconnectAnchorDirective,
     FlowConnectionLineDirective,
+    FlowNodesSelectionDirective,
     FlowSelectionBoxDirective,
     FlowBackgroundDirective,
     FlowControlsDirective,

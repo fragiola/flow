@@ -7,10 +7,14 @@ import {
     createFlowEngine,
     type FlowEngine,
 } from "../../src/engine/create-flow-engine";
+import type { FlowEngineEventOf } from "../../src/engine/events";
 import type { Connection } from "../../src/engine/verbs";
-import type { EdgePath, Viewport } from "../../src/geometry/types";
+import { watchKeyPress } from "../../src/engine/watch-key-press";
+import type { EdgePath, Rect, Viewport } from "../../src/geometry/types";
 import { minimap } from "../../src/minimap/minimap";
 import { createFlowModel } from "../../src/model/create-flow-model";
+import { selection } from "../../src/selection/selection";
+import { sameFlowValue } from "../../src/state/same-flow-value";
 
 function use(_value: unknown): void {}
 
@@ -53,6 +57,25 @@ export function coreKeys(): void {
     engine.run("set-viewport", { x: 0, duration: 200 });
     engine.run("zoom-to", { zoom: 1, duration: 200 });
     engine.run("fit-view", { duration: 400 });
+    engine.run("fit-view", {
+        padding: { top: "20px", left: 0.1 },
+        includeHidden: true,
+        minZoom: 0.5,
+        maxZoom: 2,
+    });
+    engine.run("fit-view", { padding: "12px" });
+    // @ts-expect-error a padding string is in pixels
+    engine.run("fit-view", { padding: "12em" });
+    use(
+        engine.get("edge-toolbar-by", {
+            edgeId: "e",
+            point: { x: 0, y: 0 },
+            alignX: "start",
+            alignY: "end",
+        }),
+    );
+    // @ts-expect-error an alignment is start, center or end
+    engine.get("edge-toolbar-by", { edgeId: "e", alignX: "left" });
     engine.run("center-on", { x: 0, y: 0, duration: 200 });
     engine.adapter.setOptions({
         autoPan: { speed: 12, margin: 40 },
@@ -104,6 +127,8 @@ export function coreKeys(): void {
     engine.is("dragging");
     // @ts-expect-error `minimap-view` is the minimap feature's
     engine.get("minimap-view", { width: 1, height: 1 });
+    // @ts-expect-error `minimap-point-to-flow` is the minimap feature's
+    engine.get("minimap-point-to-flow", { client: { x: 0, y: 0 } });
 }
 
 export function featureKeys(): void {
@@ -114,8 +139,57 @@ export function featureKeys(): void {
     use(engine.is("dragging"));
     use(engine.is("node-dragging", { nodeId: "a" }));
     use(engine.get("minimap-view", { width: 200, height: 150 }).viewBox);
+    const point: { x: number; y: number } | undefined = engine.get(
+        "minimap-point-to-flow",
+        { client: { x: 0, y: 0 } },
+    );
+    use(point);
     // @ts-expect-error the selection box is the selection feature's
     engine.get("selection-box");
+}
+
+export function selectionRect(): void {
+    const features = [selection({ rect: "always" }), drag()] as const;
+    const engine = createFlowEngine(createFlowModel(undefined, { features }));
+    const rect: Rect | null = engine.get("selection-rect");
+    use(rect);
+    use(engine.adapter.attributes("nodes-selection"));
+    // @ts-expect-error the rectangle shows after a box or always
+    selection({ rect: "never" });
+    engine.subscribe((event) => {
+        if (event.type === "selection-drag") {
+            const step: FlowEngineEventOf<"selection-drag"> = event;
+            use([step.nodeIds, step.client.x, step.point.y]);
+        }
+    });
+    const bare = createFlowEngine(
+        createFlowModel(undefined, { features: [drag()] }),
+    );
+    // @ts-expect-error the rectangle is the selection feature's
+    bare.get("selection-rect");
+    const internal = bare.get("internal-node-by", { nodeId: "a" });
+    if (internal) {
+        use([
+            internal.node.id,
+            internal.rect.width,
+            internal.absolutePosition.x,
+            internal.measured,
+            internal.zIndex,
+            internal.handles.length,
+        ]);
+    }
+    bare.subscribe((event) => {
+        if (event.type === "minimap-click")
+            use([event.point.x, event.client.y]);
+    });
+    const stop: () => void = watchKeyPress(
+        document,
+        ["Meta+s", "Shift"],
+        (pressed: boolean) => use(pressed),
+    );
+    stop();
+    const same: boolean = sameFlowValue({ a: [1] }, { a: [1] });
+    use(same);
 }
 
 export function attributes(engine: FlowEngine): void {

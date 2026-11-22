@@ -5,7 +5,10 @@
 // snap to the grid (the pressed node snaps, the others keep their offsets), and a node with
 // an extent (`extent: "parent"`, a rectangle `extent`, the engine's `nodeExtent`) stays inside it
 // with the measured sizes. A node holding a drag handle drags only from it. Escape,
-// `pointercancel` or a lost capture puts the nodes back.
+// `pointercancel` or a lost capture puts the nodes back. A press on the rectangle around the
+// selection (the `nodes-selection` part) is the same drag, of the selection, led by its first
+// draggable node, told as `selection-drag-start`, `selection-drag` (each step) and
+// `selection-drag-end`.
 import { flag } from "../attributes/part-attributes";
 import type { XY } from "../document/types";
 import { carriedBy, runMoves } from "../engine/node-moves";
@@ -19,6 +22,8 @@ import type { DragOptions } from "./drag";
 
 interface Drag {
     readonly nodeIds: readonly string[];
+    /** dragged from the rectangle around the selection (`nodes-selection`) */
+    readonly fromRect: boolean;
     /** each node's absolute position at the start (the snap's reference) */
     readonly starts: ReadonlyMap<string, XY>;
     /** each node's relative position at the start (a cancel puts it back) */
@@ -42,7 +47,7 @@ export function dragEngine(
     const snap = (value: number, grid: number) =>
         grid > 0 ? Math.round(value / grid) * grid : value;
 
-    const begin = (nodeId: string): Drag => {
+    const begin = (nodeId: string, fromRect: boolean): Drag => {
         if (
             options.selectOnDrag &&
             host.allows("select") &&
@@ -67,10 +72,35 @@ export function dragEngine(
                 boxes.set(id, box);
             }
         }
-        return { nodeIds: [...starts.keys()], starts, relatives, boxes };
+        return {
+            nodeIds: [...starts.keys()],
+            fromRect,
+            starts,
+            relatives,
+            boxes,
+        };
     };
 
-    const gestureFor = (nodeId: string, start: XY): FeatureGesture => {
+    /** Tells a step of a drag from the rectangle (none for a node's own drag). */
+    const step = (
+        type: "selection-drag-start" | "selection-drag" | "selection-drag-end",
+        current: Drag,
+        client: XY,
+    ) => {
+        if (!current.fromRect) return;
+        host.emit({
+            type,
+            nodeIds: current.nodeIds,
+            client,
+            point: host.toFlow(client),
+        });
+    };
+
+    const gestureFor = (
+        nodeId: string,
+        start: XY,
+        fromRect = false,
+    ): FeatureGesture => {
         let active = false;
         // the flow point pressed: an auto-pan moves the flow under a still pointer
         const anchor = host.toFlow(start);
@@ -117,13 +147,19 @@ export function dragEngine(
                         return;
                     }
                     active = true;
-                    drag = begin(nodeId);
-                    host.emit({ type: "drag-start", nodeIds: drag.nodeIds });
+                    drag = begin(nodeId, fromRect);
+                    if (fromRect) step("selection-drag-start", drag, client);
+                    else
+                        host.emit({
+                            type: "drag-start",
+                            nodeIds: drag.nodeIds,
+                        });
                 }
                 const current = drag;
                 if (!current) return;
                 runMoves(model, movesAt(current, client), true);
                 host.changed();
+                step("selection-drag", current, client);
             },
             end: (event) => {
                 const current = drag;
@@ -131,17 +167,15 @@ export function dragEngine(
                 if (!active || !current) return;
                 // the drop, from where the pointer is now (never a stored step: a parent that grew
                 // since moved what the step was relative to)
-                runMoves(
-                    model,
-                    movesAt(current, { x: event.clientX, y: event.clientY }),
-                    false,
-                );
+                const client = { x: event.clientX, y: event.clientY };
+                runMoves(model, movesAt(current, client), false);
                 host.changed();
                 host.emit({
                     type: "nodes-move",
                     nodeIds: current.nodeIds,
                     source: "pointer",
                 });
+                step("selection-drag-end", current, client);
             },
             cancel: () => {
                 const current = drag;
@@ -174,6 +208,23 @@ export function dragEngine(
                 ) ?? false,
         },
         pointerdown: (event, target) => {
+            if (target.kind === "nodes-selection") {
+                // the selection's drag, led by its first draggable node
+                const lead = (
+                    (model.get("selected-nodes") as
+                        | readonly { id: string }[]
+                        | undefined) ?? []
+                ).find((node) =>
+                    model.is("node-draggable", { nodeId: node.id }),
+                );
+                if (!lead || drag !== undefined || !host.allows("drag"))
+                    return undefined;
+                return gestureFor(
+                    lead.id,
+                    { x: event.clientX, y: event.clientY },
+                    true,
+                );
+            }
             if (
                 target.kind !== "node" ||
                 target.nodeId === undefined ||
@@ -192,6 +243,8 @@ export function dragEngine(
         attributes: (part, payload, into) => {
             if (part === "root")
                 into["data-dragging"] = flag(drag !== undefined);
+            if (part === "nodes-selection")
+                into["data-dragging"] = flag(drag?.fromRect === true);
             if (part === "node") {
                 into["data-dragging"] = flag(
                     drag?.nodeIds.includes(String(payload.nodeId)) ?? false,

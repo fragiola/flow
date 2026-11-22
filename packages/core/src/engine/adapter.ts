@@ -52,6 +52,8 @@ export interface PressTarget {
      *   edges' layers);
      * - `node`, `edge`, `handle`, `resize-handle`, `minimap`: that part (or an element inside it);
      *   a reconnect anchor is its edge's, with its `end`;
+     * - `nodes-selection`: the rectangle around the selected nodes (`selection-rect`): a press
+     *   drags the selection, a context menu is the selection's;
      * - `other`: a part with its own behaviour (the controls, a toolbar, a panel) or a control
      *   inside a node (a field, a button, `data-flow-no-gesture`): the flow leaves it alone
      */
@@ -62,6 +64,7 @@ export interface PressTarget {
         | "handle"
         | "resize-handle"
         | "minimap"
+        | "nodes-selection"
         | "other";
     /** the part's element */
     readonly element: Element | undefined;

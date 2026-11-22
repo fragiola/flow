@@ -18,7 +18,9 @@ import { styles } from "./styles";
 // or Space selects, the arrows move the selection (Shift for a bigger step), Delete removes it and
 // Escape clears it. With `connection()` too, Tab also reaches the handles: Enter on one starts a
 // connection, Tab (or the arrows) points at the next handle that accepts it, Enter draws the edge
-// and Escape cancels. The package names nothing: each node, handle and edge gets its name here.
+// and Escape cancels. A box around two or more nodes leaves a rectangle around them
+// (`flowNodesSelection`): dragging it moves the whole selection. The package names nothing: each
+// node, handle and edge gets its name here.
 
 export interface Types extends FlowTypes {
     readonly nodes: { task: { label: string } };
@@ -127,11 +129,12 @@ const edges: FlowEdgeInput<Types>[] = [
                     </ng-template>
                 </div>
                 <svg flowConnectionLine [class]="styles.connection"></svg>
+                <div flowNodesSelection [class]="styles.nodesSelection"></div>
             </div>
             <div flowSelectionBox [class]="styles.box"></div>
             <example-selection-status />
             <p [class]="styles.hint">
-                Shift + drag draws a box · Tab, arrows, Delete, Escape · Enter on a handle connects
+                Shift + drag draws a box, drag its rectangle to move it · Tab, arrows, Delete, Escape · Enter on a handle connects
             </p>
         </div>
     `,

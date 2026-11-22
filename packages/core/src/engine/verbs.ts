@@ -11,6 +11,7 @@ import type {
     XY,
 } from "../document/types";
 import type { EdgePath, HandleSide, Rect, Viewport } from "../geometry/types";
+import type { FitPadding } from "../geometry/viewport-for-bounds";
 import type { NoPayload } from "../state/queries";
 import type { FlowHandle } from "./adapter";
 import type {
@@ -21,10 +22,15 @@ import type {
 
 /** Options of `fit-view` (and of the `fitView` engine option). */
 export interface FitViewPayload {
-    /** the share of the root's size kept free on every side; default 0.1 */
-    padding?: number | undefined;
+    /**
+     * the room kept free on every side (a number: a share of the root's size), or each side's
+     * (`{ top, right, bottom, left }`, a `"<n>px"` string in pixels); default 0.1
+     */
+    padding?: FitPadding | undefined;
     /** only these nodes; default every node that is not hidden */
     nodeIds?: string[] | undefined;
+    /** without `nodeIds`, the hidden nodes of known size too; default false */
+    includeHidden?: boolean | undefined;
     /** the least zoom it may pick (within the engine's limits); default the engine's `minZoom` */
     minZoom?: number | undefined;
     /** the greatest zoom it may pick (within the engine's limits); default the engine's `maxZoom` */
@@ -37,8 +43,8 @@ export interface FitViewPayload {
 export interface ViewportForBoundsPayload {
     /** the flow rectangle to frame */
     bounds: Rect;
-    /** the share of the root's size kept free on every side; default 0.1 */
-    padding?: number | undefined;
+    /** the room kept free on every side, or each side's, as `fit-view`'s; default 0.1 */
+    padding?: FitPadding | undefined;
     /** the least zoom it may pick (within the engine's limits); default the engine's `minZoom` */
     minZoom?: number | undefined;
     /** the greatest zoom it may pick (within the engine's limits); default the engine's `maxZoom` */
@@ -138,13 +144,19 @@ export interface EdgeToolbarPayload {
     edgeId: string;
     /** the point of the edge it stands at: its label point (default), its source or its target end */
     position?: "label" | "source" | "target" | undefined;
+    /** a flow point it stands at instead (absolute flow coordinates); wins over `position` */
+    point?: XY | undefined;
     /** a screen offset from that point, in pixels; default `{ x: 0, y: 0 }` */
     offset?: XY | undefined;
+    /** which of the toolbar's edges goes at the point across: its left (`start`), centre (default) or right */
+    alignX?: "start" | "center" | "end" | undefined;
+    /** which of the toolbar's edges goes at the point down: its top (`start`), centre (default) or bottom */
+    alignY?: "start" | "center" | "end" | undefined;
 }
 
 /**
  * An edge toolbar's anchor on the screen (relative to the root, outside the zoom): the toolbar's
- * centre goes there (`anchorX`, `anchorY` are 0.5).
+ * point at `anchorX`, `anchorY` (shares of its size, 0.5 by default: its centre) goes there.
  */
 export type EdgeToolbarPosition = NodeToolbarPosition;
 
@@ -267,6 +279,27 @@ export type EngineActionPayload<K extends EngineActionKey> =
 export type EngineActionResult<K extends EngineActionKey> =
     EngineActionMap[K]["result"];
 
+/**
+ * A node as the engine knows it on screen (`internal-node-by`, what `useInternalNode` gives): the
+ * document's node, its absolute place and box, whether its size is known, its z-index and its
+ * registered handles.
+ */
+export interface InternalNode<T extends FlowTypes = AnyTypes> {
+    readonly id: string;
+    /** the document's node */
+    readonly node: FlowNode<T>;
+    /** its position in absolute flow coordinates (its parents' added; `absolute-position-by`) */
+    readonly absolutePosition: XY;
+    /** its box in absolute flow coordinates, `nodeOrigin` applied, size 0 until known (`node-rect-by`) */
+    readonly rect: Rect;
+    /** its size is known: measured, or given by the document (`node-measured`) */
+    readonly measured: boolean;
+    /** its structural `z-index` (`node-z-index-by`) */
+    readonly zIndex: number;
+    /** its registered handles, with their centres and bounds (`handles-by`) */
+    readonly handles: readonly FlowHandle[];
+}
+
 /** What `engine.get(key, payload)` reads: facts of this flow on screen. */
 export interface EngineGetMap<T extends FlowTypes = AnyTypes> {
     /** the viewport */
@@ -327,6 +360,11 @@ export interface EngineGetMap<T extends FlowTypes = AnyTypes> {
      * `elevateNodesOnSelect`), always above its parent's
      */
     "node-z-index-by": { payload: { nodeId: string }; result: number };
+    /** a node on screen: its node, absolute place and box, size known, z-index and handles */
+    "internal-node-by": {
+        payload: { nodeId: string };
+        result: InternalNode<T> | undefined;
+    };
     /** a node's registered handles, with their centres */
     "handles-by": {
         payload: { nodeId: string };
@@ -355,6 +393,13 @@ export interface EngineGetMap<T extends FlowTypes = AnyTypes> {
     };
     /** the selection box being drawn, or null (`selection()`) */
     "selection-box": { payload: NoPayload; result: SelectionBox | null };
+    /**
+     * the flow-space bounds of the selected nodes, for the rectangle around them (the
+     * `nodes-selection` part, placed in the viewport): while two or more are selected by a box
+     * (`selection({ rect: "always" })`: by anything), until the selection changes otherwise; null
+     * otherwise (and while a box is drawn) (`selection()`)
+     */
+    "selection-rect": { payload: NoPayload; result: Rect | null };
     /** the nodes being dragged (`drag()`) */
     "dragging-node-ids": { payload: NoPayload; result: readonly string[] };
     /** the connection being drawn, or null (`connection()`) */
@@ -363,6 +408,14 @@ export interface EngineGetMap<T extends FlowTypes = AnyTypes> {
     "minimap-view": {
         payload: { width: number; height: number };
         result: MinimapView;
+    };
+    /**
+     * a client point on the minimap (the one under it, else the first) as a flow point; undefined
+     * while no minimap has a size (`minimap()`)
+     */
+    "minimap-point-to-flow": {
+        payload: { client: XY };
+        result: XY | undefined;
     };
 }
 

@@ -1,5 +1,5 @@
 <script module lang="ts">
-    import type { MinimapView } from "@fragiola/flow";
+    import type { MinimapView, XY } from "@fragiola/flow";
     import type { Snippet } from "svelte";
     import type { SvgPrimitiveProps } from "../utils/render.js";
 
@@ -11,12 +11,24 @@
     export interface MiniMapProps
         extends Omit<
             SvgPrimitiveProps<MiniMapState, SVGSVGElement>,
-            "children" | "width" | "height"
+            "children" | "width" | "height" | "onclick"
         > {
         /** its width, in pixels; default 200 */
         width?: number | undefined;
         /** its height, in pixels; default 150 */
         height?: number | undefined;
+        /**
+         * a drag on it moves the view the other way (as grabbing the flow), and a press does not
+         * centre the view; default `minimap()`'s `inversePan`
+         */
+        inversePan?: boolean | undefined;
+        /** how fast its wheel zooms: 10 is the flow's own wheel, 20 twice as fast; default `minimap()`'s `zoomStep` */
+        zoomStep?: number | undefined;
+        /**
+         * a tap on it (`minimap-click`), with the flow point under the pointer on the minimap: center
+         * the view there, add a node there
+         */
+        onclick?: ((event: MouseEvent, point: XY) => void) | undefined;
         /**
          * what it draws, in flow coordinates (`{#snippet children(view)}`); default a
          * `MiniMapNode` per node, then the `MiniMapMask`
@@ -78,6 +90,9 @@
     let {
         width = 200,
         height = 150,
+        inversePan,
+        zoomStep,
+        onclick,
         children,
         render,
         class: className,
@@ -87,6 +102,34 @@
     }: MiniMapProps = $props();
 
     const context = useFlowContext("MiniMap");
+    // its options over `minimap()`'s, one set for the root's minimaps (the engine's part options)
+    $effect(() => {
+        const engine = context.engine;
+        const options = Object.fromEntries(
+            Object.entries({ inversePan, zoomStep }).filter(
+                ([, value]) => value !== undefined,
+            ),
+        );
+        if (!engine) return;
+        engine.adapter.setPartOptions("minimap", "", options);
+        return () => engine.adapter.setPartOptions("minimap", "", null);
+    });
+    // its own element: the root may draw several minimaps, each keeps only its taps
+    let own: Element | null = null;
+    // its tap: the engine's `minimap-click` (the root captures the pointer, no DOM click comes)
+    $effect(() => {
+        const engine = context.engine;
+        if (!engine) return;
+        return engine.subscribe((event) => {
+            if (
+                event.type === "minimap-click" &&
+                own !== null &&
+                event.element === own
+            ) {
+                onclick?.(event.event, event.point);
+            }
+        });
+    });
     const view = flowValue(
         context,
         () =>
@@ -105,6 +148,7 @@
         },
     });
     const refs = refProps((element) => {
+        own = element;
         ref = element as SVGSVGElement | null;
     });
     const partState = $derived<MiniMapState>({ view: view.current });

@@ -185,6 +185,7 @@ describe("the feature factories", () => {
             maxWidth: Number.POSITIVE_INFINITY,
             maxHeight: Number.POSITIVE_INFINITY,
             keepAspectRatio: false,
+            snap: undefined,
         });
         expect(connection().options).toEqual({
             radius: 20,
@@ -206,6 +207,8 @@ describe("the feature factories", () => {
             pannable: true,
             zoomable: true,
             padding: 0.1,
+            inversePan: false,
+            zoomStep: 10,
         });
         expect(selection().options).toEqual({
             boxMode: "full",
@@ -213,6 +216,7 @@ describe("the feature factories", () => {
             boxOnDrag: false,
             multiKey: ["Meta", "Control", "Shift"],
             boxKey: "Shift",
+            rect: "box",
         });
         expect(subflows().options).toEqual({});
         for (const feature of ALL()) {

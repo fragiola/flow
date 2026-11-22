@@ -37,6 +37,11 @@ interface Case {
     setup?: (container: HTMLElement) => void;
     /** a structural style key it sets, which a consumer's style does not override */
     structural?: [keyof React.CSSProperties, string, string];
+    /**
+     * the DOM handler the consumer's handler test gives it; default `onClick` (the minimap's
+     * `onClick` is its tap's callback, with the flow point)
+     */
+    handler?: "onClick" | "onDoubleClick";
 }
 
 /** The parts every case's flow is made of; `slot` names the one given the props. */
@@ -96,6 +101,7 @@ function flowWith(slot: string, p: Props): React.ReactNode {
                     )}
                 </Flow.Nodes>
                 <Flow.ConnectionLine {...(at("connection-line") as object)} />
+                <Flow.NodesSelection {...(at("nodes-selection") as object)} />
             </Flow.Viewport>
             <Flow.SelectionBox {...(at("selection-box") as object)} />
             <Flow.Controls {...(at("controls") as object)}>
@@ -157,6 +163,25 @@ function startBox(container: HTMLElement) {
     });
 }
 
+/** A box selection of both nodes, done: the rectangle around them shows. */
+function selectBoth(container: HTMLElement) {
+    pointer(part(container, "viewport"), "pointerdown", {
+        clientX: -10,
+        clientY: -10,
+        shiftKey: true,
+    });
+    pointer(part(container, "root"), "pointermove", {
+        clientX: 300,
+        clientY: 300,
+        shiftKey: true,
+    });
+    pointer(part(container, "root"), "pointerup", {
+        clientX: 300,
+        clientY: 300,
+        shiftKey: true,
+    });
+}
+
 const CASES: Case[] = [
     simple("root", "div", div, {
         structural: ["position", "static", "relative"],
@@ -192,6 +217,10 @@ const CASES: Case[] = [
         setup: startBox,
         structural: ["position", "static", "absolute"],
     }),
+    simple("nodes-selection", "div", div, {
+        setup: selectBoth,
+        structural: ["position", "static", "absolute"],
+    }),
     simple("background", "svg", () => <svg />, {
         structural: ["position", "static", "absolute"],
     }),
@@ -210,7 +239,7 @@ const CASES: Case[] = [
         // the edge's toolbar: the same part
         flow: (p) => flowWith("edge-toolbar", p),
     },
-    simple("minimap", "svg", () => <svg />),
+    simple("minimap", "svg", () => <svg />, { handler: "onDoubleClick" }),
     simple("minimap-node", "rect", () => <rect />),
     simple("minimap-mask", "path", () => <path />),
     simple("resizer", "div", div, {
@@ -299,13 +328,15 @@ describe.each(CASES)("the $part primitive", (c) => {
     });
 
     it("runs the consumer's handlers after its own", async () => {
-        const onClick = vi.fn();
+        const handler = vi.fn();
+        const name = c.handler ?? "onClick";
         const { container } = await mount(c, {
-            onClick,
+            [name]: handler,
             "data-testid": "case",
         });
-        fireEvent.click(find(container));
-        expect(onClick).toHaveBeenCalledTimes(1);
+        if (name === "onClick") fireEvent.click(find(container));
+        else fireEvent.doubleClick(find(container));
+        expect(handler).toHaveBeenCalledTimes(1);
     });
 
     it("takes className and style as values or functions of its state", async () => {

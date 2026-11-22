@@ -42,7 +42,7 @@ export const ZoomIn: FlowComponent<ZoomInProps, ZoomInSlots> = definePrimitive<
             "ZoomIn",
             "zoom-in",
             () => props.disabled,
-            () => numberProp(props.duration) as number | undefined,
+            () => ({ duration: numberProp(props.duration) }),
         );
         return () => {
             const current = state.value;

@@ -62,3 +62,40 @@ describe("viewportForBounds", () => {
         );
     });
 });
+
+describe("viewportForBounds per-side padding", () => {
+    const bounds = { x: 0, y: 0, width: 200, height: 100 };
+
+    it("keeps a plain number exactly as before, and a uniform object the same", () => {
+        // 1000 × 500 root, 0.1 each side: 800 × 400 room, zoom 4 capped at 2
+        expect(
+            viewportForBounds(bounds, 1000, 500, { padding: 0.1, maxZoom: 10 }),
+        ).toEqual({ x: 100, y: 50, zoom: 4 });
+        const sides = viewportForBounds(bounds, 1000, 500, {
+            padding: { top: 0.1, right: 0.1, bottom: 0.1, left: 0.1 },
+            maxZoom: 10,
+        });
+        expect(sides.zoom).toBeCloseTo(4);
+        expect(sides.x).toBeCloseTo(100);
+        expect(sides.y).toBeCloseTo(50);
+    });
+
+    it("centres the bounds in the room each side leaves, shares and pixels", () => {
+        // left 100 px, right 0.2 × 1000 = 200, top 50 px, bottom none: 700 × 450 room
+        // zoom min(700 / 200, 450 / 100) = 3.5; 700 left, 350 tall, centred in the room
+        expect(
+            viewportForBounds(bounds, 1000, 500, {
+                padding: { left: "100px", right: 0.2, top: "50px" },
+                maxZoom: 10,
+            }),
+        ).toEqual({ x: 100, y: 100, zoom: 3.5 });
+        // "20px" on every side: 960 × 460 room, zoom 4.6, height-bound
+        const pixels = viewportForBounds(bounds, 1000, 500, {
+            padding: "20px",
+            maxZoom: 10,
+        });
+        expect(pixels.zoom).toBeCloseTo(4.6);
+        expect(pixels.x).toBeCloseTo(40);
+        expect(pixels.y).toBeCloseTo(20);
+    });
+});

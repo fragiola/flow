@@ -5,8 +5,8 @@
 // app's document, so a flag that stops a user (`draggable`, `deletable`, `connectable`) does not
 // stop them: the step is unlocked and locked again in the same batch; a middleware still vetoes.
 // Every adapter asks the core, so none re-implements the diff. What no command can express (a
-// node's type, a removed data key, a size given back to measurement) replaces the entity: removed
-// and added again with the same id, its edges with it. The drawing order is not synced.
+// node's type, a removed data key, a size given back to measurement, an edge's path options)
+// replaces the entity: removed and added again with the same id, its edges with it. The drawing order is not synced.
 import type { BatchEntry } from "../commands/types";
 import { edgeFlag, nodeFlag, reconnectableEnd } from "../document/flags";
 import type {
@@ -40,6 +40,7 @@ const EDGE_FLAGS = [
     "deletable",
     "hidden",
     "focusable",
+    "animated",
 ] as const satisfies readonly (keyof EdgeFlags)[];
 
 /** Whether `edge.reconnect` may move an edge's ends where `next` puts them. */
@@ -262,6 +263,7 @@ export function commandsTo(
             next.targetHandle !== edge.targetHandle;
         const replaced =
             (next.type ?? "bezier") !== (edge.type ?? "bezier") ||
+            !sameJson(edge.pathOptions ?? {}, next.pathOptions ?? {}) ||
             dataPatch(edge.data as Json, next.data as Json) === undefined ||
             (moved &&
                 (!installed.has("edge.reconnect") || !reconnects(edge, next)));

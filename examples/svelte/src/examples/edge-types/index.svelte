@@ -6,8 +6,10 @@
     // The edge's `type` picks its path: the core draws `bezier` (the default), `simplebezier` (one
     // curve, its control points halfway on each end's axis), `smoothstep`, `step` and `straight`.
     // Any other type is the app's: `Flow.EdgePath` takes a `d` of your own, drawn here from the
-    // edge's ends (`useEdge(edge).state.path`) as a wave (wave-edge.svelte). Drag the nodes to see
-    // each path follow.
+    // edge's ends (`useEdge(edge).state.path`) as a wave (wave-edge.svelte). An edge's own
+    // `pathOptions` shape it over the root's (the step turns a quarter of the way down, the smooth
+    // step's corners are rounder), and `animated` marks it `data-animated` for its style (the
+    // smooth step pulses). Drag the nodes to see each path follow.
 
     export interface Types extends FlowTypes {
         readonly nodes: { point: { label: string } };
@@ -17,6 +19,12 @@
     export const features = [selection(), drag()] as const;
 
     const TYPES = ["bezier", "simplebezier", "smoothstep", "step", "straight", "wave"] as const;
+
+    /** What some edges set of their own: their path's shape, and an animated one. */
+    const EDGE_OPTIONS: Partial<Record<(typeof TYPES)[number], Partial<FlowEdgeInput<Types>>>> = {
+        step: { pathOptions: { stepPosition: 0.25 } },
+        smoothstep: { animated: true, pathOptions: { borderRadius: 16 } },
+    };
 
     const nodes: FlowNodeInput<Types>[] = TYPES.flatMap((type, index) => [
         {
@@ -42,7 +50,13 @@
                   type,
                   data: { amplitude: 10 },
               }
-            : { id: type, source: `${type}-a`, target: `${type}-b`, type },
+            : {
+                  id: type,
+                  source: `${type}-a`,
+                  target: `${type}-b`,
+                  type,
+                  ...EDGE_OPTIONS[type],
+              },
     );
 </script>
 

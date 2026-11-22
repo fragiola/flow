@@ -6,7 +6,7 @@ import {
     partAttributes,
 } from "@fragiola/flow";
 import { type Attachment, createAttachmentKey } from "svelte/attachments";
-import { useFlowContext, useNodeId } from "../context.js";
+import { useFlowContext, usePartNodeId } from "../context.js";
 import type { DataAttributes } from "../utils/render.js";
 import { flowValue, type MaybeGetter, read } from "./internal.svelte.js";
 
@@ -82,7 +82,7 @@ export function useHandle(
     options: MaybeGetter<UseHandleOptions>,
 ): UseHandleResult {
     const context = useFlowContext("useHandle");
-    const nodeIdOf = useNodeId("Handle", () => read(options).nodeId);
+    const nodeIdOf = usePartNodeId("Handle", () => read(options).nodeId);
     // the last object while its fields stay: a new one registers the handle again
     let last: HandleRegistration | undefined;
     const registration = $derived.by((): HandleRegistration => {

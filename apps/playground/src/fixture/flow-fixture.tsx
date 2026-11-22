@@ -52,6 +52,15 @@ import { createRoot } from "react-dom/client";
 //   ?threshold=10        a connection starts after 10 px (`connection({ threshold })`)
 //   ?tall=1              the page is taller than the window (a scroll to measure)
 //
+// Since #36 (the component options and the selection rectangle of Epic #37):
+//
+//   ?inversePan=1        the minimap pans the other way (`MiniMap inversePan`); a tap on it logs
+//                        its flow point in `minimap-clicks` (`onClick`), always
+//   ?direction=horizontal  c's NodeResizer moves only its width (`direction`)
+//   ?animated=1          the edge ab is `animated` (`data-animated` on its part)
+//   ?nodesSelection=1    a `Flow.NodesSelection` around a box selection of two or more nodes; its
+//                        drag's callbacks are logged in `gestures`
+//
 // The gesture callbacks of the root (`onNodeClick`, `onPaneClick`, the double clicks, the context
 // menus, `onMoveStart` / `onMoveEnd`, `onSelectionStart`, `onResizeStart`, `onInit`, …) are logged,
 // as JSON without their DOM event, in `gestures`; `events` keeps the engine's other events.
@@ -86,6 +95,14 @@ const dropToAdd = params.get("dropToAdd") === "1";
 const confirmDelete = params.get("confirmDelete") === "1";
 const threshold = Number(params.get("threshold")) || undefined;
 const tall = params.get("tall") === "1";
+const inversePan = params.get("inversePan") === "1";
+const direction =
+    params.get("direction") === "horizontal" ||
+    params.get("direction") === "vertical"
+        ? (params.get("direction") as "horizontal" | "vertical")
+        : undefined;
+const animated = params.get("animated") === "1";
+const nodesSelection = params.get("nodesSelection") === "1";
 
 /** The answer of the `Delete?` panel (`?confirmDelete=1`), while one is asked for. */
 let answerDelete: ((yes: boolean) => void) | undefined;
@@ -109,6 +126,10 @@ const GESTURE_EVENTS = new Set([
     "box-select-start",
     "resize-start",
     "resize-cancel",
+    "selection-drag-start",
+    "selection-drag-end",
+    // carries the tapped minimap element, which JSON cannot write; `minimap-clicks` logs its point
+    "minimap-click",
 ]);
 
 const features = [
@@ -173,6 +194,7 @@ const edges: FlowEdgeInput[] = [
         source: "a",
         target: "b",
         ...(edgeType ? { type: edgeType } : {}),
+        ...(animated ? { animated: true } : {}),
         ...(reconnectable === "source" || reconnectable === "target"
             ? { reconnectable }
             : {}),
@@ -200,6 +222,7 @@ function Fixture() {
     const [events, setEvents] = useState<FlowEngineEvent[]>([]);
     const [gestures, setGestures] = useState<string[]>([]);
     const [asked, setAsked] = useState<string | null>(null);
+    const [minimapClicks, setMinimapClicks] = useState<string[]>([]);
     showDelete = setAsked;
     /** Logs a gesture callback's event, without its DOM event. */
     const log = (event: FlowEngineEvent) => {
@@ -231,6 +254,8 @@ function Fixture() {
         onSelectionStart: log,
         onResizeStart: log,
         onResizeCancel: log,
+        onSelectionDragStart: log,
+        onSelectionDragStop: log,
     };
     // the ref re-renders this component once the root attached its engine
     const engine = flow.current?.engine;
@@ -345,11 +370,14 @@ function Fixture() {
                                         />
                                     </>
                                 )}
-                                {node.id === "c" && <NodeResizer />}
+                                {node.id === "c" && (
+                                    <NodeResizer direction={direction} />
+                                )}
                             </Flow.Node>
                         )}
                     </Flow.Nodes>
                     <Flow.ConnectionLine />
+                    {nodesSelection && <Flow.NodesSelection />}
                 </Flow.Viewport>
                 {nodeToolbar && (
                     <Flow.NodeToolbar
@@ -366,7 +394,21 @@ function Fixture() {
                     <Flow.FitView duration={duration}>fit view</Flow.FitView>
                     <Flow.ToggleInteractive>lock</Flow.ToggleInteractive>
                 </Flow.Controls>
-                <MiniMap width={200} height={150} aria-label="Minimap" />
+                <MiniMap
+                    width={200}
+                    height={150}
+                    aria-label="Minimap"
+                    inversePan={inversePan || undefined}
+                    onClick={(_event, point) =>
+                        setMinimapClicks((list) => [
+                            ...list,
+                            JSON.stringify({
+                                x: Math.round(point.x),
+                                y: Math.round(point.y),
+                            }),
+                        ])
+                    }
+                />
                 {asked !== null && (
                     <div
                         data-flow-part="panel"
@@ -396,6 +438,12 @@ function Fixture() {
                 )}
                 <ol data-testid="gestures" data-flow-no-gesture="">
                     {gestures.map((line, index) => (
+                        // biome-ignore lint/suspicious/noArrayIndexKey: a log
+                        <li key={index}>{line}</li>
+                    ))}
+                </ol>
+                <ol data-testid="minimap-clicks" data-flow-no-gesture="">
+                    {minimapClicks.map((line, index) => (
                         // biome-ignore lint/suspicious/noArrayIndexKey: a log
                         <li key={index}>{line}</li>
                     ))}

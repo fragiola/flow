@@ -21,7 +21,14 @@ import type {
     FeatureGesture,
 } from "../features/types";
 import type { Rect } from "../geometry/types";
-import type { ResizeOptions } from "./resize";
+import type { ResizeDirection, ResizeOptions } from "./resize";
+
+/** What a resize is kept to: the feature's options, a resizer's own over them, and its direction. */
+export interface ResizeLimits
+    extends Omit<ResizeOptions, "snap">,
+        Partial<Pick<ResizeOptions, "snap">> {
+    readonly direction?: ResizeDirection | undefined;
+}
 
 /** The corners and sides a resize handle may be on. */
 export const RESIZE_POSITIONS = [
@@ -50,20 +57,40 @@ interface Start {
 const clamp = (value: number, min: number, max: number) =>
     Math.min(Math.max(value, min), Math.max(min, max));
 
-/** A node's box after a resize from `position` by `delta` (flow units), before the parent's rules. */
+const snapTo = (value: number, grid: number) =>
+    grid > 0 ? Math.round(value / grid) * grid : value;
+
+/**
+ * A node's box after a resize from `position` by `delta` (flow units), before the parent's rules:
+ * with a `direction`, only its sides move; with `snap`, the moved sides land on the grid.
+ */
 export function resizedRect(
     start: Rect,
     position: ResizePosition,
     delta: XY,
-    limits: ResizeOptions,
+    limits: ResizeLimits,
 ): Rect {
-    const left = position.includes("left");
-    const right = position.includes("right");
-    const top = position.startsWith("top");
-    const bottom = position.startsWith("bottom");
-    let width = start.width + (right ? delta.x : left ? -delta.x : 0);
-    let height = start.height + (bottom ? delta.y : top ? -delta.y : 0);
-    if (limits.keepAspectRatio && start.width > 0 && start.height > 0) {
+    const { direction, snap } = limits;
+    const left = direction !== "vertical" && position.includes("left");
+    const right = direction !== "vertical" && position.includes("right");
+    const top = direction !== "horizontal" && position.startsWith("top");
+    const bottom = direction !== "horizontal" && position.startsWith("bottom");
+    const moved = { ...delta };
+    if (snap) {
+        // the moved side's new place, snapped, gives the delta
+        const edgeX = left ? start.x : start.x + start.width;
+        const edgeY = top ? start.y : start.y + start.height;
+        moved.x = snapTo(edgeX + delta.x, snap.x) - edgeX;
+        moved.y = snapTo(edgeY + delta.y, snap.y) - edgeY;
+    }
+    let width = start.width + (right ? moved.x : left ? -moved.x : 0);
+    let height = start.height + (bottom ? moved.y : top ? -moved.y : 0);
+    if (
+        limits.keepAspectRatio &&
+        direction === undefined &&
+        start.width > 0 &&
+        start.height > 0
+    ) {
         const horizontal = left || right;
         const vertical = top || bottom;
         // a corner follows the larger change; a side drives the other dimension
@@ -109,7 +136,7 @@ export function resizeEngine(
     const { model } = host;
     let resizing: string | undefined;
 
-    const limitsOf = (nodeId: string): ResizeOptions => {
+    const limitsOf = (nodeId: string): ResizeLimits => {
         const own = host.partOptions("resizer", nodeId) ?? {};
         const pick = <K extends keyof ResizeOptions>(
             key: K,
@@ -123,6 +150,11 @@ export function resizeEngine(
             maxWidth: pick("maxWidth"),
             maxHeight: pick("maxHeight"),
             keepAspectRatio: pick("keepAspectRatio"),
+            snap: options.snap,
+            direction:
+                own.direction === "horizontal" || own.direction === "vertical"
+                    ? own.direction
+                    : undefined,
         };
     };
 
@@ -131,7 +163,7 @@ export function resizeEngine(
         start: Start,
         rect: Rect,
         position: ResizePosition,
-        limits: ResizeOptions,
+        limits: ResizeLimits,
     ): Rect => {
         let { x, y, width, height } = rect;
         const left = position.includes("left");
@@ -157,6 +189,7 @@ export function resizeEngine(
             // the bound wins over the limits; a kept ratio shrinks the other side to it
             if (
                 limits.keepAspectRatio &&
+                limits.direction === undefined &&
                 from.width > 0 &&
                 from.height > 0 &&
                 (width !== rect.width || height !== rect.height)
@@ -353,11 +386,15 @@ export function resizeEngine(
     keyboardLinks(host).resize = {
         step: (nodeId, position, delta) => {
             if (!resizable(position)) return false;
-            // the arrow moves none of this handle's sides: not the resizer's key
+            // the arrow moves none of this handle's sides (its direction kept): not the
+            // resizer's key
+            const { direction } = limitsOf(nodeId);
             const horizontal =
-                position.includes("left") || position.includes("right");
+                direction !== "vertical" &&
+                (position.includes("left") || position.includes("right"));
             const vertical =
-                position.startsWith("top") || position.startsWith("bottom");
+                direction !== "horizontal" &&
+                (position.startsWith("top") || position.startsWith("bottom"));
             if (
                 !(horizontal && delta.x !== 0) &&
                 !(vertical && delta.y !== 0)
@@ -366,7 +403,8 @@ export function resizeEngine(
             }
             const start = startOf(nodeId);
             if (!start) return false;
-            const limits = limitsOf(nodeId);
+            // a key moves by the keyboard's step, never snapped back to where it was
+            const limits = { ...limitsOf(nodeId), snap: undefined };
             const rect = kept(
                 start,
                 resizedRect(start.rect, position, delta, limits),

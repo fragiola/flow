@@ -68,7 +68,9 @@ In Angular, the button is yours; its state is the `state()` signal (`ControlButt
 
 </Framework>
 
-The same action from code: `engine.run("fit-view")` ([engine](/docs/api/engine)).
+The same action from code: `engine.run("fit-view")` ([engine](/docs/api/engine)). Its props are
+the action's payload: one left out is not sent, so the engine's default applies. Pixels, per-side
+padding and hidden nodes: [What fit-view frames](/docs/concepts/viewport#what-fit-view-frames).
 
 ## Props
 
@@ -78,6 +80,11 @@ every `button` attribute; a `disabled` of yours disables it too.
 | prop | type | default | description |
 | --- | --- | --- | --- |
 | `duration` | `number` | `0` | how long its viewport change animates, in milliseconds (the root's `easing`); 0: at once |
+| `padding` | `FitPadding` | `0.1` | the room kept free: a share of the root's size, `"<n>px"`, or each side's `{ top, right, bottom, left }` |
+| `nodeIds` | `string[]` | every node not hidden | only these nodes |
+| `includeHidden` | `boolean` | `false` | without `nodeIds`, the hidden nodes of known size too |
+| `minZoom` | `number` | the root's `minZoom` | the least zoom it may pick |
+| `maxZoom` | `number` | the root's `maxZoom` | the greatest zoom it may pick |
 | `children` | `ReactNode` | none | its icon or label |
 
 ## State

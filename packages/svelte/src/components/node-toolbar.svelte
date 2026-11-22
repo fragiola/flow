@@ -43,7 +43,7 @@
     Presses and the wheel over it are left to it. It renders only its children (your buttons).
 -->
 <script lang="ts">
-    import { useFlowContext, useNodeId } from "../context.js";
+    import { useFlowContext, usePartNodeId } from "../context.js";
     import { flowValue } from "../runes/internal.svelte.js";
     import { plain } from "../utils/plain.svelte.js";
     import Portal from "../utils/portal.svelte";
@@ -70,7 +70,7 @@
     }: NodeToolbarProps = $props();
 
     // read only for one node: several need no enclosing node
-    const nodeIdOf = useNodeId("NodeToolbar", () => nodeIdProp);
+    const nodeIdOf = usePartNodeId("NodeToolbar", () => nodeIdProp);
     const context = useFlowContext("NodeToolbar");
     // several nodes (`nodeIds` not empty), or one: the given one or the enclosing node's
     const many = $derived(nodeIdsProp !== undefined && nodeIdsProp.length > 0);

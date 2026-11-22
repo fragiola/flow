@@ -3,7 +3,7 @@
 // touching the markup.
 
 export const styles = {
-    edge: "fill-none stroke-(--fl-edge-color) stroke-(length:--fl-edge-width) [stroke-dasharray:var(--fl-edge-dash)] data-selected:stroke-(--fl-edge-selected) data-selected:stroke-(length:--fl-edge-selected-width)",
+    edge: "fill-none stroke-(--fl-edge-color) stroke-(length:--fl-edge-width) [stroke-dasharray:var(--fl-edge-dash)] data-selected:stroke-(--fl-edge-selected) data-selected:stroke-(length:--fl-edge-selected-width) data-animated:animate-pulse data-animated:[stroke-dasharray:6_4]",
     label: "palette-raised rounded-(--fl-control-radius) border border-(--fl-node-line) bg-palette-base px-1.5 py-0.5 text-xs text-palette-accent",
     root: "size-full min-h-0 bg-(--fl-canvas-bg) font-(family-name:--fl-font) text-(length:--fl-font-size) text-palette-contrast",
     dots: "text-(--fl-grid-color) [display:var(--fl-grid-dots)]",

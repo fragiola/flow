@@ -58,6 +58,11 @@ export function setFlowContext(value: FlowContextValue): void {
     setContext(FLOW, value);
 }
 
+/** The context of the enclosing `Flow.Root`, or none outside one (a rune that works without it). */
+export function findFlowContext(): FlowContextValue | undefined {
+    return hasContext(FLOW) ? getContext<FlowContextValue>(FLOW) : undefined;
+}
+
 export function useFlowContext(part: string): FlowContextValue {
     const context = hasContext(FLOW)
         ? getContext<FlowContextValue>(FLOW)
@@ -87,11 +92,16 @@ export function useEdgeLabelLayer(): EdgeLabelLayerValue | undefined {
         : undefined;
 }
 
+/** The enclosing `Flow.Node`'s context, or none outside one. */
+export function findNodeContext(): NodeContextValue | undefined {
+    return hasContext(NODE) ? getContext<NodeContextValue>(NODE) : undefined;
+}
+
 /**
  * The node of `nodeId`, or the enclosing `Flow.Node`'s, read when called (`nodeId` is a getter of
  * the part's prop, so a new prop is followed).
  */
-export function useNodeId(
+export function usePartNodeId(
     part: string,
     nodeId: () => string | undefined,
 ): () => string {

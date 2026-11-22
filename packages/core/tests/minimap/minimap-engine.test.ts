@@ -104,4 +104,181 @@ describe("the minimap", () => {
         wheel(element, { deltaY: -100, clientX: 700, clientY: 500 });
         expect(flow.engine.get("viewport")).toEqual({ x: 0, y: 0, zoom: 1 });
     });
+
+    it("maps a client point on the minimap to a flow point", () => {
+        const flow = mount(json(), { features: [minimap()], sizes });
+        expect(
+            flow.engine.get("minimap-point-to-flow", {
+                client: { x: 650, y: 525 },
+            }),
+        ).toBeUndefined();
+        minimapElement(flow.root);
+        // the view box (-100, -75) 1000 × 750 over 200 × 150 pixels: 5 units a pixel
+        expect(
+            flow.engine.get("minimap-point-to-flow", {
+                client: { x: 650, y: 525 },
+            }),
+        ).toEqual({ x: 150, y: 300 });
+        expect(
+            flow.engine.get("minimap-point-to-flow", {
+                client: { x: 600, y: 450 },
+            }),
+        ).toEqual({ x: -100, y: -75 });
+    });
+
+    it("moves the view the other way with inversePan, without centring on the press", () => {
+        const flow = mount(json(), {
+            features: [minimap({ inversePan: true })],
+            sizes,
+        });
+        const element = minimapElement(flow.root);
+        pointer(element, "pointerdown", { clientX: 650, clientY: 525 });
+        expect(flow.engine.get("viewport")).toEqual({ x: 0, y: 0, zoom: 1 });
+        // 20 pixels right: 100 flow units, the view goes 100 left (10 up: 50 down)
+        pointer(flow.root, "pointermove", { clientX: 670, clientY: 525 });
+        expect(flow.engine.get("viewport")).toEqual({ x: 100, y: 0, zoom: 1 });
+        pointer(flow.root, "pointermove", { clientX: 650, clientY: 515 });
+        expect(flow.engine.get("viewport")).toEqual({ x: 0, y: -50, zoom: 1 });
+        pointer(flow.root, "pointerup", { clientX: 650, clientY: 515 });
+        expect(flow.engine.get("viewport")).toEqual({ x: 0, y: -50, zoom: 1 });
+    });
+
+    it("zooms by zoomStep: 20 zooms twice as fast as the default 10", () => {
+        const flow = mount(json(), {
+            features: [minimap({ zoomStep: 20 })],
+            sizes,
+        });
+        const element = minimapElement(flow.root);
+        wheel(element, { deltaY: -100, clientX: 700, clientY: 500 });
+        expect(flow.engine.get("viewport").zoom).toBeCloseTo(
+            Math.exp(200 / 600),
+        );
+        expect(minimap().options).toMatchObject({
+            inversePan: false,
+            zoomStep: 10,
+        });
+    });
+
+    it("falls back to the default zoomStep for one that is not a finite number above 0", () => {
+        for (const zoomStep of [-10, 0, Number.NaN, Number.POSITIVE_INFINITY]) {
+            expect(minimap({ zoomStep }).options.zoomStep).toBe(10);
+        }
+        const flow = mount(json(), {
+            features: [minimap({ zoomStep: -20 })],
+            sizes,
+        });
+        const element = minimapElement(flow.root);
+        // a wheel up zooms in at the default rate, not out
+        wheel(element, { deltaY: -60, clientX: 700, clientY: 500 });
+        expect(flow.engine.get("viewport").zoom).toBeCloseTo(
+            Math.exp(60 / 600),
+        );
+        // a part's bad zoomStep keeps the feature's
+        flow.engine.adapter.setPartOptions("minimap", "", { zoomStep: -5 });
+        const before = flow.engine.get("viewport").zoom;
+        wheel(element, { deltaY: -60, clientX: 700, clientY: 500 });
+        expect(flow.engine.get("viewport").zoom / before).toBeCloseTo(
+            Math.exp(60 / 600),
+        );
+    });
+
+    it("takes a minimap part's inversePan and zoomStep over the feature's, until it clears them", () => {
+        const flow = mount(json(), { features: [minimap()], sizes });
+        const element = minimapElement(flow.root);
+        flow.engine.adapter.setPartOptions("minimap", "", {
+            inversePan: true,
+            zoomStep: 30,
+        });
+        pointer(element, "pointerdown", { clientX: 650, clientY: 525 });
+        expect(flow.engine.get("viewport")).toEqual({ x: 0, y: 0, zoom: 1 });
+        pointer(flow.root, "pointermove", { clientX: 660, clientY: 525 });
+        expect(flow.engine.get("viewport")).toEqual({ x: 50, y: 0, zoom: 1 });
+        pointer(flow.root, "pointerup", { clientX: 660, clientY: 525 });
+        wheel(element, { deltaY: -50, clientX: 700, clientY: 500 });
+        expect(flow.engine.get("viewport").zoom).toBeCloseTo(
+            Math.exp(150 / 600),
+        );
+        flow.engine.adapter.setPartOptions("minimap", "", null);
+        const before = flow.engine.get("viewport").zoom;
+        wheel(element, { deltaY: -50, clientX: 700, clientY: 500 });
+        expect(flow.engine.get("viewport").zoom / before).toBeCloseTo(
+            Math.exp(50 / 600),
+        );
+    });
+
+    it("tells a tap on it as minimap-click with the flow point under it, pannable or not", () => {
+        for (const pannable of [true, false]) {
+            const flow = mount(json(), {
+                features: [minimap({ pannable })],
+                sizes,
+            });
+            const element = minimapElement(flow.root);
+            const events: unknown[] = [];
+            flow.engine.subscribe((event) => {
+                if (event.type === "minimap-click") {
+                    events.push({ point: event.point, client: event.client });
+                }
+            });
+            pointer(element, "pointerdown", { clientX: 650, clientY: 525 });
+            pointer(flow.root, "pointerup", { clientX: 651, clientY: 525 });
+            // the view box at the press: (-100, -75), 5 units a pixel
+            expect(events, `pannable ${pannable}`).toEqual([
+                { point: { x: 155, y: 300 }, client: { x: 651, y: 525 } },
+            ]);
+            // a drag is no click
+            pointer(element, "pointerdown", { clientX: 650, clientY: 525 });
+            pointer(flow.root, "pointermove", { clientX: 690, clientY: 525 });
+            pointer(flow.root, "pointerup", { clientX: 690, clientY: 525 });
+            expect(events).toHaveLength(1);
+            unmountAll();
+        }
+    });
+
+    it("names the tapped minimap in minimap-click, its point through that minimap's box", () => {
+        const flow = mount(json(), { features: [minimap()], sizes });
+        const first = minimapElement(flow.root);
+        // a second minimap at client (0, 0), 100 × 100
+        const second = document.createElement("div");
+        second.setAttribute("data-flow-part", "minimap");
+        second.getBoundingClientRect = () =>
+            ({
+                left: 0,
+                top: 0,
+                width: 100,
+                height: 100,
+                right: 100,
+                bottom: 100,
+                x: 0,
+                y: 0,
+            }) as DOMRect;
+        flow.root.append(second);
+        const events: unknown[] = [];
+        flow.engine.subscribe((event) => {
+            if (event.type === "minimap-click") {
+                events.push({ element: event.element, point: event.point });
+            }
+        });
+        const { viewBox } = flow.engine.get("minimap-view", {
+            width: 100,
+            height: 100,
+        });
+        pointer(second, "pointerdown", { clientX: 50, clientY: 50 });
+        pointer(flow.root, "pointerup", { clientX: 50, clientY: 50 });
+        expect(events).toEqual([
+            {
+                element: second,
+                point: {
+                    x: viewBox.x + viewBox.width / 2,
+                    y: viewBox.y + viewBox.height / 2,
+                },
+            },
+        ]);
+        pointer(first.firstElementChild as Element, "pointerdown", {
+            clientX: 650,
+            clientY: 525,
+        });
+        pointer(flow.root, "pointerup", { clientX: 650, clientY: 525 });
+        expect(events).toHaveLength(2);
+        expect((events[1] as { element: Element }).element).toBe(first);
+    });
 });

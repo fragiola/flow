@@ -3,11 +3,20 @@
 // clears the selection, and a drag on the pane with the box key (Shift by default; any drag with
 // `boxOnDrag`) draws a selection box that selects the nodes it holds (`"full"`) or touches
 // (`"partial"`), with the edges between them. Each box step is a
-// transient `selection.set`, the release the final one; a cancel puts the selection back.
+// transient `selection.set`, the release the final one; a cancel puts the selection back. Two or
+// more nodes a box selected get a rectangle around them (`selection-rect`, the `nodes-selection`
+// part: `drag()` drags it) until the selection changes otherwise (`rect: "always"`: whenever two
+// or more are selected).
 import { flag } from "../attributes/part-attributes";
 import type { FlowEdge, FlowNode, XY } from "../document/types";
 import type { FeatureEngine, FeatureEngineHost } from "../features/types";
-import { contains, overlaps, rectFromCorners } from "../geometry/rect";
+import {
+    boundsOf,
+    contains,
+    overlaps,
+    rectFromCorners,
+} from "../geometry/rect";
+import type { Rect } from "../geometry/types";
 import { toScreen } from "../geometry/viewport-math";
 import type { SelectionKey, SelectionOptions } from "./selection";
 
@@ -29,6 +38,8 @@ export function selectionEngine(
 ): FeatureEngine {
     const { model } = host;
     let box: Box | undefined;
+    /** the nodes the last box selected (two or more), while they are still the selection */
+    let boxed: readonly string[] | undefined;
 
     /** Whether one of `keys` is held during `event`. */
     const holds = (keys: SelectionKey, event: MouseEvent): boolean =>
@@ -80,8 +91,39 @@ export function selectionEngine(
     const same = (a: readonly string[], b: readonly string[]) =>
         a.length === b.length && a.every((id, i) => id === b[i]);
 
+    /** Whether two lists hold the same ids, in any order. */
+    const sameSet = (a: readonly string[], b: readonly string[]) => {
+        if (a.length !== b.length) return false;
+        const set = new Set(a);
+        return b.every((id) => set.has(id));
+    };
+
+    // the box's rectangle goes once the selection is anything else (a click, a key, a sync)
+    const stopWatching = model.subscribe(() => {
+        if (boxed && !sameSet(boxed, selected().nodeIds)) boxed = undefined;
+    });
+
+    /** The flow-space bounds of the selected nodes, when the rectangle shows. */
+    const selectionRect = (): Rect | null => {
+        if (box?.active) return null;
+        const { nodeIds } = selected();
+        if (nodeIds.length < 2) return null;
+        if (options.rect === "box" && !boxed) return null;
+        const rects = nodeIds
+            .filter(
+                (id) =>
+                    host.measured(id) &&
+                    (model.get("node-by", { id }) as FlowNode | undefined)
+                        ?.hidden !== true,
+            )
+            .map((id) => host.nodeRect(id))
+            .filter((rect): rect is Rect => rect !== undefined);
+        return boundsOf(rects) ?? null;
+    };
+
     return {
         get: {
+            "selection-rect": selectionRect,
             "selection-box": () => {
                 if (!box?.active) return null;
                 // the corner stays on its flow point when the view pans or zooms under it
@@ -152,11 +194,19 @@ export function selectionEngine(
                     const current = box;
                     box = undefined;
                     if (!current?.active) return;
-                    model.run("selection.set", {
+                    const result = model.run("selection.set", {
                         nodeIds: current.nodeIds,
                         edgeIds: current.edgeIds,
                         mode: "replace",
                     });
+                    // the rectangle only for the box's own selection (not one a middleware vetoed
+                    // or changed)
+                    boxed =
+                        result.ok &&
+                        current.nodeIds.length >= 2 &&
+                        sameSet(current.nodeIds, selected().nodeIds)
+                            ? current.nodeIds
+                            : undefined;
                     host.changed();
                     host.emit({
                         type: "box-select",
@@ -212,6 +262,9 @@ export function selectionEngine(
         },
         detached: () => {
             box = undefined;
+        },
+        destroy: () => {
+            stopWatching();
         },
     };
 }

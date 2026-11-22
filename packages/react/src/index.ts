@@ -32,6 +32,10 @@ export type {
 } from "./components/node-toolbar";
 export type { NodesProps, NodesState } from "./components/nodes";
 export type {
+    NodesSelectionProps,
+    NodesSelectionState,
+} from "./components/nodes-selection";
+export type {
     ReconnectAnchorProps,
     ReconnectAnchorState,
 } from "./components/reconnect-anchor";
@@ -67,18 +71,31 @@ export {
 export { useEdges } from "./hooks/use-edges";
 export { type UseFlowResult, useFlow } from "./hooks/use-flow";
 export { useFlowRef } from "./hooks/use-flow-ref";
+export { useFlowStore } from "./hooks/use-flow-store";
 export {
     type HandleState,
     type UseHandleOptions,
     type UseHandleResult,
     useHandle,
 } from "./hooks/use-handle";
+export { useInternalNode } from "./hooks/use-internal-node";
+export { type UseKeyPressOptions, useKeyPress } from "./hooks/use-key-press";
 export {
     type NodeState,
     type UseNodeResult,
     useNode,
 } from "./hooks/use-node";
+export {
+    type UseNodeConnectionsOptions,
+    useNodeConnections,
+} from "./hooks/use-node-connections";
+export { useNodeId } from "./hooks/use-node-id";
 export { useNodes } from "./hooks/use-nodes";
+export { useNodesData } from "./hooks/use-nodes-data";
+export {
+    type UseOnViewportChangeOptions,
+    useOnViewportChange,
+} from "./hooks/use-on-viewport-change";
 export { type FlowSelection, useSelection } from "./hooks/use-selection";
 export { useViewport } from "./hooks/use-viewport";
 export * as Flow from "./parts";

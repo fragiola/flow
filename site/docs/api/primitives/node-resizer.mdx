@@ -153,6 +153,68 @@ when you write no element inside it.
 
 </Framework>
 
+## One direction, and a grid
+
+`direction="horizontal"` makes this node's resize move only its width (and its x, from the left);
+`"vertical"` only its height (and its y, from the top). A corner handle then moves its one
+dimension, and `keepAspectRatio` does not apply. Without it, both. Render only the handles that
+make sense, the two sides:
+
+<Framework name="react">
+
+```tsx
+<NodeResizer direction="horizontal">
+    <ResizeHandle position="left" aria-label="Resize banner: left" className="w-1" />
+    <ResizeHandle position="right" aria-label="Resize banner: right" className="w-1" />
+</NodeResizer>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<NodeResizer direction="horizontal">
+    <ResizeHandle position="left" aria-label="Resize banner: left" class="w-1" />
+    <ResizeHandle position="right" aria-label="Resize banner: right" class="w-1" />
+</NodeResizer>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<NodeResizer direction="horizontal">
+    <ResizeHandle position="left" aria-label="Resize banner: left" class="w-1" />
+    <ResizeHandle position="right" aria-label="Resize banner: right" class="w-1" />
+</NodeResizer>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowNodeResizer direction="horizontal">
+    <div flowResizeHandle position="left" aria-label="Resize banner: left" class="w-1"></div>
+    <div flowResizeHandle position="right" aria-label="Resize banner: right" class="w-1"></div>
+</div>
+```
+
+</Framework>
+
+The direction is the resizer's, sent with its limits (`engine.adapter.setPartOptions("resizer",
+nodeId, { direction })`); a `ResizeHandle` takes none of its own.
+
+A resize snaps to a grid only with `resize({ snap })`: the sides the pointer moves land on it, so
+sizes and positions do. The drag feature's `snapGrid` is the drag's alone and does not apply to a
+resize, and an arrow key's step (with `keyboard()`) is never snapped:
+
+```ts
+const features = [drag({ snapGrid: [20, 20] }), resize({ snap: { x: 20, y: 20 } })] as const;
+```
+
 ## Props
 
 `NodeResizerProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and
@@ -166,6 +228,7 @@ every `div` attribute.
 | `maxWidth` | `number` | `resize()`'s (none) | this node's largest width |
 | `maxHeight` | `number` | `resize()`'s (none) | this node's largest height |
 | `keepAspectRatio` | `boolean` | `resize()`'s (`false`) | this node keeps its width-to-height ratio |
+| `direction` | `ResizeDirection` | both | `"horizontal"`: its handles move only the width (and x); `"vertical"`: only the height (and y); a corner then moves its one dimension |
 | `children` | `ReactNode` | a `ResizeHandle` at each corner and side | its handles |
 
 ## State

@@ -1,6 +1,7 @@
+import type { ResizeDirection } from "@fragiola/flow/resize";
 import { h, watchEffect } from "vue";
 import { useFlowValue } from "../composables/internal";
-import { useFlowContext, useNodeId } from "../context";
+import { useFlowContext, usePartNodeId } from "../context";
 import {
     definePrimitive,
     type FlowComponent,
@@ -26,6 +27,11 @@ export interface NodeResizerProps extends PrimitiveProps {
     maxHeight?: number | undefined;
     /** this node keeps its aspect ratio, over `resize()`'s */
     keepAspectRatio?: boolean | undefined;
+    /**
+     * the sides its handles move: `"horizontal"` only the width (and x), `"vertical"` only the
+     * height (and y); default both. A corner then moves its one dimension
+     */
+    direction?: ResizeDirection | undefined;
 }
 
 export interface NodeResizerSlots extends RenderSlot<NodeResizerState> {
@@ -54,10 +60,11 @@ export const NodeResizer: FlowComponent<NodeResizerProps, NodeResizerSlots> =
             "maxWidth",
             "maxHeight",
             "keepAspectRatio",
+            "direction",
             "as",
         ],
         (props, { attrs, slots }) => {
-            const nodeId = useNodeId("NodeResizer", () => props.nodeId);
+            const nodeId = usePartNodeId("NodeResizer", () => props.nodeId);
             const context = useFlowContext("NodeResizer");
             // this node's limits, set again when one changes, cleared when the resizer goes
             watchEffect((onCleanup) => {
@@ -71,6 +78,7 @@ export const NodeResizer: FlowComponent<NodeResizerProps, NodeResizerSlots> =
                         maxWidth: props.maxWidth,
                         maxHeight: props.maxHeight,
                         keepAspectRatio: props.keepAspectRatio,
+                        direction: props.direction,
                     }).filter(([, value]) => value !== undefined),
                 );
                 engine.adapter.setPartOptions("resizer", id, options);

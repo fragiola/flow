@@ -60,6 +60,7 @@ export {
     nodeSchema,
 } from "./document/document-schema";
 export { FlowValidationError } from "./document/flow-validation-error";
+export { isEdge, isNode } from "./document/type-guards";
 export type {
     AnyTypes,
     BuiltInEdgeType,
@@ -67,6 +68,7 @@ export type {
     EdgeFields,
     EdgeFlags,
     EdgeOf,
+    EdgePathOptions,
     EdgeTypeOf,
     FlowDocument,
     FlowDocumentJson,
@@ -118,6 +120,7 @@ export type {
     FlowEngineEventType,
     FlowPointerInfo,
     MoveSource,
+    SelectionDragStep,
 } from "./engine/events";
 export type {
     InteractionKind,
@@ -143,6 +146,7 @@ export type {
     EngineIsMap,
     EngineIsPayload,
     FitViewPayload,
+    InternalNode,
     IntersectingNodesPayload,
     MinimapView,
     NodeToolbarPayload,
@@ -152,6 +156,11 @@ export type {
     ZoomStepPayload,
 } from "./engine/verbs";
 export type { ViewportEasing } from "./engine/viewport-animation";
+export {
+    type KeyPressKeys,
+    type KeyPressTarget,
+    watchKeyPress,
+} from "./engine/watch-key-press";
 export {
     FEATURE_KEYS,
     type FeatureKeyKind,
@@ -178,8 +187,10 @@ export type {
 } from "./features/types";
 export {
     type BezierPathOptions,
+    type BezierPathResult,
     bezierPath,
 } from "./geometry/bezier-path";
+export { type EdgeCenter, edgeCenter } from "./geometry/edge-center";
 export {
     type SimpleBezierPathOptions,
     simpleBezierPath,
@@ -187,6 +198,7 @@ export {
 export {
     type SmoothStepPathOptions,
     type StepPathOptions,
+    type StepTurnOptions,
     smoothStepPath,
     stepPath,
 } from "./geometry/smooth-step-path";
@@ -203,6 +215,8 @@ export type {
     Viewport,
 } from "./geometry/types";
 export {
+    type FitPadding,
+    type PaddingValue,
     type ViewportForBoundsOptions,
     viewportForBounds,
 } from "./geometry/viewport-for-bounds";
@@ -230,6 +244,9 @@ export type {
     ModelIsKey,
     ModelIsMap,
     ModelIsPayload,
+    NodeConnection,
+    NodeData,
     NoPayload,
     QueryArgs,
 } from "./state/queries";
+export { sameFlowValue } from "./state/same-flow-value";

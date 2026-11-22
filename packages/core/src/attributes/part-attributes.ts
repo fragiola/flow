@@ -44,6 +44,7 @@ export type FlowPart =
     | "handle"
     | "connection-line"
     | "selection-box"
+    | "nodes-selection"
     | "background"
     | "controls"
     | "minimap"

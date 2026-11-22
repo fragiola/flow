@@ -41,7 +41,14 @@ export function useControlButton(
 export function durationPayload(duration: number | undefined): {
     duration?: number;
 } {
-    return duration === undefined ? {} : { duration };
+    return givenPayload({ duration });
+}
+
+/** @internal a control's payload: the fields its props give (an absent one is the engine's default) */
+export function givenPayload<P extends object>(fields: P): Partial<P> {
+    return Object.fromEntries(
+        Object.entries(fields).filter(([, value]) => value !== undefined),
+    ) as Partial<P>;
 }
 
 /** `ZoomIn` → `zoom-in`. */
