@@ -12,8 +12,10 @@ import { selection } from "@fragiola/flow-vue/selection";
 // Each node type renders its own content from its typed data. The `Types` registry names the node
 // types and their data, so `node.type` narrows `node.data`. The colour and number nodes write their
 // data with `node.set-data`; the preview reads the nodes wired into its two target handles. A field
-// inside a node keeps its own presses: it never starts a drag. Each node type is a component of
-// its own (colour-node.vue, number-node.vue, preview-node.vue).
+// inside a node keeps its own presses: it never starts a drag. The preview drags only by its title
+// bar: an element with `data-flow-drag-handle` makes the rest of its node a press that selects it
+// and moves nothing. Each node type is a component of its own (colour-node.vue, number-node.vue,
+// preview-node.vue).
 
 export interface Types extends FlowTypes {
     readonly nodes: {

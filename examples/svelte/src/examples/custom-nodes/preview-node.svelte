@@ -1,4 +1,4 @@
-<!-- The preview: it reads the nodes wired into its two target handles. -->
+<!-- The preview: it reads the nodes wired into its two target handles, and drags by its title bar. -->
 <script lang="ts">
     import { Flow, useEdges, useNodes } from "@fragiola/flow-svelte";
     import type { Node, Types } from "./index.svelte";
@@ -27,7 +27,10 @@
     });
 </script>
 
-<span class={styles.caption}>{node.data.label}</span>
+<div data-flow-drag-handle class={styles.dragHandle}>
+    <span class={styles.caption}>{node.data.label}</span>
+    <span aria-hidden="true" class={styles.grip}></span>
+</div>
 <div class={styles.stage}>
     {#if fill}
         <div

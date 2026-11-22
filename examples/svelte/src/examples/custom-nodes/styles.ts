@@ -10,6 +10,9 @@ export const styles = {
     handle: "size-(--fl-handle-size) cursor-crosshair rounded-(--fl-handle-radius) border-(length:--fl-handle-border) border-(--fl-handle-line) bg-(--fl-handle-bg) data-valid:bg-(--fl-valid) data-invalid:bg-(--fl-invalid)",
     range: "w-32 accent-(--fl-edge-selected)",
     value: "text-xs tabular-nums text-palette-accent",
+    dragHandle:
+        "flex cursor-grab items-center justify-between gap-3 rounded-(--fl-control-radius) border border-palette-line bg-palette-soft px-2 py-1 active:cursor-grabbing",
+    grip: "h-2 w-4 bg-[radial-gradient(currentColor_1px,transparent_1.5px)] bg-size-[4px_4px] text-palette-accent/70",
     stage: "mt-2 grid size-28 place-items-center rounded-(--fl-control-radius) border border-dashed border-palette-line bg-palette-soft",
     swatch: "rounded-(--fl-node-radius) shadow-(--fl-node-shadow)",
     empty: "px-2 text-xs font-normal text-palette-accent/85",

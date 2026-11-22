@@ -11,7 +11,7 @@
     // `minimap()` draws the whole flow small (`MiniMap`): a `MiniMapNode` per node and a `MiniMapMask`
     // over what the root does not show; dragging in it pans the flow, the wheel over it zooms.
     // `Flow.Controls` groups the buttons; each runs one engine action and is disabled while the engine
-    // refuses it (at the zoom limits). The lock (`Flow.ToggleInteractive`) stops every gesture that
+    // refuses it (at the zoom limits); `duration` animates its change over 200 ms. The lock (`Flow.ToggleInteractive`) stops every gesture that
     // changes the flow; pan and zoom stay. Its default slot gets its state: the icon follows the lock.
 
     interface Types extends FlowTypes {
@@ -102,13 +102,13 @@
         </Flow.Nodes>
     </Flow.Viewport>
     <Flow.Controls role="group" aria-label="Zoom and lock" class={styles.controls}>
-        <Flow.ZoomIn aria-label="Zoom in" class={styles.control}>
+        <Flow.ZoomIn duration={200} aria-label="Zoom in" class={styles.control}>
             <PlusIcon />
         </Flow.ZoomIn>
-        <Flow.ZoomOut aria-label="Zoom out" class={styles.control}>
+        <Flow.ZoomOut duration={200} aria-label="Zoom out" class={styles.control}>
             <MinusIcon />
         </Flow.ZoomOut>
-        <Flow.FitView aria-label="Fit view" class={styles.control}>
+        <Flow.FitView duration={200} aria-label="Fit view" class={styles.control}>
             <MaximizeIcon />
         </Flow.FitView>
         <Flow.ToggleInteractive aria-label="Lock the flow" class={styles.control}>

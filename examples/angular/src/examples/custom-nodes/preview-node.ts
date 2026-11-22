@@ -7,13 +7,16 @@ import {
 import type { Node, Types } from "./index";
 import { styles } from "./styles";
 
-// The preview: it reads the nodes wired into its two target handles.
+// The preview: it reads the nodes wired into its two target handles, and drags by its title bar.
 @Component({
     selector: "example-custom-nodes-preview",
     imports: [FlowHandleDirective],
     host: { class: "contents" },
     template: `
-        <span [class]="styles.caption">{{ node().data.label }}</span>
+        <div data-flow-drag-handle [class]="styles.dragHandle">
+            <span [class]="styles.caption">{{ node().data.label }}</span>
+            <span aria-hidden="true" [class]="styles.grip"></span>
+        </div>
         <div [class]="styles.stage">
             @if (fill(); as fill) {
                 <div

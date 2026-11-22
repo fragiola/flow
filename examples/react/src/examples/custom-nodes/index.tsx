@@ -16,7 +16,9 @@ import { styles } from "./styles";
 // Each node type renders its own content from its typed data. The `Types` registry names the node
 // types and their data, so `node.type` narrows `node.data`. The colour and number nodes write their
 // data with `node.set-data`; the preview reads the nodes wired into its two target handles. A field
-// inside a node keeps its own presses: it never starts a drag.
+// inside a node keeps its own presses: it never starts a drag. The preview drags only by its title
+// bar: an element with `data-flow-drag-handle` makes the rest of its node a press that selects it
+// and moves nothing.
 
 interface Types extends FlowTypes {
     readonly nodes: {
@@ -132,7 +134,10 @@ function PreviewNode({ node }: { node: Extract<Node, { type: "preview" }> }) {
     const side = size?.type === "number" ? size.data.value : 32;
     return (
         <>
-            <span className={styles.caption}>{node.data.label}</span>
+            <div data-flow-drag-handle="" className={styles.dragHandle}>
+                <span className={styles.caption}>{node.data.label}</span>
+                <span aria-hidden="true" className={styles.grip} />
+            </div>
             <div className={styles.stage}>
                 {fill ? (
                     <div

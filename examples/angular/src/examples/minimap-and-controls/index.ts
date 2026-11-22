@@ -25,7 +25,7 @@ import { styles } from "./styles";
 // `minimap()` draws the whole flow small (`flowMiniMap`): a `flowMiniMapNode` per node and a `flowMiniMapMask`
 // over what the root does not show; dragging in it pans the flow, the wheel over it zooms.
 // `flowControls` groups the buttons; each runs one engine action and is disabled while the engine
-// refuses it (at the zoom limits). The lock (`flowToggleInteractive`) stops every gesture that
+// refuses it (at the zoom limits); `duration` animates its change over 200 ms. The lock (`flowToggleInteractive`) stops every gesture that
 // changes the flow; pan and zoom stay.
 
 interface Types extends FlowTypes {
@@ -140,13 +140,13 @@ class RouteMinimap {
                 </div>
             </div>
             <div flowControls role="group" aria-label="Zoom and lock" [class]="styles.controls">
-                <button flowZoomIn aria-label="Zoom in" [class]="styles.control">
+                <button flowZoomIn [duration]="200" aria-label="Zoom in" [class]="styles.control">
                     <svg lucidePlus aria-hidden="true"></svg>
                 </button>
-                <button flowZoomOut aria-label="Zoom out" [class]="styles.control">
+                <button flowZoomOut [duration]="200" aria-label="Zoom out" [class]="styles.control">
                     <svg lucideMinus aria-hidden="true"></svg>
                 </button>
-                <button flowFitView aria-label="Fit view" [class]="styles.control">
+                <button flowFitView [duration]="200" aria-label="Fit view" [class]="styles.control">
                     <svg lucideMaximize aria-hidden="true"></svg>
                 </button>
                 <button
