@@ -260,6 +260,24 @@ is left to the page. Each press is one `node.resize` within the resizer's limits
 key does nothing), and a `resize` event with `source: "keyboard"`. See
 [Resizing nodes](/docs/guides/resizing#from-the-keyboard) to name the handles.
 
+## The selection rectangle
+
+With `selection()` and `keyboard()`, the rectangle around a box's selection
+([`Flow.NodesSelection`](/docs/api/primitives/nodes-selection)) takes focus too, so a keyboard user
+can act on the selection as a whole:
+
+| key | on the focused rectangle |
+| --- | --- |
+| the arrows | move every selected node by `step` (Shift: `fastStep`), within `nodeExtent` and each node's extent, as the arrows on a selected node do |
+| a delete key (`deleteKeys`) | removes the selection, after `beforeDelete` (a `remove` event) |
+| Escape | clears the selection: the rectangle goes |
+| Enter, Space | nothing |
+
+It has no text: give it an `aria-label` (`"Selected nodes"`), as in
+[Selection](/docs/guides/selection#the-selection-rectangle). While dragging is off
+(`set-interactive` `{ drag: false }`) the arrows move nothing, and an arrow with Ctrl, Alt or ⌘
+is left to the page.
+
 ## Name every part
 
 A node is an element you render, so you name it. A flow is easier to follow when each node says
