@@ -63,6 +63,11 @@ interface Case {
     elsewhere?: boolean;
     /** the place in the flow given the props, when not its part's (the edge's toolbar) */
     slot?: string;
+    /**
+     * the DOM listener the consumer's listener test gives it; default `onClick` (the minimap's
+     * `click` is its tap's event, with the flow point)
+     */
+    listener?: "onClick" | "onDblclick";
 }
 
 /** The flow every case renders, with the primitive `slot` given `given`. */
@@ -211,6 +216,11 @@ function flowWith(slot: string, given: Given): VNodeChild {
                                 attrs("connection-line"),
                                 slots("connection-line"),
                             ),
+                            h(
+                                Flow.NodesSelection,
+                                attrs("nodes-selection"),
+                                slots("nodes-selection"),
+                            ),
                         ],
                     }),
                 ),
@@ -292,6 +302,25 @@ async function startBox(container: HTMLElement) {
     });
 }
 
+/** A box selection of both nodes, done: the rectangle around them shows. */
+async function selectBoth(container: HTMLElement) {
+    await pointer(part(container, "viewport"), "pointerdown", {
+        clientX: -10,
+        clientY: -10,
+        shiftKey: true,
+    });
+    await pointer(part(container, "root"), "pointermove", {
+        clientX: 300,
+        clientY: 300,
+        shiftKey: true,
+    });
+    await pointer(part(container, "root"), "pointerup", {
+        clientX: 300,
+        clientY: 300,
+        shiftKey: true,
+    });
+}
+
 const CASES: Case[] = [
     {
         part: "root",
@@ -345,6 +374,12 @@ const CASES: Case[] = [
         structural: ["position", "static", "absolute"],
     },
     {
+        part: "nodes-selection",
+        tag: "div",
+        setup: selectBoth,
+        structural: ["position", "static", "absolute"],
+    },
+    {
         part: "background",
         tag: "svg",
         structural: ["position", "static", "absolute"],
@@ -368,7 +403,7 @@ const CASES: Case[] = [
         structural: ["position", "static", "absolute"],
         elsewhere: true,
     },
-    { part: "minimap", tag: "svg" },
+    { part: "minimap", tag: "svg", listener: "onDblclick" },
     { part: "minimap-node", tag: "rect" },
     { part: "minimap-mask", tag: "path" },
     {
@@ -475,12 +510,19 @@ describe.each(CASES)("the $part primitive", (c) => {
     );
 
     it("runs the consumer's listeners after its own", async () => {
-        const onClick = vi.fn();
+        const listener = vi.fn();
+        const name = c.listener ?? "onClick";
         const { container } = await mount(c, {
-            attrs: { onClick, "data-testid": "case" },
+            attrs: { [name]: listener, "data-testid": "case" },
         });
-        await click(find(container));
-        expect(onClick).toHaveBeenCalledTimes(1);
+        if (name === "onClick") await click(find(container));
+        else {
+            find(container).dispatchEvent(
+                new MouseEvent("dblclick", { bubbles: true, cancelable: true }),
+            );
+            await settle();
+        }
+        expect(listener).toHaveBeenCalledTimes(1);
     });
 
     it("takes class and style, any of Vue's forms", async () => {
