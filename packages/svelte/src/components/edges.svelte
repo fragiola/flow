@@ -121,7 +121,7 @@
             if (layers.length <= 1) {
                 const edges = engine
                     ? engine.get("drawn-edges")
-                    : (geometry?.drawnEdges ?? []).flatMap((id) => {
+                    : (layers[0]?.edgeIds ?? []).flatMap((id) => {
                           const edge = model.get("edge-by", { id });
                           return edge ? [edge] : [];
                       });
