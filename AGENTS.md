@@ -1892,3 +1892,15 @@ Epic #29):
   `EdgeLabelRenderer` row is unchanged.
 - **No package change**: every spec of this part passed against the adapters and core as part 1
   left them.
+- **The Epic review's follow-ups.** Every focusable handle of an example has a name:
+  `workflow-builder` (`<title> input`, `<title> output`, `<title> output: yes`), `undo-redo` and
+  `node-resizer` (`Resize <id>: <position>`, which now installs `keyboard()`, so keyboard resize
+  runs end to end in the four apps); `expectNamedHandles` (`e2e/examples/helpers.ts`) checks every
+  shown handle that takes focus. `connect-start` and the first `connect-target` come in one tick, so
+  a separate start message was replaced in the live region at once: `describe` takes the node a
+  keyboard connection started from and says the start, the first target and the keys in one
+  message (the listener keeps `startedFrom` until that target), in `announcements` and
+  `guides/keyboard.mdx` (four frameworks). A default `NodeResizer`'s eight handles cannot be named,
+  so `resizing.mdx` and `limitations.mdx` say to pass your own `ResizeHandle`s with `keyboard()`;
+  the playground's scenario names its own. The playground spec asserts an arrow across a resize
+  handle's sides reaches the page with its default kept (`defaultPrevented` false on the window).
