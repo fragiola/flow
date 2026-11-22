@@ -173,6 +173,10 @@ along their side, and carry `data-position` (`top-left`, `top`, …, `left`).
 A child with `extent: "parent"` (sub-flows) is kept inside its parent while it resizes, and a parent
 never shrinks past such a child.
 
+A resizer's `direction` (`"horizontal"` or `"vertical"`) makes its node resize along one axis only,
+and `resize({ snap: { x, y } })` puts a resize on a grid; a drag's `snapGrid` does not apply to a
+resize. See [One direction, and a grid](/docs/api/primitives/node-resizer#one-direction-and-a-grid).
+
 ## Your own handles
 
 Pass the handles you want as children: the corners only, a single grip, your own look per position.

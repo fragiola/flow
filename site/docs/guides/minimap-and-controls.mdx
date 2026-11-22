@@ -504,10 +504,17 @@ translucent fill.
 | `pannable` | `true` | a press or a drag on the minimap moves the view there |
 | `zoomable` | `true` | the wheel over the minimap zooms the flow |
 | `padding` | `0.1` | the share of the minimap's size kept free around the nodes and the view |
+| `inversePan` | `false` | a drag moves the view the other way, as grabbing the flow, and a press does not centre it |
+| `zoomStep` | `10` | how fast the wheel over the minimap zooms: `10` is the flow's own wheel, `20` twice as fast |
 
 ```ts
 const features = [minimap({ zoomable: false, padding: 0.05 })] as const;
 ```
+
+A `MiniMap`'s own `inversePan` and `zoomStep` props override the last two for the root, and its
+click callback (`onClick`; Vue `@click`, Svelte `onclick`, Angular `(minimapClick)`) tells a tap
+with the flow point under it: [Grab, wheel speed and
+clicks](/docs/api/primitives/mini-map#grab-wheel-speed-and-clicks).
 
 A node can be drawn your own way: the function's `view.nodes` gives each node's box in flow
 coordinates (`x`, `y`, `width`, `height`), and `view.scale` the map's scale.

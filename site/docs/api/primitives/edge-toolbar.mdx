@@ -113,6 +113,56 @@ listeners and `injectFlow` keep working there. Its state is the `state()` signal
 
 A toolbar has no role: give it `role="toolbar"` and a label when it holds several buttons.
 
+## At a point, aligned
+
+`point` stands the toolbar at a flow point of yours instead of one of the edge's (where the user
+clicked the edge, a point you computed on its path): absolute flow coordinates, followed as the
+viewport pans and zooms. `alignX` and `alignY` say which of the toolbar's own edges goes at the
+point: `"start"` (its left, its top), `"center"` (the default) or `"end"` (its right, its bottom).
+So `alignY="end"` sets it above the point, whatever its height:
+
+<Framework name="react">
+
+```tsx
+<Flow.EdgeToolbar point={clicked} alignX="start" alignY="end" offset={{ x: 4, y: -4 }} open={clicked !== undefined}>
+    …
+</Flow.EdgeToolbar>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.EdgeToolbar :point="clicked" align-x="start" align-y="end" :offset="{ x: 4, y: -4 }" :open="clicked !== undefined">
+    …
+</Flow.EdgeToolbar>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.EdgeToolbar point={clicked} alignX="start" alignY="end" offset={{ x: 4, y: -4 }} open={clicked !== undefined}>
+    …
+</Flow.EdgeToolbar>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<xhtml:div flowEdgeToolbar [point]="clicked()" alignX="start" alignY="end" [offset]="{ x: 4, y: -4 }" [open]="clicked() !== undefined">
+    …
+</xhtml:div>
+```
+
+</Framework>
+
+`clicked` is yours: the `point` of the root's `onEdgeClick` event, kept in your state.
+
 ## Props
 
 `EdgeToolbarProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and
@@ -137,7 +187,7 @@ every `div` attribute.
 | --- | --- | --- |
 | `edgeId` | `string` | its edge |
 | `position` | `"label" \| "source" \| "target"` | the point of the edge it stands at |
-| `anchor` | `EdgeToolbarPosition` | where it is anchored (its centre), in pixels relative to the root ([engine reads](/docs/api/engine)) |
+| `anchor` | `EdgeToolbarPosition` | where it is anchored, in pixels relative to the root, with the share of its size that goes there (`anchorX`, `anchorY`: `alignX`, `alignY`) ([engine reads](/docs/api/engine)) |
 
 ## Data attributes
 
@@ -148,5 +198,5 @@ every `div` attribute.
 
 ## Structural style
 
-`position: absolute; top: 0; left: 0; transform: translate(<x>px, <y>px) translate(-50%, -50%)`
-at its anchor (the toolbar's centre on the point).
+`position: absolute; top: 0; left: 0; transform: translate(<x>px, <y>px) translate(<-anchorX × 100>%, <-anchorY × 100>%)`
+at its anchor (by default `-50%, -50%`: the toolbar's centre on the point).

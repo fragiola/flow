@@ -68,7 +68,9 @@ In Angular, the button is yours; its state is the `state()` signal (`ControlButt
 
 </Framework>
 
-The same action from code: `engine.run("fit-view")` ([engine](/docs/api/engine)).
+The same action from code: `engine.run("fit-view")` ([engine](/docs/api/engine)). Its props are
+the action's payload: one left out is not sent, so the engine's default applies. Pixels, per-side
+padding and hidden nodes: [What fit-view frames](/docs/concepts/viewport#what-fit-view-frames).
 
 ## Props
 
