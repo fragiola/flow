@@ -122,7 +122,7 @@ flow), each with its own viewport.
 | `zoomOnPinch` | `boolean` | `true` | a two-finger pinch (and a trackpad's) zooms |
 | `zoomOnDoubleClick` | `boolean` | `true` | a double click on the pane zooms in |
 | `zoomStep` | `number` | `1.2` | the factor of `zoom-in` and `zoom-out` |
-| `fitView` | `boolean \| FitViewPayload` | `false` | fits the nodes once every visible node is measured |
+| `fitView` | `boolean \| FitViewPayload` | `false` | fits the nodes once every visible node has a size: measured, given (`width`, `height`) or initial (`initialWidth`, `initialHeight`, counted until the node is measured); it runs once and is not redone when the measured sizes differ |
 | `interactive` | `boolean` | `true` | whether gestures and keys may change the flow (pan and zoom stay) |
 | `onlyRenderVisible` | `boolean` | `false` | adapters render only the nodes and edges in view |
 | `pathOptions` | `PathOptions` | see [Path helpers](/docs/api/path-helpers) | the shape of the built-in edge paths |
@@ -136,7 +136,8 @@ flow), each with its own viewport.
 | `nodeOrigin` | `XY` | `{ x: 0, y: 0 }` | the point of a node's box its `position` stands at, as shares of its size (`{ x: 0.5, y: 0.5 }`: its centre); every box the engine derives uses it (rects, handles, edge ends, bounds, `fit-view`, `visible-nodes`, the minimap, toolbars, the selection box, drag and resize); a child's position stays its box's top-left corner inside its parent's |
 | `nodeExtent` | `Rect` | none | the flow rectangle every node's box stays inside when dragged, moved by the arrows or resized |
 | `elevateNodesOnSelect` | `boolean` | `true` | a selected node, and its descendants with it, is drawn above the other nodes (`node-z-index-by`) |
-| `elevateEdgesOnSelect` | `boolean` | `false` | a selected edge is drawn above the other edges (`drawn-edges`) |
+| `elevateEdgesOnSelect` | `boolean` | `true` in `"auto"`, `false` in `"basic"` | a selected edge is drawn above the other edges (`drawn-edges`); in `"auto"`, above the nodes too (`render-layers`); an explicit value is honoured; ignored in `"manual"` |
+| `zIndexMode` | `ZIndexMode` | `"auto"` | how nodes and edges stack: `"basic"` (each by its `zIndex`, a selected one raised, a child above its parent; the edges always below the nodes), `"auto"` (the same for nodes; an edge stands at least as high as its ends when one of them is a child, and a selected one is raised, so it may be drawn above nodes), `"manual"` (only the `zIndex` values count); see [Z-order](/docs/concepts/nodes-and-edges#z-order) |
 
 The roots of the four adapters take every option but `root` as a prop of the same name (Vue:
 kebab-case in a template; Angular: an input of `flowRoot`) and send a change through
@@ -235,8 +236,9 @@ feature at the moment it would act: no feature is installed again.
 | `"flow-to-screen"` | `XY` | a flow point as a client point |
 | `"visible-nodes"` | none | the nodes in view, plus those not measured yet |
 | `"visible-edges"` | none | the edges whose ends' box is in view |
-| `"drawn-edges"` | none | the edges to draw, in drawing order: those shown whose nodes are measured (with `onlyRenderVisible`, those in view), by `zIndex` (a selected one raised with `elevateEdgesOnSelect`), the document's order among equals |
-| `"node-z-index-by"` | `{ nodeId }` | a node's structural `z-index` among the nodes: its `zIndex` (a selected node and its descendants raised with `elevateNodesOnSelect`), always above its parent's |
+| `"drawn-edges"` | none | the edges to draw, in drawing order: those shown whose nodes have a size (with `onlyRenderVisible`, those in view), by their stack value (`zIndexMode`: `zIndex`, a selected one raised with `elevateEdgesOnSelect`, in `"auto"` at least its ends' when one is a child), the document's order among equals |
+| `"render-layers"` | none | the levels to draw, lowest first (`RenderLayer[]`, below): one level, the edges below the nodes, unless an edge's stack value is above the lowest shown node's; then each level's edges go in their own layer at its `zIndex`, between the nodes below and above them |
+| `"node-z-index-by"` | `{ nodeId }` | a node's structural `z-index`: with one render level, its stack value (its `zIndex`, a selected node and its descendants raised with `elevateNodesOnSelect`, always above its parent's; `"manual"`: its `zIndex`); with several, its rank among the layers (a negative number), so what the app renders after the layers (the connection line, the selection box, the selection's rectangle) stays above |
 | `"internal-node-by"` | `{ nodeId }` | a node on screen, an `InternalNode` (`id`, `node`, `absolutePosition`, `rect`, `measured`, `zIndex`, `handles`), undefined for an unknown node: what `useInternalNode` reads |
 | `"handles-by"` | `{ nodeId }` | a node's registered handles (`FlowHandle[]`), with their centres |
 | `"background-pattern"` | `BackgroundPatternPayload` | one tile of a background pattern at the current viewport |
@@ -361,6 +363,21 @@ edge's toolbar (its `data-flow-id`), `{ nodeId }` for a node's, nothing for seve
 | `view` | `Rect` | what the root shows |
 | `maskPath` | `string` | the view box with the view cut out, for `fill-rule="evenodd"` |
 
+`RenderLayer`, one level of `render-layers` (the same as `staticGeometry`'s `layers`):
+
+| field | type | description |
+| --- | --- | --- |
+| `level` | `number` | its place, 0 the lowest (the `data-level` of its `edges-layer`) |
+| `zIndex` | `number \| undefined` | the structural `z-index` of its edges' layer in the viewport's stacking context; none with a single level |
+| `nodeIds` | `string[]` | the shown nodes of this level, in the document's order |
+| `edgeIds` | `string[]` | its edges, in drawing order |
+
+With one level (`zIndex` undefined) an adapter renders today's DOM: one edges SVG below the nodes.
+With several, the levels' z-indexes are negative ranks in one order (level 0's edges, level 0's
+nodes, level 1's edges, level 1's nodes, …); an edge at the same value as a node stays below it.
+Nodes never change wrapper: each adapter keeps them all in the one `nodes` layer and interleaves
+them with the edges' layers by stacking order.
+
 ## Questions
 
 | key | payload | answers |
@@ -459,6 +476,7 @@ part attributes, so every adapter behaves the same.
 | `attachViewport(element)` | attaches (or, with `null`, detaches) the viewport element: the engine writes its `transform` and `transform-origin`, the framework never does |
 | `registerNode(nodeId, element)` | registers (or unregisters) a node's element: the engine measures it |
 | `registerHandle(handle, element)` | registers (or unregisters) a handle: the engine measures its centre relative to its node |
+| `refocus(element)` | gives focus back to a part that was remounted (an edge that moved to another render level's layer): when `element` is the part (`data-flow-part` and `data-flow-id`) that last had focus in the flow and focus was lost (the active element is the body, or none), it is focused again, without scrolling; each adapter's `Flow.Edge` calls it when it mounts |
 | `setPartOptions(part, id, options)` | options a part's primitive takes (a resizer's `minWidth`, …, `direction`; the minimaps' `inversePan` and `zoomStep` under the id `""`, over `minimap()`'s); `null` drops them |
 | `attributes(part, payload?)` | the record to spread on a part: `data-flow-part`, `data-flow-id` and its state |
 | `subscribe(listener)` | the view changed (a `ViewChange`); returns its remover |
@@ -499,10 +517,14 @@ part attributes, so every adapter behaves the same.
 | `gesture` | `boolean` | a gesture's state changed (the connection line, the selection box, state attributes) |
 
 `PartPayloadMap` types the payload of each part's `attributes` (`node` takes `{ nodeId }`,
-`handle` a `HandleRegistration`, `reconnect-anchor` `{ edgeId, end }`, …). `PressTarget` is what
-the engine resolved a press to (`kind`: `pane`, `node`, `edge`, `handle`, `resize-handle`,
-`minimap` or `other`, with the ids; `outsideDragHandle` on a press on a node that holds a drag
-handle, outside it), handed to the features' hooks.
+`handle` a `HandleRegistration`, `reconnect-anchor` `{ edgeId, end }`, `resize-handle`
+`{ nodeId, position, direction?, variant? }` (its own direction and how it is drawn:
+`data-direction`, `data-variant`), `edges-layer` `{ level }` (`data-level`), …). With `keyboard()`
+the record of `nodes-selection` (the rectangle around the selection) has `tabindex="0"`, as a
+resize handle's does with `resize()`. `PressTarget` is what the engine resolved a press to (`kind`:
+`pane`, `node`, `edge`, `handle`, `resize-handle`, `minimap`, `nodes-selection` or `other`, with
+the ids; a press on an `edges-layer` is a pane press; `outsideDragHandle` on a press on a node
+that holds a drag handle, outside it), handed to the features' hooks.
 
 ## Part attributes
 
@@ -515,15 +537,63 @@ The attribute names are constants, and the helpers give the static attributes wi
 | `ID_ATTRIBUTE` | `"data-flow-id"`: the id of the node, edge or handle a part stands for |
 | `POSITION_ATTRIBUTE` | `"data-position"`: a resize handle's corner or side |
 | `END_ATTRIBUTE` | `"data-end"`: a reconnect anchor's end of its edge |
+| `DIRECTION_ATTRIBUTE` | `"data-direction"`: a resize handle's own direction (`horizontal`, `vertical`), over its resizer's, read when a press or a key on it starts |
+| `VARIANT_ATTRIBUTE` | `"data-variant"`: how a resize handle is drawn (`handle`, `line`), for the app's styles |
+| `LEVEL_ATTRIBUTE` | `"data-level"`: an `edges-layer`'s render level, 0 the lowest |
 | `NO_GESTURE_ATTRIBUTE` | `"data-flow-no-gesture"`: a subtree inside a node that starts no gesture (a slider, a field) |
 | `NO_WHEEL_ATTRIBUTE` | `"data-flow-no-wheel"`: a subtree where the wheel scrolls its content instead of zooming |
 | `DRAG_HANDLE_ATTRIBUTE` | `"data-flow-drag-handle"`: an element inside a node that is its drag handle; a node holding one drags only from it (a press elsewhere on it still selects it) |
 | `partAttributes(part, id?)` | `{ "data-flow-part": part, "data-flow-id": id }` |
+| `edgesLayerAttributes(level)` | `{ "data-flow-part": "edges-layer", "data-level": level }`: one render level's edges layer, the same with or without an engine |
+| `resizeHandleAttributes(position, options?)` | a resize handle's static attributes: its part, `data-position`, `data-variant` (`line` only on a side, else `handle`) and `data-direction` when it has a valid one; `options` is a `ResizeHandleAttributeOptions` `{ direction?, variant? }` (`ResizeHandleDirection` `"horizontal" \| "vertical"`, `ResizeHandleVariant` `"handle" \| "line"`) |
 | `flag(on)` | a boolean state attribute's value: `""` when on, `undefined` when off |
 
 `PartAttributes` is a read-only record of them, `MutablePartAttributes` the writable one the engine
 and its features fill. The state attributes each part carries: [State
 attributes](/docs/concepts/state-attributes).
+
+## Static geometry
+
+`staticGeometry(flow, options?)` is a flow's geometry from its document alone, without an engine
+and without a DOM: what each adapter renders on the server and in its first client render, before
+the engine exists. It runs the very functions the engine runs before a node is measured, so the
+first render and the engine agree (no hydration mismatch, no jump). A node's size is its `width` /
+`height`, else its `initialWidth` / `initialHeight`; an edge's ends are its nodes' declared
+`handles` (else the `sourcePosition` / `targetPosition` side). An app that renders a flow itself
+(an SVG thumbnail, an image on the server) can call it too:
+
+```ts
+import { staticGeometry } from "@fragiola/flow";
+
+const geometry = staticGeometry(
+    { nodes, edges },
+    { nodeOrigin: { x: 0, y: 0 }, zIndexMode: "auto" },
+);
+const paths = geometry.drawnEdges.map((edgeId) => geometry.edgePaths[edgeId]?.path);
+```
+
+`StaticGeometryOptions`, the engine options it follows (give it the root's, so both agree):
+
+| field | type | description |
+| --- | --- | --- |
+| `nodeOrigin` | `XY` | the point of a node's box its position stands at; default top-left |
+| `pathOptions` | `PathOptions` | the shape of the built-in edge paths (an edge's own go over them) |
+| `zIndexMode` | `ZIndexMode` | how stack values are worked out; default `"auto"` |
+| `elevateNodesOnSelect` | `boolean` | a selected node is raised; default true |
+| `elevateEdgesOnSelect` | `boolean` | a selected edge is raised; default false in `"basic"`, true in `"auto"` |
+
+`StaticGeometry`, the result (frozen plain data, keyed by id):
+
+| field | type | description |
+| --- | --- | --- |
+| `nodeRects` | `Record<string, Rect>` | every node's box in absolute flow coordinates, its origin applied, its size 0 when unknown (`node-rect-by`) |
+| `nodeZIndexes` | `Record<string, number>` | every node's structural `z-index` (`node-z-index-by`) |
+| `edgePaths` | `Record<string, EdgePath>` | the path of each edge whose two nodes have a size (`edge-path-by`); the others are absent |
+| `drawnEdges` | `string[]` | the ids of the edges to draw, in drawing order (`drawn-edges`, without `onlyRenderVisible`) |
+| `layers` | `RenderLayer[]` | the levels to draw (`render-layers`) |
+
+The module (`src/geometry/`) imports nothing of the DOM and nothing of the engine; a guard test
+keeps it so. See [Server rendering](/docs/guides/server-rendering).
 
 ## Helpers for the hooks
 

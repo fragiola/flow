@@ -134,10 +134,48 @@ What every node has, whatever its type (`NodeFields`):
 
 | field | type | description |
 | --- | --- | --- |
-| `position` | `XY` | its top-left corner, in flow coordinates (relative to its parent with sub-flows) |
-| `width` | `number` | its width, when the document gives one (the engine measures the rendered one otherwise) |
-| `height` | `number` | its height, when the document gives one |
-| `zIndex` | `number` (an integer) | its place in the nodes' stacking order: a greater one is drawn above (a child always above its parent); default 0 |
+| `position` | `XY` | where it stands, in flow coordinates (relative to its parent's top-left corner with sub-flows): its box's top-left corner, or the point `origin` (else the engine's `nodeOrigin`) names |
+| `width` | `number` | its fixed width: it wins over the measured one, and draws its edges before it is measured (a server render) |
+| `height` | `number` | its fixed height |
+| `initialWidth` | `number` (>= 0) | its width until it is measured (a server render, the first client render, `fitView` on init); `width` wins |
+| `initialHeight` | `number` (>= 0) | its height until it is measured; `height` wins |
+| `handles` | `DeclaredHandle[]` | its handles, declared so its edges are drawn before it is rendered and measured (below); a measured handle of the same type and id always wins |
+| `sourcePosition` | `HandleSide` | the side its edges leave by when no handle (rendered or declared) gives one; default `"bottom"` |
+| `targetPosition` | `HandleSide` | the side its edges enter by when no handle gives one; default `"top"` |
+| `origin` | `XY` | the point of its box its `position` stands at, as shares of its size (`{ x: 0.5, y: 0.5 }`: its centre), over the engine's `nodeOrigin` for this node; a child keeps its top-left corner in its parent, as with `nodeOrigin` |
+| `zIndex` | `number` (an integer) | its place in the stacking order: a greater one is drawn above (a child always above its parent, except in `zIndexMode: "manual"`); default 0 |
+
+`DeclaredHandle`, a handle the node declares in the document (`{ id?, type, position, x, y, width?,
+height? }`). Its point, where an edge ends, is the centre of its box: the same point the engine
+measures for a rendered handle, so the server's edges and the measured ones meet at the same place
+(React Flow ends an edge on the box's side instead). It is matched to an edge's `sourceHandle` /
+`targetHandle` as a rendered handle is: with an id, the one of that type and id; without, the first
+of that type with no id, else the first of that type.
+
+| field | type | description |
+| --- | --- | --- |
+| `id` | `string` | its id among the node's handles of its type; none: the node's default handle |
+| `type` | `"source" \| "target"` | whether edges start or end at it |
+| `position` | `HandleSide` | the side of the node it sits on: the direction an edge leaves or enters by |
+| `x` | `number` | its box's left edge, relative to the node box's left edge, in flow units |
+| `y` | `number` | its box's top edge, relative to the node box's top edge |
+| `width` | `number` | its box's width; default 0 |
+| `height` | `number` | its box's height; default 0 |
+
+```json title="flow.json (a node that draws its edges on the server)"
+{
+    "id": "order",
+    "type": "card",
+    "position": { "x": 0, "y": 0 },
+    "data": { "label": "Order" },
+    "width": 160,
+    "height": 60,
+    "handles": [
+        { "type": "target", "position": "left", "x": -4, "y": 26, "width": 8, "height": 8 },
+        { "type": "source", "position": "right", "x": 156, "y": 26, "width": 8, "height": 8 }
+    ]
+}
+```
 
 Its permission flags (`NodeFlags`); an absent flag is its default, and the commands enforce them,
 for the user's gestures and for your code alike:
@@ -183,7 +221,7 @@ What every edge has (`EdgeFields`):
 | `target` | `string` | the node it ends at |
 | `sourceHandle` | `string` | the source node's handle it starts at; none: the node's default source handle |
 | `targetHandle` | `string` | the target node's handle it ends at; none: the node's default target handle |
-| `zIndex` | `number` (an integer) | its place in the edges' drawing order: a greater one is drawn above (edges stay under the nodes); default 0 |
+| `zIndex` | `number` (an integer) | its place in the edges' drawing order: a greater one is drawn above; with `zIndexMode` `"basic"` edges stay under the nodes, with `"auto"` and `"manual"` one above a node's value is drawn above it ([z-order](/docs/concepts/nodes-and-edges#z-order)); default 0 |
 | `pathOptions` | `EdgePathOptions` | the shape of its path, over the engine's `pathOptions` key by key (below); a controlled sync that changes them replaces the edge |
 
 `EdgePathOptions`, each built-in type reading its own keys (the others are ignored):
