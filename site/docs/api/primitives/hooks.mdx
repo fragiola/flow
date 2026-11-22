@@ -352,6 +352,8 @@ element, inside a node.
 | `side` | `HandleSide` | required | the side of the node it sits on |
 | `handleId` | `string` | none | its id among the node's handles of its type |
 | `connectable` | `boolean` | `true` | a connection may start or end here |
+| `connectableStart` | `boolean` | `true` | a connection may start here |
+| `connectableEnd` | `boolean` | `true` | a connection may end here |
 | `nodeId` | `string` | the enclosing `Flow.Node`'s | its node |
 
 `state` is `HandleState` (see [`Flow.Handle`](/docs/api/primitives/handle)):
@@ -363,6 +365,8 @@ element, inside a node.
 | `type` | `HandleType` | its type |
 | `side` | `HandleSide` | its side |
 | `connectable` | `boolean` | a connection may start or end here: `data-connectable` |
+| `connectableStart` | `boolean` | a connection may start here: `data-connectable-start` |
+| `connectableEnd` | `boolean` | a connection may end here: `data-connectable-end` |
 | `connecting` | `boolean` | the connection under way starts here: `data-connecting` |
 | `valid` | `boolean` | the connection under way would end here, accepted: `data-valid` |
 | `invalid` | `boolean` | the connection under way would end here, refused: `data-invalid` |

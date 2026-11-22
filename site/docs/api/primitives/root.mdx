@@ -274,6 +274,7 @@ through `engine.adapter.setOptions`).
 | `onEdgesChange` | `(edges: readonly FlowEdge<T>[]) => void` | none | the model's edges, after every command that changes them |
 | `features` | `F` | `[]` | the opt-in features of the model the root creates (read once), each from its entry (`@fragiola/flow-react/drag`) |
 | `createId` | `CreateId` | `` `${kind}-${n}` `` | the id generator of the model the root creates (read once) |
+| `defaultEdgeOptions` | `DefaultEdgeOptions<T>` | none | the fields every `edge.add` of the model the root creates fills in where it leaves them out (read once; the [model option](/docs/api/model)): `{ type: "smoothstep" }` makes every new connection a smooth step |
 | `viewport` | `Viewport` | none | controlled viewport: a new value runs `set-viewport` |
 | `defaultViewport` | `Viewport` | `{ x: 0, y: 0, zoom: 1 }` | the viewport the flow starts at (read once) |
 | `onViewportChange` | `(viewport: Viewport, gesture: boolean) => void` | none | every viewport change; `gesture` is true for a pan, a zoom or a pinch |
@@ -291,7 +292,7 @@ through `engine.adapter.setOptions`).
 | `interactive` | `boolean` | `true` | gestures and keys may change the flow (pan and zoom always work) |
 | `onlyRenderVisible` | `boolean` | `false` | render only the nodes and edges in view |
 | `pathOptions` | `PathOptions` | `{ curvature: 0.5, borderRadius: 5, offset: 20 }` | the shape of the built-in edge paths ([path helpers](/docs/api/path-helpers)) |
-| `autoPan` | `boolean \| AutoPanOptions` | `true` | the viewport pans while a drag, a connection, a reconnection, a selection box or a resize is near the root's edge (`{ speed: 10, margin: 30 }`) |
+| `autoPan` | `boolean \| AutoPanOptions` | `true` | the viewport pans while a drag, a connection, a reconnection, a selection box or a resize is near the root's edge (`{ speed: 10, margin: 30 }`; `{ node, connect, selection, resize }` turn one gesture's off) |
 | `panActivationKey` | `string \| null` | `" "` | held, a primary drag pans from anywhere, nodes included; `null` for none |
 | `panOnScrollMode` | `PanOnScrollMode` | `"free"` | which way the wheel pans with `panOnScroll`: `"free"`, `"horizontal"`, `"vertical"` |
 | `panOnScrollSpeed` | `number` | `1` | the factor of the wheel's pixels when it pans |
@@ -301,7 +302,111 @@ through `engine.adapter.setOptions`).
 | `nodeExtent` | `Rect` | none | the flow rectangle every node's box stays inside when dragged, moved by keys or resized |
 | `elevateNodesOnSelect` | `boolean` | `true` | a selected node, and its children, is drawn above the others |
 | `elevateEdgesOnSelect` | `boolean` | `false` | a selected edge is drawn above the other edges |
+| `paneClickDistance` | `number` | `3` | how far, in pixels, a press on the pane may move and still be a click (`onPaneClick`, clearing the selection) |
+| `nodeClickDistance` | `number` | `3` | how far a press on a node, an edge or a handle may move and still be a click (`onNodeClick`, selecting) |
+| `preventScrolling` | `boolean` | `true` | the wheel over the flow never scrolls the page, even with `zoomOnScroll` and `panOnScroll` off |
+| `nodesFocusable` | `boolean` | `true` | nodes take focus (with `keyboard()`; a node's `focusable: false` still wins) |
+| `edgesFocusable` | `boolean` | `true` | edges take focus (with `keyboard()`; an edge's `focusable: false` still wins) |
 | `children` | `ReactNode` | none | the flow's layers: `Flow.Background`, `Flow.Viewport`, `Flow.Controls`, … |
+| `onInit` | `(event: FlowEngineEventOf<"ready">) => void` | none | `ready`: the root has a size and every shown node was measured, once |
+| `onMoveStart` | `(event: FlowEngineEventOf<"viewport-change-start">) => void` | none | `viewport-change-start`: the viewport starts a move (a pan, the wheel, a pinch, an animation, an action) |
+| `onMoveEnd` | `(event: FlowEngineEventOf<"viewport-change-end">) => void` | none | `viewport-change-end`: the move ended (a release, the animation's end, the wheel at rest for 150 ms) |
+| `onNodeClick` | `(event: FlowEngineEventOf<"node-click">) => void` | none | `node-click`: a click on a node: a press released within `nodeClickDistance` that dragged nothing |
+| `onNodeDoubleClick` | `(event: FlowEngineEventOf<"node-double-click">) => void` | none | `node-double-click`: a double click on a node (two clicks) |
+| `onNodeContextMenu` | `(event: FlowEngineEventOf<"node-context-menu">) => void` | none | `node-context-menu`: a context menu on a node (`event.event.preventDefault()` to show your own) |
+| `onEdgeClick` | `(event: FlowEngineEventOf<"edge-click">) => void` | none | `edge-click`: a click on an edge |
+| `onEdgeDoubleClick` | `(event: FlowEngineEventOf<"edge-double-click">) => void` | none | `edge-double-click`: a double click on an edge |
+| `onEdgeContextMenu` | `(event: FlowEngineEventOf<"edge-context-menu">) => void` | none | `edge-context-menu`: a context menu on an edge |
+| `onPaneClick` | `(event: FlowEngineEventOf<"pane-click">) => void` | none | `pane-click`: a click on the pane: a press within `paneClickDistance` |
+| `onPaneDoubleClick` | `(event: FlowEngineEventOf<"pane-double-click">) => void` | none | `pane-double-click`: a double click on the pane (it zooms in with `zoomOnDoubleClick`) |
+| `onPaneContextMenu` | `(event: FlowEngineEventOf<"pane-context-menu">) => void` | none | `pane-context-menu`: a context menu on the pane |
+| `onSelectionContextMenu` | `(event: FlowEngineEventOf<"selection-context-menu">) => void` | none | `selection-context-menu`: a context menu on one of several selected nodes |
+| `onSelectionStart` | `(event: FlowEngineEventOf<"box-select-start">) => void` | none | `box-select-start`: a selection box started (`selection()`) |
+| `onSelectionEnd` | `(event: FlowEngineEventOf<"box-select">) => void` | none | `box-select`: a selection box ended |
+| `onNodeDragStart` | `(event: FlowEngineEventOf<"drag-start">) => void` | none | `drag-start`: a drag of nodes started (`drag()`) |
+| `onNodesMove` | `(event: FlowEngineEventOf<"nodes-move">) => void` | none | `nodes-move`: nodes were dropped, or moved by the arrows |
+| `onNodeDragCancel` | `(event: FlowEngineEventOf<"drag-cancel">) => void` | none | `drag-cancel`: a drag was cancelled |
+| `onConnectStart` | `(event: FlowEngineEventOf<"connect-start">) => void` | none | `connect-start`: a connection started (`connection()`) |
+| `onConnectTarget` | `(event: FlowEngineEventOf<"connect-target">) => void` | none | `connect-target`: a keyboard connection points at another target |
+| `onConnect` | `(event: FlowEngineEventOf<"connect">) => void` | none | `connect`: an edge was added by a connection |
+| `onConnectCancel` | `(event: FlowEngineEventOf<"connect-cancel">) => void` | none | `connect-cancel`: a connection ended without an edge, with where (`from`, `to`, `client`, `point`): React Flow's `onConnectEnd` with its connection state |
+| `onReconnectStart` | `(event: FlowEngineEventOf<"reconnect-start">) => void` | none | `reconnect-start`: an edge's end was grabbed (`reconnection()`) |
+| `onReconnect` | `(event: FlowEngineEventOf<"reconnect">) => void` | none | `reconnect`: an edge was reconnected |
+| `onReconnectCancel` | `(event: FlowEngineEventOf<"reconnect-cancel">) => void` | none | `reconnect-cancel`: a reconnection ended with the edge as it was, with where |
+| `onResizeStart` | `(event: FlowEngineEventOf<"resize-start">) => void` | none | `resize-start`: a resize started (`resize()`); its steps are transient `node.resize` commands (`onNodesChange`) |
+| `onResizeEnd` | `(event: FlowEngineEventOf<"resize">) => void` | none | `resize`: a node was resized |
+| `onResizeCancel` | `(event: FlowEngineEventOf<"resize-cancel">) => void` | none | `resize-cancel`: a resize was cancelled |
+| `onDelete` | `(event: FlowEngineEventOf<"remove">) => void` | none | `remove`: a delete key removed nodes and edges (`keyboard()`, after its `beforeDelete`) |
+
+The callbacks are `RootEventProps`: one per [engine event](/docs/api/engine#events) but
+`viewport-change` (`onViewportChange` has its own), named from the core's `ENGINE_EVENT_CALLBACKS`
+(a `CallbackEventType` to its `EventCallbackName`), each called with the event (its
+`FlowEngineEventOf<K>`), the latest one given. The names follow React Flow's callbacks; Vue emits
+them in kebab-case (`@node-click`), Svelte takes them lowercase (`onnodeclick`), Angular as outputs
+of `flowRoot` (`(nodeClick)`).
+
+<Framework name="react">
+
+```tsx
+<Flow.Root
+    features={features}
+    onNodeClick={(event) => setOpen(event.nodeId)}
+    onPaneContextMenu={(event) => {
+        event.event.preventDefault();
+        showMenu(event.client);
+    }}
+>
+    {/* … */}
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Root
+    :features="features"
+    @node-click="(event) => (open = event.nodeId)"
+    @pane-context-menu="(event) => { event.event.preventDefault(); showMenu(event.client); }"
+>
+    <!-- … -->
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Root
+    {features}
+    onnodeclick={(event) => (open = event.nodeId)}
+    onpanecontextmenu={(event) => {
+        event.event.preventDefault();
+        showMenu(event.client);
+    }}
+>
+    <!-- … -->
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div
+    flowRoot
+    [features]="features"
+    (nodeClick)="open = $event.nodeId"
+    (paneContextMenu)="$event.event.preventDefault(); showMenu($event.client)"
+>
+    <!-- … -->
+</div>
+```
+
+</Framework>
 
 ## State
 

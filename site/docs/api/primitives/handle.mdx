@@ -3,7 +3,7 @@ title: Handle
 description: Flow.Handle is a connection point on a side of its node, registered with the engine, where edges start or end and connections are drawn.
 ---
 
-`Flow.Handle` goes inside `Flow.Node`. It registers `{ nodeId, handleId, type, side, connectable }`
+`Flow.Handle` goes inside `Flow.Node`. It registers `{ nodeId, handleId, type, side, connectable, connectableStart, connectableEnd }`
 with the engine, which measures its centre relative to its node: an edge naming this handle
 (`sourceHandle`, `targetHandle`) starts or ends at that centre, leaving or entering by its `side`.
 With `connection()`, a press on it draws a connection; while one is drawn it says whether the
@@ -88,6 +88,8 @@ hand, [`useHandle`](/docs/api/primitives/hooks) gives the same state and props.
 | `side` | `HandleSide` | required | the side of the node it sits on: the direction its edges leave or enter by |
 | `handleId` | `string` | none | its id among the node's handles of its type (none: the default handle) |
 | `connectable` | `boolean` | `true` | a connection may start or end here |
+| `connectableStart` | `boolean` | `true` | a connection may start here (a drag, a click, a key); `false`: only an end (React Flow's `isConnectableStart`) |
+| `connectableEnd` | `boolean` | `true` | a connection may end here; `false`: never a target (React Flow's `isConnectableEnd`) |
 | `nodeId` | `string` | the enclosing `Flow.Node`'s | its node |
 | `children` | `ReactNode` | none | its content |
 
@@ -102,6 +104,8 @@ hand, [`useHandle`](/docs/api/primitives/hooks) gives the same state and props.
 | `type` | `HandleType` | `"source"` or `"target"` |
 | `side` | `HandleSide` | its side |
 | `connectable` | `boolean` | a connection may start or end here (its flag and its node's) |
+| `connectableStart` | `boolean` | a connection may start here |
+| `connectableEnd` | `boolean` | a connection may end here |
 | `connecting` | `boolean` | the connection under way starts here |
 | `valid` | `boolean` | the connection under way would end here and be accepted |
 | `invalid` | `boolean` | the connection under way would end here and be refused |
@@ -116,6 +120,8 @@ hand, [`useHandle`](/docs/api/primitives/hooks) gives the same state and props.
 | `data-handle-type` | `"source"` or `"target"` |
 | `data-side` | `"top"`, `"right"`, `"bottom"` or `"left"` |
 | `data-connectable` | present when a connection may start or end here |
+| `data-connectable-start` | present when a connection may start here |
+| `data-connectable-end` | present when a connection may end here |
 | `data-connecting` | present while the connection under way starts here |
 | `data-valid` / `data-invalid` | present while the connection under way would end here, accepted or refused |
 

@@ -133,6 +133,35 @@ Every part takes the props of its React page as inputs (for example
 | `edgesChange` | `flowRoot` | output: the model's edges after every command that changes them; `[(edges)]` binds it |
 | `viewportChange` | `flowRoot` | output: the viewport on every change; `[(viewport)]` binds it |
 | `viewportMove` | `flowRoot` | output: `ViewportMoveEvent`, `{ viewport, gesture }`, `gesture` true for a pan, a zoom or a pinch |
+| `init` | `flowRoot` | output: `FlowEngineEventOf<"ready">`, the root callback `onInit` ([Root](/docs/api/primitives/root#props)) |
+| `moveStart` | `flowRoot` | output: `FlowEngineEventOf<"viewport-change-start">`, the root callback `onMoveStart` ([Root](/docs/api/primitives/root#props)) |
+| `moveEnd` | `flowRoot` | output: `FlowEngineEventOf<"viewport-change-end">`, the root callback `onMoveEnd` ([Root](/docs/api/primitives/root#props)) |
+| `nodeClick` | `flowRoot` | output: `FlowEngineEventOf<"node-click">`, the root callback `onNodeClick` ([Root](/docs/api/primitives/root#props)) |
+| `nodeDoubleClick` | `flowRoot` | output: `FlowEngineEventOf<"node-double-click">`, the root callback `onNodeDoubleClick` ([Root](/docs/api/primitives/root#props)) |
+| `nodeContextMenu` | `flowRoot` | output: `FlowEngineEventOf<"node-context-menu">`, the root callback `onNodeContextMenu` ([Root](/docs/api/primitives/root#props)) |
+| `edgeClick` | `flowRoot` | output: `FlowEngineEventOf<"edge-click">`, the root callback `onEdgeClick` ([Root](/docs/api/primitives/root#props)) |
+| `edgeDoubleClick` | `flowRoot` | output: `FlowEngineEventOf<"edge-double-click">`, the root callback `onEdgeDoubleClick` ([Root](/docs/api/primitives/root#props)) |
+| `edgeContextMenu` | `flowRoot` | output: `FlowEngineEventOf<"edge-context-menu">`, the root callback `onEdgeContextMenu` ([Root](/docs/api/primitives/root#props)) |
+| `paneClick` | `flowRoot` | output: `FlowEngineEventOf<"pane-click">`, the root callback `onPaneClick` ([Root](/docs/api/primitives/root#props)) |
+| `paneDoubleClick` | `flowRoot` | output: `FlowEngineEventOf<"pane-double-click">`, the root callback `onPaneDoubleClick` ([Root](/docs/api/primitives/root#props)) |
+| `paneContextMenu` | `flowRoot` | output: `FlowEngineEventOf<"pane-context-menu">`, the root callback `onPaneContextMenu` ([Root](/docs/api/primitives/root#props)) |
+| `selectionContextMenu` | `flowRoot` | output: `FlowEngineEventOf<"selection-context-menu">`, the root callback `onSelectionContextMenu` ([Root](/docs/api/primitives/root#props)) |
+| `selectionStart` | `flowRoot` | output: `FlowEngineEventOf<"box-select-start">`, the root callback `onSelectionStart` ([Root](/docs/api/primitives/root#props)) |
+| `selectionEnd` | `flowRoot` | output: `FlowEngineEventOf<"box-select">`, the root callback `onSelectionEnd` ([Root](/docs/api/primitives/root#props)) |
+| `nodeDragStart` | `flowRoot` | output: `FlowEngineEventOf<"drag-start">`, the root callback `onNodeDragStart` ([Root](/docs/api/primitives/root#props)) |
+| `nodesMove` | `flowRoot` | output: `FlowEngineEventOf<"nodes-move">`, the root callback `onNodesMove` ([Root](/docs/api/primitives/root#props)) |
+| `nodeDragCancel` | `flowRoot` | output: `FlowEngineEventOf<"drag-cancel">`, the root callback `onNodeDragCancel` ([Root](/docs/api/primitives/root#props)) |
+| `connectStart` | `flowRoot` | output: `FlowEngineEventOf<"connect-start">`, the root callback `onConnectStart` ([Root](/docs/api/primitives/root#props)) |
+| `connectTarget` | `flowRoot` | output: `FlowEngineEventOf<"connect-target">`, the root callback `onConnectTarget` ([Root](/docs/api/primitives/root#props)) |
+| `connect` | `flowRoot` | output: `FlowEngineEventOf<"connect">`, the root callback `onConnect` ([Root](/docs/api/primitives/root#props)) |
+| `connectCancel` | `flowRoot` | output: `FlowEngineEventOf<"connect-cancel">`, the root callback `onConnectCancel` ([Root](/docs/api/primitives/root#props)) |
+| `reconnectStart` | `flowRoot` | output: `FlowEngineEventOf<"reconnect-start">`, the root callback `onReconnectStart` ([Root](/docs/api/primitives/root#props)) |
+| `reconnect` | `flowRoot` | output: `FlowEngineEventOf<"reconnect">`, the root callback `onReconnect` ([Root](/docs/api/primitives/root#props)) |
+| `reconnectCancel` | `flowRoot` | output: `FlowEngineEventOf<"reconnect-cancel">`, the root callback `onReconnectCancel` ([Root](/docs/api/primitives/root#props)) |
+| `resizeStart` | `flowRoot` | output: `FlowEngineEventOf<"resize-start">`, the root callback `onResizeStart` ([Root](/docs/api/primitives/root#props)) |
+| `resizeEnd` | `flowRoot` | output: `FlowEngineEventOf<"resize">`, the root callback `onResizeEnd` ([Root](/docs/api/primitives/root#props)) |
+| `resizeCancel` | `flowRoot` | output: `FlowEngineEventOf<"resize-cancel">`, the root callback `onResizeCancel` ([Root](/docs/api/primitives/root#props)) |
+| `delete` | `flowRoot` | output: `FlowEngineEventOf<"remove">`, the root callback `onDelete` ([Root](/docs/api/primitives/root#props)) |
 | `flowNode` | `[flowNode]` (`FlowNodeDirective`) | the node it renders (React's `node`) |
 | `flowEdge` | `[flowEdge]` (`FlowEdgeDirective`) | the edge it renders (React's `edge`), on an SVG group |
 | `flowNodesItem` | `ng-template[flowNodesItem]` (`FlowNodesItemDirective`) | optional: the model, which types the template's `node` (`TypedBy<T>`); the template's context is `NodesItemContext<T>` (`$implicit`, `node`) |
