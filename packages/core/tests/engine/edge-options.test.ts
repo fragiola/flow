@@ -56,8 +56,21 @@ describe("an edge's pathOptions", () => {
             { sizes },
         );
         expect(engine.get("edge-path-by", { edgeId: "own" })?.path).toBe(
-            "M50,50 L50,80 L350,80 L350,200",
+            "M50,50 L50,92 L350,92 L350,200",
         );
+    });
+
+    it("ignore an engine stepPosition, centerX or centerY that is not a finite number", () => {
+        const pathOf = (pathOptions: Record<string, number>) =>
+            mount(json([{ id: "e", source: "a", target: "b", type: "step" }]), {
+                sizes,
+                engine: { pathOptions },
+            }).engine.get("edge-path-by", { edgeId: "e" })?.path;
+        const plain = "M50,50 L50,125 L350,125 L350,200";
+        expect(pathOf({})).toBe(plain);
+        expect(pathOf({ stepPosition: Number.NaN })).toBe(plain);
+        expect(pathOf({ centerY: Number.NaN })).toBe(plain);
+        expect(pathOf({ centerX: Number.NaN, centerY: Infinity })).toBe(plain);
     });
 
     it("are checked by the document's schema", () => {

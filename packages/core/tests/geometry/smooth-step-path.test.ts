@@ -172,7 +172,8 @@ describe("the turn's place: stepPosition, centerX, centerY", () => {
         }
         // a bad centerX still lets stepPosition place the turn
         expect(
-            stepPath({ ...facing, centerX: Number.NaN, stepPosition: 0.25 }).path,
+            stepPath({ ...facing, centerX: Number.NaN, stepPosition: 0.25 })
+                .path,
         ).toBe("M0,0 L35,0 L35,50 L100,50");
     });
 

@@ -166,9 +166,9 @@ route's length. Where that one turn (or the run across) sits is the `StepTurnOpt
 | --- | --- | --- |
 | `borderRadius` | `number` | the radius of each rounded corner, in flow units; default `5` |
 | `offset` | `number` | how far each end stands out from its node before the route turns; default `20` |
-| `stepPosition` | `number` | where the turn sits between the source (`0`) and the target (`1`), along the ends' axis (across it when the target is behind); default `0.5` |
-| `centerX` | `number` | the x of a vertical turn, in flow coordinates, over `stepPosition` |
-| `centerY` | `number` | the y of a horizontal turn, in flow coordinates, over `stepPosition` |
+| `stepPosition` | `number` | where the turn sits between the source (`0`) and the target (`1`), along the ends' axis (across it when the target is behind), counted from the points `offset` out from each end (so `0` and `1` keep the stand-out); default `0.5`, also for a value that is not a finite number |
+| `centerX` | `number` | the x of a vertical turn, in flow coordinates, over `stepPosition` (ignored when not a finite number) |
+| `centerY` | `number` | the y of a horizontal turn, in flow coordinates, over `stepPosition` (ignored when not a finite number) |
 
 `StepPathOptions` (with the `PathEnds` and the `StepTurnOptions`): `offset`, `stepPosition`,
 `centerX` and `centerY`, as above.

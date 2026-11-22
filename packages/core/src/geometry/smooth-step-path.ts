@@ -19,12 +19,13 @@ import type { PathEnds, PathResult } from "./types";
 export interface StepTurnOptions {
     /**
      * where the turn sits between the source (0) and the target (1), along the ends' axis (across
-     * it when the target is behind); default 0.5
+     * it when the target is behind), counted from the points `offset` out from each end so that
+     * 0 and 1 keep the stand-out; default 0.5 (also for a value that is not a finite number)
      */
     readonly stepPosition?: number | undefined;
-    /** the turn's x (flow units) when it runs vertically, over `stepPosition` */
+    /** the turn's x (flow units) when it runs vertically, over `stepPosition` (when finite) */
     readonly centerX?: number | undefined;
-    /** the turn's y (flow units) when it runs horizontally, over `stepPosition` */
+    /** the turn's y (flow units) when it runs horizontally, over `stepPosition` (when finite) */
     readonly centerY?: number | undefined;
 }
 
@@ -49,7 +50,9 @@ function between(from: number, to: number, share: number): number {
 
 /** A finite number as given; anything else (none, NaN, an infinity) as `fallback`. */
 function finiteOr<T>(value: number | undefined, fallback: T): number | T {
-    return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+    return typeof value === "number" && Number.isFinite(value)
+        ? value
+        : fallback;
 }
 
 function plus(point: XY, direction: XY, distance: number): XY {
