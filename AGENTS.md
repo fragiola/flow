@@ -202,7 +202,7 @@ the playground, `examples/shared` and `examples/react`), and **never runs `playw
 in one PR. `main` has no required checks: a skipped job blocks nothing.
 
 **Shards: none.** Shard a suite only when its test step alone passes about 3 minutes. Measured
-locally (4 workers; CI runs 2): the playground's 120 tests (60 per browser) in ~30 s, each
+locally (4 workers; CI runs 2): the playground's 122 tests (61 per browser) in ~30 s, each
 examples app's 178 tests (95 smoke runs: 19 examples × 5 themes) in ~20 to ~45 s, its embed build
 included (measured after #25; Angular and React the slower).
 
@@ -413,7 +413,7 @@ engine's state attributes from `engine.adapter.attributes(part, payload)`):
 | --- | --- | --- |
 | `Root` | `div` `root` | owns the model (or takes `model`) and the engine, attaches the root; `position: relative; overflow: hidden` |
 | `Viewport` | `div` `viewport` | `attachViewport`: the engine writes its transform, React never does |
-| `Nodes` | `div` `nodes` | children function per node not hidden (`visible-nodes` with `onlyRenderVisible`), keyed by id |
+| `Nodes` | `div` `nodes` | children function per node not hidden (`visible-nodes` with `onlyRenderVisible`), keyed by id; `isolation: isolate` (#25: the nodes' `z-index` stays inside the layer) |
 | `Node` | `div` `node` | `registerNode`; `transform: translate(x, y)` from `node-rect-by` (its `nodeOrigin` applied), `z-index` from `node-z-index-by` (#25), the document's `width`/`height`; `tabIndex` from `node-focusable` |
 | `Handle` | `div` `handle` | `registerHandle({ nodeId, handleId, type, side, connectable })`; centred on its side by default (a style may move it) |
 | `Edges` | `div` + `svg` `edges` | children function per edge of `drawn-edges`, in its order (#25: shown, measured, by z-order); the `div` is the HTML layer labels portal into |
@@ -502,7 +502,12 @@ Decisions of the adapter (#5):
   structural `z-index` is `node-z-index-by` (every node gets one, 0 by default, so each node is a
   stacking context, as in xyflow); a render without an engine (the first, the server's) has none
   and places nodes at `absolute-position-by`, which knows no `nodeOrigin` (the first client render
-  with the engine moves them). `ZoomIn`, `ZoomOut`, `FitView` take `duration` only (the payload
+  with the engine moves them). The `Nodes` layer is `isolation: isolate` (#25's review, all four
+  adapters): without a stacking context of its own, a selected node's 10 000 would paint over
+  what follows the layer in the viewport (the connection line drawn from it, the app's overlays);
+  a node's z-index orders the nodes only (playground E2E `gestures.spec.ts`, the adapters'
+  `options` tests). The core's `nodeZ` answers a node without a parent without walking a chain
+  (it is read per node on every pan frame). `ZoomIn`, `ZoomOut`, `FitView` take `duration` only (the payload
   has it when given: `can` and `run` get `{ duration }`, or `{}`); `FitView`'s other payload
   fields (`padding`, `nodeIds`) stay the engine's defaults. The edges' own filter is gone: `Edges`
   renders `drawn-edges`, which applies `onlyRenderVisible` itself. `DRAG_HANDLE_ATTRIBUTE`
@@ -607,8 +612,12 @@ Decisions of the Vue adapter (#9):
   `panOnDrag` is typed `[Boolean, Array]` and `autoPan` `[Boolean, Object]` (a bare attribute
   `true`, a list or an options object kept; before #25 `panOnDrag` was `Boolean` alone, which
   warned on a list); `elevate-nodes-on-select` / `elevate-edges-on-select` take a bare
-  attribute. `ZoomIn`, `ZoomOut`, `FitView` take `:duration` (a number: the attribute's text
-  `duration="300"` is a string the engine refuses, `invalid_payload`, so the button is disabled).
+  attribute. `ZoomIn`, `ZoomOut`, `FitView` take `duration`, and the root `pan-on-scroll-speed`,
+  as `[Number, String]` props whose numeric text is its number (`numberProp`, Angular's
+  `optionalNumber`: `duration="300"` works; a text that is no number reaches the engine, which
+  refuses it). `plain` is a shallow `toRaw`: a reactive `nodeOrigin`, `nodeExtent` or `autoPan`
+  mutated in place (`origin.x = 1`) is not seen, as `pathOptions` / `translateExtent`; give a
+  new object.
   The node's `z-index`, the node origin and `drawn-edges` are React's (#25 there).
 - **Known limits:** jsdom lays nothing out, so the tests stub the layout (`tests/flow.ts`,
   React's); the gestures' real feel is the Vue examples' shared Playwright specs (#10), which
@@ -963,7 +972,7 @@ every feature, an 800 × 500 root at the page's corner, the viewport at `{ x: 10
 Chromium and Firefox: pan, wheel, double-click and pinch zoom, drag (selection, cancel, extent,
 snap), connect, reconnect, box select, resize, keyboard and minimap, and (`e2e/gestures.spec.ts`,
 #25) auto-pan, animated controls, the middle-button and Space pans, click-to-connect, drag handles,
-`nodeOrigin` and a selected node's z-order, each with the mouse and with fingers
+`nodeOrigin`, a selected node's z-order and the connection line above a selected node, each with the mouse and with fingers
 (`e2e/helpers.ts` `touch`: Chromium's real touch input through the DevTools protocol, touch
 pointer events in Firefox), and the 500-node scenario's re-render count.
 
