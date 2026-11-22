@@ -147,6 +147,10 @@ export function resizeEngine(
             }
             width = Math.min(width, bounds.x + bounds.width - x);
             height = Math.min(height, bounds.y + bounds.height - y);
+            // a node already past its bounds gets no room there: it keeps its least size, never a
+            // negative one
+            if (width < 0) width = Math.min(limits.minWidth, rect.width);
+            if (height < 0) height = Math.min(limits.minHeight, rect.height);
             // the bound wins over the limits; a kept ratio shrinks the other side to it
             if (
                 limits.keepAspectRatio &&

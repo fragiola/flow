@@ -143,6 +143,24 @@ describe("a rectangle extent", () => {
     });
 });
 
+describe("a node already outside its extent", () => {
+    it("resizes to its least size there, never a negative one", () => {
+        const flow = mount(flowOf({ n: [400, 100] }), {
+            features: [resize({ minWidth: 20, minHeight: 20 })],
+            sizes: { n: [100, 50] },
+            engine: { nodeExtent: { x: 0, y: 0, width: 300, height: 200 } },
+        });
+        const corner = resizeHandle(flow.node("n"), "bottom-right");
+        dragOn(corner, flow.root, [
+            { clientX: 500, clientY: 150 },
+            { clientX: 520, clientY: 160 },
+        ]);
+        const node = flow.model.get("node-by", { id: "n" });
+        expect(node?.width).toBe(20);
+        expect(node?.height).toBe(60);
+    });
+});
+
 describe("nodeExtent", () => {
     it("bounds every node's drag, arrows and resize, with or without its own extent", () => {
         const flow = mount(flowOf({ a: [10, 10], b: [200, 100] }), {
