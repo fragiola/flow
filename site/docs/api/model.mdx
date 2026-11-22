@@ -251,6 +251,8 @@ order: compare them by identity.
 | `"all-nodes"` | none | every node, in drawing order |
 | `"all-edges"` | none | every edge, in drawing order |
 | `"node-edges-by"` | `{ nodeId, handleType?, handleId? }` | the edges that start or end at a node; with `handleType` (`HandleType`: `"source"` or `"target"`) only those that start or end there; with `handleId` only those at that handle |
+| `"node-connections-by"` | `{ nodeId, handleType?, handleId? }` | `node-edges-by`'s edges as `NodeConnection`s (`edgeId`, `source`, `sourceHandle`, `target`, `targetHandle`): what `useNodeConnections` reads |
+| `"nodes-data-by"` | `{ nodeIds }` | each existing node's `NodeData` (`{ id, type, data }`, `type` narrowing `data`), in the order asked: what `useNodesData` reads |
 | `"connected-edges-by"` | `{ nodeIds }` | the edges that touch any of the nodes (an edge between two of them once) |
 | `"incomers-by"` | `{ nodeId }` | the nodes edges come from into a node (the sources of the edges that end at it), in the document's order, each once; a self loop makes it its own incomer |
 | `"outgoers-by"` | `{ nodeId }` | the nodes a node's edges go to (the targets of the edges that start at it), in the document's order, each once; a self loop makes it its own outgoer |

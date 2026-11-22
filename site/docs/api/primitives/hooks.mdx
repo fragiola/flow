@@ -378,3 +378,29 @@ element, inside a node.
 | --- | --- | --- |
 | `state` | `HandleState` | its state |
 | `props` | `{ ref } & DataAttributes` | its attributes and the ref that registers it (its centre is measured) |
+
+## Selecting hooks
+
+Each re-renders its component only when what it selected changed (React's for now; the other
+adapters' land in the same Issue).
+
+- `useFlowStore(selector, equal?)`: `selector({ model, engine })`, compared with `equal` (default
+  `Object.is`; `sameFlowValue` for a built value).
+- `useNodeId()`: the enclosing `Flow.Node`'s id, or `null`.
+- `useNodesData(nodeId)` / `useNodesData(nodeIds)`: `NodeData` (`nodes-data-by`), `null` for an
+  unknown id.
+- `useNodeConnections(options?)`: the node's `NodeConnection`s (`node-connections-by`).
+- `useInternalNode(nodeId)`: the engine's `InternalNode` (`internal-node-by`).
+- `useKeyPress(keys, options?)`: whether a combo is held (`watchKeyPress`: `"Shift"`,
+  `"Meta+s"`, `["Meta+z", "Control+z"]`), read on the root's window.
+- `useOnViewportChange(options)`: the viewport's start, changes and end, without re-rendering.
+
+| option | type | description |
+| --- | --- | --- |
+| `id` | `string` | `UseNodeConnectionsOptions`: the node; default the enclosing one's |
+| `handleId` | `string` | `UseNodeConnectionsOptions`: only those at this handle |
+| `type` | `HandleType` | `UseNodeConnectionsOptions`: only those that start (`"source"`) or end (`"target"`) there |
+| `target` | `KeyPressTarget \| null` | `UseKeyPressOptions`: where the keys are read; default the root's window |
+| `onStart` | `(viewport, gesture) => void` | `UseOnViewportChangeOptions`: the viewport starts changing |
+| `onChange` | `(viewport, gesture) => void` | `UseOnViewportChangeOptions`: each change |
+| `onEnd` | `(viewport, gesture) => void` | `UseOnViewportChangeOptions`: it stopped changing |

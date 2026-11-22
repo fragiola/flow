@@ -1,0 +1,96 @@
+---
+title: NodesSelection
+description: Flow.NodesSelection draws the rectangle around the nodes a box selected, in flow coordinates, and drags the selection by it.
+---
+
+`Flow.NodesSelection` goes inside `Flow.Viewport`, after `Flow.Nodes` (it is in flow
+coordinates), and renders a `div` at the engine's `selection-rect` while two or more nodes are
+selected by a box (`selection()`; with `selection({ rect: "always" })`, whenever two or more are
+selected). A press on it drags the selection (`drag()`: the same threshold, snap, extent and
+auto-pan as a node's drag), with the root's `onSelectionDragStart`, `onSelectionDrag` and
+`onSelectionDragStop`; its context menu is the selection's (`onSelectionContextMenu`). Give it its
+look.
+
+<Framework name="react">
+
+```tsx
+<Flow.Root<Types, typeof features> features={features} defaultNodes={nodes}>
+    <Flow.Viewport>
+        <Flow.Nodes>{(node) => <Flow.Node node={node} />}</Flow.Nodes>
+        <Flow.NodesSelection className="border border-blue-500 bg-blue-500/5" />
+    </Flow.Viewport>
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Root :features="features" :default-nodes="nodes">
+    <Flow.Viewport>
+        <Flow.Nodes v-slot="{ node }"><Flow.Node :node="node" /></Flow.Nodes>
+        <Flow.NodesSelection class="border border-blue-500 bg-blue-500/5" />
+    </Flow.Viewport>
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Root {features} defaultNodes={nodes}>
+    <Flow.Viewport>
+        <Flow.Nodes>
+            {#snippet children(node)}<Flow.Node {node} />{/snippet}
+        </Flow.Nodes>
+        <Flow.NodesSelection class="border border-blue-500 bg-blue-500/5" />
+    </Flow.Viewport>
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowRoot [features]="features" [defaultNodes]="nodes">
+    <div flowViewport>
+        <div flowNodes>…</div>
+        <div flowNodesSelection class="border border-blue-500 bg-blue-500/5"></div>
+    </div>
+</div>
+```
+
+</Framework>
+
+## Props
+
+`NodesSelectionProps` extends the [common primitive props](/docs/api/primitives/root#common-props)
+and every `div` attribute.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `children` | `ReactNode` | none | its content |
+
+## State
+
+`NodesSelectionState`, what `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `rect` | `Rect` | the rectangle around the selected nodes, in flow coordinates |
+| `dragging` | `boolean` | the selection is being dragged by it: `data-dragging` |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"nodes-selection"` |
+| `data-dragging` | present while it drags the selection |
+
+## Structural style
+
+`position: absolute` at the flow's origin, `transform: translate(x, y)`, `width` and `height` of
+`selection-rect`.

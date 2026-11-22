@@ -237,6 +237,7 @@ feature at the moment it would act: no feature is installed again.
 | `"visible-edges"` | none | the edges whose ends' box is in view |
 | `"drawn-edges"` | none | the edges to draw, in drawing order: those shown whose nodes are measured (with `onlyRenderVisible`, those in view), by `zIndex` (a selected one raised with `elevateEdgesOnSelect`), the document's order among equals |
 | `"node-z-index-by"` | `{ nodeId }` | a node's structural `z-index` among the nodes: its `zIndex` (a selected node and its descendants raised with `elevateNodesOnSelect`), always above its parent's |
+| `"internal-node-by"` | `{ nodeId }` | a node on screen, an `InternalNode` (`id`, `node`, `absolutePosition`, `rect`, `measured`, `zIndex`, `handles`), undefined for an unknown node: what `useInternalNode` reads |
 | `"handles-by"` | `{ nodeId }` | a node's registered handles (`FlowHandle[]`), with their centres |
 | `"background-pattern"` | `BackgroundPatternPayload` | one tile of a background pattern at the current viewport |
 | `"node-toolbar-by"` | `NodeToolbarPayload` | where a node's toolbar goes, outside the zoom: beside a node, or beside several nodes' bounds (`nodeIds`); undefined until one of them has a size |
@@ -399,6 +400,7 @@ viewport from it.
 | `"drag-start"` | `nodeIds` | a drag of these nodes started (`drag()`) |
 | `"nodes-move"` | `nodeIds`, `source` | nodes were dropped after a drag, or moved by the arrows; `source` is a `MoveSource`, `"pointer"` or `"keyboard"` |
 | `"drag-cancel"` | `nodeIds` | a drag was cancelled: its nodes went back |
+| `"minimap-click"` | `point`, `client`, `event` (a `FlowPointerInfo`) | a tap on a minimap (`minimap()`), `point` the flow point under it on the minimap; not a root callback (the `MiniMap`'s `onClick`) |
 | `"selection-drag-start"`, `"selection-drag"`, `"selection-drag-end"` | `nodeIds`, `client`, `point` (a `SelectionDragStep`) | a press on the rectangle around the selection (`nodes-selection`, `drag()`) dragged the selection, as a node drag (threshold, snap, extent, auto-pan): it started (instead of `drag-start`), moved its nodes (each step), dropped them (after their `nodes-move`); a cancel is `drag-cancel` |
 | `"connect-start"` | `nodeId`, `handleId`, `handleType`, `input` | a connection started from a handle (`connection()`); `input` (a `MoveSource`): `"pointer"` (a drag or a tap) or `"keyboard"` (Enter on a focused handle, with `keyboard()`) |
 | `"connect-target"` | `nodeId`, `handleId`, `handleType`, `index`, `count` | a keyboard connection points at another target: the `index`-th of the `count` handles the model accepts, nearest first (`index` -1 and no handle when it accepts none), for your live region |
@@ -457,7 +459,7 @@ part attributes, so every adapter behaves the same.
 | `attachViewport(element)` | attaches (or, with `null`, detaches) the viewport element: the engine writes its `transform` and `transform-origin`, the framework never does |
 | `registerNode(nodeId, element)` | registers (or unregisters) a node's element: the engine measures it |
 | `registerHandle(handle, element)` | registers (or unregisters) a handle: the engine measures its centre relative to its node |
-| `setPartOptions(part, id, options)` | options a part's primitive takes (a resizer's `minWidth`, …); `null` drops them |
+| `setPartOptions(part, id, options)` | options a part's primitive takes (a resizer's `minWidth`, …, `direction`; the minimaps' `inversePan` and `zoomStep` under the id `""`, over `minimap()`'s); `null` drops them |
 | `attributes(part, payload?)` | the record to spread on a part: `data-flow-part`, `data-flow-id` and its state |
 | `subscribe(listener)` | the view changed (a `ViewChange`); returns its remover |
 | `getSnapshot()` | a number that changes whenever the view changes |
@@ -522,3 +524,13 @@ The attribute names are constants, and the helpers give the static attributes wi
 `PartAttributes` is a read-only record of them, `MutablePartAttributes` the writable one the engine
 and its features fill. The state attributes each part carries: [State
 attributes](/docs/concepts/state-attributes).
+
+## Helpers for the hooks
+
+What every adapter's hooks share, so they agree: `watchKeyPress(target, keys, onChange)` calls
+`onChange(pressed)` whenever a combo of `keys` (a `KeyPressKeys`: key names joined by `+`, held at
+once, `"Meta+s"`, or a list of combos, any of them; a name is a `KeyboardEvent.key` or `.code`
+without case) starts or stops being held on `target` (a `KeyPressTarget`: a window, a document or
+an element), forgetting the keys on its window's `blur` and on Meta's release, and returns its
+stop. `sameFlowValue(a, b)` tells two reads apart: arrays and plain records compared all the way
+down, anything else by identity.

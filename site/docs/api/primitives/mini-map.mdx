@@ -138,6 +138,9 @@ every SVG attribute of an `svg` but `children`.
 | --- | --- | --- | --- |
 | `width` | `number` | `200` | its width, in pixels |
 | `height` | `number` | `150` | its height, in pixels |
+| `inversePan` | `boolean` | `minimap()`'s (`false`) | a drag moves the view the other way (as grabbing the flow), and a press does not centre it |
+| `zoomStep` | `number` | `minimap()`'s (`10`) | how fast its wheel zooms: 10 is the flow's own wheel, 20 twice as fast |
+| `onClick` | `(event: MouseEvent, point: XY) => void` | none | a tap on it (the engine's `minimap-click`), with the flow point under the pointer on the minimap |
 | `children` | `ReactNode \| ((view: MinimapView) => ReactNode)` | a `MiniMapNode` per node, then the `MiniMapMask` | what it draws, in flow coordinates |
 
 ## State

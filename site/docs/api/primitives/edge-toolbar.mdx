@@ -122,7 +122,10 @@ every `div` attribute.
 | --- | --- | --- | --- |
 | `edgeId` | `string` | the enclosing `Flow.Edge`'s | its edge |
 | `position` | `"label" \| "source" \| "target"` | `"label"` | the point of the edge it stands at: its label point, its source or its target end |
+| `point` | `XY` | none | a flow point it stands at instead (absolute flow coordinates); wins over `position` |
 | `offset` | `XY` | `{ x: 0, y: 0 }` | a screen offset from that point, in pixels |
+| `alignX` | `"start" \| "center" \| "end"` | `"center"` | which of its edges goes at the point across: its left, centre or right |
+| `alignY` | `"start" \| "center" \| "end"` | `"center"` | which of its edges goes at the point down: its top, centre or bottom |
 | `open` | `boolean` | while its edge is selected | whether it is shown |
 | `children` | `ReactNode` | none | your buttons |
 
