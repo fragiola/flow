@@ -60,6 +60,7 @@ export {
     nodeSchema,
 } from "./document/document-schema";
 export { FlowValidationError } from "./document/flow-validation-error";
+export { isEdge, isNode } from "./document/type-guards";
 export type {
     AnyTypes,
     BuiltInEdgeType,
@@ -178,8 +179,10 @@ export type {
 } from "./features/types";
 export {
     type BezierPathOptions,
+    type BezierPathResult,
     bezierPath,
 } from "./geometry/bezier-path";
+export { type EdgeCenter, edgeCenter } from "./geometry/edge-center";
 export {
     type SimpleBezierPathOptions,
     simpleBezierPath,
@@ -187,6 +190,7 @@ export {
 export {
     type SmoothStepPathOptions,
     type StepPathOptions,
+    type StepTurnOptions,
     smoothStepPath,
     stepPath,
 } from "./geometry/smooth-step-path";

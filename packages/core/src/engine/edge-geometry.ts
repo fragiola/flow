@@ -115,10 +115,12 @@ export function pathOf(
             return { ...ends, ...straightPath(ends) };
         case "simplebezier":
             return { ...ends, ...simpleBezierPath(ends) };
-        default:
-            return {
+        default: {
+            const { path, label } = bezierPath({
                 ...ends,
-                ...bezierPath({ ...ends, curvature: options.curvature }),
-            };
+                curvature: options.curvature,
+            });
+            return { ...ends, path, label };
+        }
     }
 }

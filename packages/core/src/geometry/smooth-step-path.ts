@@ -4,8 +4,9 @@
 //
 // The route: each end first stands out from its node by `offset` along its side. Then
 // - two ends on parallel axes facing each other (right to left), the target ahead: one turn halfway
-//   between them;
-// - facing each other, the target behind: out by `offset`, across halfway, and back in;
+//   between them (at `stepPosition` of the way, or at `centerX` / `centerY`);
+// - facing each other, the target behind: out by `offset`, across halfway (the same options), and
+//   back in;
 // - on the same side (right and right): out to the farther of the two, across, and in;
 // - on perpendicular axes: one corner where the two lines meet when both ends reach it going
 //   forward, otherwise out from both ends by `offset` and joined with one more corner.
@@ -14,8 +15,21 @@ import type { XY } from "../document/types";
 import { formatPoint, sideDirection } from "./path-format";
 import type { PathEnds, PathResult } from "./types";
 
+/** Where the turn between two ends facing each other goes (`smoothStepPath`, `stepPath`). */
+export interface StepTurnOptions {
+    /**
+     * where the turn sits between the source (0) and the target (1), along the ends' axis (across
+     * it when the target is behind); default 0.5
+     */
+    readonly stepPosition?: number | undefined;
+    /** the turn's x (flow units) when it runs vertically, over `stepPosition` */
+    readonly centerX?: number | undefined;
+    /** the turn's y (flow units) when it runs horizontally, over `stepPosition` */
+    readonly centerY?: number | undefined;
+}
+
 /** Options of {@link smoothStepPath}. */
-export interface SmoothStepPathOptions extends PathEnds {
+export interface SmoothStepPathOptions extends PathEnds, StepTurnOptions {
     /** the radius of each rounded corner, in flow units; default 5 */
     readonly borderRadius?: number | undefined;
     /** how far each end stands out from its node before the route turns, in flow units; default 20 */
@@ -23,9 +37,14 @@ export interface SmoothStepPathOptions extends PathEnds {
 }
 
 /** Options of {@link stepPath}. */
-export interface StepPathOptions extends PathEnds {
+export interface StepPathOptions extends PathEnds, StepTurnOptions {
     /** how far each end stands out from its node before the route turns, in flow units; default 20 */
     readonly offset?: number | undefined;
+}
+
+/** The value `share` of the way from `from` to `to` (exactly the middle at 0.5). */
+function between(from: number, to: number, share: number): number {
+    return share === 0.5 ? (from + to) / 2 : from + (to - from) * share;
 }
 
 function plus(point: XY, direction: XY, distance: number): XY {
@@ -48,8 +67,13 @@ function distance(a: XY, b: XY): number {
 }
 
 /** The corners of the orthogonal route between two ends, both ends included. */
-export function orthogonalRoute(ends: PathEnds, offset: number): XY[] {
+export function orthogonalRoute(
+    ends: PathEnds,
+    offset: number,
+    turn: StepTurnOptions = {},
+): XY[] {
     const { source, target } = ends;
+    const share = Math.min(Math.max(turn.stepPosition ?? 0.5, 0), 1);
     const a = sideDirection(ends.sourceSide);
     const b = sideDirection(ends.targetSide);
     const out = plus(source, a, offset);
@@ -74,12 +98,16 @@ export function orthogonalRoute(ends: PathEnds, offset: number): XY[] {
                     : Math.min(along(out), along(into));
             middle = [at(reach, across(source)), at(reach, across(target))];
         } else if ((along(target) - along(source)) * sign >= 0) {
-            // facing each other, the target ahead: turn halfway
-            const half = (along(source) + along(target)) / 2;
+            // facing each other, the target ahead: turn halfway (or where asked)
+            const half =
+                (horizontal ? turn.centerX : turn.centerY) ??
+                between(along(source), along(target), share);
             middle = [at(half, across(source)), at(half, across(target))];
         } else {
-            // facing each other, the target behind: out, across halfway, back in
-            const half = (across(source) + across(target)) / 2;
+            // facing each other, the target behind: out, across halfway (or where asked), back in
+            const half =
+                (horizontal ? turn.centerY : turn.centerX) ??
+                between(across(source), across(target), share);
             middle = [out, at(along(out), half), at(along(into), half), into];
         }
     } else {
@@ -186,7 +214,7 @@ export function roundedPath(points: readonly XY[], radius: number): string {
 
 /** A smooth step edge's path (orthogonal, rounded corners) and its label point. */
 export function smoothStepPath(options: SmoothStepPathOptions): PathResult {
-    const route = orthogonalRoute(options, options.offset ?? 20);
+    const route = orthogonalRoute(options, options.offset ?? 20, options);
     return {
         path: roundedPath(route, options.borderRadius ?? 5),
         label: halfwayAlong(route),
