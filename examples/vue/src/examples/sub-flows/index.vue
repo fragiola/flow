@@ -12,6 +12,10 @@ import { subflows } from "@fragiola/flow-vue/subflows";
 // with it, and with `extent: "parent"` it stays inside it. Nodes are rendered flat (a child is not
 // inside its parent's element), each at its absolute place. Drop a loose node onto a group and the
 // app puts it in with `node.set-parent` (drop-into-groups.vue), which keeps it where it is on screen.
+// With `zIndexMode="auto"` (the default, written here to show it) an edge with an end in a group is
+// drawn at its ends' level: above the groups it crosses, under the nodes it joins; a selected edge
+// rises above every node. `"basic"` keeps every edge under every node, and `"manual"` follows only
+// the `zIndex` values.
 
 export interface Types extends FlowTypes {
     readonly nodes: {
@@ -91,6 +95,7 @@ const Flow = typedFlow<Types, typeof features>();
         :default-nodes="nodes"
         :default-edges="edges"
         :fit-view="{ padding: 0.2, maxZoom: 1 }"
+        z-index-mode="auto"
         :class="styles.root"
     >
         <Flow.Background variant="dots" :size="2" :class="styles.dots" />
