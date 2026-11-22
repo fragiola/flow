@@ -151,6 +151,33 @@ describe("core package guard", () => {
         );
     });
 
+    it("keeps src/geometry/ pure: nothing of the engine and no DOM (a server render runs it)", () => {
+        // what a geometry module may import: its own folder, the document's types, the query types
+        const ALLOWED =
+            /^(?:\.\/[^/]+|\.\.\/document\/types|\.\.\/state\/queries)$/;
+        const IMPORTS = /(?:from|import)\s*\(?\s*["']([^"']+)["']/g;
+        const DOM =
+            /(?<![.\w$])(?:Element|HTMLElement|SVGElement|Node|Window|Document|EventTarget|DOMRect|Event)\b|\.(?:ownerDocument|defaultView|getBoundingClientRect|offsetWidth|offsetHeight|style)\b/;
+        const files = listFiles(join(src, "geometry"));
+        expect(files.length).toBeGreaterThan(0);
+        const offenders = files.flatMap((file) => {
+            const source = readFileSync(file, "utf8");
+            const name = file.slice(root.length + 1);
+            const imports = [...source.matchAll(IMPORTS)]
+                .map((match) => match[1] ?? "")
+                .filter((path) => !ALLOWED.test(path))
+                .map((path) => `${name}: imports ${path}`);
+            const dom = DOM.exec(codeOnly(source));
+            return dom ? [...imports, `${name}: ${dom[0]}`] : imports;
+        });
+        expect(offenders).toEqual([]);
+        expect(ALLOWED.test("../engine/adapter")).toBe(false);
+        expect(ALLOWED.test("./rect")).toBe(true);
+        expect(DOM.test(codeOnly("const e: HTMLElement = x;"))).toBe(true);
+        expect(DOM.test(codeOnly("el.getBoundingClientRect()"))).toBe(true);
+        expect(DOM.test(codeOnly("const nodeBox = 1;"))).toBe(false);
+    });
+
     it("never reaches for the global crypto (ids come from an injectable createId)", () => {
         expect(offendersOf(GLOBAL_CRYPTO)).toEqual([]);
         expect(GLOBAL_CRYPTO.test(codeOnly("crypto.randomUUID()"))).toBe(true);

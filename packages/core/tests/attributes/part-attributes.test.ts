@@ -2,13 +2,29 @@
 // The part attributes (D11): `data-flow-part` and `data-flow-id` on every part, boolean state
 // attributes present as "" or absent, from one core helper every adapter spreads.
 import { afterEach, describe, expect, it } from "vitest";
-import { flag, partAttributes } from "../../src/attributes/part-attributes";
+import {
+    edgesLayerAttributes,
+    flag,
+    partAttributes,
+} from "../../src/attributes/part-attributes";
 import { selection } from "../../src/selection/selection";
 import { flowOf, mount, unmountAll } from "../engine/harness";
 
 afterEach(unmountAll);
 
 describe("part attributes", () => {
+    it("give an edges layer its level, with or without an engine", () => {
+        const static_ = edgesLayerAttributes(1);
+        expect(static_).toEqual({
+            "data-flow-part": "edges-layer",
+            "data-level": "1",
+        });
+        const { engine } = mount(flowOf({}));
+        expect(engine.adapter.attributes("edges-layer", { level: 1 })).toEqual(
+            static_,
+        );
+    });
+
     it("give a part its name and id without an engine", () => {
         expect(partAttributes("viewport")).toEqual({
             "data-flow-part": "viewport",
