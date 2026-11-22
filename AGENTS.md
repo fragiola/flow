@@ -956,7 +956,7 @@ and the eight feature entries as ng-packagr secondary entry points (`/minimap` a
 
 | React | Angular |
 | --- | --- |
-| `<Flow.Root …>` and every part | the part's directive on the app's element: `flowRoot`, `flowViewport`, `flowNodes`, `flowNode`, `flowHandle`, `flowEdges`, `flowEdge`, `flowEdgePath`, `flowEdgeLabel`, `flowReconnectAnchor`, `flowConnectionLine`, `flowSelectionBox`, `flowBackground`, `flowControls`, `flowZoomIn`, `flowZoomOut`, `flowFitView`, `flowToggleInteractive`, `flowNodeToolbar`, `flowEdgeToolbar` (#28), `flowMiniMap`, `flowMiniMapNode`, `flowMiniMapMask`, `flowNodeResizer`, `flowResizeHandle` |
+| `<Flow.Root …>` and every part | the part's directive on the app's element: `flowRoot`, `flowViewport`, `flowNodes`, `flowNode`, `flowHandle`, `flowEdges`, `flowEdge`, `flowEdgePath`, `flowEdgeLabel`, `flowReconnectAnchor`, `flowConnectionLine`, `flowNodesSelection` (#36), `flowSelectionBox`, `flowBackground`, `flowControls`, `flowZoomIn`, `flowZoomOut`, `flowFitView`, `flowToggleInteractive`, `flowNodeToolbar`, `flowEdgeToolbar` (#28), `flowMiniMap`, `flowMiniMapNode`, `flowMiniMapMask`, `flowNodeResizer`, `flowResizeHandle` |
 | `render={<section />}`, `render={(props, state) => …}` | not applicable: the app writes its own element and puts the directive on it |
 | the children functions of `Nodes`, `Edges` | `<ng-template flowNodesItem let-node>` inside `[flowNodes]` (or `*flowNodesItem="let node"`), `<ng-template flowEdgesItem let-edge>` inside `[flowEdges]` (its elements with the `svg:` prefix); `[flowNodesItem]="model"` types the node by the registry (`ngTemplateContextGuard`) |
 | the children functions of `ConnectionLine`, `MiniMap` | the app's elements inside them, reading `#line="flowConnectionLine"`'s `line.state()?.connection` or `#map="flowMiniMap"`'s `map.state().view` |
@@ -972,6 +972,9 @@ and the eight feature entries as ng-packagr secondary entry points (`/minimap` a
 | `useEdge`, `useHandle` | `injectEdge`, `injectHandle`, as `injectNode` (`injectHandle` takes a `nodeId` outside `[flowNode]`) |
 | `useViewport()`, `useConnection()`, `useSelection()`, `useNodes()`, `useEdges()` | `injectViewport()`, `injectConnection()`, `injectSelection()`, `injectNodes()`, `injectEdges()`: signals |
 | `useFlowRef()` | `injectFlowRef()` (`createFlowRef()` in a field) |
+| `useFlowStore`, `useNodeId`, `useNodesData`, `useNodeConnections`, `useInternalNode`, `useKeyPress` (#36) | `injectFlowStore`, `injectNodeId`, `injectNodesData`, `injectNodeConnections`, `injectInternalNode`, `injectKeyPress`: signals (`src/lib/inject/inject-*.ts`), their arguments values, signals or getters (`ValueOrSignal`) |
+| `useOnViewportChange` (#36) | `injectOnViewportChange(options)`: it returns nothing, its options read at each event |
+| `MiniMap`'s `onClick(event, point)` (#36) | `flowMiniMap`'s output `(minimapClick)`: the engine's `minimap-click` event (`point`, `client`, `event`) |
 | `<Flow.Root<Types, typeof features>>` | inferred from the inputs (`[model]`); a child types `injectFlow<Types, typeof features>()` |
 
 Decisions of the Angular adapter (#15):
@@ -1073,6 +1076,24 @@ Decisions of the Angular adapter (#15):
   node's `z-index` is a key of its `bindStructuralStyle` (it wins over the app's `[style]`,
   tested); the node origin and `drawn-edges` (the order `SlotViews` places the edges' elements in)
   are React's.
+- **#36 in Angular** (React's decisions above hold): `flowMiniMap` takes `inversePan`, `zoomStep`
+  (its part options, one set per root, set by an `effect` and `null` on destroy) and emits
+  `minimapClick` with the engine's whole `minimap-click` event (an output carries one value, as
+  the root's engine outputs); `flowNodeResizer` takes `direction`; `flowFitView` takes `padding`,
+  `nodeIds`, `includeHidden`, `minZoom`, `maxZoom` (only the given ones in its payload:
+  `givenPayload` in `control-button.ts`, which now takes the payload getter, `flowZoomIn` /
+  `flowZoomOut` passing their `duration` through it); `flowEdgeToolbar` takes `point`, `alignX`,
+  `alignY`. `flowNodesSelection` is `flowSelectionBox`'s way (`bindPresence`: out of the document
+  while `selection-rect` is null), in flow coordinates inside `[flowViewport]`. The injection
+  functions are on `flowValue` with `sameFlowValue` where they build a value; `injectNodeId()` is a
+  signal of the enclosing node's id (null outside one); `injectNodeConnections` throws at once
+  outside `[flowNode]` when its options are a value without an `id` (React's error), and reports
+  it once rendered when they are a signal or a getter (`partOwnerId`); `injectKeyPress` listens
+  in an `effect` (an equal list of keys keeps its listener), on the root's window by default
+  (`null` outside a root without a `target`: never pressed); `injectOnViewportChange` subscribes
+  per engine in an `effect` and marks nothing. Tested in `tests/part-options.test.ts` and
+  `tests/hooks.test.ts` (each signal's updates seen by an effect, React's render counts; a
+  component of typed calls checked by `ngc`).
 - **Known limits:** no server render nor hydration (the sibling Angular adapters do not support it
   either; `[flowEdges]` adds its SVG in its constructor); jsdom lays nothing out, so the tests stub
   the layout (`tests/flow.ts`, React's); a part that leaves the document while hidden must not be
@@ -1339,7 +1360,7 @@ compares every React example again; the shared specs pass unchanged (215).
 ## The Angular examples and the Angular docs (Issue #16)
 
 `examples/angular` (`examples-angular`, private) is `examples/react` in Angular 22 (standalone
-components, signals, zoneless, OnPush): the 20 examples with the same ids, metadata, text, names,
+components, signals, zoneless, OnPush): the 21 examples (`connected-data` since #36) with the same ids, metadata, text, names,
 roles and test ids, and the same scripts as Splitter's Angular app (`generate`, `dev` (port 5188),
 `build` (Vite + `@analogjs/vite-plugin-angular`, `tsconfig.app.json`), `typecheck` (`ngc -p
 tsconfig.json --noEmit`, strict templates, TypeScript 6.0.3 pinned in this app, as
@@ -1402,6 +1423,12 @@ Decisions of #16:
   part does not infer its type from an entity narrowed around it (the adapter's known limit).
 - **Fixed in the adapter, found by the specs:** the root's `renderSoon` (see the Angular adapter's
   decisions); no core fix was needed.
+- **#36:** `selection-and-keyboard` puts `flowNodesSelection` after the connection line;
+  `node-resizer`'s banner has a `direction="horizontal"` resizer with its two side handles;
+  `edge-types` gives `step` and `smoothstep` their `pathOptions` (and `smoothstep` `animated`);
+  `connected-data`'s number and sum bodies are components of their own (`number-body.ts`,
+  `sum-body.ts`, inside `[flowNode]`: the sum's `injectNodeConnections` and `injectNodesData` need
+  the node), the sum's ids given to `injectNodesData` as a getter over its connections.
 - **Known limits:** the docs' Angular fences are parsed (TypeScript, `parseTemplate`), not type
   checked (39 component snippets were checked once with ngc by hand); a `(dragover)` on the root
   (`add-nodes`, `workflow-builder`) checks the example's template while an outside drag hovers it;
