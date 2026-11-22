@@ -11,6 +11,7 @@ import type {
     FlowFeatures,
     FlowModel,
     FlowTypes,
+    StaticGeometry,
 } from "@fragiola/flow";
 import { getContext, hasContext, setContext } from "svelte";
 
@@ -32,6 +33,12 @@ export interface FlowContextValue {
     readonly rootElement: HTMLElement | null;
     /** bumped on every commit of the model and every view change of the engine */
     readonly revision: number;
+    /**
+     * the flow's geometry from its document alone (`staticGeometry`, the root's options) while
+     * there is no engine (the server render and the first client render), null once it exists:
+     * one object per document and options, so every part reads the same
+     */
+    readonly geometry: StaticGeometry | null;
 }
 
 const FLOW = Symbol("Flow");
@@ -49,9 +56,12 @@ export interface EdgeContextValue {
     readonly edgeId: string;
 }
 
-/** The HTML layer of `Flow.Edges` that edge labels render into (null until mounted). */
+/**
+ * The HTML layer of `Flow.Edges` that an edge's labels render into (null until mounted): the
+ * edges' element with one render level, the edge's own level wrapper with several.
+ */
 export interface EdgeLabelLayerValue {
-    readonly element: HTMLElement | null;
+    elementOf(edgeId: string): HTMLElement | null;
 }
 
 export function setFlowContext(value: FlowContextValue): void {

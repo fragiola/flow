@@ -22,7 +22,9 @@
     `Flow.EdgeLabel`, `Flow.ReconnectAnchor`); a press on its stroke selects it (`selection()`).
 -->
 <script lang="ts" generics="T extends FlowTypes = AnyTypes">
-    import { setEdgeContext } from "../context.js";
+    import { untrack } from "svelte";
+    import { type Attachment, createAttachmentKey } from "svelte/attachments";
+    import { setEdgeContext, useFlowContext } from "../context.js";
     import { useEdge } from "../runes/use-edge.svelte.js";
     import {
         elementProps,
@@ -41,7 +43,14 @@
         ...rest
     }: EdgeProps<T> = $props();
 
+    const context = useFlowContext("Edge");
     const own = useEdge<T>(() => edge);
+    // mounted again (moved to another render level's SVG, keyed by its id): the engine gives it
+    // back the focus it had, when the focus was lost meanwhile
+    const refocusKey = createAttachmentKey();
+    const refocus: Attachment<Element> = (element) => {
+        untrack(() => context.engine)?.adapter.refocus(element);
+    };
     // the id alone: the parts inside follow another id, not every new edge object
     const edgeId = $derived(edge.id);
     setEdgeContext({
@@ -58,7 +67,7 @@
             className,
             style,
             state: own.state,
-            own: { ...own.props, ...refs },
+            own: { ...own.props, ...refs, [refocusKey]: refocus },
             structural: EDGE_STYLE,
         }),
     );

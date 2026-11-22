@@ -3,6 +3,7 @@ import {
     type EdgePath,
     type FlowEdge,
     type FlowTypes,
+    flag,
     type PartAttributes,
     partAttributes,
 } from "@fragiola/flow";
@@ -96,8 +97,13 @@ export function useEdge<T extends FlowTypes = AnyTypes>(
                       focusable: engine.is("edge-focusable", { edgeId }),
                   }
                 : {
-                      attributes: partAttributes("edge", edgeId),
-                      path: undefined,
+                      // before the engine: the static geometry's path, once both nodes have a size
+                      attributes: staticAttributes(
+                          "edge",
+                          edgeId,
+                          current() as FlowEdge,
+                      ),
+                      path: context.geometry?.edgePaths[edgeId],
                       reconnecting: false,
                       focusable: false,
                   };
@@ -137,14 +143,39 @@ export function useEdge<T extends FlowTypes = AnyTypes>(
     };
 }
 
-/** @internal an edge's path, notifying its readers when it changes (`Flow.EdgePath`, …) */
+/**
+ * @internal an edge's path, notifying its readers when it changes (`Flow.EdgePath`, …): the
+ * engine's, or the static geometry's before the engine
+ */
 export function edgePathValue(
     context: FlowContextValue,
     edgeId: () => string,
 ): FlowValue<EdgePath | undefined> {
     return flowValue(
         context,
-        () => context.engine?.get("edge-path-by", { edgeId: edgeId() }),
+        () => {
+            const id = edgeId();
+            const { engine, geometry } = context;
+            return engine
+                ? engine.get("edge-path-by", { edgeId: id })
+                : geometry?.edgePaths[id];
+        },
         sameEdgePath,
     );
+}
+
+/**
+ * @internal the attributes of an edge part before the engine (as a node's): its part, its id,
+ * `data-selected` and `data-animated` from the document
+ */
+export function staticAttributes(
+    part: "edge" | "edge-path" | "edge-label",
+    edgeId: string,
+    edge: FlowEdge | undefined,
+): PartAttributes {
+    return {
+        ...partAttributes(part, edgeId),
+        "data-selected": flag(edge?.selected === true),
+        "data-animated": flag(edge?.animated === true),
+    };
 }

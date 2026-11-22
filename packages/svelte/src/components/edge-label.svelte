@@ -32,7 +32,10 @@
         useFlowContext,
     } from "../context.js";
     import { flowValue } from "../runes/internal.svelte.js";
-    import { edgePathValue } from "../runes/use-edge.svelte.js";
+    import {
+        edgePathValue,
+        staticAttributes,
+    } from "../runes/use-edge.svelte.js";
     import Portal from "../utils/portal.svelte";
     import {
         elementProps,
@@ -55,11 +58,18 @@
     const layer = useEdgeLabelLayer();
     const context = useFlowContext("EdgeLabel");
     const path = edgePathValue(context, edgeIdOf);
-    const attributes = flowValue(context, () =>
-        context.engine?.adapter.attributes("edge-label", {
-            edgeId: edgeIdOf(),
-        }),
-    );
+    // the engine's attributes, or before it (the server, the first render) the document's
+    const attributes = flowValue(context, () => {
+        const edgeId = edgeIdOf();
+        const { engine, model } = context;
+        return engine
+            ? engine.adapter.attributes("edge-label", { edgeId })
+            : staticAttributes(
+                  "edge-label",
+                  edgeId,
+                  model.get("edge-by", { id: edgeId }),
+              );
+    });
     const refs = refProps((element) => {
         ref = element as HTMLDivElement | null;
     });
@@ -109,5 +119,5 @@
 {/snippet}
 
 {#if partState}
-    <Portal target={layer?.element}>{@render label()}</Portal>
+    <Portal target={layer?.elementOf(edgeIdOf())}>{@render label()}</Portal>
 {/if}
