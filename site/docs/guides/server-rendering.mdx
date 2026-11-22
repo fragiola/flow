@@ -251,17 +251,27 @@ the server sent, so hydration reports no mismatch. Then the engine measures. Whe
 sizes and handle centres equal the declared ones, no path and no node moves; when they differ, the
 measured ones win and the edges follow them.
 
+The server HTML is drawn at the identity viewport (`{ x: 0, y: 0, zoom: 1 }`): only the engine
+writes the viewport's transform, and the engine is attached after mount. `defaultViewport` and
+`fitView` apply then, so they pan and zoom the whole flow once the page is interactive. For a
+server-rendered flow without a jump, keep the identity viewport and place the nodes where they
+should be seen at zoom 1 (as the example above does), or accept that move.
+
 - **Measured handles win**: a declared handle is used only until a handle of that node, type and
   id is rendered and measured. Declare the handles you render, at the place you render them.
 - **Fixed sizes stay**: `width` / `height` are the node's size before and after measurement;
   `initialWidth` / `initialHeight` give way to the measured size.
 - **Origins and layers too**: a node's `origin` (or the root's `nodeOrigin`) places it on the
   server as in the browser, and an edge that stands above nodes (`zIndexMode`) is in its own
-  `edges-layer` from the server on ([Z-order](/docs/concepts/nodes-and-edges#z-order)).
+  `edges-layer` from the server on ([Z-order](/docs/concepts/nodes-and-edges#z-order)). The
+  viewport is its own stacking context from the server on too (`isolation: isolate`), so those
+  layers stack inside it before the engine as after.
 - **Edge labels come after mount**: a `Flow.EdgeLabel` portals into its layer, so labels are not
   in the server HTML; the paths are.
-- **`fitView` on init counts the declared sizes**: it fits once, and is not run again when the
-  measured sizes differ.
+- **`fitView` moves the flow after mount**: the server draws the identity viewport, and `fitView`
+  runs once the engine is attached, counting the declared sizes; it fits once, and is not run
+  again when the measured sizes differ. Leave it out (and `defaultViewport` at the identity) for a
+  flow that does not move on hydration.
 
 ## Draw a flow yourself
 
