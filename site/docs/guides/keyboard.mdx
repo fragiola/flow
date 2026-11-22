@@ -635,15 +635,21 @@ $effect(() => {
 <Framework name="angular">
 
 ```ts
-constructor() {
-    let startedFrom: string | undefined; // a keyboard connection just started, until its first target
-    const stop = this.flow.engine.subscribe((event) => {
-        if (event.type === "connect-start") startedFrom = event.input === "keyboard" ? event.nodeId : undefined;
-        const next = describe(event, this.flow.model(), startedFrom);
-        if (event.type === "connect-target") startedFrom = undefined;
-        if (next) this.message.set(next);
-    });
-    inject(DestroyRef).onDestroy(stop);
+// LiveRegion's constructor
+export class LiveRegion {
+    private readonly flow = injectFlow<Types, typeof features>();
+    protected readonly message = signal("");
+
+    constructor() {
+        let startedFrom: string | undefined; // a keyboard connection just started, until its first target
+        const stop = this.flow.engine.subscribe((event) => {
+            if (event.type === "connect-start") startedFrom = event.input === "keyboard" ? event.nodeId : undefined;
+            const next = describe(event, this.flow.model(), startedFrom);
+            if (event.type === "connect-target") startedFrom = undefined;
+            if (next) this.message.set(next);
+        });
+        inject(DestroyRef).onDestroy(stop);
+    }
 }
 ```
 
