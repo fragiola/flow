@@ -600,6 +600,17 @@ Decisions of the Vue adapter (#9):
   (Tree's `primitiveProps`); `fitView` takes a boolean or a payload.
 - **`typedFlow<T, F>()`** types `Root` (model, lists, features, events), `Nodes`, `Node`, `Edges`,
   `Edge` by the registry; the untyped `Flow.Root` takes any features.
+- **The viewport and gesture options (#25)** are React's root props in kebab-case attributes
+  (`:auto-pan`, `:pan-on-drag="[1, 2]"`, `pan-activation-key`, `pan-on-scroll-mode`,
+  `:pan-on-scroll-speed`, `zoom-activation-key`, `:easing`, `:node-origin`, `:node-extent`,
+  `elevate-nodes-on-select`, `elevate-edges-on-select`), sent as React's (`null` is not
+  `undefined`, a function by identity: `easing` is watched beside the options' JSON key).
+  `panOnDrag` is typed `[Boolean, Array]` and `autoPan` `[Boolean, Object]` (a bare attribute
+  `true`, a list or an options object kept; before #25 `panOnDrag` was `Boolean` alone, which
+  warned on a list); `elevate-nodes-on-select` / `elevate-edges-on-select` take a bare
+  attribute. `ZoomIn`, `ZoomOut`, `FitView` take `:duration` (a number: the attribute's text
+  `duration="300"` is a string the engine refuses, `invalid_payload`, so the button is disabled).
+  The node's `z-index`, the node origin and `drawn-edges` are React's (#25 there).
 - **Known limits:** jsdom lays nothing out, so the tests stub the layout (`tests/flow.ts`,
   React's); the gestures' real feel is the Vue examples' shared Playwright specs (#10), which
   needed no adapter fix.

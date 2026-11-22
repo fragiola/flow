@@ -13,6 +13,8 @@ import { type RenderSlot, renderElement } from "../utils/render";
 export interface ZoomInProps extends PrimitiveProps {
     /** disabled even when the engine would run its action */
     disabled?: boolean | undefined;
+    /** how long its viewport change animates, in milliseconds (the root's `easing`); default 0: at once */
+    duration?: number | undefined;
 }
 
 export interface ZoomInSlots extends RenderSlot<ControlButtonState> {
@@ -29,12 +31,13 @@ export const ZoomIn: FlowComponent<ZoomInProps, ZoomInSlots> = definePrimitive<
     ZoomInSlots
 >(
     "ZoomIn",
-    ["disabled", "as"],
+    ["disabled", "duration", "as"],
     (props, { attrs, slots }) => {
         const { state, props: own } = useControlButton(
             "ZoomIn",
             "zoom-in",
             () => props.disabled,
+            () => props.duration,
         );
         return () => {
             const current = state.value;

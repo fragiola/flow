@@ -90,7 +90,7 @@ const EdgeLabelOutlet = defineComponent({
 /**
  * The layer of the edges (`data-flow-part="edges"`), inside `Flow.Viewport`, before `Flow.Nodes`:
  * an SVG (`data-flow-part="edges"` too) where the default slot draws each edge, once both its
- * nodes have a size (`edge-path-by`), and the HTML layer edge labels render in. It lets presses
+ * nodes have a size, in the engine's drawing order (`drawn-edges`: by `zIndex`), and the HTML layer edge labels render in. It lets presses
  * through to the pane; the edges' own parts take them.
  *
  * ```vue
@@ -102,26 +102,11 @@ export const Edges: FlowComponent<EdgesProps, EdgesSlots> = definePrimitive<
     EdgesSlots
 >("Edges", ["as"], (props, { attrs, slots }) => {
     const context = useFlowContext("Edges");
-    const { model } = context;
     const list = useFlowValue(context, () => {
         const engine = context.engine.value;
         if (!engine) return [];
-        const edges = engine.adapter.settings.onlyRenderVisible
-            ? engine.get("visible-edges")
-            : model
-                  .get("all-edges")
-                  .filter(
-                      (edge) =>
-                          edge.hidden !== true &&
-                          model.get("node-by", { id: edge.source })?.hidden !==
-                              true &&
-                          model.get("node-by", { id: edge.target })?.hidden !==
-                              true,
-                  );
-        return edges.filter(
-            (edge) =>
-                engine.get("edge-path-by", { edgeId: edge.id }) !== undefined,
-        );
+        // the core's drawing order: shown, measured, in view with `onlyRenderVisible`, by z-order
+        return engine.get("drawn-edges");
     });
     // the labels of the edges, rendered in the HTML layer (SVG holds no HTML)
     const labels = shallowRef<readonly EdgeLabelEntry[]>([]);

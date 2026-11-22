@@ -13,6 +13,8 @@ import { type RenderSlot, renderElement } from "../utils/render";
 export interface FitViewProps extends PrimitiveProps {
     /** disabled even when the engine would run its action */
     disabled?: boolean | undefined;
+    /** how long its viewport change animates, in milliseconds (the root's `easing`); default 0: at once */
+    duration?: number | undefined;
 }
 
 export interface FitViewSlots extends RenderSlot<ControlButtonState> {
@@ -27,12 +29,13 @@ export interface FitViewSlots extends RenderSlot<ControlButtonState> {
 export const FitView: FlowComponent<FitViewProps, FitViewSlots> =
     definePrimitive<FitViewProps, FitViewSlots>(
         "FitView",
-        ["disabled", "as"],
+        ["disabled", "duration", "as"],
         (props, { attrs, slots }) => {
             const { state, props: own } = useControlButton(
                 "FitView",
                 "fit-view",
                 () => props.disabled,
+                () => props.duration,
             );
             return () => {
                 const current = state.value;

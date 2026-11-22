@@ -84,6 +84,16 @@ export type RootEngineProps = Pick<
     | "interactive"
     | "onlyRenderVisible"
     | "pathOptions"
+    | "autoPan"
+    | "panActivationKey"
+    | "panOnScrollMode"
+    | "panOnScrollSpeed"
+    | "zoomActivationKey"
+    | "easing"
+    | "nodeOrigin"
+    | "nodeExtent"
+    | "elevateNodesOnSelect"
+    | "elevateEdgesOnSelect"
 >;
 
 export interface RootProps<
@@ -155,6 +165,16 @@ const ENGINE_PROPS = [
     "interactive",
     "onlyRenderVisible",
     "pathOptions",
+    "autoPan",
+    "panActivationKey",
+    "panOnScrollMode",
+    "panOnScrollSpeed",
+    "zoomActivationKey",
+    "easing",
+    "nodeOrigin",
+    "nodeExtent",
+    "elevateNodesOnSelect",
+    "elevateEdgesOnSelect",
 ] as const satisfies readonly (keyof RootEngineProps)[];
 
 const ROOT_PROPS = [
@@ -182,6 +202,9 @@ const ROOT_BOOLEANS = [
     "zoomOnDoubleClick",
     "interactive",
     "onlyRenderVisible",
+    "autoPan",
+    "elevateNodesOnSelect",
+    "elevateEdgesOnSelect",
 ] as const satisfies readonly (keyof RootProps)[];
 
 const ROOT_EMITS = [
@@ -215,13 +238,26 @@ function warnOnce(): (message: string) => void {
     };
 }
 
-/** Each engine option's value as a key: a new equal object (`pathOptions`) is the same. */
-function optionKeys(options: RootEngineProps): Record<string, string> {
+/**
+ * Each engine option's value as a key: a new equal object (`pathOptions`) is the same, a function
+ * (`easing`) is itself, and `null` (`:pan-activation-key="null"`: none) is not `undefined` (the
+ * default).
+ */
+function optionKeys(options: RootEngineProps): Record<string, unknown> {
     return Object.fromEntries(
         Object.entries(options).map(([key, value]) => [
             key,
-            JSON.stringify(value ?? null),
+            typeof value === "function" || value === undefined
+                ? value
+                : JSON.stringify(value),
         ]),
+    );
+}
+
+/** A key that changes when an engine option's value does (but a function's: `easing` is watched). */
+function optionsKey(options: RootEngineProps): string {
+    return JSON.stringify(optionKeys(options), (_key, value) =>
+        value === undefined ? "undefined" : value,
     );
 }
 
@@ -315,7 +351,7 @@ const RootFlow = definePrimitive<AnyRootProps, RootSlots, RootEmits<AnyTypes>>(
 
         // the engine options last sent, by key: a change sends only the keys that changed (an
         // `interactive` that stays must not undo the lock of `Flow.ToggleInteractive`)
-        let sentOptions: Record<string, string> = {};
+        let sentOptions: Record<string, unknown> = {};
         const stops: (() => void)[] = [];
         // the engine is created once mounted, so that no server render attaches or observes
         // anything; the parts that attach to it read `engine` in their render, and patch then
@@ -374,25 +410,20 @@ const RootFlow = definePrimitive<AnyRootProps, RootSlots, RootEmits<AnyTypes>>(
         onBeforeUnmount(() => holdFlowRef(undefined));
 
         // the engine options that changed since they were sent
-        watch(
-            () => JSON.stringify(optionKeys(engineProps())),
-            () => {
-                const live = engine.value;
-                if (!live) return;
-                const options = engineProps() as Record<string, unknown>;
-                const next = optionKeys(options);
-                const changed = Object.keys(next).filter(
-                    (key) => next[key] !== sentOptions[key],
-                );
-                sentOptions = next;
-                if (changed.length === 0) return;
-                live.adapter.setOptions(
-                    Object.fromEntries(
-                        changed.map((key) => [key, options[key]]),
-                    ),
-                );
-            },
-        );
+        watch([() => optionsKey(engineProps()), () => props.easing], () => {
+            const live = engine.value;
+            if (!live) return;
+            const options = engineProps() as Record<string, unknown>;
+            const next = optionKeys(options);
+            const changed = Object.keys(next).filter(
+                (key) => next[key] !== sentOptions[key],
+            );
+            sentOptions = next;
+            if (changed.length === 0) return;
+            live.adapter.setOptions(
+                Object.fromEntries(changed.map((key) => [key, options[key]])),
+            );
+        });
 
         // a controlled viewport that differs from the engine's is set on it
         watch(
@@ -556,7 +587,12 @@ const RootFlow = definePrimitive<AnyRootProps, RootSlots, RootEmits<AnyTypes>>(
     },
     {
         booleans: ROOT_BOOLEANS,
-        types: { fitView: [Boolean, Object] as PropType<unknown> },
+        types: {
+            fitView: [Boolean, Object] as PropType<unknown>,
+            // a bare attribute is `true`, mouse buttons (`:pan-on-drag="[1, 2]"`) stay a list
+            panOnDrag: [Boolean, Array] as PropType<unknown>,
+            autoPan: [Boolean, Object] as PropType<unknown>,
+        },
         emits: ROOT_EMITS,
     },
 );
