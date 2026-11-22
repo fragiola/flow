@@ -1,0 +1,147 @@
+---
+title: EdgeToolbar
+description: Flow.EdgeToolbar places your buttons on an edge, outside the zoom so they keep their size, shown while the edge is selected by default.
+---
+
+`Flow.EdgeToolbar` goes inside `Flow.Edge` (or anywhere in the root with an `edgeId`). It is
+portalled into `Flow.Root`, outside the zoom, centred at the point `edge-toolbar-by` gives: the
+edge's label point (`position="label"`, the default) or one of its ends (`"source"`, `"target"`),
+moved by `offset` pixels. So it keeps its size at any zoom and follows the edge as its nodes move
+and the viewport pans or zooms. Nothing is drawn before the edge has a path. By default it is shown
+while its edge is selected (`selection()`); `open` decides instead. Presses and the wheel over it
+are left to it. It renders only your children.
+
+<Framework name="react">
+
+```tsx
+function Edge({ edge }: { edge: FlowEdge<Types> }) {
+    const { model } = useFlow<Types, typeof features>();
+    return (
+        <Flow.Edge edge={edge}>
+            <Flow.EdgePath />
+            <Flow.EdgeToolbar role="toolbar" aria-label="Edge actions" offset={{ x: 0, y: -24 }}>
+                <button type="button" aria-label="Delete" onClick={() => model.run("edge.remove", { edgeId: edge.id })}>
+                    <Trash2Icon />
+                </button>
+            </Flow.EdgeToolbar>
+        </Flow.Edge>
+    );
+}
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="edge.vue"
+<script setup lang="ts">
+import { type FlowEdge, useFlow } from "@fragiola/flow-vue";
+import { Trash2Icon } from "@lucide/vue";
+
+const props = defineProps<{ edge: FlowEdge<Types> }>();
+const { model } = useFlow<Types, typeof features>();
+</script>
+
+<template>
+    <Flow.Edge :edge="edge">
+        <Flow.EdgePath />
+        <Flow.EdgeToolbar role="toolbar" aria-label="Edge actions" :offset="{ x: 0, y: -24 }">
+            <button type="button" aria-label="Delete" @click="model.run('edge.remove', { edgeId: props.edge.id })">
+                <Trash2Icon />
+            </button>
+        </Flow.EdgeToolbar>
+    </Flow.Edge>
+</template>
+```
+
+In Vue, it is a `Teleport` to the root's element; inside `Flow.Edges` (SVG) it teleports from the
+edges' HTML layer, since a `Teleport` out of an SVG would keep creating SVG elements. A bare `open`
+attribute is `true`. Its element renders elsewhere, so a template `ref` on it reaches no element:
+use its `render` slot.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="edge.svelte"
+<script lang="ts">
+    import { Flow, type FlowEdge, useFlow } from "@fragiola/flow-svelte";
+    import { Trash2Icon } from "@lucide/svelte";
+
+    let { edge }: { edge: FlowEdge<Types> } = $props();
+    const flow = useFlow<Types, typeof features>();
+</script>
+
+<Flow.Edge {edge}>
+    <Flow.EdgePath />
+    <Flow.EdgeToolbar role="toolbar" aria-label="Edge actions" offset={{ x: 0, y: -24 }}>
+        <button type="button" aria-label="Delete" onclick={() => flow.model.run("edge.remove", { edgeId: edge.id })}>
+            <Trash2Icon />
+        </button>
+    </Flow.EdgeToolbar>
+</Flow.Edge>
+```
+
+In Svelte, its element is mounted in the root's element (Svelte has no portal: it is mounted
+there with every context of its place, and unmounted with it); `bind:ref` reaches it.
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<!-- inside <ng-template flowEdgesItem let-edge>; remove() runs model.run("edge.remove", …) -->
+<svg:g [flowEdge]="edge">
+    <svg:path flowEdgePath />
+    <xhtml:div flowEdgeToolbar role="toolbar" aria-label="Edge actions" [offset]="{ x: 0, y: -24 }">
+        <xhtml:button type="button" aria-label="Delete" (click)="remove(edge.id)">
+            <svg lucideTrash2 aria-hidden="true"></svg>
+        </xhtml:button>
+    </xhtml:div>
+</svg:g>
+```
+
+In Angular, write it with the `xhtml:` prefix inside the edge's SVG group (the toolbar is HTML),
+as an edge label is: the toolbar moves its element into the root's element (Angular has no
+portal), a comment keeping its place; it leaves the document while it is not open. Your bindings,
+listeners and `injectFlow` keep working there. Its state is the `state()` signal
+(`#t="flowEdgeToolbar"`, `null` while it is not shown).
+
+</Framework>
+
+A toolbar has no role: give it `role="toolbar"` and a label when it holds several buttons.
+
+## Props
+
+`EdgeToolbarProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and
+every `div` attribute.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `edgeId` | `string` | the enclosing `Flow.Edge`'s | its edge |
+| `position` | `"label" \| "source" \| "target"` | `"label"` | the point of the edge it stands at: its label point, its source or its target end |
+| `offset` | `XY` | `{ x: 0, y: 0 }` | a screen offset from that point, in pixels |
+| `open` | `boolean` | while its edge is selected | whether it is shown |
+| `children` | `ReactNode` | none | your buttons |
+
+## State
+
+`EdgeToolbarState`, what `className`, `style` and `render` receive:
+
+| field | type | description |
+| --- | --- | --- |
+| `edgeId` | `string` | its edge |
+| `position` | `"label" \| "source" \| "target"` | the point of the edge it stands at |
+| `anchor` | `EdgeToolbarPosition` | where it is anchored (its centre), in pixels relative to the root ([engine reads](/docs/api/engine)) |
+
+## Data attributes
+
+| attribute | value |
+| --- | --- |
+| `data-flow-part` | `"toolbar"` |
+| `data-flow-id` | its edge's id |
+
+## Structural style
+
+`position: absolute; top: 0; left: 0; transform: translate(<x>px, <y>px) translate(-50%, -50%)`
+at its anchor (the toolbar's centre on the point).

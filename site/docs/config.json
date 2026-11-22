@@ -218,6 +218,10 @@
                     "path": "api/primitives/node-toolbar"
                 },
                 {
+                    "label": "Flow.EdgeToolbar",
+                    "path": "api/primitives/edge-toolbar"
+                },
+                {
                     "label": "MiniMap",
                     "path": "api/primitives/mini-map"
                 },

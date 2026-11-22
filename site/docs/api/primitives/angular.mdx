@@ -105,7 +105,7 @@ your component's whole template on every emit (every drag step): bind one only w
 
 | React | Angular |
 | --- | --- |
-| `<Flow.Root …>` and every part | the part's directive on your own element: `flowRoot`, `flowViewport`, `flowNodes`, `flowNode`, `flowHandle`, `flowEdges`, `flowEdge`, `flowEdgePath`, `flowEdgeLabel`, `flowReconnectAnchor`, `flowConnectionLine`, `flowSelectionBox`, `flowBackground`, `flowControls`, `flowZoomIn`, `flowZoomOut`, `flowFitView`, `flowToggleInteractive`, `flowNodeToolbar`, `flowMiniMap`, `flowMiniMapNode`, `flowMiniMapMask`, `flowNodeResizer`, `flowResizeHandle` |
+| `<Flow.Root …>` and every part | the part's directive on your own element: `flowRoot`, `flowViewport`, `flowNodes`, `flowNode`, `flowHandle`, `flowEdges`, `flowEdge`, `flowEdgePath`, `flowEdgeLabel`, `flowReconnectAnchor`, `flowConnectionLine`, `flowSelectionBox`, `flowBackground`, `flowControls`, `flowZoomIn`, `flowZoomOut`, `flowFitView`, `flowToggleInteractive`, `flowNodeToolbar`, `flowEdgeToolbar`, `flowMiniMap`, `flowMiniMapNode`, `flowMiniMapMask`, `flowNodeResizer`, `flowResizeHandle` |
 | the parts' props | the same names as inputs (`[defaultNodes]`, `[fitView]`, `handleId`, `[minWidth]`); a bare boolean attribute is `true` (`panOnScroll`, `fitView`, `open`, `keepAspectRatio`); `node` and `edge` are the directives' own inputs (`[flowNode]="node"`, `[flowEdge]="edge"`) |
 | `render={<section />}`, `render={(props, state) => …}` | not needed: the element is yours (`<section [flowNode]="node">`), and a `d` of your own on `flowEdgePath` wins over the engine's |
 | children functions of `Flow.Nodes`, `Flow.Edges` | an item template: `<ng-template flowNodesItem let-node>` inside `[flowNodes]` (or `*flowNodesItem="let node"`), `<ng-template flowEdgesItem let-edge>` inside `[flowEdges]`, its elements with the `svg:` prefix; `[flowNodesItem]="model"` types the node by the model's registry |
@@ -147,7 +147,8 @@ directive of the main entry for a component's `imports`: `FlowRootDirective`,
 `FlowEdgePathDirective`, `FlowEdgeLabelDirective`, `FlowReconnectAnchorDirective`,
 `FlowConnectionLineDirective`, `FlowSelectionBoxDirective`, `FlowBackgroundDirective`,
 `FlowControlsDirective`, `FlowZoomInDirective`, `FlowZoomOutDirective`, `FlowFitViewDirective`,
-`FlowToggleInteractiveDirective`, `FlowNodeToolbarDirective`. `FLOW_MINIMAP`
+`FlowToggleInteractiveDirective`, `FlowNodeToolbarDirective`, `FlowEdgeToolbarDirective`.
+`FLOW_MINIMAP`
 (`@fragiola/flow-angular/minimap`) lists `FlowMiniMapDirective`, `FlowMiniMapNodeDirective`,
 `FlowMiniMapMaskDirective`; `FLOW_RESIZE` (`@fragiola/flow-angular/resize`) lists
 `FlowNodeResizerDirective`, `FlowResizeHandleDirective`, beside `RESIZE_POSITIONS`.
@@ -166,7 +167,8 @@ What differs from React, part by part:
 - **`flowEdges`** adds the `<svg>` its edges are drawn in to your element, which is the HTML layer
   labels go to.
 - **`flowEdgeLabel`** (written `<xhtml:div flowEdgeLabel>` in the edge's SVG group) moves its
-  element into the edges' HTML layer, and **`flowNodeToolbar`** into the root's element: Angular
+  element into the edges' HTML layer, and **`flowNodeToolbar`** and **`flowEdgeToolbar`** (written
+  `<xhtml:div flowEdgeToolbar>` there too) into the root's element: Angular
   has no portal, so each part moves its own element, a comment keeping its place. A part shown
   only sometimes (the connection line, the selection box, a minimap node, a toolbar not open)
   leaves the document meanwhile; wrap one that would be the first element of an `@for`'s view.
@@ -177,7 +179,7 @@ What differs from React, part by part:
 
 The state of each part is typed by its exports: `RootState`, `RootEngineProps` (the engine
 options the root takes), `ViewportMoveEvent`; `ViewportState`; `BackgroundState`; `NodesState`,
-`NodesItemContext`; `EdgesState`, `EdgesItemContext`; `EdgePathState`; `EdgeLabelState`;
+`NodesItemContext`; `EdgesState`, `EdgesItemContext`; `EdgePathState`; `EdgeLabelState`; `EdgeToolbarState`;
 `ReconnectAnchorState`; `ConnectionLineState`; `SelectionBoxState`; `NodeToolbarState`;
 `ControlsState`; `ToggleInteractiveState`; `ControlButtonState` (`flowZoomIn`, `flowZoomOut`,
 `flowFitView`); `TypedBy`. On the feature entries: `MiniMapState`, `MiniMapNodeState`,

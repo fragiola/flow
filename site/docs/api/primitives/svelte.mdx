@@ -160,7 +160,7 @@ What differs from React, part by part:
   a server render has no engine. Another `model` gets another engine at the last viewport, as
   React swaps it in place.
 - **`Flow.EdgeLabel`** mounts its element in `Flow.Edges`' HTML layer, and **`Flow.NodeToolbar`**
-  in the root's element: Svelte has no portal, so each one mounts its content there with every
+  and **`Flow.EdgeToolbar`** in the root's element: Svelte has no portal, so each one mounts its content there with every
   context of its place (`useFlow` works inside) and unmounts it with the part. `bind:ref` and an
   attachment reach the mounted element.
 - **`MiniMap`** and **`NodeResizer`** come from `@fragiola/flow-svelte/minimap` and
@@ -170,7 +170,8 @@ What differs from React, part by part:
 The props and state of each part are typed by its exports: `RootProps`, `RootEngineProps`,
 `RootState`; `ViewportProps`, `ViewportState`; `BackgroundProps`, `BackgroundState`; `NodesProps`,
 `NodesState`; `NodeProps`; `HandleProps`; `EdgesProps`, `EdgesState`; `EdgeProps`;
-`EdgePathProps`, `EdgePathState`; `EdgeLabelProps`, `EdgeLabelState`; `ReconnectAnchorProps`,
+`EdgePathProps`, `EdgePathState`; `EdgeLabelProps`, `EdgeLabelState`; `EdgeToolbarProps`,
+`EdgeToolbarState`; `ReconnectAnchorProps`,
 `ReconnectAnchorState`; `ConnectionLineProps`, `ConnectionLineState`; `SelectionBoxProps`,
 `SelectionBoxState`; `NodeToolbarProps`, `NodeToolbarState`; `ControlsProps`, `ControlsState`;
 `ZoomInProps`; `ZoomOutProps`; `FitViewProps`; `ToggleInteractiveProps`,
