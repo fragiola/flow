@@ -9,6 +9,8 @@ import type {
     FlowFeatures,
     FlowModel,
     FlowTypes,
+    RenderLayer,
+    StaticGeometry,
 } from "@fragiola/flow";
 
 /** The model as the parts see it: any registry, any features. */
@@ -33,6 +35,14 @@ export interface FlowContext {
      * follows them (the model's state is never made reactive)
      */
     readonly revision: Signal<number>;
+    /**
+     * the flow's geometry from its document alone (`staticGeometry`, with the root's options)
+     * while there is no engine (the first render), `null` once there is: the parts draw the
+     * edges and place the nodes from it, as the engine will before it measures anything
+     */
+    readonly geometry: Signal<StaticGeometry | null>;
+    /** the levels the flow is drawn in (`render-layers`, or the static geometry's) */
+    readonly layers: Signal<readonly RenderLayer[]>;
 }
 
 export const FLOW_CONTEXT = new InjectionToken<FlowContext>("Flow");
@@ -53,8 +63,13 @@ export interface EdgeContext {
 
 export const FLOW_EDGE = new InjectionToken<EdgeContext>("FlowEdge");
 
-/** The HTML layer of a `[flowEdges]`, which edge labels go into (SVG holds no HTML). */
-export const FLOW_EDGE_LABEL_LAYER = new InjectionToken<HTMLElement>(
+/** The HTML layers of a `[flowEdges]`, which edge labels go into (SVG holds no HTML). */
+export interface EdgeLabelLayers {
+    /** the HTML layer of the edge's level: the app's element with one level, its level's wrapper with several */
+    of(edgeId: string): HTMLElement;
+}
+
+export const FLOW_EDGE_LABEL_LAYER = new InjectionToken<EdgeLabelLayers>(
     "FlowEdgeLabelLayer",
 );
 

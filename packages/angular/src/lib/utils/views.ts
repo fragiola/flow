@@ -4,7 +4,8 @@
 // would be checked again on every drag step of any node; in a view of its own (a `FlowSlot`
 // attached to the application), only the view whose node changed is. The views are still checked
 // whenever the app's component is (`markForCheck` from the directive's `ngDoCheck`), as embedded
-// views are. Their elements are placed by the part, in order, before its template's anchor.
+// views are. Their elements are placed by the part, in order, before its template's anchor (or
+// the anchor an item names: an edge's render level).
 // `SignalContext` is from Dockable (fragiola/dockable, packages/angular/src/lib/utils/views.ts),
 // same author and licence.
 import {
@@ -81,6 +82,16 @@ interface Slot<C extends object> {
     /** where its view's elements are made, out of the document */
     readonly box: HTMLElement;
     readonly view: EmbeddedViewRef<SignalContext<C> & C>;
+    /** where its elements were placed last (the parent of their anchor) */
+    place: Node | null;
+}
+
+/** An entity's view to show: its key, its template context, and the anchor it goes before. */
+export interface SlotItem<C extends object> {
+    readonly key: string;
+    readonly context: C;
+    /** the node its elements go before; default the template's anchor */
+    readonly anchor?: Node | undefined;
 }
 
 /** The views of a template, one per key, each in a root view of its own, placed before `anchor`. */
@@ -95,8 +106,15 @@ export class SlotViews<C extends object> {
         private readonly template: TemplateRef<C>,
     ) {}
 
-    /** Brings the views to `items`, in their order: a key that stays keeps its view and its elements. */
-    sync(items: readonly { key: string; context: C }[]): void {
+    /**
+     * Brings the views to `items`, in their order before each one's anchor: a key that stays keeps
+     * its view and its elements, moved when its anchor is elsewhere now (`moved` is told the root
+     * elements that changed parent: one that had focus lost it).
+     */
+    sync(
+        items: readonly SlotItem<C>[],
+        moved?: (elements: readonly Element[]) => void,
+    ): void {
         untracked(() => {
             const keep = new Set(items.map((item) => item.key));
             for (const [key, slot] of this.slots) {
@@ -105,8 +123,9 @@ export class SlotViews<C extends object> {
                     this.slots.delete(key);
                 }
             }
-            const ordered: Slot<C>[] = [];
-            for (const { key, context } of items) {
+            // the slots by anchor, each list in order
+            const byAnchor = new Map<Node, Slot<C>[]>();
+            for (const { key, context, anchor } of items) {
                 let slot = this.slots.get(key);
                 if (slot) {
                     slot.view.context.update(context);
@@ -114,28 +133,47 @@ export class SlotViews<C extends object> {
                     slot = this.create(context);
                     this.slots.set(key, slot);
                 }
-                ordered.push(slot);
+                const at = anchor ?? this.anchor;
+                const list = byAnchor.get(at) ?? [];
+                list.push(slot);
+                byAnchor.set(at, list);
             }
-            // in order, from the last: each view's elements before the next one's
-            let next: Node = this.anchor;
-            const parent = this.anchor.parentNode;
-            for (let i = ordered.length - 1; i >= 0; i--) {
-                const slot = ordered[i];
-                // a root element a part moved elsewhere (a label into the edges' HTML layer, a
-                // toolbar into the root) stays there: its comment keeps its place here
-                const nodes = ((slot?.view.rootNodes ?? []) as Node[]).filter(
-                    (node) =>
-                        node.parentNode === parent ||
-                        node.parentNode === slot?.box,
-                );
-                const last = nodes.at(-1);
-                if (last && last.nextSibling !== next) {
-                    for (const node of nodes) {
-                        next.parentNode?.insertBefore(node, next);
+            const changed: Element[] = [];
+            for (const [anchor, ordered] of byAnchor) {
+                // in order, from the last: each view's elements before the next one's
+                let next: Node = anchor;
+                const parent = anchor.parentNode;
+                for (let i = ordered.length - 1; i >= 0; i--) {
+                    const slot = ordered[i];
+                    if (!slot) continue;
+                    // a root element a part moved elsewhere (a label into the edges' HTML layer,
+                    // a toolbar into the root) stays there: its comment keeps its place here
+                    const from = slot.place;
+                    const nodes = (slot.view.rootNodes as Node[]).filter(
+                        (node) =>
+                            node.parentNode === parent ||
+                            node.parentNode === slot.box ||
+                            (from !== null && node.parentNode === from),
+                    );
+                    const last = nodes.at(-1);
+                    if (last && last.nextSibling !== next) {
+                        for (const node of nodes) {
+                            const before = node.parentNode;
+                            next.parentNode?.insertBefore(node, next);
+                            if (
+                                before !== slot.box &&
+                                before !== node.parentNode &&
+                                node.nodeType === 1
+                            ) {
+                                changed.push(node as Element);
+                            }
+                        }
                     }
+                    slot.place = parent;
+                    next = nodes[0] ?? next;
                 }
-                next = nodes[0] ?? next;
             }
+            if (changed.length > 0) moved?.(changed);
         });
     }
 
@@ -168,6 +206,6 @@ export class SlotViews<C extends object> {
             signalContext(context),
         );
         ref.changeDetectorRef.markForCheck();
-        return { ref, box, view };
+        return { ref, box, view, place: null };
     }
 }

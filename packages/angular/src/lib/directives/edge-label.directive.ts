@@ -5,7 +5,7 @@ import {
     injectEdgeContext,
     injectFlowContext,
 } from "../context";
-import { edgePathOf } from "../inject/inject-edge";
+import { edgePathOf, staticEdgeAttributes } from "../inject/inject-edge";
 import { flowValue, partOwnerId } from "../inject/internal";
 import {
     bindAttributes,
@@ -25,7 +25,8 @@ export interface EdgeLabelState {
 /**
  * An edge's label (`data-flow-part="edge-label"`): the app's HTML element, written inside
  * `[flowEdge]` with the `xhtml:` prefix (`<xhtml:div flowEdgeLabel>`: the edge is SVG, the label
- * HTML) and moved into the HTML layer of `[flowEdges]` (SVG holds no HTML), centred on the path's
+ * HTML) and moved into the HTML layer of `[flowEdges]` (SVG holds no HTML; with several render
+ * levels, its edge's level wrapper), centred on the path's
  * label point in flow coordinates. It holds only what the app writes; a press on it selects its
  * edge. It is out of the document while its edge has no path.
  */
@@ -44,11 +45,11 @@ export class FlowEdgeLabelDirective {
     private readonly path = edgePathOf(this.context, this.id);
     private readonly attributes = flowValue(this.context, () => {
         const edgeId = this.id();
-        return edgeId === undefined
-            ? undefined
-            : this.context
-                  .engine()
-                  ?.adapter.attributes("edge-label", { edgeId });
+        if (edgeId === undefined) return undefined;
+        const engine = this.context.engine();
+        return engine
+            ? engine.adapter.attributes("edge-label", { edgeId })
+            : staticEdgeAttributes(this.context, "edge-label", edgeId);
     });
 
     /** the label's state (`undefined` while its edge has no path) */
@@ -66,7 +67,7 @@ export class FlowEdgeLabelDirective {
 
     constructor() {
         const host = injectHost();
-        const layer = inject(FLOW_EDGE_LABEL_LAYER, { optional: true });
+        const layers = inject(FLOW_EDGE_LABEL_LAYER, { optional: true });
         bindAttributes(host, () => this.attributes() ?? {});
         bindStructuralStyle(host, () => {
             const label = this.path()?.label;
@@ -80,6 +81,10 @@ export class FlowEdgeLabelDirective {
                 pointerEvents: "all",
             };
         });
-        bindPresence(host, () => (this.state() && layer ? layer : null));
+        // into the HTML layer of its edge's level
+        bindPresence(host, () => {
+            const state = this.state();
+            return state && layers ? layers.of(state.edgeId) : null;
+        });
     }
 }
