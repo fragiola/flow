@@ -120,6 +120,7 @@ export type {
     FlowEngineEventType,
     FlowPointerInfo,
     MoveSource,
+    SelectionDragStep,
 } from "./engine/events";
 export type {
     InteractionKind,

@@ -367,6 +367,13 @@ export interface EngineGetMap<T extends FlowTypes = AnyTypes> {
     };
     /** the selection box being drawn, or null (`selection()`) */
     "selection-box": { payload: NoPayload; result: SelectionBox | null };
+    /**
+     * the flow-space bounds of the selected nodes, for the rectangle around them (the
+     * `nodes-selection` part, placed in the viewport): while two or more are selected by a box
+     * (`selection({ rect: "always" })`: by anything), until the selection changes otherwise; null
+     * otherwise (and while a box is drawn) (`selection()`)
+     */
+    "selection-rect": { payload: NoPayload; result: Rect | null };
     /** the nodes being dragged (`drag()`) */
     "dragging-node-ids": { payload: NoPayload; result: readonly string[] };
     /** the connection being drawn, or null (`connection()`) */

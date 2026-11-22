@@ -216,6 +216,7 @@ describe("the feature factories", () => {
             boxOnDrag: false,
             multiKey: ["Meta", "Control", "Shift"],
             boxKey: "Shift",
+            rect: "box",
         });
         expect(subflows().options).toEqual({});
         for (const feature of ALL()) {

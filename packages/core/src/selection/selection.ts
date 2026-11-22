@@ -13,6 +13,13 @@ import { selectionEngine } from "./selection-engine";
 export type BoxSelectionMode = "partial" | "full";
 
 /**
+ * When the rectangle around the selected nodes (`selection-rect`, the `nodes-selection` part)
+ * shows: after a box selected two or more nodes, until the selection changes otherwise (`"box"`),
+ * or whenever two or more nodes are selected (`"always"`).
+ */
+export type SelectionRectMode = "box" | "always";
+
+/**
  * A key a gesture reads while it is held (`KeyboardEvent.key` or `.code`; `Meta`, `Control`, `Alt`
  * and `Shift` from the pointer event's flags), several (any of them), or `null` for none.
  */
@@ -33,6 +40,8 @@ export interface SelectionOptions {
     readonly multiKey: SelectionKey;
     /** the key that, held, makes a drag on the pane draw a selection box; default `"Shift"`; `null` for none */
     readonly boxKey: SelectionKey;
+    /** when the rectangle around the selected nodes shows (`selection-rect`); default `"box"` */
+    readonly rect: SelectionRectMode;
 }
 
 /** The selection feature, as `selection()` makes it. */
@@ -61,6 +70,7 @@ export function selection(
         boxOnDrag: options.boxOnDrag ?? false,
         multiKey: keyOption(options.multiKey, ["Meta", "Control", "Shift"]),
         boxKey: keyOption(options.boxKey, "Shift"),
+        rect: options.rect ?? "box",
     });
     return Object.freeze({
         name: "selection",

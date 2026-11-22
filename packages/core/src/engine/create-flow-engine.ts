@@ -2120,22 +2120,27 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     /**
      * Tells the app a tap, a double click or a context menu on a node, an edge or the pane
-     * (`node-click`, `edge-double-click`, `pane-context-menu`, …); several selected nodes take a
-     * context menu as the selection's (`selection-context-menu`).
+     * (`node-click`, `edge-double-click`, `pane-context-menu`, …); several selected nodes, and the
+     * rectangle around the selection (`nodes-selection`), take a context menu as the selection's
+     * (`selection-context-menu`).
      */
     private emitPointer(
         what: "click" | "double-click" | "context-menu",
         target: PressTarget,
         event: MouseEvent,
     ): void {
-        const on = tapOn(target);
-        if (!on) return;
         const client = { x: event.clientX, y: event.clientY };
         const info: FlowPointerInfo = {
             point: this.toFlow(client),
             client,
             event,
         };
+        if (target.kind === "nodes-selection") {
+            if (what === "context-menu") this.emitSelectionMenu(info);
+            return;
+        }
+        const on = tapOn(target);
+        if (!on) return;
         if (on.kind === "pane") {
             this.emit({ type: `pane-${what}`, ...info });
             return;
@@ -2153,20 +2158,27 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 nodes.length > 1 &&
                 nodes.some((node) => node.id === on.nodeId)
             ) {
-                const edges =
-                    (this.model.get("selected-edges") as
-                        | readonly FlowEdge[]
-                        | undefined) ?? [];
-                this.emit({
-                    type: "selection-context-menu",
-                    nodeIds: nodes.map((node) => node.id),
-                    edgeIds: edges.map((edge) => edge.id),
-                    ...info,
-                });
+                this.emitSelectionMenu(info);
                 return;
             }
         }
         this.emit({ type: `node-${what}`, nodeId: on.nodeId, ...info });
+    }
+
+    /** Tells the app a context menu on the selection (`selection-context-menu`). */
+    private emitSelectionMenu(info: FlowPointerInfo): void {
+        const ids = (key: "selected-nodes" | "selected-edges") =>
+            (
+                (this.model.get(key) as
+                    | readonly (FlowNode | FlowEdge)[]
+                    | undefined) ?? []
+            ).map((item) => item.id);
+        this.emit({
+            type: "selection-context-menu",
+            nodeIds: ids("selected-nodes"),
+            edgeIds: ids("selected-edges"),
+            ...info,
+        });
     }
 
     private pointerLost(event: PointerEvent): void {

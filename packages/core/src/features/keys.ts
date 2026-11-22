@@ -15,7 +15,7 @@ export const FEATURE_KEYS = Object.freeze({
         get: ["selected-nodes", "selected-edges"],
         is: ["node-selected", "edge-selected"],
         engineRun: [],
-        engineGet: ["selection-box"],
+        engineGet: ["selection-box", "selection-rect"],
         engineIs: ["box-selecting"],
         nodeFields: ["selected"],
         edgeFields: ["selected"],
