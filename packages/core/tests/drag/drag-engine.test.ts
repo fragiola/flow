@@ -221,4 +221,58 @@ describe("dragging in sub-flows", () => {
             height: 50,
         });
     });
+
+    it("keeps a child under the pointer while its parent grows (expandParent), step by step", () => {
+        const flow = mount(
+            {
+                version: 1,
+                nodes: [
+                    {
+                        id: "p",
+                        type: "group",
+                        position: { x: 100, y: 100 },
+                        width: 200,
+                        height: 200,
+                        data: {},
+                    },
+                    {
+                        id: "c",
+                        type: "default",
+                        position: { x: 10, y: 10 },
+                        parentId: "p",
+                        expandParent: true,
+                        data: {},
+                    },
+                ],
+                edges: [],
+            },
+            {
+                features: [subflows(), drag()],
+                sizes: { p: [200, 200], c: [50, 50] },
+            },
+        );
+        const box = () => flow.engine.get("node-rect-by", { nodeId: "c" });
+        pointer(flow.node("c"), "pointerdown", { clientX: 120, clientY: 120 });
+        for (const [step, x] of [
+            [-20, 90],
+            [-40, 70],
+            [-60, 50],
+        ] as const) {
+            pointer(flow.root, "pointermove", {
+                clientX: 120 + step,
+                clientY: 120,
+            });
+            expect(box()).toMatchObject({ x, y: 110 });
+        }
+        pointer(flow.root, "pointerup", { clientX: 60, clientY: 120 });
+        expect(box()).toMatchObject({ x: 50, y: 110 });
+        expect(flow.model.get("node-by", { id: "p" })).toMatchObject({
+            position: { x: 50, y: 100 },
+            width: 250,
+        });
+        expect(flow.model.get("node-by", { id: "c" })?.position).toEqual({
+            x: 0,
+            y: 10,
+        });
+    });
 });
