@@ -1,6 +1,6 @@
 <!--
     #36's parts and their new props: its props go to `Flow.Root`; `minimap` (given: a `MiniMap`
-    with them), `resizer` (a `NodeResizer` in every node with them), `fitView` (a `FitView`,
+    with them), `minimaps` (a `MiniMap` for each), `resizer` (a `NodeResizer` in every node with them), `fitView` (a `FitView`,
     test id `fit`), `edgeToolbar` (an `EdgeToolbar` on every edge, test id `toolbar`),
     `nodesSelection` (a `Flow.NodesSelection` after the nodes, test id `rect`).
 -->
@@ -11,6 +11,7 @@
 
     let {
         minimap,
+        minimaps = [],
         resizer,
         fitView,
         edgeToolbar,
@@ -18,6 +19,7 @@
         ...rest
     }: RootProps & {
         minimap?: MiniMapProps | undefined;
+        minimaps?: readonly MiniMapProps[];
         resizer?: NodeResizerProps | undefined;
         fitView?: FitViewProps | undefined;
         edgeToolbar?: EdgeToolbarProps | undefined;
@@ -58,4 +60,7 @@
     {#if minimap}
         <MiniMap {...minimap} />
     {/if}
+    {#each minimaps as each, i (i)}
+        <MiniMap {...each} />
+    {/each}
 </Flow.Root>

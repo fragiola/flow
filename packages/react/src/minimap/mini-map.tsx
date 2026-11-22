@@ -78,10 +78,15 @@ export function MiniMap(props: MiniMapProps) {
     }, [engine, inversePan, zoomStep]);
     const latestClick = React.useRef(onClick);
     latestClick.current = onClick;
+    // its own element: the root may draw several minimaps, each keeps only its taps
+    const own = React.useRef<SVGSVGElement | null>(null);
     React.useEffect(() => {
         if (!engine) return;
         return engine.subscribe((event) => {
-            if (event.type === "minimap-click") {
+            if (
+                event.type === "minimap-click" &&
+                event.element === own.current
+            ) {
                 latestClick.current?.(event.event, event.point);
             }
         });
@@ -124,6 +129,7 @@ export function MiniMap(props: MiniMapProps) {
                   </>
               ));
     const element = useRenderElement("svg", rest, {
+        ref: own,
         state: { view },
         props: {
             ...attributes,

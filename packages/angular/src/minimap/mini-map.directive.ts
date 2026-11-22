@@ -159,12 +159,16 @@ export class FlowMiniMapDirective {
             );
             onCleanup(() => engine.adapter.setPartOptions("minimap", "", null));
         });
+        // its taps (`minimap-click` on its own element: the root may draw several minimaps)
         effect((onCleanup) => {
             const engine = this.context.engine();
             if (!engine) return;
             const stop = untracked(() =>
                 engine.subscribe((event) => {
-                    if (event.type === "minimap-click") {
+                    if (
+                        event.type === "minimap-click" &&
+                        event.element === host
+                    ) {
                         this.minimapClick.emit(event);
                     }
                 }),

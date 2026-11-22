@@ -114,12 +114,18 @@
         engine.adapter.setPartOptions("minimap", "", options);
         return () => engine.adapter.setPartOptions("minimap", "", null);
     });
+    // its own element: the root may draw several minimaps, each keeps only its taps
+    let own: Element | null = null;
     // its tap: the engine's `minimap-click` (the root captures the pointer, no DOM click comes)
     $effect(() => {
         const engine = context.engine;
         if (!engine) return;
         return engine.subscribe((event) => {
-            if (event.type === "minimap-click") {
+            if (
+                event.type === "minimap-click" &&
+                own !== null &&
+                event.element === own
+            ) {
                 onclick?.(event.event, event.point);
             }
         });
@@ -142,6 +148,7 @@
         },
     });
     const refs = refProps((element) => {
+        own = element;
         ref = element as SVGSVGElement | null;
     });
     const partState = $derived<MiniMapState>({ view: view.current });

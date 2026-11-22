@@ -10,7 +10,7 @@ import {
     type PrimitiveProps,
     type SlotFunction,
 } from "../utils/primitive";
-import { px, type RenderSlot, renderElement } from "../utils/render";
+import { px, type RenderSlot, renderElement, toElement } from "../utils/render";
 import { MiniMapMask } from "./mini-map-mask";
 import { MiniMapNode } from "./mini-map-node";
 
@@ -90,12 +90,21 @@ export const MiniMap: FlowComponent<MiniMapProps, MiniMapSlots, MiniMapEmits> =
                     engine.adapter.setPartOptions("minimap", "", null),
                 );
             });
-            // its taps (`minimap-click`), to the listener given now
+            // its taps (`minimap-click` on its own element: the root may draw several minimaps),
+            // to the listener given now
+            let own: Element | null = null;
+            const ownRef = (value: unknown) => {
+                own = toElement(value);
+            };
             watchEffect((onCleanup) => {
                 const engine = context.engine.value;
                 if (!engine) return;
                 const stop = engine.subscribe((event) => {
-                    if (event.type === "minimap-click") {
+                    if (
+                        event.type === "minimap-click" &&
+                        own !== null &&
+                        event.element === own
+                    ) {
                         emit("click", event.event, event.point);
                     }
                 });
@@ -142,6 +151,7 @@ export const MiniMap: FlowComponent<MiniMapProps, MiniMapSlots, MiniMapEmits> =
                     attrs,
                     render: slots.render,
                     state: { view: current },
+                    ref: ownRef,
                     props: {
                         ...attributes.value,
                         viewBox: current.viewBoxAttribute,

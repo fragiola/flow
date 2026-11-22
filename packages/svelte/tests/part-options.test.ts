@@ -87,6 +87,34 @@ describe("MiniMap", () => {
         const slow = zoomOf() / middle;
         expect(Math.log(fast)).toBeCloseTo(2 * Math.log(slow));
     });
+
+    it("calls only the tapped minimap's onclick when the root draws two", async () => {
+        const first = vi.fn();
+        const second = vi.fn();
+        const { container } = await render(PartOptionsFlow, {
+            features: [minimap()],
+            defaultNodes: [task("a")],
+            minimaps: [{ onclick: first }, { onclick: second }],
+        });
+        const [mapA, mapB] = container.querySelectorAll(
+            '[data-flow-part="minimap"]',
+        );
+        const root = part(container, "root");
+        await pointer(mapA as Element, "pointerdown", {
+            clientX: 100,
+            clientY: 75,
+        });
+        await pointer(root, "pointerup", { clientX: 100, clientY: 75 });
+        expect(first).toHaveBeenCalledTimes(1);
+        expect(second).not.toHaveBeenCalled();
+        await pointer(mapB as Element, "pointerdown", {
+            clientX: 100,
+            clientY: 75,
+        });
+        await pointer(root, "pointerup", { clientX: 100, clientY: 75 });
+        expect(first).toHaveBeenCalledTimes(1);
+        expect(second).toHaveBeenCalledTimes(1);
+    });
 });
 
 describe("NodeResizer", () => {
