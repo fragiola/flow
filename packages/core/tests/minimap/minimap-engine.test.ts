@@ -159,6 +159,29 @@ describe("the minimap", () => {
         });
     });
 
+    it("falls back to the default zoomStep for one that is not a finite number above 0", () => {
+        for (const zoomStep of [-10, 0, Number.NaN, Number.POSITIVE_INFINITY]) {
+            expect(minimap({ zoomStep }).options.zoomStep).toBe(10);
+        }
+        const flow = mount(json(), {
+            features: [minimap({ zoomStep: -20 })],
+            sizes,
+        });
+        const element = minimapElement(flow.root);
+        // a wheel up zooms in at the default rate, not out
+        wheel(element, { deltaY: -60, clientX: 700, clientY: 500 });
+        expect(flow.engine.get("viewport").zoom).toBeCloseTo(
+            Math.exp(60 / 600),
+        );
+        // a part's bad zoomStep keeps the feature's
+        flow.engine.adapter.setPartOptions("minimap", "", { zoomStep: -5 });
+        const before = flow.engine.get("viewport").zoom;
+        wheel(element, { deltaY: -60, clientX: 700, clientY: 500 });
+        expect(flow.engine.get("viewport").zoom / before).toBeCloseTo(
+            Math.exp(60 / 600),
+        );
+    });
+
     it("takes a minimap part's inversePan and zoomStep over the feature's, until it clears them", () => {
         const flow = mount(json(), { features: [minimap()], sizes });
         const element = minimapElement(flow.root);

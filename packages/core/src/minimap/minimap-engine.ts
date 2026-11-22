@@ -99,6 +99,13 @@ function contains(box: DOMRect, client: XY): boolean {
     );
 }
 
+/** A zoom step that is a finite number above 0 as given, anything else as none. */
+export function zoomStepOf(value: unknown): number | undefined {
+    return typeof value === "number" && Number.isFinite(value) && value > 0
+        ? value
+        : undefined;
+}
+
 /**
  * The options a minimap part gave (`engine.adapter.setPartOptions("minimap", "", { inversePan,
  * zoomStep })`: the `MiniMap` primitive's props) over the feature's: one set for the root's
@@ -114,10 +121,7 @@ function effective(
             typeof own.inversePan === "boolean"
                 ? own.inversePan
                 : options.inversePan,
-        zoomStep:
-            typeof own.zoomStep === "number" && Number.isFinite(own.zoomStep)
-                ? own.zoomStep
-                : options.zoomStep,
+        zoomStep: zoomStepOf(own.zoomStep) ?? options.zoomStep,
     };
 }
 
