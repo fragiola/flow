@@ -85,10 +85,12 @@ describe("the core's keys", () => {
             "node.resize",
             "node.set-data",
             "node.set-flags",
+            "node.set-z-index",
             "edge.add",
             "edge.remove",
             "edge.set-data",
             "edge.set-flags",
+            "edge.set-z-index",
             "batch",
         ]);
         for (const info of commands) {

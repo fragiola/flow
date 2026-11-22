@@ -31,7 +31,14 @@ export interface NodesSlots<T extends FlowTypes = AnyTypes>
     default?: SlotFunction<{ node: FlowNode<T> }>;
 }
 
-const NODES_STYLE = { position: "absolute", top: "0", left: "0" };
+// its own stacking context: the nodes' z-index (a selected one raised) orders them among
+// themselves, never above what follows the layer (the connection line)
+const NODES_STYLE = {
+    position: "absolute",
+    top: "0",
+    left: "0",
+    isolation: "isolate",
+};
 
 /**
  * One node's rendering, again only when its node changes (the model shares the nodes a command

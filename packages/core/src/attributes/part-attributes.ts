@@ -21,6 +21,12 @@ export const END_ATTRIBUTE = "data-end";
 /** A subtree inside a node that starts no gesture when pressed (a slider, a text field). */
 export const NO_GESTURE_ATTRIBUTE = "data-flow-no-gesture";
 
+/**
+ * An element inside a node that is its drag handle: a node holding one is dragged only from it (a
+ * press elsewhere on it still selects it).
+ */
+export const DRAG_HANDLE_ATTRIBUTE = "data-flow-drag-handle";
+
 /** A subtree inside the flow where the wheel scrolls its content instead of zooming the flow. */
 export const NO_WHEEL_ATTRIBUTE = "data-flow-no-wheel";
 

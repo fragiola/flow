@@ -112,8 +112,12 @@ flow), each with its own viewport.
 | `minZoom` | `number` | `0.5` | the least zoom |
 | `maxZoom` | `number` | `2` | the greatest zoom |
 | `translateExtent` | `Rect` | none | the flow rectangle the view stays inside |
-| `panOnDrag` | `boolean` | `true` | a drag on the pane pans |
+| `panOnDrag` | `boolean \| number[]` | `true` | a drag on the pane pans: `true` with the primary button (a touch, a pen), or the mouse buttons listed (`0` primary, `1` middle, `2` right; a middle or right pan that moved keeps the context menu out) |
+| `panActivationKey` | `string \| null` | `" "` (Space) | held, a primary drag pans from anywhere, nodes included, and starts no other gesture (a `KeyboardEvent.key` or `.code`; not while typing in a field); `null` for none |
 | `panOnScroll` | `boolean` | `false` | the wheel pans (Ctrl + wheel zooms); otherwise the wheel zooms |
+| `panOnScrollMode` | `"free" \| "horizontal" \| "vertical"` | `"free"` | which way the wheel pans with `panOnScroll` (`PanOnScrollMode`) |
+| `panOnScrollSpeed` | `number` | `1` | the factor of the wheel's pixels when it pans |
+| `zoomActivationKey` | `string \| null` | `Meta` on Apple platforms, `Control` elsewhere | held, the wheel zooms while `panOnScroll` is on; `null` for none |
 | `zoomOnScroll` | `boolean` | `true` | the wheel zooms around the pointer |
 | `zoomOnPinch` | `boolean` | `true` | a two-finger pinch (and a trackpad's) zooms |
 | `zoomOnDoubleClick` | `boolean` | `true` | a double click on the pane zooms in |
@@ -122,6 +126,16 @@ flow), each with its own viewport.
 | `interactive` | `boolean` | `true` | whether gestures and keys may change the flow (pan and zoom stay) |
 | `onlyRenderVisible` | `boolean` | `false` | adapters render only the nodes and edges in view |
 | `pathOptions` | `PathOptions` | see [Path helpers](/docs/api/path-helpers) | the shape of the built-in edge paths |
+| `autoPan` | `boolean \| AutoPanOptions` | `true` | the viewport pans while a node drag, a connection, a reconnection, a selection box or a resize has its pointer near the root's edge, and the gesture follows the pointer; `AutoPanOptions` `{ speed, margin }`: the pixels a frame at the edge (default `10`) and how near it starts (default `30` pixels) |
+| `easing` | `(t: number) => number` | a smooth ease in and out | how an animated viewport action (`duration`) eases (`ViewportEasing`) |
+| `nodeOrigin` | `XY` | `{ x: 0, y: 0 }` | the point of a node's box its `position` stands at, as shares of its size (`{ x: 0.5, y: 0.5 }`: its centre); every box the engine derives uses it (rects, handles, edge ends, bounds, `fit-view`, `visible-nodes`, the minimap, toolbars, the selection box, drag and resize); a child's position stays its box's top-left corner inside its parent's |
+| `nodeExtent` | `Rect` | none | the flow rectangle every node's box stays inside when dragged, moved by the arrows or resized |
+| `elevateNodesOnSelect` | `boolean` | `true` | a selected node, and its descendants with it, is drawn above the other nodes (`node-z-index-by`) |
+| `elevateEdgesOnSelect` | `boolean` | `false` | a selected edge is drawn above the other edges (`drawn-edges`) |
+
+The roots of the four adapters take every option but `root` as a prop of the same name (Vue:
+kebab-case in a template; Angular: an input of `flowRoot`) and send a change through
+`engine.adapter.setOptions` ([Root](/docs/api/primitives/root#props)).
 
 ## The members
 
@@ -151,16 +165,22 @@ take and give client points (a pointer's `clientX` / `clientY`, a drop's).
 
 | action | payload | does |
 | --- | --- | --- |
-| `"set-viewport"` | `{ x?, y?, zoom? }` | sets the viewport (what it leaves out stays), zoom limits and extent kept |
+| `"set-viewport"` | `{ x?, y?, zoom?, duration? }` | sets the viewport (what it leaves out stays), zoom limits and extent kept |
 | `"pan-by"` | `{ x, y }` | pans by a screen offset, in pixels |
 | `"zoom-in"` | `ZoomStepPayload` | zooms in by a step around a point; refused at the greatest zoom |
 | `"zoom-out"` | `ZoomStepPayload` | zooms out by a step; refused at the least zoom |
-| `"zoom-to"` | `{ zoom, around? }` | zooms to a level around a point (default the root's centre) |
+| `"zoom-to"` | `{ zoom, around?, duration? }` | zooms to a level around a point (default the root's centre) |
 | `"fit-view"` | `FitViewPayload` | fits the nodes (or some) in the root; refused while none is measured or the root has no size |
-| `"center-on"` | `{ x, y, zoom? }` | centres a flow point in the root |
+| `"center-on"` | `{ x, y, zoom?, duration? }` | centres a flow point in the root |
 | `"focus-node"` | `{ nodeId }` | gives DOM focus to a node's element, panning it into view |
 | `"set-interactive"` | `{ interactive }` | lets gestures and keys change the flow, or not (`Flow.ToggleInteractive`); pan and zoom stay |
-| `"cancel-gesture"` | none | cancels the gesture under way (what Escape does); refused when there is none |
+| `"cancel-gesture"` | none | cancels the gesture under way (what Escape does) and stops a viewport animation where it is; refused when there is neither |
+
+`duration` (milliseconds, default `0`: at once) animates `set-viewport`, `zoom-in`, `zoom-out`,
+`zoom-to`, `fit-view` and `center-on` on the root window's frames, eased by the `easing` option:
+the result is the viewport it ends at (zoom limits and extent kept), and every frame tells a
+`viewport-change` with `gesture: false`. Another viewport action, a pan, the wheel, a pinch,
+`cancel-gesture` or `destroy` stops it where it is.
 
 `FitViewPayload` (also the `fitView` option's object form):
 
@@ -170,6 +190,7 @@ take and give client points (a pointer's `clientX` / `clientY`, a drop's).
 | `nodeIds` | `string[]` | only these nodes; default every node that is not hidden |
 | `minZoom` | `number` | the least zoom it may pick, within the engine's limits (it narrows them, never widens) |
 | `maxZoom` | `number` | the greatest zoom it may pick, within the engine's limits |
+| `duration` | `number` | how long it animates, in milliseconds; default `0`: at once |
 
 `ZoomStepPayload`:
 
@@ -177,6 +198,7 @@ take and give client points (a pointer's `clientX` / `clientY`, a drop's).
 | --- | --- | --- |
 | `step` | `number` | the factor; default the engine's `zoomStep` |
 | `around` | `XY` | the root-relative point that stays put; default the root's centre |
+| `duration` | `number` | how long it animates, in milliseconds; default `0`: at once |
 
 ## Reads
 
@@ -191,6 +213,8 @@ take and give client points (a pointer's `clientX` / `clientY`, a drop's).
 | `"flow-to-screen"` | `XY` | a flow point as a client point |
 | `"visible-nodes"` | none | the nodes in view, plus those not measured yet |
 | `"visible-edges"` | none | the edges whose ends' box is in view |
+| `"drawn-edges"` | none | the edges to draw, in drawing order: those shown whose nodes are measured (with `onlyRenderVisible`, those in view), by `zIndex` (a selected one raised with `elevateEdgesOnSelect`), the document's order among equals |
+| `"node-z-index-by"` | `{ nodeId }` | a node's structural `z-index` among the nodes: its `zIndex` (a selected node and its descendants raised with `elevateNodesOnSelect`), always above its parent's |
 | `"handles-by"` | `{ nodeId }` | a node's registered handles (`FlowHandle[]`), with their centres |
 | `"background-pattern"` | `BackgroundPatternPayload` | one tile of a background pattern at the current viewport |
 | `"node-toolbar-by"` | `NodeToolbarPayload` | where a node's toolbar goes, outside the zoom |
@@ -301,7 +325,7 @@ viewport from it.
 | `"reconnect-cancel"` | `edgeId`, `refused` | a reconnection ended with the edge as it was |
 | `"resize"` | `nodeId`, `width`, `height` | a node was resized (`resize()`) |
 | `"box-select"` | `nodeIds`, `edgeIds` | a box selection ended with these selected (`selection()`) |
-| `"remove"` | `nodeIds`, `edgeIds` | Delete or Backspace removed these (`keyboard()`) |
+| `"remove"` | `nodeIds`, `edgeIds` | a delete key (`deleteKeys`: Delete or Backspace by default) removed these (`keyboard()`) |
 
 ```ts
 const stop = engine.subscribe((event) => {
@@ -365,7 +389,8 @@ part attributes, so every adapter behaves the same.
 `PartPayloadMap` types the payload of each part's `attributes` (`node` takes `{ nodeId }`,
 `handle` a `HandleRegistration`, `reconnect-anchor` `{ edgeId, end }`, …). `PressTarget` is what
 the engine resolved a press to (`kind`: `pane`, `node`, `edge`, `handle`, `resize-handle`,
-`minimap` or `other`, with the ids), handed to the features' hooks.
+`minimap` or `other`, with the ids; `outsideDragHandle` on a press on a node that holds a drag
+handle, outside it), handed to the features' hooks.
 
 ## Part attributes
 
@@ -380,6 +405,7 @@ The attribute names are constants, and the helpers give the static attributes wi
 | `END_ATTRIBUTE` | `"data-end"`: a reconnect anchor's end of its edge |
 | `NO_GESTURE_ATTRIBUTE` | `"data-flow-no-gesture"`: a subtree inside a node that starts no gesture (a slider, a field) |
 | `NO_WHEEL_ATTRIBUTE` | `"data-flow-no-wheel"`: a subtree where the wheel scrolls its content instead of zooming |
+| `DRAG_HANDLE_ATTRIBUTE` | `"data-flow-drag-handle"`: an element inside a node that is its drag handle; a node holding one drags only from it (a press elsewhere on it still selects it) |
 | `partAttributes(part, id?)` | `{ "data-flow-part": part, "data-flow-id": id }` |
 | `flag(on)` | a boolean state attribute's value: `""` when on, `undefined` when off |
 

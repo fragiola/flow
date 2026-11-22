@@ -5,6 +5,7 @@
 // `/keyboard`, `/minimap`), which this one never imports (`scripts/check-features.ts`).
 
 export {
+    DRAG_HANDLE_ATTRIBUTE,
     END_ATTRIBUTE,
     type FlowPart,
     flag,
@@ -96,10 +97,12 @@ export type {
     PressTarget,
     ViewChange,
 } from "./engine/adapter";
+export type { AutoPanOptions } from "./engine/auto-pan";
 export {
     createFlowEngine,
     type FlowEngine,
     type FlowEngineOptions,
+    type PanOnScrollMode,
 } from "./engine/create-flow-engine";
 export type { PathOptions } from "./engine/edge-geometry";
 export type {
@@ -130,6 +133,7 @@ export type {
     SelectionBox,
     ZoomStepPayload,
 } from "./engine/verbs";
+export type { ViewportEasing } from "./engine/viewport-animation";
 export {
     FEATURE_KEYS,
     type FeatureKeyKind,

@@ -62,10 +62,11 @@ an implementation detail. Where the Epic's decisions say nothing, the Fragiola g
    `model.get("flow-json")` round-trips. Ids are explicit, generated with an injectable `createId`
    when missing (no global `crypto`).
    - A node: `id`, `type` (narrowed by the `Types` registry), `position {x, y}`, `data`, optional
-     `width`/`height`, flags (`draggable`, `selectable`, `connectable`, `deletable`, `hidden`),
-     `parentId`/`extent` only with `subflows()`.
+     `width`/`height`, `zIndex` (#24), flags (`draggable`, `selectable`, `connectable`,
+     `deletable`, `hidden`), `parentId`/`extent` only with `subflows()` (`extent`: `"parent"` or,
+     #24, a flow `Rect` `{ x, y, width, height }`).
    - An edge: `id`, `source`, `target`, `sourceHandle?`, `targetHandle?`, `type` (`bezier` |
-     `smoothstep` | `step` | `straight` | an app type), `data`, flags.
+     `smoothstep` | `step` | `straight` | an app type), `data`, `zIndex` (#24), flags.
    - A field of a feature that is not installed is a validation issue.
 4. **The viewport is view state (D4).** `{ x, y, zoom }` lives in the engine
    (`engine.get("viewport")`; engine actions `set-viewport`, `pan-by`, `zoom-in`, `zoom-out`,
@@ -78,7 +79,8 @@ an implementation detail. Where the Epic's decisions say nothing, the Fragiola g
 6. **Commands (D6)**, `<entity>.<verb>`, payload ids `<entity>Id`: `node.add`, `node.remove`,
    `node.move`, `node.resize`, `node.set-data`, `node.set-flags`, `node.set-parent`, `edge.add`,
    `edge.remove`, `edge.reconnect`, `edge.set-data`, `edge.set-flags`, `selection.set`,
-   `selection.clear`, `selection.remove`, `batch`. Removing a node removes its edges (and, with
+   `selection.clear`, `selection.remove`, `batch` (#24 added `node.set-z-index`,
+   `edge.set-z-index`). Removing a node removes its edges (and, with
    `subflows()`, its children) in one step. The catalogue is made with `defineCommand` and JSON
    Schemas, like Dockable's; `model.get("commands")` lists it;
    `packages/core/scripts/generate-command-docs.ts --check` runs in `pnpm check`
@@ -200,11 +202,9 @@ the playground, `examples/shared` and `examples/react`), and **never runs `playw
 in one PR. `main` has no required checks: a skipped job blocks nothing.
 
 **Shards: none.** Shard a suite only when its test step alone passes about 3 minutes. Measured
-locally (4 workers; CI runs 2): the playground's 90 tests (45 per browser) in ~23 s, the React
-examples' 175 tests (95 smoke runs: 19 examples × 5 themes) in ~45 s, the embed build included;
-the Vue examples' 175 tests in ~16 s (~17 s with its embed build); the Svelte examples' 175 tests
-in ~17 s (~19 s with its embed build); the Angular examples' 175 tests in ~28 s (~29 s with its
-embed build).
+locally (4 workers; CI runs 2): the playground's 122 tests (61 per browser) in ~30 s, each
+examples app's 178 tests (95 smoke runs: 19 examples × 5 themes) in ~20 to ~45 s, its embed build
+included (measured after #25; Angular and React the slower).
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
@@ -238,6 +238,7 @@ surface exact). The source layout of the core:
 | `node.resize` | core | sets a node's size (and position); transient |
 | `node.set-data`, `edge.set-data` | core | shallow-merge a data patch |
 | `node.set-flags`, `edge.set-flags` | core | set some flags |
+| `node.set-z-index`, `edge.set-z-index` | core | set the `zIndex` in place (`null`: the default, 0; #24) |
 | `edge.add` | core | joins two connectable nodes; one edge per pair of handles and direction |
 | `edge.remove` | core | removes an edge; refused when not deletable |
 | `batch` | core | several commands, all or nothing, one event; transient when each may be |
@@ -289,22 +290,42 @@ microtask queue. It changes the flow only through `model.run`.
 | --- | --- |
 | `src/geometry/` | the path helpers (`bezierPath`, `smoothStepPath`, `stepPath`, `straightPath`, each with its label point, written from the geometry), rectangles, the viewport's math |
 | `src/attributes/` | the part attribute names and `partAttributes` (D11) |
-| `src/engine/` | `createFlowEngine`, the key registry (`verbs.ts`), the adapter contract (`adapter.ts`), events (`events.ts`), measurement, the press target (`dom.ts`), edge geometry, the background pattern, the toolbar position, node moves shared by drag and keyboard, the one structural style writer |
+| `src/engine/` | `createFlowEngine`, the key registry (`verbs.ts`), the adapter contract (`adapter.ts`), events (`events.ts`), measurement, the press target (`dom.ts`), edge geometry, the background pattern, the toolbar position, node moves shared by drag and keyboard, the one structural style writer, the viewport animation (`viewport-animation.ts`), the auto-pan step (`auto-pan.ts`) |
 | `src/connect-session/` | the connection under way, shared by `connection()` and `reconnection()` through `host.shared` (no entry; the bundle guard counts it as both features' code) |
 | `src/<feature>/<feature>-engine.ts` | each feature's engine side |
 
 **Options** (`FlowEngineOptions`): `root`, `defaultViewport` (`{ x: 0, y: 0, zoom: 1 }`),
-`minZoom` 0.5, `maxZoom` 2, `translateExtent` (a flow `Rect`), `panOnDrag` true, `panOnScroll`
-false, `zoomOnScroll` true, `zoomOnPinch` true, `zoomOnDoubleClick` true, `zoomStep` 1.2, `fitView`
-(true or `fit-view`'s payload: once every visible node is measured), `interactive` true,
-`onlyRenderVisible` false, `pathOptions` (`curvature` 0.5, `borderRadius` 5, `offset` 20).
+`minZoom` 0.5, `maxZoom` 2, `translateExtent` (a flow `Rect`), `panOnDrag` true (`true`: the
+primary button, a touch, a pen; or the mouse buttons that pan the pane, `[0]`, `[1]`, `[2]`),
+`panActivationKey` `" "` (held, a primary drag pans from anywhere, nodes included, and no other
+gesture starts; `null` none), `panOnScroll` false, `panOnScrollMode` `"free"` (`"horizontal"`,
+`"vertical"`: the other axis' deltas are ignored), `panOnScrollSpeed` 1, `zoomActivationKey` (Meta
+on Apple platforms, Control elsewhere, from the root window's `navigator`; with `panOnScroll`, the
+wheel zooms while it is held; `null` none), `zoomOnScroll` true, `zoomOnPinch` true,
+`zoomOnDoubleClick` true, `zoomStep` 1.2, `fitView` (true or `fit-view`'s payload: once every
+visible node is measured), `interactive` true, `onlyRenderVisible` false, `pathOptions`
+(`curvature` 0.5, `borderRadius` 5, `offset` 20), `autoPan` true (`AutoPanOptions` `{ speed: 10,
+margin: 30 }`: pixels a frame at the edge, pixels from the edge it starts at), `easing` (a cubic
+ease in and out; `ViewportEasing`), `nodeOrigin` `{ x: 0, y: 0 }` (#24: the point of a node's box
+its position stands at, as shares of its size, for the nodes on the flow), `nodeExtent` (#24: a
+flow `Rect` every node's box stays inside when dragged, moved by the arrows or resized),
+`elevateNodesOnSelect` true, `elevateEdgesOnSelect` false (#24). `adapter.setOptions` takes each
+of them (the four adapters' roots take the new ones in #25).
 
 **Actions** (`engine.run`; `can`/`check` are their dry runs): `set-viewport { x?, y?, zoom? }`,
 `pan-by { x, y }` (pixels), `zoom-in` / `zoom-out { step?, around? }` (refused at the limit: a
 Controls button's disabled state is `!engine.can("zoom-in")`), `zoom-to { zoom, around? }`,
 `fit-view { padding? 0.1, nodeIds?, minZoom?, maxZoom? }` (refused before a size is known),
 `center-on { x, y, zoom? }`, `focus-node { nodeId }`, `set-interactive { interactive }` (the
-Controls' toggle: gestures and keys stop changing the flow, pan and zoom stay), `cancel-gesture`.
+Controls' toggle: gestures and keys stop changing the flow, pan and zoom stay), `cancel-gesture`
+(also stops a viewport animation; refused when neither is under way). `set-viewport`, `zoom-in`,
+`zoom-out`, `zoom-to`, `fit-view` and `center-on` take `duration` (ms, default 0: at once; a
+negative or non-number one is `invalid_payload` at `/duration`): the result is the final viewport
+(zoom limits and extent kept), reached frame by frame on the root window's
+`requestAnimationFrame` with a `viewport-change { gesture: false }` per frame; another viewport
+action (`pan-by` and `focus-node`'s reveal included), a gesture's viewport change (pan, wheel,
+pinch, minimap, auto-pan), a pan press, `cancel-gesture`, `detachRoot` and `destroy` stop it where
+it is (the pending frame cancelled).
 `around` and the selection box are **root-relative** pixels; `screen-to-flow` / `flow-to-screen`
 take and give **client** points (a pointer's `clientX`/`clientY`, a drop's).
 
@@ -312,7 +333,9 @@ take and give **client** points (a pointer's `clientX`/`clientY`, a drop's).
 source, sourceSide, target, targetSide }`, undefined until both nodes have a size; an app type gets
 the bezier), `node-rect-by { nodeId }` (absolute, size 0 until known), `nodes-bounds { nodeIds? }`,
 `screen-to-flow`, `flow-to-screen`, `visible-nodes` (in view, plus the unmeasured),
-`visible-edges`, `handles-by { nodeId }`, `background-pattern { variant?, gap?, size?, offset? }`
+`visible-edges`, `drawn-edges` (#24: the edges to draw in drawing order, shown and with measured
+nodes, in view with `onlyRenderVisible`, by z-order), `node-z-index-by { nodeId }` (#24: the node's
+structural `z-index`), `handles-by { nodeId }`, `background-pattern { variant?, gap?, size?, offset? }`
 (one SVG pattern tile on the screen: dots, lines, cross), `node-toolbar-by { nodeId, side?, align?,
 offset? }` (a root-relative anchor outside the zoom); features: `selection-box` (selection),
 `dragging-node-ids` (drag), `connection` (connection: `from`, `fromPoint`, `toPoint`, `toSide`,
@@ -332,13 +355,16 @@ offset? }` (a root-relative anchor outside the zoom); features: `selection-box` 
 
 - `attachRoot(element)` / `detachRoot()`: the engine listens to the root itself (`pointerdown`,
   `pointermove`, `pointerup`, `pointercancel`, `lostpointercapture`, `wheel` non-passive,
-  `dblclick`, `keydown`, `focusin`), captures the pointer on the root, and writes its
-  `touch-action: none`. The adapter forwards no event.
+  `dblclick`, `keydown`, `focusin`, `contextmenu`), and to the root's `ownerDocument` (`keydown`,
+  `keyup`: the activation keys held) and `defaultView` (`blur`: they are released), captures the
+  pointer on the root, and writes its `touch-action: none`. The adapter forwards no event.
 - `attachViewport(element | null)`: the engine writes `transform` and `transform-origin` on it; the
   framework never renders a transform there (D4). Nodes render inside it at their absolute
-  position: `node-rect-by`'s `x`, `y` as a structural `transform: translate(x, y)`, flat (a
-  child is not nested in its parent's element), and the document's `width`/`height` when given
-  (a resize writes them).
+  position: `node-rect-by`'s `x`, `y` as a structural `transform: translate(x, y)` (its
+  `nodeOrigin` applied: the core is the one source of a node's place), `node-z-index-by` as its
+  structural `z-index` (#24), flat (a child is not nested in its parent's element), and the
+  document's `width`/`height` when given (a resize writes them). Edges are drawn in `drawn-edges`'
+  order (#24): an SVG's order is its drawing order.
 - `registerNode(nodeId, element | null)` (observed: its `offsetWidth`/`offsetHeight`),
   `registerHandle({ nodeId, handleId?, type, side, connectable? }, element | null)` (D8: its centre
   relative to its node, from the client rects divided by the zoom).
@@ -350,7 +376,8 @@ offset? }` (a root-relative anchor outside the zoom); features: `selection-box` 
   position }` (`data-position`: `top-left` … `left`, inside the node's element); `minimap`,
   `minimap-node`, `minimap-mask`; anything else (`controls`, `toolbar`, `panel`) is left alone.
   Inside a node, fields, buttons, links and `data-flow-no-gesture` start no gesture;
-  `data-flow-no-wheel` keeps its wheel.
+  `data-flow-no-wheel` keeps its wheel; a node holding a `data-flow-drag-handle` element
+  (`DRAG_HANDLE_ATTRIBUTE`, #24) drags only from it.
 - `setPartOptions("resizer", nodeId, { minWidth, … } | null)`: a resizer's own limits.
 - `setOptions(partial)`: root props that change (`minZoom`, `panOnDrag`, `pathOptions`,
   `interactive`, …).
@@ -358,7 +385,8 @@ offset? }` (a root-relative anchor outside the zoom); features: `selection-box` 
   edges, the connection line, the selection box, the minimap, toolbars and state attributes
   re-render from it; node and edge data from `model.subscribe`. Measurements are told once per
   task (the root window's microtask), so a mount re-renders once.
-- `settings.onlyRenderVisible`: render `visible-nodes` / `visible-edges` instead of every one.
+- `settings.onlyRenderVisible`: render `visible-nodes` instead of every node (the edges' list,
+  `drawn-edges`, applies it itself: #25's adapters render it and filter nothing).
 
 ## The React adapter (Issue #5)
 
@@ -385,10 +413,10 @@ engine's state attributes from `engine.adapter.attributes(part, payload)`):
 | --- | --- | --- |
 | `Root` | `div` `root` | owns the model (or takes `model`) and the engine, attaches the root; `position: relative; overflow: hidden` |
 | `Viewport` | `div` `viewport` | `attachViewport`: the engine writes its transform, React never does |
-| `Nodes` | `div` `nodes` | children function per node not hidden (`visible-nodes` with `onlyRenderVisible`), keyed by id |
-| `Node` | `div` `node` | `registerNode`; `transform: translate(x, y)` from `node-rect-by`, the document's `width`/`height`; `tabIndex` from `node-focusable` |
+| `Nodes` | `div` `nodes` | children function per node not hidden (`visible-nodes` with `onlyRenderVisible`), keyed by id; `isolation: isolate` (#25: the nodes' `z-index` stays inside the layer) |
+| `Node` | `div` `node` | `registerNode`; `transform: translate(x, y)` from `node-rect-by` (its `nodeOrigin` applied), `z-index` from `node-z-index-by` (#25), the document's `width`/`height`; `tabIndex` from `node-focusable` |
 | `Handle` | `div` `handle` | `registerHandle({ nodeId, handleId, type, side, connectable })`; centred on its side by default (a style may move it) |
-| `Edges` | `div` + `svg` `edges` | children function per edge whose `edge-path-by` is defined; the `div` is the HTML layer labels portal into |
+| `Edges` | `div` + `svg` `edges` | children function per edge of `drawn-edges`, in its order (#25: shown, measured, by z-order); the `div` is the HTML layer labels portal into |
 | `Edge` | `g` `edge` | default child `EdgePath`; `pointer-events: visibleStroke`; `tabIndex` from `edge-focusable` |
 | `EdgePath` | `path` `edge-path` | `d` from `edge-path-by` (a `d` of your own draws an app type), `fill="none"` |
 | `EdgeLabel` | `div` `edge-label` | portal into the edges' HTML layer, centred on the label point |
@@ -397,7 +425,7 @@ engine's state attributes from `engine.adapter.attributes(part, payload)`):
 | `SelectionBox` | `div` `selection-box` | while a box is drawn, root-relative |
 | `Background` | `svg` `background` | `background-pattern`: `pattern` `background-pattern`, `circle`/`path` `background-mark` in `currentColor`, `rect` `background-fill` |
 | `Controls` | `div` `controls` | a group for the buttons |
-| `ZoomIn`, `ZoomOut`, `FitView` | `button` `zoom-in`, `zoom-out`, `fit-view` | run their action; `disabled` / `data-disabled` while `!engine.can(...)` |
+| `ZoomIn`, `ZoomOut`, `FitView` | `button` `zoom-in`, `zoom-out`, `fit-view` | run their action (with their `duration` prop, #25); `disabled` / `data-disabled` while `!engine.can(...)` |
 | `ToggleInteractive` | `button` `toggle-interactive` | `set-interactive`; `aria-pressed` while locked, `data-interactive` |
 | `NodeToolbar` | `div` `toolbar` | portal into the root at `node-toolbar-by` (outside the zoom); `open`, default while its node is selected |
 | `MiniMap` (`/minimap`) | `svg` `minimap` | `width` × `height` (200 × 150), `minimap-view`; children default: a `MiniMapNode` per node and the `MiniMapMask` |
@@ -410,8 +438,11 @@ engine's state attributes from `engine.adapter.attributes(part, payload)`):
 `features` warns); `viewport` (controlled: `set-viewport`) / `defaultViewport` and
 `onViewportChange(viewport, gesture)` (the `viewport-change` event); `fitView` (read once); the
 engine options `minZoom`, `maxZoom`, `translateExtent`, `panOnDrag`, `panOnScroll`, `zoomOnScroll`,
-`zoomOnPinch`, `zoomOnDoubleClick`, `zoomStep`, `interactive`, `onlyRenderVisible`, `pathOptions`
-(a change sends only the keys that changed, `adapter.setOptions`); `flowRef`.
+`zoomOnPinch`, `zoomOnDoubleClick`, `zoomStep`, `interactive`, `onlyRenderVisible`, `pathOptions`,
+and #23's and #24's (#25) `autoPan`, `panActivationKey`, `panOnScrollMode`, `panOnScrollSpeed`,
+`zoomActivationKey`, `easing`, `nodeOrigin`, `nodeExtent`, `elevateNodesOnSelect`,
+`elevateEdgesOnSelect` (the core's names and defaults; `panOnDrag` takes mouse buttons too; a
+change sends only the keys that changed, `adapter.setOptions`); `flowRef`.
 
 **Hooks:** `useFlow<T, F>()` → `{ model, engine }` (the engine a facade: there from the first
 render, an action refused before the mount); part hooks `useNode(node)`, `useEdge(edge)`,
@@ -464,6 +495,25 @@ Decisions of the adapter (#5):
   the gestures' real feel is the playground E2E's (#6, Chromium and Firefox, mouse and touch).
 - **A resize corner is above its sides** (`zIndex: 1` in its structural place, #6): the side
   handles span their whole side.
+- **The viewport and gesture options (#25).** An engine option's sent key tells `null` from
+  `undefined` (`panActivationKey={null}` is none, an absent one the default: undefined in
+  `setOptions` puts the default back) and keeps a function (`easing`) by identity (JSON drops it);
+  an equal new object (`nodeOrigin={{ x: 0.5, y: 0.5 }}` on each render) sends nothing. The node's
+  structural `z-index` is `node-z-index-by` (every node gets one, 0 by default, so each node is a
+  stacking context, as in xyflow); a render without an engine (the first, the server's) has none
+  and places nodes at `absolute-position-by`, which knows no `nodeOrigin` (the first client render
+  with the engine moves them). The `Nodes` layer is `isolation: isolate` (#25's review, all four
+  adapters): without a stacking context of its own, a selected node's 10 000 would paint over
+  what follows the layer in the viewport (the connection line drawn from it, the app's overlays);
+  a node's z-index orders the nodes only (playground E2E `gestures.spec.ts`, the adapters'
+  `options` tests). The core's `nodeZ` answers a node without a parent without walking a chain
+  (it is read per node on every pan frame). `ZoomIn`, `ZoomOut`, `FitView` take `duration` only (the payload
+  has it when given: `can` and `run` get `{ duration }`, or `{}`); `FitView`'s other payload
+  fields (`padding`, `nodeIds`) stay the engine's defaults. The edges' own filter is gone: `Edges`
+  renders `drawn-edges`, which applies `onlyRenderVisible` itself. `DRAG_HANDLE_ATTRIBUTE`
+  reaches the package through `export *`. Tested through a wrapped engine
+  (`tests/options.test.tsx`: `vi.mock` of the core's `createFlowEngine`, its frozen engine and
+  adapter inherited by a wrapper that records `setOptions` and `run`).
 
 For the playground and examples (#6, see [The playground and the examples](#the-playground-and-the-examples-issue-6)): wrap the flow in a sized element (the root fills it); put
 `Edges` before `Nodes` inside `Viewport`, and `Background`, `SelectionBox`, `Controls`, `MiniMap`
@@ -554,6 +604,21 @@ Decisions of the Vue adapter (#9):
   (Tree's `primitiveProps`); `fitView` takes a boolean or a payload.
 - **`typedFlow<T, F>()`** types `Root` (model, lists, features, events), `Nodes`, `Node`, `Edges`,
   `Edge` by the registry; the untyped `Flow.Root` takes any features.
+- **The viewport and gesture options (#25)** are React's root props in kebab-case attributes
+  (`:auto-pan`, `:pan-on-drag="[1, 2]"`, `pan-activation-key`, `pan-on-scroll-mode`,
+  `:pan-on-scroll-speed`, `zoom-activation-key`, `:easing`, `:node-origin`, `:node-extent`,
+  `elevate-nodes-on-select`, `elevate-edges-on-select`), sent as React's (`null` is not
+  `undefined`, a function by identity: `easing` is watched beside the options' JSON key).
+  `panOnDrag` is typed `[Boolean, Array]` and `autoPan` `[Boolean, Object]` (a bare attribute
+  `true`, a list or an options object kept; before #25 `panOnDrag` was `Boolean` alone, which
+  warned on a list); `elevate-nodes-on-select` / `elevate-edges-on-select` take a bare
+  attribute. `ZoomIn`, `ZoomOut`, `FitView` take `duration`, and the root `pan-on-scroll-speed`,
+  as `[Number, String]` props whose numeric text is its number (`numberProp`, Angular's
+  `optionalNumber`: `duration="300"` works; a text that is no number reaches the engine, which
+  refuses it). `plain` is a shallow `toRaw`: a reactive `nodeOrigin`, `nodeExtent` or `autoPan`
+  mutated in place (`origin.x = 1`) is not seen, as `pathOptions` / `translateExtent`; give a
+  new object.
+  The node's `z-index`, the node origin and `drawn-edges` are React's (#25 there).
 - **Known limits:** jsdom lays nothing out, so the tests stub the layout (`tests/flow.ts`,
   React's); the gestures' real feel is the Vue examples' shared Playwright specs (#10), which
   needed no adapter fix.
@@ -679,6 +744,15 @@ Decisions of the Svelte adapter (#12):
   entity again (`{@render}` follows the snippet's identity): Vue's #11 bug cannot happen.
 - **Callback props are lowercase** (`onnodeschange`, `onedgeschange`, `onviewportchange`), as
   Svelte's DOM event props and xyflow's Svelte package.
+- **The viewport and gesture options (#25)** are React's root props under React's names
+  (`autoPan`, `panOnDrag={[1, 2]}`, `panActivationKey`, `panOnScrollMode`, `panOnScrollSpeed`,
+  `zoomActivationKey`, `easing`, `nodeOrigin`, `nodeExtent`, `elevateNodesOnSelect`,
+  `elevateEdgesOnSelect`), sent as React's (`null` is not `undefined`, a function by identity);
+  the object-valued ones (`panOnDrag`, `autoPan`, `nodeOrigin`, `nodeExtent`) go through `plain`
+  (a `$state` parent's proxy never reaches the engine; `panOnDrag` did not before #25).
+  `ZoomIn`, `ZoomOut`, `FitView` take `duration`. The node's `z-index` is in its structural style
+  string (`useNode`'s `props.style`, `elementProps`' `structural`), so a consumer's `style`
+  (`z-index` included) never replaces it (tested). The node origin and `drawn-edges` are React's.
 - **`ref` has no fallback** (`ref = $bindable()`): Svelte refuses `bind:ref={undefined}` on a prop
   with a fallback, and `let el = $state()` is the common app code.
 - **Biome does not read `.svelte` files** (not in its `includes`); `svelte-check
@@ -816,6 +890,19 @@ Decisions of the Angular adapter (#15):
   part writing its DOM from its own subscription (a control button's click wrote `disabled`
   directly, #16's first fix); refused: one place, and the direct write could leave a button
   disabled when the app's `(click)` undid the limit in the same task (#16's review).
+- **The viewport and gesture options (#25)** are React's root props as inputs of `flowRoot`
+  under React's names (`[autoPan]`, `[panOnDrag]="[1, 2]"`, `panActivationKey`,
+  `panOnScrollMode`, `panOnScrollSpeed`, `zoomActivationKey`, `[easing]`, `[nodeOrigin]`,
+  `[nodeExtent]`, `elevateNodesOnSelect`, `elevateEdgesOnSelect`), sent as React's (`null` is not
+  `undefined`, a function by identity). Transforms: `panOnDrag` keeps a list of mouse buttons
+  (a bare attribute or a boolean as before; before #25 `optionalBoolean` turned a list into
+  `true`), `autoPan` keeps an options object, `panOnScrollSpeed` takes its attribute's text as a
+  number, `elevateNodesOnSelect` / `elevateEdgesOnSelect` a bare attribute; the keys and
+  `panOnScrollMode` are plain strings (`[panActivationKey]="null"` for none). `flowZoomIn`,
+  `flowZoomOut`, `flowFitView` take `duration` (`duration="300"` or `[duration]="300"`). The
+  node's `z-index` is a key of its `bindStructuralStyle` (it wins over the app's `[style]`,
+  tested); the node origin and `drawn-edges` (the order `SlotViews` places the edges' elements in)
+  are React's.
 - **Known limits:** no server render nor hydration (the sibling Angular adapters do not support it
   either; `[flowEdges]` adds its SVG in its constructor); jsdom lays nothing out, so the tests stub
   the layout (`tests/flow.ts`, React's); a part that leaves the document while hidden must not be
@@ -855,7 +942,10 @@ the authoring guide): Basics `basic`, `custom-nodes`, `edge-types`, `edge-labels
 `snap-to-grid`, `minimap-and-controls`; Building blocks `sub-flows`, `node-resizer`,
 `node-toolbar`, `add-nodes`, `save-and-restore`, `undo-redo`, `announcements`; Apps
 `workflow-builder` (the landing's showcase). `_kit/persistence.ts` and `_kit/undo.ts` are the
-copyable app policy.
+copyable app policy. Epic #26's options where they are natural (#25): `custom-nodes`' preview drags
+only by its title bar (`data-flow-drag-handle`, `styles.dragHandle` and `styles.grip` from the
+theme tokens), `minimap-and-controls`' zoom and fit-view buttons animate for 200 ms (`duration`),
+the same in the four apps; the shared specs cover both.
 
 **Theme tokens** (`--fl-*`; `tests/themes.test.ts` holds the list, `e2e/themes.spec.ts` checks the
 shapes differ on computed styles): shape `font`, `font-size`, `title-weight`, `node-padding`,
@@ -870,13 +960,19 @@ square everything, dashed edges, crosses.
 
 **The playground** (`apps/playground`, `pnpm dev`, port 5197): the examples in place (themes,
 source panel), scenarios (`src/scenarios/<area>/<id>.tsx`, default export only: `gestures/every-
-feature`, `performance/five-hundred-nodes`, `api/commands`), the inspector
+feature`, `gestures/viewport-options`, `gestures/click-to-connect-and-drag-handles`,
+`gestures/origin-extent-and-z-order` (#25: every option of Epic #26 behind a control),
+`performance/five-hundred-nodes`, `api/commands`), the inspector
 (`src/inspector/flow-inspector.tsx`: viewport, gestures under way, selection, engine events, the
 document) and `fixtures/basic`, the unstyled flow its specs drive (`src/fixture/flow-fixture.tsx`:
 every feature, an 800 × 500 root at the page's corner, the viewport at `{ x: 100, y: 100, zoom:
-1 }`, its document, viewport and events printed beside it). Its suite runs on Chromium and Firefox:
-pan, wheel, double-click and pinch zoom, drag (selection, cancel, extent, snap), connect,
-reconnect, box select, resize, keyboard and minimap, each with the mouse and with fingers
+1 }`, its document, viewport and events printed beside it; its query turns options on:
+`boxOnDrag=1`, `snap=20`, and since #25 `clickToConnect=1`, `dragHandle=1` (a `grip` drag handle in a and b),
+`origin=0.5` (`nodeOrigin`), `panOnDrag=0,1`, `duration=300` (the controls)). Its suite runs on
+Chromium and Firefox: pan, wheel, double-click and pinch zoom, drag (selection, cancel, extent,
+snap), connect, reconnect, box select, resize, keyboard and minimap, and (`e2e/gestures.spec.ts`,
+#25) auto-pan, animated controls, the middle-button and Space pans, click-to-connect, drag handles,
+`nodeOrigin`, a selected node's z-order and the connection line above a selected node, each with the mouse and with fingers
 (`e2e/helpers.ts` `touch`: Chromium's real touch input through the DevTools protocol, touch
 pointer events in Firefox), and the 500-node scenario's re-render count.
 
@@ -994,8 +1090,8 @@ markup, the file without its `<script>` / `<style>` blocks, has `<Flow.Root>` in
 no `class="…"`, string inside `class={…}`, `class:` directive or `cn()`).
 
 **The docs.** Every `<Framework name="vue">` block is followed by its `<Framework name="svelte">`
-twin (129 each, as React's): a `svelte` component, or the same `ts` with `@fragiola/flow-svelte`,
-and an "In Svelte, …" note where it differs. Installation adds `pnpm add @fragiola/flow-svelte`;
+twin (136 each since #25, as React's): a `svelte` component, or the same `ts` with
+`@fragiola/flow-svelte`, and an "In Svelte, …" note where it differs. Installation adds `pnpm add @fragiola/flow-svelte`;
 the Hero's eyebrow is `@fragiola/flow · React · Vue · Svelte`; `api/primitives/svelte` (sidebar:
 after `vue`) maps React's API onto Svelte's and names every Svelte export.
 
@@ -1067,8 +1163,8 @@ template has `flowRoot`; no `class="…"` / `class='…'`, string inside `[class
 `contents`).
 
 **The docs.** Every `<Framework name="svelte">` block is followed by its `<Framework
-name="angular">` twin (129 each, as React's): a standalone component in a `ts` fence, a template
-excerpt in an `html` fence, or the same `ts` with `@fragiola/flow-angular`, and an "In Angular, …"
+name="angular">` twin (136 each since #25, as React's): a standalone component in a `ts` fence, a
+template excerpt in an `html` fence, or the same `ts` with `@fragiola/flow-angular`, and an "In Angular, …"
 note where it differs. Installation adds `pnpm add @fragiola/flow-angular`; the Hero's eyebrow is
 `@fragiola/flow · React · Vue · Svelte · Angular` (the title unchanged); `api/primitives/angular`
 ("Angular directives", sidebar: after `svelte`) maps React's API onto Angular's and names every
@@ -1326,7 +1422,7 @@ its reason.
   handles in the same direction is refused (in a document too). `edge.reconnect` takes the whole
   new connection (a handle left out is none). Edge `type` and `data` are optional (`type` none is
   `"bezier"`); a node's `data` is required, a JSON object.
-- **Sub-flows.** `extent` is `"parent"` only (no coordinate extent in D2). `expandParent` is a
+- **Sub-flows.** `extent` is `"parent"` only (no coordinate extent in D2; #24 added a `Rect`). `expandParent` is a
   subflows field (D2's "expand parent"). The model clamps and grows with the sizes the document
   gives (`width`, `height`): without them it clamps at the parent's origin only, so the engine
   (#3) keeps the rules during a gesture with measured sizes; resizing a parent smaller does not
@@ -1350,7 +1446,10 @@ its reason.
   maxWidth, maxHeight, keepAspectRatio: false })`, `connection({ radius: 20, mode: "strict" })`,
   `reconnection({ radius: 10 })`, `keyboard({ step: 5, fastStep: 20 })`, `minimap({ pannable: true,
   zoomable: true })`. #3 extended them: `selection({ boxOnDrag: false })` (any pane drag draws the
-  box instead of Shift + drag), `minimap({ padding: 0.1 })` (a share of its size).
+  box instead of Shift + drag), `minimap({ padding: 0.1 })` (a share of its size). #24 extended
+  them: `selection({ multiKey: ["Meta", "Control", "Shift"], boxKey: "Shift" })` (`SelectionKey`:
+  a key, several, or `null` for none), `keyboard({ deleteKeys: ["Delete", "Backspace"] })` (`[]`
+  for none), `connection({ clickToConnect: false })`.
 
 Decisions of the engine (#3):
 
@@ -1369,19 +1468,25 @@ Decisions of the engine (#3):
   `pointercancel`, a lost capture and a missed release for every gesture; `tap` (a press that did
   not become a gesture and moved at most 3 px: selection's click), `wheel`, `keydown(event,
   target)`, `focus`, `attributes`. The host lends the viewport, measured rects, handles, edge
-  paths, `keepInParent`, `interactive`, `partOptions`, `changed`, `emit`.
+  paths, `keepInParent` (#24: `keepInExtent`, with `absolutePosition`, `positionFor`, `extentOf`,
+  `held`), `interactive`, `partOptions`, `changed`, `emit`. A gesture with
+  `autoPan: true` (drag, connection, reconnection, selection box, resize; #23) is auto-panned by
+  the engine, which calls its `move` again with the last pointer event after each frame's pan, so
+  its `move` reads the flow point from the client point (`host.toFlow`), never a client delta
+  divided by the zoom.
 - **Clicks are taps the engine detects**, not native `click`s: with the pointer captured on the
   root, a browser's `click` targets the root.
 - **Sizes: the document's where it gives one, the measured one otherwise** (per dimension), so a
   resize is drawn at once and a node without a size is measured; a 0 × 0 measurement is no size.
   A node whose element goes while it stays in the flow (culled, hidden) keeps its last size and
   handle bounds, never offered to a connection; a removed node's are forgotten (#6).
-- **Extent with measured sizes (closes #2's L6).** `host.keepInParent` clamps a drag's and the
-  arrows' positions with the measured sizes before each `node.move`. A resize keeps a child inside
-  its parent (the bound wins over `minWidth`, the ratio kept by shrinking), never shrinks a parent
-  past its `extent: "parent"` children, and moves the children back when the parent's top or left
-  edge moves (one `batch`), so they stay on screen; a parent holding a child that is not draggable
-  keeps its top and left edges (its child cannot be moved back).
+- **Extent with measured sizes (closes #2's L6).** `host.keepInParent` (`keepInExtent` since #24)
+  clamps a drag's and the arrows' positions with the measured sizes before each `node.move`. A
+  resize keeps a child inside its parent (the bound wins over `minWidth`, the ratio kept by
+  shrinking), never shrinks a parent past its `extent: "parent"` children, and moves the children
+  back when the parent's top or left edge moves (one `batch`), so they stay on screen; a parent
+  holding a child that is not draggable keeps its top and left edges (its child cannot be moved
+  back).
 - **Drags.** A press on a selected node drags the selection's draggable nodes (a node whose parent
   is dragged too is carried by it); on an unselected one, selects it (`selection.set`, refused
   silently without `selection()`) and drags it alone. Snap moves the pressed node to the grid and
@@ -1404,3 +1509,151 @@ Decisions of the engine (#3):
   node presses keep their default (focus), so an app sets `user-select: none` on nodes to avoid
   text selection while dragging. `fit-view`'s own `minZoom`/`maxZoom` narrow the engine's limits,
   never widen them.
+
+Decisions of the animated viewport, auto-pan and pan/zoom options (#23, Epic #26):
+
+- **Animation.** Linear interpolation of `x`, `y` and `zoom` by one eased share (a zoom around a
+  point keeps that point still all the way); the first frame starts the clock (frames are the only
+  clock, no `performance` read); a duration to the viewport it is already at, a root without a
+  window or a window without `requestAnimationFrame` applies at once. Each frame is kept to the
+  zoom limits and the extent (an extent may bend the path). `cancel-gesture` counts a running
+  animation as something to cancel; Escape still cancels only a press or a pinch, so the keyboard
+  feature's Escape (clear the selection) is not lost to an animation.
+- **Auto-pan is a flag on the gesture** (`FeatureGesture.autoPan`), not a host method: the engine
+  owns the one loop (one pending frame per engine), started by a pointer move of an active
+  `autoPan` gesture within `margin` of the root's edge (or past it), run on the root window's
+  frames, stopped by the gesture's end or cancel, the pointer leaving the edge, the extent (a frame
+  whose pan changes nothing ends it; the next move starts it again), `autoPan: false`, a detach and
+  `destroy`. Its viewport changes are `gesture: true`. Speed is per frame (pixels, linear from 0 at
+  `margin` to `speed` at the edge and past it), our own defaults (10, 30). Drag and resize now
+  compute their delta from flow points (`host.toFlow`), so what is dragged stays under a still
+  pointer while the view moves; selection and connections already did. The minimap's drag and a
+  pan do not auto-pan.
+- **`panOnDrag` buttons.** `true` is `[0]` (a touch and a pen press as button 0), `false` none. A
+  non-primary button pans only from the pane (the Issue's "buttons that pan the pane"), and starts
+  no feature gesture and no tap (a right click never clears the selection). The context menu is
+  prevented while a middle or right pan press is under way, moved or not (macOS and Linux open it
+  on press, before any move: otherwise it would open and the right-drag pan never happen), and,
+  for the right button only, once after a release that moved (Windows opens it on release). The
+  trade-off: with `2` in `panOnDrag`, a right click on the pane opens no menu on macOS and Linux
+  (on Windows a right click that did not move still opens it); a middle pan never blocks a later
+  keyboard context menu.
+- **Activation keys.** Held keys are tracked by `key` and `code` from the root's document
+  (`keydown` ignored when its target is in a field: `input`, `textarea`, `select`,
+  contenteditable), released on `keyup` anywhere, on the window's `blur` and on a detach. `Meta`,
+  `Control`, `Alt` and `Shift` are read from the pointer or wheel event's modifier flags instead.
+  The pan key pans even with `panOnDrag: false`, from every target but `other` (fields, controls,
+  panels); a key pan never taps (a click with the key held selects nothing). xyflow's "the pan key also
+  turns scroll panning on" is left out (not in #23). The zoom key zooms whatever `zoomOnScroll`
+  says (it is the explicit request), at the wheel's rate (the pinch's with Ctrl); Apple platforms
+  are told by `navigator.platform` / `userAgent` (`Mac`, `iPhone`, `iPad`, `iPod`).
+- **`panOnScrollMode`.** Shift turns a vertical-only wheel sideways except in `"vertical"` mode
+  (there Shift + wheel still pans vertically); `"horizontal"` ignores a plain wheel's vertical
+  delta (symmetric with `"vertical"` ignoring horizontal ones). `panOnScrollSpeed` defaults to 1, today's behaviour.
+
+Decisions of the configurable keys, click-to-connect, drag handles, node origin and extent, and
+z-order (#24, Epic #26):
+
+- **Keys.** `selection({ multiKey, boxKey })` take a key, several (any held) or `null`, matched by
+  `host.held` (the engine's activation-key tracking: `Meta`, `Control`, `Alt`, `Shift` from the
+  pointer event's flags, any other `key`/`code` from the root's document). `multiKey` defaults to
+  `["Meta", "Control", "Shift"]`, not the Epic's "Meta/Control": a Shift click toggled before #24
+  and its tests stay green; an app that wants Shift for the box only passes `multiKey:
+  ["Meta", "Control"]`. `multiple: false` still turns toggling off. `boxKey: null` leaves the box
+  to `boxOnDrag`. `keyboard({ deleteKeys })` matches `KeyboardEvent.key` or `.code`; Enter/Space's
+  toggle modifiers stay the keyboard's own (features talk only through keys, and the keyboard does
+  not read the selection's options).
+- **Click-to-connect is a gesture that outlives its press** (see the tap tolerance below). `FeatureEngine.tap` may return a
+  `FeatureGesture`: the engine keeps it as the gesture under way without a press, moves it on every
+  primary pointer move (the hover), and gives it the next primary press (no other gesture starts,
+  no pan; a press on `other` parts, the controls, leaves it waiting; the pan key still pans); that
+  press's release is its `end`, a drop at that point: within `radius` of an eligible handle it
+  connects through `model.can("edge.add")` (`connect`), a vetoed one `connect-cancel { refused:
+  true }`, anywhere else `connect-cancel { refused: false }`. Escape, `cancel-gesture`,
+  `set-interactive false`, a detach and `destroy` cancel it (Escape from anywhere in the page). So a tap on the pane that cancels it
+  does not also clear the selection (the press is the connection's). The session is the drag's
+  (`connect-session`), started at once (`connect-start`, `connection` non-null, `data-connecting`).
+  Why the engine and not a feature flag: the engine owns Escape, capture and the press routing for
+  every gesture (#3's decision), and the walk order of the features' `tap` hooks would otherwise
+  let `selection()` take the cancelling tap.
+- **Drag handles** are resolved in the press target (`dom.ts`): a press on a node that holds a
+  `data-flow-drag-handle` element (one whose nearest node part is that node) outside it is a
+  `node` target with `outsideDragHandle: true`; `drag()` skips it, so it neither drags nor pans,
+  and its tap still selects. `DRAG_HANDLE_ATTRIBUTE` is the exported name.
+- **`nodeOrigin` applies to the nodes on the flow; a child's position stays its box's top-left
+  corner in its parent's box.** Why: the model's sub-flow rules (`extent: "parent"` clamping with
+  the document's sizes, the resize's children rules) work in the parent's top-left box and know no
+  origin; a child placed from its parent's corner keeps them exact, whatever the origin. xyflow
+  applies the origin to children too; a per-node origin was not needed (the Epic: an engine option
+  only). One helper, `nodeBox(position, size, origin)` (`geometry/rect.ts`), turns a position and
+  a size into a box; the engine's node box (`boxOf`: the parent's corner plus the position, then
+  `nodeBox`) feeds `node-rect-by`, the handles' centres, edge ends, `nodes-bounds`, `fit-view`,
+  `visible-nodes`, `visible-edges`, the minimap, `node-toolbar-by`, `focus-node`'s reveal, the
+  selection box's hit test, drag, the arrows and resize (which works on the absolute box and turns
+  it back into a position once, `host.positionFor`). The model's `absolute-position-by` stays the
+  sum of positions (an adapter without an engine, the server render, uses it). Known limits with an
+  origin other than `{ 0, 0 }`: `node.set-parent` keeps the place on screen as if it were 0, 0, and
+  `expandParent` grows a parent on the flow around its origin (its children shift by the origin's
+  share of the growth).
+- **Extent.** A `Rect` extent stays a `subflows()` field (D3 names `extent` with `parentId`; a
+  rectangle on a node with no parent therefore needs `subflows()` installed); it is in the
+  coordinates of the node's position (relative to its parent's top-left corner for a child). The
+  engine keeps a node's box inside the intersection of its parent's box (`"parent"`, measured),
+  its `Rect` and the engine's `nodeExtent` (`host.extentOf`, `host.keepInExtent`) during drags,
+  the arrows and resizes (a box larger than its bounds keeps to their top-left corner); the model's
+  own clamp stays `"parent"` only, with the document's sizes (a rectangle is kept by the gestures,
+  not by `node.move` from code). `node.set-parent` takes a `Rect` and keeps it without a parent
+  (`"parent"` is dropped there, as before); controlled props compare extents by value.
+- **z-order within each layer** (the Epic's decision: edges never over nodes). A node's
+  structural `z-index` (`node-z-index-by`) is its `zIndex` (0 without), plus 10 000 when it is
+  selected and `elevateNodesOnSelect` is on (our own raise), and always at least its parent's + 1,
+  so a selected node's descendants are raised with it and a child is above its parent. An edge's
+  order (`drawn-edges`) is its `zIndex`, plus 10 000 when selected with `elevateEdgesOnSelect`,
+  stable among equals (the document's order). Why a read and not an attribute: `z-index` is style,
+  not state, and an SVG has no `z-index`; the adapters (#25) apply the number to the node's
+  structural style and render `drawn-edges` instead of their own filter. `node.set-z-index` and
+  `edge.set-z-index` (core commands: an app with no feature raises a node in code too; `null` puts
+  the default back) set it in place, and controlled props (`commands-to`) emit them, so a raise
+  keeps the node's edges and measurements (replacing it, the first choice, removed and re-added
+  them). D6's catalogue grows by these two.
+- **A drag step is computed from the start, never accumulated.** Each step (and the drop, from the
+  release's point) puts every dragged node's start box at the pointer's travel and turns it into a
+  position against its parent's corner as it is then (`host.positionFor`), so a child whose parent
+  grows (`expandParent`) past its left or top edge stays under the pointer.
+- **Click-to-connect and the tap tolerance.** With `clickToConnect`, a handle's drag starts only
+  past the engine's tap tolerance (`TAP_TOLERANCE`, 3 pixels, `engine/tap.ts`), so a tap that
+  jitters still starts a connection; without it, a drag starts after 1 pixel, as before. Escape
+  cancels a waiting connection from anywhere in the root's document (its `keydown` listener, #23's),
+  since the handle's press may have kept the focus outside the root.
+- **Resizing a node already past its bounds** gives it its least size (`minWidth`/`minHeight`) on
+  that side instead of a negative one.
+
+Decisions of the docs, examples and E2E of the new options (#25, part 2, Epic #26):
+
+- **The playground's fixture takes query options** (`clickToConnect`, `dragHandle`, `origin`,
+  `panOnDrag`, `duration`) rather than a second fixture page: the specs keep one known layout
+  (800 × 500, viewport at `{ x: 100, y: 100 }`) and `openFixture`'s checks. The three new
+  `gestures/` scenarios are for a human (controls over every option, the inspector beside); a
+  scenarios spec only proves they render without an error.
+- **An animation is proven by its frames**: the specs sample the viewport element's computed
+  `transform` on every `requestAnimationFrame` after the press and expect zooms strictly between
+  the start and the end (and none without `duration`). Specs that read a zoom after a button wait
+  for it to settle (two equal polls), so they pass with or without an animation.
+- **The examples use what a reader would copy**: a title-bar drag handle (the common node UI) and
+  a 200 ms animation on the controls; auto-pan, the pan key and elevate-on-select are defaults, so
+  every example already has them. `nodeOrigin`, `nodeExtent` and click-to-connect stay in the
+  docs and the playground: no example needs them, and a gallery example built only to show an
+  option would not be one an app copies.
+- **The drag handle is the literal attribute** (`data-flow-drag-handle`) in the examples and the
+  docs, identical in the four frameworks; `DRAG_HANDLE_ATTRIBUTE` is named for code that builds
+  it.
+- **Edges over nodes and a per-node origin are "Not yet"** in `limitations.mdx` (a cost decision,
+  not a principle); the first render's top-left placement and missing `z-index`, the overridden
+  `z-index` and the gesture-only extent rectangle are known limits there.
+- **What the specs and the review changed in the packages**: the docs, examples and specs of this
+  part passed on their first run, but the Epic's review then fixed the adapters and the core
+  (3736fd0: the nodes' layer is its own stacking context, `isolation: isolate` in the four
+  adapters, so a raised node never covers the connection line, with a playground spec; 08de796: a
+  node without a parent gets its z-index without walking a chain; 4d6b834: Vue's `duration` and
+  `pan-on-scroll-speed` take a number's text). The `node.move` / `node.resize` descriptions now
+  say the model keeps `extent: "parent"` only (a rectangle is the gestures').

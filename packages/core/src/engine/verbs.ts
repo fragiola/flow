@@ -24,6 +24,8 @@ export interface FitViewPayload {
     minZoom?: number | undefined;
     /** the greatest zoom it may pick (within the engine's limits); default the engine's `maxZoom` */
     maxZoom?: number | undefined;
+    /** how long it animates, in milliseconds (the engine's `easing`); default 0: at once */
+    duration?: number | undefined;
 }
 
 /** A zoom by a step around a point (`zoom-in`, `zoom-out`). */
@@ -32,6 +34,8 @@ export interface ZoomStepPayload {
     step?: number | undefined;
     /** the screen point (relative to the root) that stays put; default the root's centre */
     around?: XY | undefined;
+    /** how long it animates, in milliseconds (the engine's `easing`); default 0: at once */
+    duration?: number | undefined;
 }
 
 /** The pattern a `Background` draws (`background-pattern`). */
@@ -143,11 +147,22 @@ export interface MinimapView {
     readonly maskPath: string;
 }
 
-/** What `engine.run(action, payload)` does: each screen action's payload and result. */
+/**
+ * What `engine.run(action, payload)` does: each screen action's payload and result. A viewport
+ * action with a `duration` returns the viewport it animates to (zoom limits and extent kept) and
+ * gets there frame by frame (`viewport-change` with `gesture: false` each frame); another viewport
+ * action, a pan or zoom gesture, `cancel-gesture` or `destroy` stops it where it is.
+ */
 export interface EngineActionMap {
     /** sets the viewport (what it leaves out stays), its zoom and extent kept */
     "set-viewport": {
-        payload: { x?: number; y?: number; zoom?: number };
+        payload: {
+            x?: number;
+            y?: number;
+            zoom?: number;
+            /** how long it animates, in milliseconds; default 0: at once */
+            duration?: number | undefined;
+        };
         result: Viewport;
     };
     /** pans by a screen offset, in pixels */
@@ -158,14 +173,25 @@ export interface EngineActionMap {
     "zoom-out": { payload: ZoomStepPayload; result: Viewport };
     /** zooms to a zoom around a point (default the root's centre) */
     "zoom-to": {
-        payload: { zoom: number; around?: XY | undefined };
+        payload: {
+            zoom: number;
+            around?: XY | undefined;
+            /** how long it animates, in milliseconds; default 0: at once */
+            duration?: number | undefined;
+        };
         result: Viewport;
     };
     /** fits the nodes (or some) in the root; refused while none is measured or the root has no size */
     "fit-view": { payload: FitViewPayload; result: Viewport };
     /** centres a flow point in the root (at a zoom) */
     "center-on": {
-        payload: { x: number; y: number; zoom?: number | undefined };
+        payload: {
+            x: number;
+            y: number;
+            zoom?: number | undefined;
+            /** how long it animates, in milliseconds; default 0: at once */
+            duration?: number | undefined;
+        };
         result: Viewport;
     };
     /** gives DOM focus to a node's element, panning it into view */
@@ -175,7 +201,10 @@ export interface EngineActionMap {
         payload: { interactive: boolean };
         result: { interactive: boolean };
     };
-    /** cancels the gesture under way (what Escape does); refused when there is none */
+    /**
+     * cancels the gesture under way (what Escape does) and stops a viewport animation where it is;
+     * refused when there is neither
+     */
     "cancel-gesture": { payload: NoPayload; result: NoPayload };
 }
 
@@ -217,6 +246,17 @@ export interface EngineGetMap<T extends FlowTypes = AnyTypes> {
     "visible-nodes": { payload: NoPayload; result: readonly FlowNode<T>[] };
     /** the edges whose ends' box is in view */
     "visible-edges": { payload: NoPayload; result: readonly FlowEdge<T>[] };
+    /**
+     * the edges to draw, in drawing order: those shown whose nodes are measured (with
+     * `onlyRenderVisible`, those in view), by `zIndex` (a selected one raised with
+     * `elevateEdgesOnSelect`), the document's order among equals
+     */
+    "drawn-edges": { payload: NoPayload; result: readonly FlowEdge<T>[] };
+    /**
+     * a node's structural `z-index` among the nodes: its `zIndex` (a selected one raised with
+     * `elevateNodesOnSelect`), always above its parent's
+     */
+    "node-z-index-by": { payload: { nodeId: string }; result: number };
     /** a node's registered handles, with their centres */
     "handles-by": {
         payload: { nodeId: string };

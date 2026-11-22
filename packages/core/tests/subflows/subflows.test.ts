@@ -179,6 +179,33 @@ describe("subflows()", () => {
         expect(flow.get("node-by", { id: "a" })).not.toHaveProperty("extent");
     });
 
+    it("node.set-parent sets a rectangle extent, kept without a parent", () => {
+        const flow = model();
+        const extent = { x: 0, y: 0, width: 50, height: 40 };
+        flow.run("node.set-parent", {
+            nodeId: "free",
+            parentId: "group",
+            extent,
+        });
+        expect(flow.get("node-by", { id: "free" })?.extent).toEqual(extent);
+        flow.run("node.set-parent", { nodeId: "free", parentId: null });
+        expect(flow.get("node-by", { id: "free" })?.extent).toEqual(extent);
+        // controlled props with the same rectangle (a new object) change nothing
+        const nodes = flow
+            .get("all-nodes")
+            .map((node) =>
+                node.id === "free" ? { ...node, extent: { ...extent } } : node,
+            );
+        expect(flow.get("commands-to", { nodes })).toEqual([]);
+        expect(
+            flow.run("node.set-parent", {
+                nodeId: "free",
+                parentId: null,
+                extent: { x: 0, y: 0, width: -1, height: 0 },
+            }).ok,
+        ).toBe(false);
+    });
+
     it("node.set-parent refuses a cycle and a missing parent", () => {
         const flow = model();
         expect(

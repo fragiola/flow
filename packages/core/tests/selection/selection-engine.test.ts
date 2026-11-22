@@ -174,3 +174,61 @@ describe("the selection box", () => {
         expect(model.get("selected-nodes").map((n) => n.id)).toEqual(["c"]);
     });
 });
+
+describe("the selection keys", () => {
+    const selectedNodes = (model: {
+        get(key: "selected-nodes"): readonly { id: string }[];
+    }) => model.get("selected-nodes").map((n) => n.id);
+
+    it("toggles with the multiKey given, and never with null", () => {
+        const flow = mount(json, {
+            features: [selection({ multiKey: "Alt" })],
+            sizes,
+        });
+        tap(flow.node("a"));
+        tap(flow.node("b"), { shiftKey: true });
+        expect(selectedNodes(flow.model)).toEqual(["b"]);
+        tap(flow.node("a"), { altKey: true });
+        expect(selectedNodes(flow.model)).toEqual(["a", "b"]);
+        const off = mount(json, {
+            features: [selection({ multiKey: null })],
+            sizes,
+        });
+        tap(off.node("a"));
+        tap(off.node("b"), { metaKey: true, ctrlKey: true, shiftKey: true });
+        expect(selectedNodes(off.model)).toEqual(["b"]);
+    });
+
+    it("draws the box with the boxKey given (a held key too), and never with null", () => {
+        const flow = mount(json, {
+            features: [selection({ boxKey: "b" })],
+            sizes,
+        });
+        const box = (root: HTMLElement, init: PointerEventInit = {}) =>
+            dragOn(
+                root,
+                root,
+                [
+                    { clientX: -10, clientY: -10 },
+                    { clientX: 60, clientY: 30 },
+                    { clientX: 120, clientY: 60 },
+                ],
+                init,
+            );
+        box(flow.root, { shiftKey: true });
+        expect(selectedNodes(flow.model)).toEqual([]);
+        // that drag panned
+        flow.engine.run("set-viewport", { x: 0, y: 0 });
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "b" }));
+        box(flow.root);
+        expect(selectedNodes(flow.model)).toEqual(["a"]);
+        document.dispatchEvent(new KeyboardEvent("keyup", { key: "b" }));
+        const off = mount(json, {
+            features: [selection({ boxKey: null })],
+            sizes,
+        });
+        box(off.root, { shiftKey: true });
+        expect(selectedNodes(off.model)).toEqual([]);
+        expect(off.engine.get("viewport")).not.toEqual({ x: 0, y: 0, zoom: 1 });
+    });
+});

@@ -50,6 +50,16 @@
         | "interactive"
         | "onlyRenderVisible"
         | "pathOptions"
+        | "autoPan"
+        | "panActivationKey"
+        | "panOnScrollMode"
+        | "panOnScrollSpeed"
+        | "zoomActivationKey"
+        | "easing"
+        | "nodeOrigin"
+        | "nodeExtent"
+        | "elevateNodesOnSelect"
+        | "elevateEdgesOnSelect"
     >;
 
     export interface RootProps<
@@ -119,12 +129,18 @@
         return (list ?? []).map((feature) => feature.name).join(",");
     }
 
-    /** Each engine option's value as a key: a new equal object (`pathOptions`) is the same. */
-    function optionKeys(options: RootEngineProps): Record<string, string> {
+    /**
+     * Each engine option's value as a key: a new equal object (`pathOptions`) is the same, a
+     * function (`easing`) is itself, and `null` (`panActivationKey={null}`: none) is not
+     * `undefined` (the default).
+     */
+    function optionKeys(options: RootEngineProps): Record<string, unknown> {
         return Object.fromEntries(
             Object.entries(options).map(([key, value]) => [
                 key,
-                JSON.stringify(value ?? null),
+                typeof value === "function" || value === undefined
+                    ? value
+                    : JSON.stringify(value),
             ]),
         );
     }
@@ -179,6 +195,16 @@
         interactive,
         onlyRenderVisible,
         pathOptions,
+        autoPan,
+        panActivationKey,
+        panOnScrollMode,
+        panOnScrollSpeed,
+        zoomActivationKey,
+        easing,
+        nodeOrigin,
+        nodeExtent,
+        elevateNodesOnSelect,
+        elevateEdgesOnSelect,
         children,
         render,
         class: className,
@@ -230,7 +256,7 @@
         minZoom,
         maxZoom,
         translateExtent: plain(translateExtent),
-        panOnDrag,
+        panOnDrag: plain(panOnDrag),
         panOnScroll,
         zoomOnScroll,
         zoomOnPinch,
@@ -239,6 +265,16 @@
         interactive,
         onlyRenderVisible,
         pathOptions: plain(pathOptions),
+        autoPan: plain(autoPan),
+        panActivationKey,
+        panOnScrollMode,
+        panOnScrollSpeed,
+        zoomActivationKey,
+        easing,
+        nodeOrigin: plain(nodeOrigin),
+        nodeExtent: plain(nodeExtent),
+        elevateNodesOnSelect,
+        elevateEdgesOnSelect,
     });
     // the viewport a new engine starts at: the last one's (another model), else the props'
     let start: Viewport = untrack(() =>
@@ -375,7 +411,7 @@
 
     // the engine options last sent, by key: a change sends only the keys that changed (an
     // `interactive` that stays must not undo the lock of `Flow.ToggleInteractive`)
-    let sentOptions: Record<string, string> = {};
+    let sentOptions: Record<string, unknown> = {};
     // the engine is created once mounted (a server render never attaches or observes anything),
     // one per model; the parts attach to it through their attachments, which read `engine`
     $effect(() => {

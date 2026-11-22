@@ -282,7 +282,7 @@ through `engine.adapter.setOptions`).
 | `minZoom` | `number` | `0.5` | the least zoom |
 | `maxZoom` | `number` | `2` | the greatest zoom |
 | `translateExtent` | `Rect` | none | the flow rectangle the view stays inside |
-| `panOnDrag` | `boolean` | `true` | a drag on the pane pans |
+| `panOnDrag` | `boolean \| number[]` | `true` | a drag on the pane pans: `true` with the primary button (a touch, a pen), or the mouse buttons listed (`0`, `1`, `2`) |
 | `panOnScroll` | `boolean` | `false` | the wheel pans (Ctrl + wheel zooms) |
 | `zoomOnScroll` | `boolean` | `true` | the wheel zooms around the pointer |
 | `zoomOnPinch` | `boolean` | `true` | a two-finger pinch (and a trackpad's) zooms |
@@ -291,6 +291,16 @@ through `engine.adapter.setOptions`).
 | `interactive` | `boolean` | `true` | gestures and keys may change the flow (pan and zoom always work) |
 | `onlyRenderVisible` | `boolean` | `false` | render only the nodes and edges in view |
 | `pathOptions` | `PathOptions` | `{ curvature: 0.5, borderRadius: 5, offset: 20 }` | the shape of the built-in edge paths ([path helpers](/docs/api/path-helpers)) |
+| `autoPan` | `boolean \| AutoPanOptions` | `true` | the viewport pans while a drag, a connection, a reconnection, a selection box or a resize is near the root's edge (`{ speed: 10, margin: 30 }`) |
+| `panActivationKey` | `string \| null` | `" "` | held, a primary drag pans from anywhere, nodes included; `null` for none |
+| `panOnScrollMode` | `PanOnScrollMode` | `"free"` | which way the wheel pans with `panOnScroll`: `"free"`, `"horizontal"`, `"vertical"` |
+| `panOnScrollSpeed` | `number` | `1` | the factor of the wheel's pixels when it pans |
+| `zoomActivationKey` | `string \| null` | `Meta` on Apple platforms, `Control` elsewhere | held, the wheel zooms while `panOnScroll` is on; `null` for none |
+| `easing` | `ViewportEasing` | a cubic ease in and out | how an animated viewport change (a `duration`) eases |
+| `nodeOrigin` | `XY` | `{ x: 0, y: 0 }` | the point of a node's box its position stands at, as shares of its size (for the nodes on the flow) |
+| `nodeExtent` | `Rect` | none | the flow rectangle every node's box stays inside when dragged, moved by keys or resized |
+| `elevateNodesOnSelect` | `boolean` | `true` | a selected node, and its children, is drawn above the others |
+| `elevateEdgesOnSelect` | `boolean` | `false` | a selected edge is drawn above the other edges |
 | `children` | `ReactNode` | none | the flow's layers: `Flow.Background`, `Flow.Viewport`, `Flow.Controls`, … |
 
 ## State

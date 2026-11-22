@@ -50,3 +50,62 @@ export function rectFromCorners(
         height: Math.abs(b.y - a.y),
     };
 }
+
+/**
+ * A node's box from its position and its size: the position stands at `origin` of the box (shares
+ * of its size, `{ x: 0, y: 0 }` its top-left corner, `{ x: 0.5, y: 0.5 }` its centre). Every box
+ * the engine derives from a node goes through it (`nodeOrigin`).
+ */
+export function nodeBox(
+    position: { x: number; y: number },
+    size: { width: number; height: number },
+    origin: { x: number; y: number },
+): Rect {
+    return {
+        x: position.x - origin.x * size.width,
+        y: position.y - origin.y * size.height,
+        width: size.width,
+        height: size.height,
+    };
+}
+
+/** The intersection of rectangles (`undefined` for none given); an empty one keeps its corner. */
+export function intersectionOf(rects: Iterable<Rect>): Rect | undefined {
+    let left = Number.NEGATIVE_INFINITY;
+    let top = Number.NEGATIVE_INFINITY;
+    let right = Number.POSITIVE_INFINITY;
+    let bottom = Number.POSITIVE_INFINITY;
+    let found = false;
+    for (const rect of rects) {
+        found = true;
+        left = Math.max(left, rect.x);
+        top = Math.max(top, rect.y);
+        right = Math.min(right, rect.x + rect.width);
+        bottom = Math.min(bottom, rect.y + rect.height);
+    }
+    return found
+        ? {
+              x: left,
+              y: top,
+              width: Math.max(0, right - left),
+              height: Math.max(0, bottom - top),
+          }
+        : undefined;
+}
+
+/**
+ * A box's top-left corner moved so the box stays inside `bounds` (as far as it fits: a box larger
+ * than the bounds keeps to their top-left corner).
+ */
+export function cornerInside(
+    corner: { x: number; y: number },
+    size: { width: number; height: number },
+    bounds: Rect,
+): { x: number; y: number } {
+    const keep = (value: number, min: number, max: number) =>
+        Math.max(min, Math.min(value, max));
+    return {
+        x: keep(corner.x, bounds.x, bounds.x + bounds.width - size.width),
+        y: keep(corner.y, bounds.y, bounds.y + bounds.height - size.height),
+    };
+}

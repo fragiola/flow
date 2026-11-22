@@ -3,7 +3,7 @@ import {
     type ControlButtonState,
     controlButton,
 } from "../inject/control-button";
-import { optionalBoolean } from "../utils/helpers";
+import { optionalBoolean, optionalNumber } from "../utils/helpers";
 
 /**
  * A button (`data-flow-part="zoom-out"`), on the app's `<button flowZoomOut>`: zooms out by a step
@@ -18,11 +18,14 @@ import { optionalBoolean } from "../utils/helpers";
 export class FlowZoomOutDirective {
     /** disabled whatever the engine says */
     readonly disabled = input(undefined, { transform: optionalBoolean });
+    /** how long its viewport change animates, in milliseconds (the root's `easing`); default 0: at once */
+    readonly duration = input(undefined, { transform: optionalNumber });
 
     private readonly button = controlButton(
         "zoom-out",
         "zoom-out",
         this.disabled,
+        this.duration,
     );
 
     /** the button's state (`#b="flowZoomOut"`, then `b.state().disabled`) */

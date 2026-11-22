@@ -60,6 +60,8 @@ interface NodeView {
     attributes: PartAttributes;
     x: number;
     y: number;
+    /** its structural `z-index` (`node-z-index-by`); none without an engine */
+    zIndex: number | undefined;
     focusable: boolean;
 }
 
@@ -87,6 +89,7 @@ export function useNode<T extends FlowTypes = AnyTypes>(
                 },
                 x: at?.x ?? value.position.x,
                 y: at?.y ?? value.position.y,
+                zIndex: undefined,
                 focusable: false,
             };
         }
@@ -95,6 +98,7 @@ export function useNode<T extends FlowTypes = AnyTypes>(
             attributes: engine.adapter.attributes("node", { nodeId }),
             x: rect?.x ?? value.position.x,
             y: rect?.y ?? value.position.y,
+            zIndex: engine.get("node-z-index-by", { nodeId }),
             focusable: engine.is("node-focusable", { nodeId }),
         };
     });
@@ -125,7 +129,7 @@ export function useNode<T extends FlowTypes = AnyTypes>(
         };
     });
     const props = computed<NodeElementProps>(() => {
-        const { attributes, x, y, focusable } = view.value;
+        const { attributes, x, y, zIndex, focusable } = view.value;
         // the engine, read here: once it is there, the element patches and its ref registers it
         context.engine.value;
         const value = current();
@@ -138,6 +142,7 @@ export function useNode<T extends FlowTypes = AnyTypes>(
                 top: "0",
                 left: "0",
                 transform: `translate(${px(x)}, ${px(y)})`,
+                ...(zIndex === undefined ? {} : { zIndex: String(zIndex) }),
                 ...(value.width === undefined
                     ? {}
                     : { width: px(value.width) }),

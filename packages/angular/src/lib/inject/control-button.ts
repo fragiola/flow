@@ -24,12 +24,18 @@ export function controlButton(
     part: string,
     action: EngineActionKey,
     disabledInput: () => boolean | undefined,
+    duration: () => number | undefined = () => undefined,
 ): { state: Signal<ControlButtonState>; click: () => void } {
     const context = injectFlowContext(`[flow${pascal(part)}]`);
     const host = injectHost<HTMLButtonElement>();
+    // its `duration` when given (an absent one is the engine's default)
+    const payload = () => {
+        const value = duration();
+        return value === undefined ? {} : { duration: value };
+    };
     const allowed = flowValue(context, () => {
         const engine = context.engine();
-        return engine ? engine.can(action, {} as never) : false;
+        return engine ? engine.can(action, payload() as never) : false;
     });
     const state = computed(() => ({
         disabled: disabledInput() === true || !allowed(),
@@ -45,7 +51,7 @@ export function controlButton(
         click: () => {
             const engine = context.engine();
             if (!engine) return;
-            engine.run(action, {} as never);
+            engine.run(action, payload() as never);
         },
     };
 }

@@ -5,6 +5,7 @@ import {
     nodeFlagProperties,
     nodeSchema,
     xySchema,
+    zIndexSchema,
 } from "../document/document-schema";
 import { nodeFlag } from "../document/flags";
 import type { FlowNode } from "../document/types";
@@ -113,7 +114,7 @@ export const nodeRemove = defineCommand({
 export const nodeMove = defineCommand({
     name: "node.move",
     description:
-        "Moves a node to a position (relative to its parent with sub-flows), kept to its extent. Refused when the node is not draggable. A drag runs it as transient steps, then once more for the drop.",
+        'Moves a node to a position (relative to its parent with sub-flows), kept inside its parent with `extent: "parent"` (a rectangle extent is kept by the gestures, not here). Refused when the node is not draggable. A drag runs it as transient steps, then once more for the drop.',
     payloadSchema: {
         type: "object",
         properties: {
@@ -133,7 +134,8 @@ export const nodeMove = defineCommand({
             nodeId,
             position: {
                 ...xySchema,
-                description: "the position it got, kept to its extent",
+                description:
+                    'the position it got, kept inside its parent with `extent: "parent"`',
             },
         },
         required: ["nodeId", "position"],
@@ -166,7 +168,7 @@ export const nodeMove = defineCommand({
 export const nodeResize = defineCommand({
     name: "node.resize",
     description:
-        "Sets a node's width and height, and optionally its position (a resize from a top or left edge moves it), kept to its extent. A resize gesture runs it as transient steps, then once more at the end.",
+        'Sets a node\'s width and height, and optionally its position (a resize from a top or left edge moves it), kept inside its parent with `extent: "parent"` (a rectangle extent is kept by the gestures, not here). A resize gesture runs it as transient steps, then once more at the end.',
     payloadSchema: {
         type: "object",
         properties: {
@@ -193,7 +195,8 @@ export const nodeResize = defineCommand({
             height: { type: "number", description: "its height" },
             position: {
                 ...xySchema,
-                description: "the position it got, kept to its extent",
+                description:
+                    'the position it got, kept inside its parent with `extent: "parent"`',
             },
         },
         required: ["nodeId", "width", "height", "position"],
@@ -269,6 +272,38 @@ export const nodeSetFlags = defineCommand({
         }
         draft.putNode({ ...node, ...flags });
         features.flagsChanged(draft, "node", nodeId);
+        return ok({ nodeId });
+    },
+});
+
+export const nodeSetZIndex = defineCommand({
+    name: "node.set-z-index",
+    description:
+        "Sets a node's `zIndex`, its place in the nodes' stacking order (null: the default, 0), in place: its edges and measurements stay.",
+    payloadSchema: {
+        type: "object",
+        properties: {
+            nodeId,
+            zIndex: {
+                anyOf: [zIndexSchema, { type: "null" }],
+                description:
+                    "its place in its layer's stacking order (an integer); null: back to the default, 0",
+            },
+        },
+        required: ["nodeId", "zIndex"],
+        additionalProperties: false,
+    },
+    resultSchema: nodeIdResult,
+    transient: false,
+    reduce: ({ nodeId, zIndex }, { draft }) => {
+        const node = findNode(draft, nodeId, "/nodeId");
+        if (isFailure(node)) {
+            return node;
+        }
+        const { zIndex: _was, ...rest } = node;
+        draft.putNode(
+            (zIndex === null ? rest : { ...rest, zIndex }) as typeof node,
+        );
         return ok({ nodeId });
     },
 });

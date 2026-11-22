@@ -71,6 +71,14 @@ export interface FeatureGesture {
      * gesture is not active and that barely moved is a tap (`FeatureEngine.tap`)
      */
     active?(): boolean;
+    /**
+     * the gesture follows the pointer in the flow (a drag, a connection, a box, a resize): while it
+     * is active and its pointer nears the root's edge, the engine pans the viewport every frame
+     * (the `autoPan` option) and calls `move` again with the pointer's last event, so `move` must
+     * read the flow point from the client point each time (`host.toFlow`), never from a delta
+     * divided by the zoom
+     */
+    readonly autoPan?: boolean | undefined;
 }
 
 /**
@@ -108,14 +116,38 @@ export interface FeatureEngineHost {
     /** an edge's drawn ends, once both its nodes are measured */
     edgePath(edgeId: string): EdgePath | undefined;
     /**
-     * a node's position (relative to its parent) kept inside its parent with the measured sizes
-     * when its `extent` is `"parent"`; `size` overrides the node's own (a resize under way)
+     * a node's position in absolute flow coordinates: its parent's box's top-left corner plus its
+     * own position (with the `nodeOrigin`, the point of its box at that origin)
      */
-    keepInParent(
+    absolutePosition(nodeId: string): XY | undefined;
+    /**
+     * the position (relative to its parent) that puts a node's box of `size` with its top-left
+     * corner at the absolute flow point `corner` (the `nodeOrigin` applied)
+     */
+    positionFor(
+        nodeId: string,
+        corner: XY,
+        size: { readonly width: number; readonly height: number },
+    ): XY;
+    /**
+     * the absolute rectangle a node's box stays inside: its parent's box with `extent: "parent"`
+     * (measured), its rectangle `extent`, the engine's `nodeExtent`, together; none when unbound
+     */
+    extentOf(nodeId: string): Rect | undefined;
+    /**
+     * a node's position (relative to its parent) kept inside its extent (`extentOf`) with the
+     * measured sizes; `size` overrides the node's own (a resize under way)
+     */
+    keepInExtent(
         nodeId: string,
         position: XY,
         size?: { readonly width: number; readonly height: number },
     ): XY;
+    /**
+     * whether a key is held during `event`: `Meta`, `Control`, `Alt` and `Shift` from the event's
+     * flags, any other (`KeyboardEvent.key` or `.code`) from the keys held in the root's document
+     */
+    held(key: string, event: MouseEvent | KeyboardEvent): boolean;
     /** a node's element, as the adapter registered it */
     nodeElement(nodeId: string): HTMLElement | undefined;
     /** whether the flow's gestures and keys may change it (the Controls' interactivity toggle) */
@@ -162,8 +194,16 @@ export interface FeatureEngine {
         event: PointerEvent,
         target: PressTarget,
     ): FeatureGesture | undefined;
-    /** a press released where it was pressed (no active gesture): `true` takes it (a click selects) */
-    tap?(event: PointerEvent, target: PressTarget): boolean | undefined;
+    /**
+     * a press released where it was pressed (no active gesture): `true` takes it (a click
+     * selects); a gesture takes it and goes on without a press (a click-to-connect connection):
+     * the engine moves it with the pointer, and the next press is its own (its release is the
+     * gesture's `end`), as Escape, `cancel-gesture` and a detach are
+     */
+    tap?(
+        event: PointerEvent,
+        target: PressTarget,
+    ): boolean | FeatureGesture | undefined;
     /** the wheel in the flow: `true` takes it (the minimap zooms) */
     wheel?(event: WheelEvent, target: PressTarget): boolean | undefined;
     /** a key in the flow: `true` takes it (its default is prevented) */

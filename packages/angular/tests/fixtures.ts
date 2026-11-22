@@ -20,6 +20,7 @@ import {
     type FitViewPayload,
     FLOW,
     type FlowEdge,
+    type FlowEngineOptions,
     type FlowFeatures,
     type FlowModel,
     type FlowNode,
@@ -55,6 +56,20 @@ export abstract class RootInputs {
     readonly minZoom = input<number | undefined>();
     readonly maxZoom = input<number | undefined>();
     readonly interactive = input<boolean | undefined>();
+    readonly autoPan = input<FlowEngineOptions["autoPan"]>();
+    readonly panOnDrag = input<FlowEngineOptions["panOnDrag"]>();
+    readonly panActivationKey = input<FlowEngineOptions["panActivationKey"]>();
+    readonly panOnScrollMode = input<FlowEngineOptions["panOnScrollMode"]>();
+    readonly panOnScrollSpeed = input<FlowEngineOptions["panOnScrollSpeed"]>();
+    readonly zoomActivationKey =
+        input<FlowEngineOptions["zoomActivationKey"]>();
+    readonly easing = input<FlowEngineOptions["easing"]>();
+    readonly nodeOrigin = input<FlowEngineOptions["nodeOrigin"]>();
+    readonly nodeExtent = input<FlowEngineOptions["nodeExtent"]>();
+    readonly elevateNodesOnSelect =
+        input<FlowEngineOptions["elevateNodesOnSelect"]>();
+    readonly elevateEdgesOnSelect =
+        input<FlowEngineOptions["elevateEdgesOnSelect"]>();
     readonly onNodesChange = input<(nodes: readonly FlowNode[]) => void>();
     readonly onEdgesChange = input<(edges: readonly FlowEdge[]) => void>();
     readonly onViewportChange = input<(viewport: Viewport) => void>();
@@ -76,6 +91,17 @@ const INPUTS = `
     [minZoom]="minZoom()"
     [maxZoom]="maxZoom()"
     [interactive]="interactive()"
+    [autoPan]="autoPan()"
+    [panOnDrag]="panOnDrag()"
+    [panActivationKey]="panActivationKey()"
+    [panOnScrollMode]="panOnScrollMode()"
+    [panOnScrollSpeed]="panOnScrollSpeed()"
+    [zoomActivationKey]="zoomActivationKey()"
+    [easing]="easing()"
+    [nodeOrigin]="nodeOrigin()"
+    [nodeExtent]="nodeExtent()"
+    [elevateNodesOnSelect]="elevateNodesOnSelect()"
+    [elevateEdgesOnSelect]="elevateEdgesOnSelect()"
 `;
 
 /**
@@ -137,6 +163,11 @@ export class ZoomReadout {
                         <button flowZoomOut data-testid="out"></button>
                         <button flowFitView data-testid="fit"></button>
                         <button flowToggleInteractive data-testid="lock"></button>
+                        @if (durations()) {
+                            <button flowZoomIn data-testid="in-300" duration="300"></button>
+                            <button flowZoomOut data-testid="out-200" [duration]="200"></button>
+                            <button flowFitView data-testid="fit-400" [duration]="400"></button>
+                        }
                     </div>
                     <test-zoom-readout data-testid="zoom" />
                 }
@@ -149,6 +180,8 @@ export class TestFlow extends RootInputs {
     readonly shown = input(true);
     readonly label = input(false);
     readonly controls = input(false);
+    /** with `controls`, buttons that animate (`duration`) */
+    readonly durations = input(false);
     readonly zoomInClick = input<() => void>();
 }
 
@@ -214,7 +247,7 @@ export class Counted implements OnInit {
  * A flow that tells what renders (binding no output of the root's): `onRender(kind, entity)` each
  * time a node's or an edge's template is checked again, `onMount(id)` when a node's content is created. `mark` is read by
  * the templates (a value of the component), `alt` swaps the nodes' template for another,
- * `style` and `viewportStyle` are the root's and the viewport's styles.
+ * `style`, `viewportStyle` and `nodeStyle` are the root's, the viewport's and each node's styles.
  */
 @Component({
     selector: "test-probe-flow",
@@ -237,7 +270,7 @@ export class Counted implements OnInit {
                         </ng-template>
                     } @else {
                         <ng-template flowNodesItem let-node>
-                            <div [flowNode]="node" [attr.data-mark]="mark()" data-template="a">
+                            <div [flowNode]="node" [attr.data-mark]="mark()" data-template="a" [style]="nodeStyle()">
                                 {{ probe("node", node) }}
                                 <test-counted [id]="node.id" [onMount]="onMount()" />
                             </div>
@@ -256,6 +289,7 @@ export class ProbeFlow extends RootInputs {
     readonly alt = input(false);
     readonly style = input<string | undefined>();
     readonly viewportStyle = input<string | undefined>();
+    readonly nodeStyle = input<string | undefined>();
 
     /** tells that a template read its entity again; renders nothing */
     probe(kind: string, entity: FlowNode | FlowEdge): string {

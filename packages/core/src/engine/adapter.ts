@@ -67,6 +67,11 @@ export interface PressTarget {
     readonly position?: string | undefined;
     /** a reconnect anchor's end of its edge (`data-end`) */
     readonly end?: "source" | "target" | undefined;
+    /**
+     * a press on a node that holds a drag handle (`data-flow-drag-handle`), outside it: the node
+     * is not dragged from there
+     */
+    readonly outsideDragHandle?: boolean | undefined;
 }
 
 /** What changed in the view, for an adapter to re-render only what depends on it. */
@@ -104,7 +109,8 @@ export interface FlowEngineAdapter {
     };
     /**
      * the engine's options changed (a root prop: `minZoom`, `panOnDrag`, `translateExtent`,
-     * `pathOptions`, `interactive`, …): they apply from now on, a gesture under way included;
+     * `pathOptions`, `interactive`, `autoPan`, `panActivationKey`, `zoomActivationKey`, `easing`,
+     * …): they apply from now on, a gesture under way included;
      * `root`, `defaultViewport` and `fitView` are creation options and are ignored here
      */
     setOptions(options: Partial<FlowEngineOptions>): void;

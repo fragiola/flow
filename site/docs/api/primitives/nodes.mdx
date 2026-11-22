@@ -121,5 +121,7 @@ every `div` attribute but `children`.
 
 ## Structural style
 
-`position: absolute` at the viewport's origin. The layer is part of the pane: a press on it, off
+`position: absolute` at the viewport's origin, and `isolation: isolate`: the nodes' `z-index` (a
+selected node raised) orders them among themselves and never lifts one above what follows the
+layer in `Flow.Viewport` (the connection line). The layer is part of the pane: a press on it, off
 any node, pans or draws a selection box.

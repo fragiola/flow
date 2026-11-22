@@ -312,7 +312,7 @@ export function commandsTo(
             const reparented =
                 subflows &&
                 (next.parentId !== node.parentId ||
-                    next.extent !== node.extent ||
+                    !sameJson(next.extent, node.extent) ||
                     (next.expandParent ?? false) !==
                         (node.expandParent ?? false));
             if (reparented) {
@@ -359,6 +359,11 @@ export function commandsTo(
                     height: next.height,
                 });
             }
+            if (next.zIndex !== node.zIndex)
+                push("node.set-z-index", {
+                    nodeId,
+                    zIndex: next.zIndex ?? null,
+                });
             const patch = dataPatch(node.data as Json, next.data as Json);
             if (patch && Object.keys(patch).length > 0)
                 push("node.set-data", { nodeId, data: patch });
@@ -410,6 +415,8 @@ export function commandsTo(
         }
         if (Object.keys(flags).length > 0)
             push("edge.set-flags", { edgeId, ...flags });
+        if (next.zIndex !== edge.zIndex)
+            push("edge.set-z-index", { edgeId, zIndex: next.zIndex ?? null });
         const patch = dataPatch(edge.data as Json, next.data as Json);
         if (patch && Object.keys(patch).length > 0)
             push("edge.set-data", { edgeId, data: patch });

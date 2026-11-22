@@ -35,7 +35,7 @@
     @component
     The layer of the edges (`data-flow-part="edges"`), inside `Flow.Viewport`, before `Flow.Nodes`:
     an SVG (`data-flow-part="edges"` too) where its children snippet draws each edge, once both its
-    nodes have a size (`edge-path-by`), and the HTML layer edge labels render into. It lets presses
+    nodes have a size, in the engine's drawing order (`drawn-edges`: by `zIndex`), and the HTML layer edge labels render into. It lets presses
     through to the pane; the edges' own parts take them.
 -->
 <script lang="ts" generics="T extends FlowTypes = AnyTypes">
@@ -59,24 +59,10 @@
 
     const context = useFlowContext("Edges");
     const list = flowValue(context, () => {
-        const { engine, model } = context;
+        const { engine } = context;
         if (!engine) return [] as readonly FlowEdge<T>[];
-        const edges = engine.adapter.settings.onlyRenderVisible
-            ? engine.get("visible-edges")
-            : model
-                  .get("all-edges")
-                  .filter(
-                      (edge) =>
-                          edge.hidden !== true &&
-                          model.get("node-by", { id: edge.source })?.hidden !==
-                              true &&
-                          model.get("node-by", { id: edge.target })?.hidden !==
-                              true,
-                  );
-        return edges.filter(
-            (edge) =>
-                engine.get("edge-path-by", { edgeId: edge.id }) !== undefined,
-        ) as unknown as readonly FlowEdge<T>[];
+        // the core's drawing order: shown, measured, in view with `onlyRenderVisible`, by z-order
+        return engine.get("drawn-edges") as unknown as readonly FlowEdge<T>[];
     });
     let layer = $state.raw<HTMLElement | null>(null);
     setEdgeLabelLayer({

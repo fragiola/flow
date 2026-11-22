@@ -4,7 +4,7 @@ import { computed } from "vue";
 import type { Node, Types } from "./index.vue";
 import { styles } from "./styles";
 
-// The preview: it reads the nodes wired into its two target handles.
+// The preview: it reads the nodes wired into its two target handles, and drags by its title bar.
 
 const props = defineProps<{ node: Extract<Node, { type: "preview" }> }>();
 
@@ -30,7 +30,10 @@ const side = computed(() => {
 </script>
 
 <template>
-    <span :class="styles.caption">{{ node.data.label }}</span>
+    <div data-flow-drag-handle :class="styles.dragHandle">
+        <span :class="styles.caption">{{ node.data.label }}</span>
+        <span aria-hidden="true" :class="styles.grip" />
+    </div>
     <div :class="styles.stage">
         <div
             v-if="fill"

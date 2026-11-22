@@ -97,8 +97,9 @@ const features = [selection(), drag()] as const;
 </Framework>
 
 - **A click** on a node or an edge selects it alone; a click on the canvas clears the selection.
-- **Shift, Ctrl or ⌘ with a click** toggles it in the selection (`multiple: true`, the default).
-- **Shift with a drag on the canvas** draws a box, rendered by `Flow.SelectionBox` (in screen
+- **Shift, Ctrl or ⌘ with a click** toggles it in the selection (`multiple: true`, the default;
+  the keys are `multiKey`).
+- **Shift with a drag on the canvas** draws a box (the key is `boxKey`), rendered by `Flow.SelectionBox` (in screen
   pixels, so outside `Flow.Viewport`). Releasing it selects the nodes it holds and the edges
   between them; Escape puts the selection back.
 - Pressing a selected node and dragging it (with `drag()`) moves the whole selection.
@@ -110,10 +111,23 @@ const features = [selection(), drag()] as const;
 | `boxMode` | `"full"` | a box takes the nodes it holds whole (`"full"`) or every node it touches (`"partial"`) |
 | `multiple` | `true` | a modifier click toggles the item in the selection; `false`: a click always selects one |
 | `boxOnDrag` | `false` | any drag on the canvas draws a box, instead of Shift + drag (the canvas then never pans by dragging) |
+| `multiKey` | `["Meta", "Control", "Shift"]` | the keys that, held with a click, toggle the item in the selection: one key, several (any of them held) or `null` for none |
+| `boxKey` | `"Shift"` | the key that, held with a drag on the canvas, draws a box; `null` leaves the box to `boxOnDrag` |
 
 ```ts
 const features = [selection({ boxMode: "partial", boxOnDrag: true }), drag()] as const;
 ```
+
+A key is a `KeyboardEvent.key` (`"Alt"`, `"Meta"`, `"a"`) or `.code` (`"KeyA"`); `Meta`,
+`Control`, `Alt` and `Shift` are read from the click itself, any other key while it is held in
+the root's document. So Shift draws the box only and Ctrl or ⌘ toggle:
+
+```ts
+const features = [selection({ multiKey: ["Meta", "Control"], boxKey: "Shift" }), drag()] as const;
+```
+
+A held `panActivationKey` (Space by default) pans instead of selecting
+([The viewport](/docs/concepts/viewport#pan-buttons-and-keys)).
 
 ## Style what is selected
 

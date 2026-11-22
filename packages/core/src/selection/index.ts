@@ -3,6 +3,7 @@
 export {
     type BoxSelectionMode,
     type SelectionFeature,
+    type SelectionKey,
     type SelectionOptions,
     selection,
 } from "./selection";

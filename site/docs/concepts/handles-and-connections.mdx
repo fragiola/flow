@@ -163,6 +163,23 @@ changes and the engine tells `connect-cancel` (with `refused: true` when the han
   handle it ends at.
 - Escape, a cancelled pointer or a lost pointer capture cancels it.
 
+## Click to connect
+
+With `connection({ clickToConnect: true })`, a tap on a handle starts a connection that stays
+after the release: the connection line follows the pointer, and a tap on another handle draws the
+edge, checked by `model.can("edge.add", …)` exactly as a drop (a vetoed handle is
+`data-invalid`). A tap anywhere else, Escape (wherever the focus is) or `cancel-gesture` cancels
+it, and that tap selects nothing. A drag from a handle still connects as before, so a mouse, a
+finger and a pen each use what suits them; while a connection waits, the root has
+`data-connecting` and the pan key still pans.
+
+```ts
+const features = [selection(), drag(), connection({ clickToConnect: true })] as const;
+```
+
+It is off by default: a tap on a handle then does nothing, and a slightly shaky press on a handle
+starts a drag after 1 pixel instead of 3.
+
 ## Rules are middleware
 
 There is no `isValidConnection` callback. A rule is a middleware on `edge.add`, and because the

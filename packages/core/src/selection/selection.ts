@@ -12,20 +12,44 @@ import { selectionEngine } from "./selection-engine";
 /** How a box selection takes nodes: those it touches (`"partial"`) or those it holds whole (`"full"`). */
 export type BoxSelectionMode = "partial" | "full";
 
+/**
+ * A key a gesture reads while it is held (`KeyboardEvent.key` or `.code`; `Meta`, `Control`, `Alt`
+ * and `Shift` from the pointer event's flags), several (any of them), or `null` for none.
+ */
+export type SelectionKey = string | readonly string[] | null;
+
 /** Options of {@link selection}: read by its engine side. */
 export interface SelectionOptions {
     /** how a box selection takes nodes; default `"full"` */
     readonly boxMode: BoxSelectionMode;
-    /** whether a modifier click (Ctrl/⌘, Shift) adds to the selection; default true */
+    /** whether a click with the multi-selection key adds to the selection; default true */
     readonly multiple: boolean;
-    /** whether any drag on the pane draws a selection box (instead of panning); default false: Shift + drag */
+    /** whether any drag on the pane draws a selection box (instead of panning); default false: the box key + drag */
     readonly boxOnDrag: boolean;
+    /**
+     * the key that, held, makes a click toggle a node or an edge in the selection; default
+     * `["Meta", "Control", "Shift"]`; `null` for none
+     */
+    readonly multiKey: SelectionKey;
+    /** the key that, held, makes a drag on the pane draw a selection box; default `"Shift"`; `null` for none */
+    readonly boxKey: SelectionKey;
 }
 
 /** The selection feature, as `selection()` makes it. */
 export type SelectionFeature = FlowFeature<"selection", SelectionOptions>;
 
 const UNSELECTABLE = "is selected, but not selectable";
+
+/** A key option as given (frozen), or its default when left out. */
+function keyOption(
+    value: SelectionKey | undefined,
+    fallback: SelectionKey,
+): SelectionKey {
+    const key = value === undefined ? fallback : value;
+    return typeof key === "string" || key === null
+        ? key
+        : Object.freeze([...key]);
+}
 
 /** Selecting nodes and edges: `features: [selection()]` (`@fragiola/flow/selection`). */
 export function selection(
@@ -35,6 +59,8 @@ export function selection(
         boxMode: options.boxMode ?? "full",
         multiple: options.multiple ?? true,
         boxOnDrag: options.boxOnDrag ?? false,
+        multiKey: keyOption(options.multiKey, ["Meta", "Control", "Shift"]),
+        boxKey: keyOption(options.boxKey, "Shift"),
     });
     return Object.freeze({
         name: "selection",

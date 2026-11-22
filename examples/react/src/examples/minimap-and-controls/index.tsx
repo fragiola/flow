@@ -24,8 +24,8 @@ import { styles } from "./styles";
 // `minimap()` draws the whole flow small (`MiniMap`): a `MiniMapNode` per node and a `MiniMapMask`
 // over what the root does not show; dragging in it pans the flow, the wheel over it zooms.
 // `Flow.Controls` groups the buttons; each runs one engine action and is disabled while the engine
-// refuses it (at the zoom limits). The lock (`Flow.ToggleInteractive`) stops every gesture that
-// changes the flow; pan and zoom stay.
+// refuses it (at the zoom limits); `duration` animates its change over 200 ms. The lock
+// (`Flow.ToggleInteractive`) stops every gesture that changes the flow; pan and zoom stay.
 
 interface Types extends FlowTypes {
     readonly nodes: { city: { label: string } };
@@ -119,13 +119,25 @@ export default function MinimapAndControls() {
                 aria-label="Zoom and lock"
                 className={styles.controls}
             >
-                <Flow.ZoomIn aria-label="Zoom in" className={styles.control}>
+                <Flow.ZoomIn
+                    duration={200}
+                    aria-label="Zoom in"
+                    className={styles.control}
+                >
                     <PlusIcon />
                 </Flow.ZoomIn>
-                <Flow.ZoomOut aria-label="Zoom out" className={styles.control}>
+                <Flow.ZoomOut
+                    duration={200}
+                    aria-label="Zoom out"
+                    className={styles.control}
+                >
                     <MinusIcon />
                 </Flow.ZoomOut>
-                <Flow.FitView aria-label="Fit view" className={styles.control}>
+                <Flow.FitView
+                    duration={200}
+                    aria-label="Fit view"
+                    className={styles.control}
+                >
                     <MaximizeIcon />
                 </Flow.FitView>
                 <Flow.ToggleInteractive

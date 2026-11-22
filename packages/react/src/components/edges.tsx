@@ -48,31 +48,16 @@ const EdgeSlot = React.memo(function EdgeSlot({ edge, render }: EdgeSlotProps) {
 /**
  * The layer of the edges (`data-flow-part="edges"`), inside `Flow.Viewport`, before `Flow.Nodes`:
  * an SVG (`data-flow-part="edges"` too) where `children` draws each edge, once both its nodes have
- * a size (`edge-path-by`), and the HTML layer edge labels go to. It lets presses through to the
- * pane; the edges' own parts take them.
+ * a size, in the engine's drawing order (`drawn-edges`: by `zIndex`), and the HTML layer edge
+ * labels go to. It lets presses through to the pane; the edges' own parts take them.
  */
 export function Edges<T extends FlowTypes = AnyTypes>(props: EdgesProps<T>) {
     const { children, ...rest } = props;
     const { model, engine } = useFlowContext("Edges");
-    const list = useFlowValue(model, engine, () => {
-        if (!engine) return [];
-        const edges = engine.adapter.settings.onlyRenderVisible
-            ? engine.get("visible-edges")
-            : model
-                  .get("all-edges")
-                  .filter(
-                      (edge) =>
-                          edge.hidden !== true &&
-                          model.get("node-by", { id: edge.source })?.hidden !==
-                              true &&
-                          model.get("node-by", { id: edge.target })?.hidden !==
-                              true,
-                  );
-        return edges.filter(
-            (edge) =>
-                engine.get("edge-path-by", { edgeId: edge.id }) !== undefined,
-        );
-    });
+    // the core's drawing order: shown, measured, in view with `onlyRenderVisible`, by z-order
+    const list = useFlowValue(model, engine, () =>
+        engine ? engine.get("drawn-edges") : [],
+    );
     const [layer, setLayer] = React.useState<HTMLElement | null>(null);
     const render = children as unknown as (edge: FlowEdge) => React.ReactNode;
     const element = useRenderElement("div", rest, {

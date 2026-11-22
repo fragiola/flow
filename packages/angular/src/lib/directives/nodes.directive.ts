@@ -75,10 +75,13 @@ export class FlowNodesDirective {
     constructor() {
         const host = injectHost();
         bindAttributes(host, () => ATTRIBUTES);
+        // its own stacking context: the nodes' z-index (a selected one raised) orders them
+        // among themselves, never above what follows the layer (the connection line)
         bindStructuralStyle(host, () => ({
             position: "absolute",
             top: 0,
             left: 0,
+            isolation: "isolate",
         }));
     }
 }

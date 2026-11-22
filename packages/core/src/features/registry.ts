@@ -254,8 +254,8 @@ export interface ComposedFeatureEngine {
         event: PointerEvent,
         target: PressTarget,
     ): FeatureGesture | undefined;
-    /** the first feature whose hook takes a tap: whether one did */
-    tap(event: PointerEvent, target: PressTarget): boolean;
+    /** the first feature whose hook takes a tap: whether one did, or the gesture it started */
+    tap(event: PointerEvent, target: PressTarget): boolean | FeatureGesture;
     /** the first feature whose hook takes the wheel: whether one did */
     wheel(event: WheelEvent, target: PressTarget): boolean;
     /** the first feature whose hook takes a key: whether one did */
@@ -309,8 +309,15 @@ export function featureEngine(
             }
             return undefined;
         },
-        tap: (event, target) =>
-            list.some((engine) => engine.tap?.(event, target) === true),
+        tap: (event, target) => {
+            for (const engine of list) {
+                const taken = engine.tap?.(event, target);
+                if (taken === true || (taken && typeof taken === "object")) {
+                    return taken;
+                }
+            }
+            return false;
+        },
         wheel: (event, target) =>
             list.some((engine) => engine.wheel?.(event, target) === true),
         keydown: (event, target) =>

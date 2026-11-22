@@ -49,6 +49,25 @@ export function coreKeys(): void {
     engine.run("fit-view");
     engine.run("fit-view", { padding: 0.2, nodeIds: ["a"] });
     engine.run("zoom-in");
+    engine.run("zoom-in", { duration: 300 });
+    engine.run("set-viewport", { x: 0, duration: 200 });
+    engine.run("zoom-to", { zoom: 1, duration: 200 });
+    engine.run("fit-view", { duration: 400 });
+    engine.run("center-on", { x: 0, y: 0, duration: 200 });
+    engine.adapter.setOptions({
+        autoPan: { speed: 12, margin: 40 },
+        panOnDrag: [1, 2],
+        panActivationKey: " ",
+        panOnScrollMode: "vertical",
+        panOnScrollSpeed: 0.5,
+        zoomActivationKey: null,
+        easing: (t) => t,
+    });
+    createFlowEngine(createFlowModel(), { autoPan: false, panOnDrag: true });
+    // @ts-expect-error a duration is a number of milliseconds
+    engine.run("zoom-out", { duration: "fast" });
+    // @ts-expect-error not a scroll mode
+    engine.adapter.setOptions({ panOnScrollMode: "diagonal" });
     // @ts-expect-error pan-by takes both offsets
     engine.run("pan-by", { x: 1 });
     // @ts-expect-error a command is the model's, not an action

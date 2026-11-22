@@ -40,7 +40,13 @@ import type {
     FeatureModel,
     FlowFeatures,
 } from "../features/types";
-import { boundsOf, overlaps } from "../geometry/rect";
+import {
+    boundsOf,
+    cornerInside,
+    intersectionOf,
+    nodeBox,
+    overlaps,
+} from "../geometry/rect";
 import type { EdgePath, Rect, Viewport } from "../geometry/types";
 import {
     centeredOn,
@@ -62,8 +68,9 @@ import type {
     PressTarget,
     ViewChange,
 } from "./adapter";
+import { type AutoPanOptions, autoPanOffset } from "./auto-pan";
 import { backgroundPattern } from "./background-pattern";
-import { pressTargetOf, viewOf } from "./dom";
+import { asElement, pressTargetOf, viewOf } from "./dom";
 import { edgeEnds, type PathOptions, pathOf } from "./edge-geometry";
 import type { FlowEngineEvent } from "./events";
 import { Measurements } from "./measurements";
@@ -74,6 +81,7 @@ import {
     writeRootTouchAction,
     writeViewportTransform,
 } from "./structural-style";
+import { TAP_TOLERANCE } from "./tap";
 import type {
     BackgroundPatternPayload,
     EngineActionKey,
@@ -88,7 +96,11 @@ import type {
     NodeToolbarPayload,
     ZoomStepPayload,
 } from "./verbs";
+import { animateViewport, type ViewportEasing } from "./viewport-animation";
 import { WHEEL_PINCH_RATE, WHEEL_RATE } from "./wheel-rate";
+
+/** Which way the wheel pans with `panOnScroll`: both ways, or one axis only. */
+export type PanOnScrollMode = "free" | "horizontal" | "vertical";
 
 /** Options of {@link createFlowEngine}. */
 export interface FlowEngineOptions {
@@ -102,10 +114,28 @@ export interface FlowEngineOptions {
     maxZoom?: number | undefined;
     /** the flow rectangle the view stays inside; default none */
     translateExtent?: Rect | undefined;
-    /** a drag on the pane pans; default true */
-    panOnDrag?: boolean | undefined;
+    /**
+     * a drag on the pane pans: `true` with the primary button (and a touch or a pen), or the mouse
+     * buttons that pan (`[0]` primary, `[1]` middle, `[2]` right); default true
+     */
+    panOnDrag?: boolean | readonly number[] | undefined;
+    /**
+     * the key that, held, makes a primary drag pan from anywhere (nodes included) and start no
+     * other gesture (`KeyboardEvent.key`, or `.code`); null for none; default `" "` (Space)
+     */
+    panActivationKey?: string | null | undefined;
     /** the wheel pans (Ctrl + wheel zooms); default false: the wheel zooms */
     panOnScroll?: boolean | undefined;
+    /** which way the wheel pans with `panOnScroll`; default `"free"` */
+    panOnScrollMode?: PanOnScrollMode | undefined;
+    /** the factor of the wheel's pixels when it pans (`panOnScroll`); default 1 */
+    panOnScrollSpeed?: number | undefined;
+    /**
+     * the key that, held, makes the wheel zoom while `panOnScroll` is on (`KeyboardEvent.key`;
+     * `Meta`, `Control`, `Alt` and `Shift` read from the wheel event); null for none; default
+     * `Meta` on Apple platforms and `Control` elsewhere (the root window's `navigator`)
+     */
+    zoomActivationKey?: string | null | undefined;
     /** the wheel zooms around the pointer; default true */
     zoomOnScroll?: boolean | undefined;
     /** a two-finger pinch (and a trackpad's) zooms; default true */
@@ -122,6 +152,25 @@ export interface FlowEngineOptions {
     onlyRenderVisible?: boolean | undefined;
     /** the shape of the built-in edge paths */
     pathOptions?: PathOptions | undefined;
+    /**
+     * the viewport pans while a drag, a connection, a reconnection, a selection box or a resize
+     * has its pointer near the root's edge (`{ speed, margin }` tunes it); default true
+     */
+    autoPan?: boolean | AutoPanOptions | undefined;
+    /** how an animated viewport action (its `duration`) eases; default a smooth ease in and out */
+    easing?: ViewportEasing | undefined;
+    /**
+     * the point of a node's box its `position` stands at, as shares of its size (`{ x: 0.5, y: 0.5 }`:
+     * its centre), for the nodes on the flow (a child's position is its box's top-left corner in its
+     * parent's); default `{ x: 0, y: 0 }`: the top-left corner
+     */
+    nodeOrigin?: XY | undefined;
+    /** the flow rectangle every node's box stays inside when dragged, moved by keys or resized */
+    nodeExtent?: Rect | undefined;
+    /** a selected node, and its children with it, is drawn above the others; default true */
+    elevateNodesOnSelect?: boolean | undefined;
+    /** a selected edge is drawn above the other edges; default false */
+    elevateEdgesOnSelect?: boolean | undefined;
 }
 
 /**
@@ -167,9 +216,6 @@ type ActionHandler = (
     dryRun: boolean,
 ) => CommandResult<unknown>;
 
-/** How far (in pixels) a press may move and still be a tap. */
-const TAP_TOLERANCE = 3;
-
 /** A press under way: its pointer, where it started, and the gesture that took it. */
 interface Press {
     readonly pointerId: number;
@@ -177,6 +223,12 @@ interface Press {
     readonly target: PressTarget;
     readonly gesture: FeatureGesture | undefined;
     readonly pan: boolean;
+    /** the mouse button pressed (0 for a touch or a pen) */
+    readonly button: number;
+    /** started by the pan activation key: it pans and never taps */
+    readonly keyPan: boolean;
+    /** its gesture is the one a tap started (click-to-connect): its release is the gesture's end */
+    readonly follows: boolean;
     travel: number;
     /** its pointer's last move: a press whose release was missed ends there */
     last: PointerEvent | undefined;
@@ -194,6 +246,16 @@ interface Pinch {
 }
 
 const ZERO_SIZE: Size = { width: 0, height: 0 };
+
+const TOP_LEFT: XY = { x: 0, y: 0 };
+
+/** What a selected node (with `elevateNodesOnSelect`) or edge (`elevateEdgesOnSelect`) is raised by. */
+const SELECTED_RAISE = 10_000;
+
+/** A `zIndex` as a number (none, or not a finite number: 0). */
+function zOf(value: unknown): number {
+    return finite(value) ? value : 0;
+}
 
 function finite(value: unknown): value is number {
     return typeof value === "number" && Number.isFinite(value);
@@ -218,6 +280,29 @@ function sameViewport(a: Viewport, b: Viewport): boolean {
 
 function distance(a: XY, b: XY): number {
     return Math.hypot(b.x - a.x, b.y - a.y);
+}
+
+/** What typing goes into: a key pressed there never activates a pan or a zoom. */
+const EDITABLE =
+    'input, textarea, select, [contenteditable]:not([contenteditable="false"])';
+
+/** The keys a pointer or wheel event tells itself whether they are held. */
+const MODIFIERS: Readonly<
+    Record<string, "metaKey" | "ctrlKey" | "altKey" | "shiftKey">
+> = { Meta: "metaKey", Control: "ctrlKey", Alt: "altKey", Shift: "shiftKey" };
+
+/** A viewport action's `duration`, in milliseconds (0 when it leaves it out), or its failure. */
+function durationOf(payload: unknown): number | CommandResult<unknown> {
+    const { duration } = payloadRecord(payload);
+    if (duration === undefined) return 0;
+    if (!finite(duration) || duration < 0) {
+        return fail(
+            "invalid_payload",
+            "duration must be a number of milliseconds, 0 or more",
+            "/duration",
+        );
+    }
+    return duration;
 }
 
 class Engine<T extends FlowTypes, F extends FlowFeatures> {
@@ -245,9 +330,22 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     private viewportElement: HTMLElement | SVGElement | undefined;
     private removeRootListeners: (() => void) | undefined;
     private press: Press | undefined;
+    /**
+     * a gesture a tap started that goes on without a press (click-to-connect): the pointer's moves
+     * move it, and the next primary press is its own
+     */
+    private following: FeatureGesture | undefined;
     private pinch: Pinch | undefined;
     private readonly pointers = new Map<number, XY>();
     private pendingFit: FitViewPayload | undefined;
+    /** stops the viewport animation under way */
+    private stopAnimation: (() => void) | undefined;
+    /** the auto-pan's pending frame, and its window */
+    private autoPanFrame: { view: Window; id: number } | undefined;
+    /** the keys held now (`key` and `code`), from the root's document */
+    private readonly heldKeys = new Set<string>();
+    /** a non-primary pan moved: the context menu its release opens is kept out */
+    private blockContextMenu = false;
     private revision = 0;
     private destroyed = false;
 
@@ -304,6 +402,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                         "/zoom",
                     );
                 }
+                const duration = durationOf(payload);
+                if (typeof duration !== "number") return duration;
                 return this.apply(
                     zoomAround(
                         this.current,
@@ -311,6 +411,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                         pointOf(around) ?? this.center(),
                     ),
                     dryRun,
+                    duration,
                 );
             },
             "fit-view": (payload, dryRun) =>
@@ -327,6 +428,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                         "/zoom",
                     );
                 }
+                const duration = durationOf(payload);
+                if (typeof duration !== "number") return duration;
                 return this.apply(
                     centeredOn(
                         at,
@@ -338,6 +441,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                         this.rootSize(),
                     ),
                     dryRun,
+                    duration,
                 );
             },
             "focus-node": (payload, dryRun) => this.focusNode(payload, dryRun),
@@ -351,19 +455,32 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                     );
                 }
                 if (!dryRun && interactive !== this.interactive) {
-                    if (!interactive) this.cancelPress();
+                    if (!interactive) {
+                        this.cancelPress();
+                        this.cancelFollowing();
+                    }
                     this.interactive = interactive;
                     this.notify({ gesture: true });
                 }
                 return ok({ interactive });
             },
             "cancel-gesture": (_payload, dryRun) => {
-                if (!this.press && !this.pinch) {
-                    return fail("refused", "no gesture is under way");
+                if (
+                    !this.press &&
+                    !this.pinch &&
+                    !this.following &&
+                    !this.stopAnimation
+                ) {
+                    return fail(
+                        "refused",
+                        "no gesture nor viewport animation is under way",
+                    );
                 }
                 if (!dryRun) {
                     this.cancelPress();
+                    this.cancelFollowing();
                     this.endPinch();
+                    this.stopViewportAnimation();
                 }
                 return ok({});
             },
@@ -433,6 +550,9 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             },
             "visible-nodes": () => this.visibleNodes(),
             "visible-edges": () => this.visibleEdges(),
+            "drawn-edges": () => this.drawnEdges(),
+            "node-z-index-by": (p) =>
+                this.nodeZ(String(payloadRecord(p).nodeId)),
             "handles-by": (p) => {
                 const nodeId = String(payloadRecord(p).nodeId);
                 return this.measurements
@@ -494,6 +614,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     destroy(): void {
         if (this.destroyed) return;
         this.detachRoot();
+        this.stopViewportAnimation();
         this.destroyed = true;
         this.features.destroy();
         if (this.viewportElement) clearViewportTransform(this.viewportElement);
@@ -523,6 +644,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     /** Sets the viewport: writes its transform, tells the adapters and the app. */
     private setViewport(viewport: Viewport, gesture: boolean): Viewport {
+        // a gesture (a pan, the wheel, a pinch, the minimap, auto-pan) takes the viewport over
+        if (gesture) this.stopViewportAnimation();
         const next = this.kept(viewport);
         if (sameViewport(next, this.current)) return this.current;
         this.current = Object.freeze(next);
@@ -534,7 +657,15 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         return this.current;
     }
 
-    private apply(viewport: Viewport, dryRun: boolean): CommandResult<unknown> {
+    /**
+     * A viewport action's change: at once, or (`duration`, with a root whose window has frames)
+     * animated to the viewport it returns; either way an animation under way stops.
+     */
+    private apply(
+        viewport: Viewport,
+        dryRun: boolean,
+        duration = 0,
+    ): CommandResult<unknown> {
         if (
             !finite(viewport.x) ||
             !finite(viewport.y) ||
@@ -546,9 +677,41 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 "the viewport must be finite numbers",
             );
         }
-        return ok(
-            dryRun ? this.kept(viewport) : this.setViewport(viewport, false),
-        );
+        if (dryRun) return ok(this.kept(viewport));
+        this.stopViewportAnimation();
+        const target = this.kept(viewport);
+        const view = viewOf(this.rootElement);
+        if (
+            duration > 0 &&
+            view &&
+            typeof view.requestAnimationFrame === "function" &&
+            !sameViewport(target, this.current)
+        ) {
+            const stop = animateViewport({
+                view,
+                from: this.current,
+                to: target,
+                duration,
+                easing: this.options.easing,
+                step: (next) => {
+                    this.setViewport(next, false);
+                },
+                done: () => {
+                    if (this.stopAnimation === stop)
+                        this.stopAnimation = undefined;
+                },
+            });
+            this.stopAnimation = stop;
+            return ok(Object.freeze(target));
+        }
+        return ok(this.setViewport(viewport, false));
+    }
+
+    /** Stops the viewport animation under way, where it is. */
+    private stopViewportAnimation(): void {
+        const stop = this.stopAnimation;
+        this.stopAnimation = undefined;
+        stop?.();
     }
 
     private setViewportAction(
@@ -565,6 +728,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 );
             }
         }
+        const duration = durationOf(payload);
+        if (typeof duration !== "number") return duration;
         return this.apply(
             {
                 x: (record.x as number | undefined) ?? this.current.x,
@@ -572,6 +737,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 zoom: (record.zoom as number | undefined) ?? this.current.zoom,
             },
             dryRun,
+            duration,
         );
     }
 
@@ -581,6 +747,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         direction: 1 | -1,
     ): CommandResult<unknown> {
         const { step, around } = payloadRecord(payload) as ZoomStepPayload;
+        const duration = durationOf(payload);
+        if (typeof duration !== "number") return duration;
         const factor = step ?? this.options.zoomStep ?? 1.2;
         if (!finite(factor) || factor <= 1) {
             return fail(
@@ -607,6 +775,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         return this.apply(
             zoomAround(this.current, zoom, pointOf(around) ?? this.center()),
             dryRun,
+            duration,
         );
     }
 
@@ -614,6 +783,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         payload: FitViewPayload,
         dryRun: boolean,
     ): CommandResult<unknown> {
+        const duration = durationOf(payload);
+        if (typeof duration !== "number") return duration;
         const size = this.rootSize();
         if (size.width <= 0 || size.height <= 0) {
             return fail("refused", "the root has no size yet");
@@ -627,7 +798,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             payload.minZoom ?? this.minZoom,
             payload.maxZoom ?? this.maxZoom,
         );
-        return this.apply(viewport, dryRun);
+        return this.apply(viewport, dryRun, duration);
     }
 
     private focusNode(
@@ -672,6 +843,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             rect.x + rect.width <= view.x + view.width &&
             rect.y + rect.height <= view.y + view.height;
         if (!inside) {
+            this.stopViewportAnimation();
             this.setViewport(
                 centeredOn(
                     { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 },
@@ -734,37 +906,182 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             : { width, height };
     }
 
-    private positionOf(nodeId: string): XY | undefined {
-        return this.model.get("absolute-position-by", { nodeId });
+    /**
+     * The share of a node's size its position stands at: the engine's `nodeOrigin` for a node on
+     * the flow, the top-left corner for a child (its position is relative to its parent's
+     * top-left corner, so the model's sub-flow rules hold as they are).
+     */
+    private originOf(node: FlowNode): XY {
+        if (node.parentId !== undefined && this.node(node.parentId)) {
+            return TOP_LEFT;
+        }
+        return this.options.nodeOrigin ?? TOP_LEFT;
+    }
+
+    /** A node's position in absolute flow coordinates: its parent's top-left corner plus its own. */
+    private absolutePosition(node: FlowNode, seen = new Set<string>()): XY {
+        seen.add(node.id);
+        const parent =
+            node.parentId === undefined || seen.has(node.parentId)
+                ? undefined
+                : this.node(node.parentId);
+        if (!parent) return node.position;
+        const corner = this.boxOf(parent, seen);
+        return {
+            x: corner.x + node.position.x,
+            y: corner.y + node.position.y,
+        };
+    }
+
+    /** A node's absolute box (`nodeBox`: its position at its origin), its size zero until known. */
+    private boxOf(node: FlowNode, seen = new Set<string>()): Rect {
+        return nodeBox(
+            this.absolutePosition(node, seen),
+            this.sizeOf(node) ?? ZERO_SIZE,
+            this.originOf(node),
+        );
+    }
+
+    /** The top-left corner of a node's parent's box (0, 0 without one). */
+    private parentCorner(node: FlowNode): XY {
+        const parent =
+            node.parentId === undefined ? undefined : this.node(node.parentId);
+        return parent ? this.boxOf(parent) : TOP_LEFT;
     }
 
     /** A node's absolute box, its size zero until known. */
     private nodeRect(nodeId: string): Rect | undefined {
         const node = this.node(nodeId);
-        const position = node && this.positionOf(nodeId);
-        if (!node || !position) return undefined;
-        const size = this.sizeOf(node) ?? ZERO_SIZE;
-        return {
-            x: position.x,
-            y: position.y,
-            width: size.width,
-            height: size.height,
-        };
+        return node ? this.boxOf(node) : undefined;
     }
 
     /** A node's absolute box, once its size is known. */
     private knownRect(nodeId: string): Rect | undefined {
         const node = this.node(nodeId);
-        const size = node && this.sizeOf(node);
-        const position = size && this.positionOf(nodeId);
-        return size && position
-            ? {
-                  x: position.x,
-                  y: position.y,
-                  width: size.width,
-                  height: size.height,
-              }
-            : undefined;
+        return node && this.sizeOf(node) ? this.boxOf(node) : undefined;
+    }
+
+    /**
+     * The position (relative to its parent) that puts a node's box of `size` with its top-left
+     * corner at the absolute flow point `corner`.
+     */
+    private positionFor(nodeId: string, corner: XY, size: Size): XY {
+        const node = this.node(nodeId);
+        if (!node) return corner;
+        const parent = this.parentCorner(node);
+        const origin = this.originOf(node);
+        return {
+            x: corner.x + origin.x * size.width - parent.x,
+            y: corner.y + origin.y * size.height - parent.y,
+        };
+    }
+
+    /**
+     * The absolute rectangle a node's box stays inside: its parent's box (`extent: "parent"`,
+     * with the measured sizes), its own rectangle `extent` (relative to its parent's top-left
+     * corner for a child) and the engine's `nodeExtent`, together; none when nothing bounds it.
+     */
+    private extentOf(nodeId: string): Rect | undefined {
+        const node = this.node(nodeId);
+        if (!node) return undefined;
+        const bounds: Rect[] = [];
+        const parent =
+            node.parentId === undefined ? undefined : this.node(node.parentId);
+        const corner = parent ? this.boxOf(parent) : TOP_LEFT;
+        if (parent && node.extent === "parent" && node.expandParent !== true) {
+            const room = this.sizeOf(parent);
+            bounds.push({
+                x: corner.x,
+                y: corner.y,
+                width: room?.width ?? Number.POSITIVE_INFINITY,
+                height: room?.height ?? Number.POSITIVE_INFINITY,
+            });
+        }
+        const own = node.extent;
+        if (typeof own === "object" && own !== null) {
+            bounds.push({
+                x: corner.x + own.x,
+                y: corner.y + own.y,
+                width: own.width,
+                height: own.height,
+            });
+        }
+        if (this.options.nodeExtent) bounds.push(this.options.nodeExtent);
+        return intersectionOf(bounds);
+    }
+
+    /**
+     * A node's position (relative to its parent) kept inside its extent (`extentOf`) with its
+     * measured size; `size` overrides it (a resize under way).
+     */
+    private keepInExtent(nodeId: string, position: XY, size?: Size): XY {
+        const node = this.node(nodeId);
+        const bounds = this.extentOf(nodeId);
+        if (!node || !bounds) return position;
+        const own = size ?? this.sizeOf(node) ?? ZERO_SIZE;
+        const parent = this.parentCorner(node);
+        const origin = this.originOf(node);
+        const corner = {
+            x: parent.x + position.x - origin.x * own.width,
+            y: parent.y + position.y - origin.y * own.height,
+        };
+        const kept = cornerInside(corner, own, bounds);
+        return {
+            x:
+                kept.x === corner.x
+                    ? position.x
+                    : kept.x + origin.x * own.width - parent.x,
+            y:
+                kept.y === corner.y
+                    ? position.y
+                    : kept.y + origin.y * own.height - parent.y,
+        };
+    }
+
+    /**
+     * A node's own stacking value: its `zIndex`, raised when it is selected and
+     * `elevateNodesOnSelect` is on.
+     */
+    private ownZ(node: FlowNode): number {
+        const raised =
+            node.selected === true &&
+            (this.options.elevateNodesOnSelect ?? true);
+        return zOf(node.zIndex) + (raised ? SELECTED_RAISE : 0);
+    }
+
+    /** A node's structural `z-index`: its own, and always above its parent's (0 for none). */
+    private nodeZ(nodeId: string): number {
+        // most nodes have no parent: no chain to walk (it is read per node on every pan frame)
+        const first = this.node(nodeId);
+        if (first === undefined) return 0;
+        if (first.parentId === undefined) return this.ownZ(first);
+        const chain: FlowNode[] = [];
+        const seen = new Set<string>();
+        for (
+            let node: FlowNode | undefined = first;
+            node !== undefined && !seen.has(node.id);
+            node =
+                node.parentId === undefined
+                    ? undefined
+                    : this.node(node.parentId)
+        ) {
+            seen.add(node.id);
+            chain.push(node);
+        }
+        let z: number | undefined;
+        for (const node of chain.reverse()) {
+            const own = this.ownZ(node);
+            z = z === undefined ? own : Math.max(own, z + 1);
+        }
+        return z ?? 0;
+    }
+
+    /** An edge's stacking value: its `zIndex`, raised when selected with `elevateEdgesOnSelect`. */
+    private edgeZ(edge: FlowEdge): number {
+        const raised =
+            edge.selected === true &&
+            (this.options.elevateEdgesOnSelect ?? false);
+        return zOf(edge.zIndex) + (raised ? SELECTED_RAISE : 0);
     }
 
     private boundsOf(
@@ -787,13 +1104,13 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     /** A handle with its absolute centre (once it and its node are measured). */
     private placed(handle: FlowHandle): FlowHandle {
         if (!handle.bounds) return handle;
-        const position = this.positionOf(handle.nodeId);
-        if (!position) return handle;
+        const rect = this.nodeRect(handle.nodeId);
+        if (!rect) return handle;
         return {
             ...handle,
             center: {
-                x: position.x + handle.bounds.x + handle.bounds.width / 2,
-                y: position.y + handle.bounds.y + handle.bounds.height / 2,
+                x: rect.x + handle.bounds.x + handle.bounds.width / 2,
+                y: rect.y + handle.bounds.y + handle.bounds.height / 2,
             },
         };
     }
@@ -871,33 +1188,28 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         });
     }
 
-    /** A node's position kept inside its parent's measured box (`extent: "parent"`). */
-    private keepInParent(nodeId: string, position: XY, size?: Size): XY {
-        const node = this.node(nodeId);
-        if (
-            !node ||
-            node.parentId === undefined ||
-            node.extent !== "parent" ||
-            node.expandParent === true
-        ) {
-            return position;
-        }
-        const parent = this.node(node.parentId);
-        if (!parent) return position;
-        const room = this.sizeOf(parent);
-        const own = size ?? this.sizeOf(node) ?? ZERO_SIZE;
-        const clamp = (value: number, max: number) =>
-            Math.min(Math.max(value, 0), Math.max(0, max));
-        return {
-            x: clamp(
-                position.x,
-                (room?.width ?? Number.POSITIVE_INFINITY) - own.width,
-            ),
-            y: clamp(
-                position.y,
-                (room?.height ?? Number.POSITIVE_INFINITY) - own.height,
-            ),
-        };
+    /**
+     * The edges an adapter draws, in drawing order: those shown whose nodes are measured (with
+     * `onlyRenderVisible`, those in view), by their stacking value, the document's order among
+     * equals.
+     */
+    private drawnEdges(): readonly FlowEdge[] {
+        const shown =
+            (this.options.onlyRenderVisible ?? false)
+                ? this.visibleEdges()
+                : this.model
+                      .get("all-edges")
+                      .filter(
+                          (edge) =>
+                              edge.hidden !== true &&
+                              this.node(edge.source)?.hidden !== true &&
+                              this.node(edge.target)?.hidden !== true &&
+                              this.edgePath(edge.id) !== undefined,
+                      );
+        return shown
+            .map((edge, i) => ({ edge, i, z: this.edgeZ(edge) }))
+            .sort((a, b) => a.z - b.z || a.i - b.i)
+            .map(({ edge }) => edge);
     }
 
     /**
@@ -976,8 +1288,16 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             measured: (nodeId) => this.knownRect(nodeId) !== undefined,
             handles: () => this.handles(),
             edgePath: (edgeId) => this.edgePath(edgeId),
-            keepInParent: (nodeId, position, size) =>
-                this.keepInParent(nodeId, position, size),
+            absolutePosition: (nodeId) => {
+                const node = this.node(nodeId);
+                return node ? this.absolutePosition(node) : undefined;
+            },
+            positionFor: (nodeId, corner, size) =>
+                this.positionFor(nodeId, corner, size),
+            extentOf: (nodeId) => this.extentOf(nodeId),
+            keepInExtent: (nodeId, position, size) =>
+                this.keepInExtent(nodeId, position, size),
+            held: (key, event) => this.held(key, event),
             nodeElement: (nodeId) => this.measurements.nodeElement(nodeId),
             interactive: () => this.interactive,
             partOptions: (part, id) =>
@@ -1017,13 +1337,37 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             ["dblclick", (event) => this.doubleClick(event as MouseEvent)],
             ["keydown", (event) => this.keyDown(event as KeyboardEvent)],
             ["focusin", (event) => this.focusIn(event as FocusEvent)],
+            ["contextmenu", (event) => this.contextMenu(event as MouseEvent)],
         ];
         for (const [type, listener, options] of listeners) {
             element.addEventListener(type, listener, options);
         }
+        // the activation keys are held anywhere in the page, not only with focus in the flow
+        const doc = element.ownerDocument;
+        const view = viewOf(element);
+        const keyListeners: [EventTarget | undefined, string, EventListener][] =
+            [
+                [
+                    doc,
+                    "keydown",
+                    (event) => this.keyHeld(event as KeyboardEvent, true),
+                ],
+                [
+                    doc,
+                    "keyup",
+                    (event) => this.keyHeld(event as KeyboardEvent, false),
+                ],
+                [view, "blur", () => this.heldKeys.clear()],
+            ];
+        for (const [target, type, listener] of keyListeners) {
+            target?.addEventListener(type, listener);
+        }
         this.removeRootListeners = () => {
             for (const [type, listener, options] of listeners) {
                 element.removeEventListener(type, listener, options);
+            }
+            for (const [target, type, listener] of keyListeners) {
+                target?.removeEventListener(type, listener);
             }
         };
         this.features.attached(element);
@@ -1034,7 +1378,13 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     private detachRoot(): void {
         if (!this.rootElement) return;
         this.cancelPress();
+        this.cancelFollowing();
         this.endPinch();
+        // the frames are the root window's: another root may be in another window
+        this.stopViewportAnimation();
+        this.stopAutoPan();
+        this.heldKeys.clear();
+        this.blockContextMenu = false;
         this.pointers.clear();
         this.features.detached();
         this.removeRootListeners?.();
@@ -1088,6 +1438,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 event.pointerType !== "touch")
         ) {
             this.press = undefined;
+            this.stopAutoPan();
             this.release(press.pointerId);
             if (press.last) press.gesture?.end(press.last);
             else press.gesture?.cancel();
@@ -1109,21 +1460,38 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             return;
         }
         if (event.isPrimary === false) return;
-        if (event.pointerType === "mouse" && event.button !== 0) return;
+        this.blockContextMenu = false;
+        // a touch or a pen presses as the primary button
+        const button = event.pointerType === "mouse" ? event.button : 0;
+        // a mouse button that does not pan starts nothing (a feature's gestures are primary)
+        if (button !== 0 && !this.pansWith(button)) return;
         const target = this.target(event.target);
         if (target.kind === "other") {
             this.pointers.delete(event.pointerId);
             return;
         }
-        let gesture = this.features.pointerdown(event, target);
+        let gesture: FeatureGesture | undefined;
         let pan = false;
-        if (
-            !gesture &&
-            target.kind === "pane" &&
-            (this.options.panOnDrag ?? true)
-        ) {
+        const keyPan = button === 0 && this.panKeyHeld(event);
+        const following = button === 0 && !keyPan ? this.following : undefined;
+        if (following) {
+            // the gesture a tap started takes the next press: its release is the gesture's end
+            this.following = undefined;
+            gesture = following;
+        } else if (keyPan) {
+            // the pan activation key: a pan from anywhere, and no other gesture
             gesture = this.panGesture(client);
             pan = true;
+        } else if (button !== 0) {
+            if (target.kind !== "pane") return;
+            gesture = this.panGesture(client);
+            pan = true;
+        } else {
+            gesture = this.features.pointerdown(event, target);
+            if (!gesture && target.kind === "pane" && this.pansWith(0)) {
+                gesture = this.panGesture(client);
+                pan = true;
+            }
         }
         this.press = {
             pointerId: event.pointerId,
@@ -1131,6 +1499,9 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             target,
             gesture,
             pan,
+            button,
+            keyPan,
+            follows: following !== undefined,
             travel: 0,
             last: undefined,
         };
@@ -1140,7 +1511,77 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             event.preventDefault();
     }
 
+    /** Whether a press of a mouse button (0 for a touch or a pen) pans the pane (`panOnDrag`). */
+    private pansWith(button: number): boolean {
+        const option = this.options.panOnDrag ?? true;
+        return typeof option === "boolean"
+            ? option && button === 0
+            : option.includes(button);
+    }
+
+    /** Whether `key` is held now: a modifier as `event` tells it, any other from the document's keys. */
+    private held(
+        key: string | null,
+        event: MouseEvent | KeyboardEvent,
+    ): boolean {
+        if (key === null || key === "") return false;
+        const modifier = MODIFIERS[key];
+        return modifier !== undefined
+            ? event[modifier]
+            : this.heldKeys.has(key);
+    }
+
+    private panKeyHeld(event: MouseEvent): boolean {
+        const key = this.options.panActivationKey;
+        return this.held(key === undefined ? " " : key, event);
+    }
+
+    private zoomKeyHeld(event: MouseEvent): boolean {
+        const key = this.options.zoomActivationKey;
+        if (key !== undefined) return this.held(key, event);
+        const agent = viewOf(this.rootElement)?.navigator;
+        const platform = `${agent?.platform ?? ""} ${agent?.userAgent ?? ""}`;
+        return this.held(
+            /Mac|iPhone|iPad|iPod/.test(platform) ? "Meta" : "Control",
+            event,
+        );
+    }
+
+    /** A key went down or up in the root's document: the activation keys read it. */
+    private keyHeld(event: KeyboardEvent, down: boolean): void {
+        // a connection a tap started waits without a press, often with focus outside the root (the
+        // handle's press kept it from moving): Escape anywhere in the page cancels it
+        if (down && event.key === "Escape" && this.following && !this.press) {
+            this.cancelFollowing();
+            event.preventDefault();
+            return;
+        }
+        if (down) {
+            // typing in a field (a node's, the page's) holds no activation key
+            if (asElement(event.target)?.closest?.(EDITABLE)) return;
+            this.heldKeys.add(event.key);
+            this.heldKeys.add(event.code);
+        } else {
+            this.heldKeys.delete(event.key);
+            this.heldKeys.delete(event.code);
+        }
+    }
+
+    /**
+     * A middle or right button pan keeps the context menu out while it is pressed (macOS and Linux
+     * open it on press, before any move), and a right-button pan that moved after its release
+     * (Windows opens it on release).
+     */
+    private contextMenu(event: MouseEvent): void {
+        const press = this.press;
+        const panning = press?.pan === true && press.button !== 0;
+        if (panning || this.blockContextMenu) event.preventDefault();
+        this.blockContextMenu = false;
+    }
+
     private panGesture(start: XY): FeatureGesture {
+        // a pan takes the viewport over from an animation, where it is
+        this.stopViewportAnimation();
         const origin = this.current;
         let moved = false;
         return {
@@ -1179,10 +1620,78 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             return;
         }
         const press = this.press;
-        if (!press || press.pointerId !== event.pointerId) return;
+        if (!press) {
+            // a gesture a tap started follows the pointer without a press
+            if (event.isPrimary !== false) this.following?.move(event);
+            return;
+        }
+        if (press.pointerId !== event.pointerId) return;
         press.travel = Math.max(press.travel, distance(press.start, client));
         press.last = event;
         press.gesture?.move(event);
+        this.autoPan();
+    }
+
+    /** The auto-pan offset of the press under way now (zero when it does not auto-pan). */
+    private autoPanNow(): XY {
+        const press = this.press;
+        const gesture = press?.gesture;
+        if (
+            !press?.last ||
+            press.pan ||
+            gesture?.autoPan !== true ||
+            gesture.active?.() !== true
+        ) {
+            return { x: 0, y: 0 };
+        }
+        return autoPanOffset(
+            this.toRoot({ x: press.last.clientX, y: press.last.clientY }),
+            this.rootSize(),
+            this.options.autoPan,
+        );
+    }
+
+    /** Starts the auto-pan loop when the press's pointer is near the edge (one loop per engine). */
+    private autoPan(): void {
+        if (this.autoPanFrame || this.destroyed) return;
+        const offset = this.autoPanNow();
+        if (offset.x === 0 && offset.y === 0) return;
+        const view = viewOf(this.rootElement);
+        if (!view || typeof view.requestAnimationFrame !== "function") return;
+        const id = view.requestAnimationFrame(() => {
+            this.autoPanFrame = undefined;
+            this.autoPanStep();
+        });
+        this.autoPanFrame = { view, id };
+    }
+
+    /**
+     * One auto-pan frame: the viewport pans, and the gesture moves again with its last pointer
+     * event (the flow point under the still pointer changed). It stops at the translate extent and
+     * when the pointer leaves the edge; the next move starts it again.
+     */
+    private autoPanStep(): void {
+        const offset = this.autoPanNow();
+        const last = this.press?.last;
+        if (!last || (offset.x === 0 && offset.y === 0)) return;
+        const before = this.current;
+        const after = this.setViewport(
+            {
+                x: before.x + offset.x,
+                y: before.y + offset.y,
+                zoom: before.zoom,
+            },
+            true,
+        );
+        if (sameViewport(before, after)) return;
+        this.press?.gesture?.move(last);
+        this.autoPan();
+    }
+
+    private stopAutoPan(): void {
+        const frame = this.autoPanFrame;
+        this.autoPanFrame = undefined;
+        if (frame) frame.view.cancelAnimationFrame(frame.id);
     }
 
     private pointerUp(event: PointerEvent): void {
@@ -1195,11 +1704,28 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         const press = this.press;
         if (!press || press.pointerId !== event.pointerId) return;
         this.press = undefined;
+        this.stopAutoPan();
         this.release(event.pointerId);
         const active = press.gesture?.active?.() ?? false;
         press.gesture?.end(event);
-        if (!active && press.travel <= TAP_TOLERANCE && this.interactive) {
-            this.features.tap(event, press.target);
+        if (press.button !== 0) {
+            // the context menu a moved right-button pan's release opens stays out
+            this.blockContextMenu =
+                press.pan && press.button === 2 && press.travel > TAP_TOLERANCE;
+            return;
+        }
+        if (
+            !press.keyPan &&
+            !press.follows &&
+            !active &&
+            press.travel <= TAP_TOLERANCE &&
+            this.interactive
+        ) {
+            const taken = this.features.tap(event, press.target);
+            if (typeof taken === "object") {
+                this.cancelFollowing();
+                this.following = taken;
+            }
         }
     }
 
@@ -1213,11 +1739,19 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         if (this.press?.pointerId === event.pointerId) this.cancelPress();
     }
 
+    /** Ends the gesture a tap started without committing. */
+    private cancelFollowing(): void {
+        const following = this.following;
+        this.following = undefined;
+        following?.cancel();
+    }
+
     /** Ends the press under way without committing (its gesture cancelled). */
     private cancelPress(): void {
         const press = this.press;
         if (!press) return;
         this.press = undefined;
+        this.stopAutoPan();
         this.release(press.pointerId);
         press.gesture?.cancel();
     }
@@ -1229,6 +1763,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         // the press's gesture (a pan) gives way: the pinch pans and zooms from here
         const press = this.press;
         this.press = undefined;
+        this.stopAutoPan();
+        this.stopViewportAnimation();
         if (press && !press.pan) press.gesture?.cancel();
         const middle = this.toRoot({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
         this.pinch = {
@@ -1293,13 +1829,16 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         const dx = event.deltaX * scale;
         const dy = event.deltaY * scale;
         const pinching = event.ctrlKey;
+        const panOnScroll = this.options.panOnScroll ?? false;
         const point = this.toRoot({ x: event.clientX, y: event.clientY });
+        // with panOnScroll, the zoom activation key held turns the wheel back into a zoom
+        const zoomKey = panOnScroll && this.zoomKeyHeld(event);
         if (
-            pinching
-                ? (this.options.zoomOnPinch ?? true)
-                : !(this.options.panOnScroll ?? false)
+            zoomKey ||
+            (pinching ? (this.options.zoomOnPinch ?? true) : !panOnScroll)
         ) {
-            if (!pinching && !(this.options.zoomOnScroll ?? true)) return;
+            if (!zoomKey && !pinching && !(this.options.zoomOnScroll ?? true))
+                return;
             event.preventDefault();
             // a trackpad's pinch sends small deltas: it zooms faster per pixel than a wheel
             const zoom =
@@ -1315,14 +1854,19 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             );
             return;
         }
-        if (this.options.panOnScroll ?? false) {
+        if (panOnScroll) {
             event.preventDefault();
-            const horizontal = event.shiftKey && dx === 0;
+            // Shift turns a wheel without a sideways delta sideways; the mode keeps one axis
+            const mode = this.options.panOnScrollMode ?? "free";
+            const sideways = event.shiftKey && dx === 0 && mode !== "vertical";
+            const speed = this.options.panOnScrollSpeed ?? 1;
+            const byX = mode === "vertical" ? 0 : sideways ? dy : dx;
+            const byY = mode === "horizontal" || sideways ? 0 : dy;
             this.setViewport(
                 {
                     ...this.current,
-                    x: this.current.x - (horizontal ? dy : dx),
-                    y: this.current.y - (horizontal ? 0 : dy),
+                    x: this.current.x - byX * speed,
+                    y: this.current.y - byY * speed,
                 },
                 true,
             );
@@ -1343,8 +1887,12 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     private keyDown(event: KeyboardEvent): void {
         if (this.destroyed) return;
-        if (event.key === "Escape" && (this.press || this.pinch)) {
+        if (
+            event.key === "Escape" &&
+            (this.press || this.pinch || this.following)
+        ) {
             this.cancelPress();
+            this.cancelFollowing();
             this.endPinch();
             event.preventDefault();
             return;

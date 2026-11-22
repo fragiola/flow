@@ -1,6 +1,6 @@
 // What every gesture or key that moves nodes shares: the nodes a move carries (a selected node
-// carries the selection; a node whose parent moves too is carried by it), their positions relative
-// to their parents, and the commands that move them (one `node.move`, or a `batch` of them).
+// carries the selection; a node whose parent moves too is carried by it) and the commands that move
+// them (one `node.move`, or a `batch` of them).
 import type { BatchEntry } from "../commands/types";
 import type { FlowNode, XY } from "../document/types";
 import type { FeatureModel } from "../features/types";
@@ -38,20 +38,6 @@ export function carriedBy(model: FeatureModel, nodeId: string): string[] {
             .filter((node) => model.is("node-draggable", { nodeId: node.id }))
             .map((node) => node.id),
     );
-}
-
-/** The absolute position of a node's parent (its origin for a relative position); 0, 0 without one. */
-export function parentOrigin(model: FeatureModel, nodeId: string): XY {
-    const parentId = (
-        model.get("node-by", { id: nodeId }) as FlowNode | undefined
-    )?.parentId;
-    const origin =
-        parentId === undefined
-            ? undefined
-            : (model.get("absolute-position-by", { nodeId: parentId }) as
-                  | XY
-                  | undefined);
-    return origin ?? { x: 0, y: 0 };
 }
 
 /** Runs moves as one step: one `node.move`, or a `batch` of them. */

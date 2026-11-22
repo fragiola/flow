@@ -346,6 +346,69 @@ A press on a field, a button or a link inside a node starts no gesture: typing i
 drags the node. Mark anything else that must keep its presses with `data-flow-no-gesture`, and an
 element that scrolls with `data-flow-no-wheel` (the wheel then scrolls it instead of zooming).
 
+## Drag by a handle
+
+A node that holds an element with `data-flow-drag-handle` drags only from that element: a title
+bar, a grip. A press anywhere else on the node selects it but moves nothing and does not pan, so
+its body is free for a canvas, a chart or text to select. The `custom-nodes` example's preview
+drags by its title bar. `DRAG_HANDLE_ATTRIBUTE` is the attribute's name, for code that builds it.
+
+<Framework name="react">
+
+```tsx
+<Flow.Node<Types> node={node} className="node">
+    <div data-flow-drag-handle="" className="cursor-grab border-b px-2 py-1 active:cursor-grabbing">
+        {node.data.label}
+    </div>
+    <div className="p-2">…</div>
+</Flow.Node>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Node :node="node" class="node">
+    <div data-flow-drag-handle class="cursor-grab border-b px-2 py-1 active:cursor-grabbing">
+        {{ node.data.label }}
+    </div>
+    <div class="p-2">…</div>
+</Flow.Node>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Node {node} class="node">
+    <div data-flow-drag-handle class="cursor-grab border-b px-2 py-1 active:cursor-grabbing">
+        {node.data.label}
+    </div>
+    <div class="p-2">…</div>
+</Flow.Node>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div [flowNode]="node" class="node">
+    <div data-flow-drag-handle class="cursor-grab border-b px-2 py-1 active:cursor-grabbing">
+        {{ node.data.label }}
+    </div>
+    <div class="p-2">…</div>
+</div>
+```
+
+</Framework>
+
+The handle belongs to the nearest node around it: a child node's handle drags the child and does
+not limit its parent.
+Keyboard moves (the arrows) and code (`node.move`) ignore it.
+
 ## Handles where you want them
 
 A `Flow.Handle` sits at the middle of its `side` by default. Give a node several handles of one
@@ -389,6 +452,51 @@ type with a `handleId` each, and move them along the side with your style:
 
 An edge names the handle it ends at with `targetHandle: "colour"` (and `sourceHandle` at its
 start). See [Handles and connections](/docs/concepts/handles-and-connections).
+
+## Where a node stands
+
+A node's `position` is its box's top-left corner. The root's `nodeOrigin` moves that anchor, as
+shares of the node's size: `{ x: 0.5, y: 0.5 }` stands every node on its centre, which suits a
+layout that computes centres (a circle, a force layout). The engine applies it everywhere a box
+is drawn or measured (edges, handles, the minimap, `fit-view`, the selection box, drags and
+resizes); a child of a sub-flow keeps its top-left corner inside its parent.
+
+<Framework name="react">
+
+```tsx
+<Flow.Root defaultNodes={nodes} nodeOrigin={{ x: 0.5, y: 0.5 }} className="h-96">
+    …
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Root :default-nodes="nodes" :node-origin="{ x: 0.5, y: 0.5 }" class="h-96">…</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Root defaultNodes={nodes} nodeOrigin={{ x: 0.5, y: 0.5 }} class="h-96">…</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowRoot [defaultNodes]="nodes" [nodeOrigin]="{ x: 0.5, y: 0.5 }" class="h-96">…</div>
+```
+
+</Framework>
+
+The first render, before the engine measures anything (and a server render), places nodes by
+their top-left corner: an origin applies from the next frame.
 
 ## Read what is wired into a node
 

@@ -37,6 +37,13 @@ export function useControlButton(
     };
 }
 
+/** @internal a control's payload: its `duration` when given (an absent one is the engine's default) */
+export function durationPayload(duration: number | undefined): {
+    duration?: number;
+} {
+    return duration === undefined ? {} : { duration };
+}
+
 /** `ZoomIn` → `zoom-in`. */
 function partName(part: string): string {
     return part.replace(

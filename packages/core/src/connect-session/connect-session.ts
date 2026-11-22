@@ -28,6 +28,14 @@ export interface ConnectStart {
         | undefined;
 }
 
+/** How a connection gesture starts (`ConnectSession.gesture`). */
+export interface GestureOptions {
+    /** it has started already: a tap began it */
+    readonly following?: boolean | undefined;
+    /** it starts only once the pointer moved past this many pixels; default: 1 pixel */
+    readonly tolerance?: number | undefined;
+}
+
 /** The shared connection state of one engine. */
 export class ConnectSession {
     /** how near (in pixels) a handle snaps; set by `connection()` */
@@ -131,34 +139,60 @@ export class ConnectSession {
         this.host.changed();
     }
 
-    /** A gesture drawing a connection from `start`, pressed at `client`. */
-    gesture(start: ConnectStart, client: XY): FeatureGesture {
-        let active = false;
+    private started(start: ConnectStart): void {
+        if (start.reconnecting) {
+            this.host.emit({
+                type: "reconnect-start",
+                edgeId: start.reconnecting.edgeId,
+                end: start.reconnecting.end,
+            });
+        } else {
+            this.host.emit({
+                type: "connect-start",
+                nodeId: start.from.nodeId,
+                handleId: start.from.handleId,
+                handleType: start.from.type,
+            });
+        }
+    }
+
+    /**
+     * A gesture drawing a connection from `start`, pressed at `client`: it starts once the pointer
+     * moves (1 pixel, or past `tolerance` pixels: a press that moves less stays a tap); `following`,
+     * it has started (a tap began it: it follows the pointer until the next press's release, its
+     * drop).
+     */
+    gesture(
+        start: ConnectStart,
+        client: XY,
+        { following = false, tolerance }: GestureOptions = {},
+    ): FeatureGesture {
+        let active = following;
         const finish = () => {
             this.state = null;
             this.host.changed();
         };
+        if (following) {
+            this.started(start);
+            this.update(start, client);
+        }
         return {
+            autoPan: true,
             move: (event) => {
                 const point = { x: event.clientX, y: event.clientY };
                 if (!active) {
-                    if (Math.hypot(point.x - client.x, point.y - client.y) < 1)
+                    const travel = Math.hypot(
+                        point.x - client.x,
+                        point.y - client.y,
+                    );
+                    if (
+                        tolerance === undefined
+                            ? travel < 1
+                            : travel <= tolerance
+                    )
                         return;
                     active = true;
-                    if (start.reconnecting) {
-                        this.host.emit({
-                            type: "reconnect-start",
-                            edgeId: start.reconnecting.edgeId,
-                            end: start.reconnecting.end,
-                        });
-                    } else {
-                        this.host.emit({
-                            type: "connect-start",
-                            nodeId: start.from.nodeId,
-                            handleId: start.from.handleId,
-                            handleType: start.from.type,
-                        });
-                    }
+                    this.started(start);
                 }
                 this.update(start, point);
             },

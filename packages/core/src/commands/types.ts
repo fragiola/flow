@@ -15,6 +15,7 @@ import type {
 } from "../document/types";
 import type { FeatureName } from "../features/keys";
 import type { CommandNameOf, FlowFeatures } from "../features/types";
+import type { Rect } from "../geometry/types";
 import type { JsonSchema, ValidationIssue } from "../schema/types";
 
 /** A shallow patch of data `D`: some of its top-level keys (any keys when `D` is not typed). */
@@ -103,11 +104,15 @@ export interface CommandMap<T extends FlowTypes = AnyTypes> {
         result: { nodeId: string };
     };
     "node.set-flags": { payload: NodeFlagsPayload; result: { nodeId: string } };
+    "node.set-z-index": {
+        payload: { nodeId: string; zIndex: number | null };
+        result: { nodeId: string };
+    };
     "node.set-parent": {
         payload: {
             nodeId: string;
             parentId: string | null;
-            extent?: "parent" | null;
+            extent?: "parent" | Rect | null;
             expandParent?: boolean;
         };
         result: { nodeId: string; position: XY };
@@ -123,6 +128,10 @@ export interface CommandMap<T extends FlowTypes = AnyTypes> {
         result: { edgeId: string };
     };
     "edge.set-flags": { payload: EdgeFlagsPayload; result: { edgeId: string } };
+    "edge.set-z-index": {
+        payload: { edgeId: string; zIndex: number | null };
+        result: { edgeId: string };
+    };
     "selection.set": {
         payload: {
             nodeIds?: string[];

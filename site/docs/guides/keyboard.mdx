@@ -65,11 +65,19 @@ node or edge:
 | Arrow keys | move the selected nodes, or the focused node, by `step` flow units (default 5), kept inside their parents; one step per press |
 | Shift + arrow | move by `fastStep` (default 20) |
 | Enter, Space | select it; with Shift, Ctrl or ⌘, toggle it in the selection |
-| Delete, Backspace | remove the selection (`selection.remove`), or without `selection()` the focused node or edge |
+| Delete, Backspace (`deleteKeys`) | remove the selection (`selection.remove`), or without `selection()` the focused node or edge |
 | Escape | cancel a gesture under way, then clear the selection |
 
 ```ts
 const features = [selection(), drag(), keyboard({ step: 10, fastStep: 50 })] as const;
+```
+
+`deleteKeys` (default `["Delete", "Backspace"]`) are the keys that remove, each a
+`KeyboardEvent.key` or `.code`; `[]` turns removing by key off, for a flow whose app removes from a
+menu or a button of its own:
+
+```ts
+const features = [selection(), keyboard({ deleteKeys: ["Delete"] })] as const; // Delete only, Backspace does nothing
 ```
 
 A node that is not draggable does not move, and one that is not deletable stays. The root's
