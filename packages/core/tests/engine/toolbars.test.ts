@@ -165,3 +165,37 @@ describe("node-toolbar-by with nodeIds", () => {
         expect(engine.get("node-toolbar-by", {})).toBeUndefined();
     });
 });
+
+describe("edge-toolbar-by at a point, aligned", () => {
+    it("stands at a flow point instead of the label point, with alignX and alignY", () => {
+        const { engine } = flow();
+        // (50, 40) → 50 * 2 + 10, 40 * 2 + 20
+        expect(
+            engine.get("edge-toolbar-by", {
+                edgeId: "ab",
+                point: { x: 50, y: 40 },
+                position: "source",
+                offset: { x: 1, y: -1 },
+            }),
+        ).toEqual({ x: 111, y: 99, anchorX: 0.5, anchorY: 0.5 });
+        expect(
+            engine.get("edge-toolbar-by", {
+                edgeId: "ab",
+                alignX: "start",
+                alignY: "end",
+            }),
+        ).toEqual({ x: 410, y: 170, anchorX: 0, anchorY: 1 });
+        expect(
+            engine.get("edge-toolbar-by", {
+                edgeId: "ab",
+                alignX: "end",
+                alignY: "start",
+            }),
+        ).toMatchObject({ anchorX: 1, anchorY: 0 });
+        // a point that is no point is the label point's
+        const get = engine.get as (key: string, payload: unknown) => unknown;
+        expect(
+            get("edge-toolbar-by", { edgeId: "ab", point: { x: "1" } }),
+        ).toEqual(engine.get("edge-toolbar-by", { edgeId: "ab" }));
+    });
+});

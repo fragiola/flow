@@ -702,6 +702,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 return path
                     ? edgeToolbarPosition(path, this.current, {
                           ...request,
+                          point: pointOf(request.point),
                           offset: pointOf(request.offset),
                       })
                     : undefined;

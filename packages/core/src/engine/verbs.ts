@@ -144,13 +144,19 @@ export interface EdgeToolbarPayload {
     edgeId: string;
     /** the point of the edge it stands at: its label point (default), its source or its target end */
     position?: "label" | "source" | "target" | undefined;
+    /** a flow point it stands at instead (absolute flow coordinates); wins over `position` */
+    point?: XY | undefined;
     /** a screen offset from that point, in pixels; default `{ x: 0, y: 0 }` */
     offset?: XY | undefined;
+    /** which of the toolbar's edges goes at the point across: its left (`start`), centre (default) or right */
+    alignX?: "start" | "center" | "end" | undefined;
+    /** which of the toolbar's edges goes at the point down: its top (`start`), centre (default) or bottom */
+    alignY?: "start" | "center" | "end" | undefined;
 }
 
 /**
  * An edge toolbar's anchor on the screen (relative to the root, outside the zoom): the toolbar's
- * centre goes there (`anchorX`, `anchorY` are 0.5).
+ * point at `anchorX`, `anchorY` (shares of its size, 0.5 by default: its centre) goes there.
  */
 export type EdgeToolbarPosition = NodeToolbarPosition;
 
