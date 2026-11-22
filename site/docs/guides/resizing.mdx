@@ -281,6 +281,65 @@ import { FLOW_RESIZE, RESIZE_POSITIONS } from "@fragiola/flow-angular/resize";
 
 A corner is drawn above the two sides it joins, so a press on it resizes both dimensions.
 
+## One handle, one direction, and lines
+
+A `ResizeHandle` takes a `direction` of its own (`"horizontal"`, `"vertical"`), which overrides its
+resizer's for that handle, for a press and for the arrows: a node can grow freely from its corner
+while its sides each move one dimension. `variant="line"` marks a side's handle as a line
+(`data-variant="line"`, a corner is always `"handle"`), so your styles draw it as a thin bar along
+the whole side:
+
+<Framework name="react">
+
+```tsx
+<NodeResizer>
+    <ResizeHandle position="bottom-right" aria-label="Resize note" className="size-2.5 bg-palette-ring" />
+    <ResizeHandle position="right" variant="line" direction="horizontal" aria-label="Resize note: width" className="w-0.5 cursor-ew-resize" />
+    <ResizeHandle position="bottom" variant="line" direction="vertical" aria-label="Resize note: height" className="h-0.5 cursor-ns-resize" />
+</NodeResizer>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<NodeResizer>
+    <ResizeHandle position="bottom-right" aria-label="Resize note" class="size-2.5 bg-palette-ring" />
+    <ResizeHandle position="right" variant="line" direction="horizontal" aria-label="Resize note: width" class="w-0.5 cursor-ew-resize" />
+    <ResizeHandle position="bottom" variant="line" direction="vertical" aria-label="Resize note: height" class="h-0.5 cursor-ns-resize" />
+</NodeResizer>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<NodeResizer>
+    <ResizeHandle position="bottom-right" aria-label="Resize note" class="size-2.5 bg-palette-ring" />
+    <ResizeHandle position="right" variant="line" direction="horizontal" aria-label="Resize note: width" class="w-0.5 cursor-ew-resize" />
+    <ResizeHandle position="bottom" variant="line" direction="vertical" aria-label="Resize note: height" class="h-0.5 cursor-ns-resize" />
+</NodeResizer>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowNodeResizer>
+    <div flowResizeHandle position="bottom-right" aria-label="Resize note" class="size-2.5 bg-palette-ring"></div>
+    <div flowResizeHandle position="right" variant="line" direction="horizontal" aria-label="Resize note: width" class="w-0.5 cursor-ew-resize"></div>
+    <div flowResizeHandle position="bottom" variant="line" direction="vertical" aria-label="Resize note: height" class="h-0.5 cursor-ns-resize"></div>
+</div>
+```
+
+</Framework>
+
+The line is a styling marker only: its structural style is a side handle's, and its look is yours
+([ResizeHandle](/docs/api/primitives/resize-handle#its-own-direction-and-a-line)).
+
 ## From the keyboard
 
 Install `keyboard()` beside `resize()` and every resize handle takes focus (`tabindex="0"`, from
@@ -293,6 +352,9 @@ Shift + arrow by its `fastStep` (20):
 | `left`, `right` | Arrow Left, Arrow Right |
 | `top`, `bottom` | Arrow Up, Arrow Down |
 | a corner | the four arrows, each moving one of its two sides |
+
+A handle's own `direction` (or else its resizer's) holds for the keys too: a corner of a
+`"horizontal"` handle answers Arrow Left and Arrow Right only.
 
 Every limit holds as for a drag: `minWidth` to `maxHeight`, the resizer's own, the aspect ratio,
 the parent's box and its children. At a limit the key does nothing (and the page does not scroll);
