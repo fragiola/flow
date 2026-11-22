@@ -39,13 +39,24 @@ export const Handle: FlowComponent<HandleProps, HandleSlots> = definePrimitive<
     HandleSlots
 >(
     "Handle",
-    ["type", "side", "handleId", "connectable", "nodeId", "as"],
+    [
+        "type",
+        "side",
+        "handleId",
+        "connectable",
+        "connectableStart",
+        "connectableEnd",
+        "nodeId",
+        "as",
+    ],
     (props, { attrs, slots }) => {
         const { state, props: own } = useHandle(() => ({
             type: props.type,
             side: props.side,
             handleId: props.handleId,
             connectable: props.connectable,
+            connectableStart: props.connectableStart,
+            connectableEnd: props.connectableEnd,
             nodeId: props.nodeId,
         }));
         return () => {
@@ -65,5 +76,5 @@ export const Handle: FlowComponent<HandleProps, HandleSlots> = definePrimitive<
             });
         };
     },
-    { booleans: ["connectable"] },
+    { booleans: ["connectable", "connectableStart", "connectableEnd"] },
 );

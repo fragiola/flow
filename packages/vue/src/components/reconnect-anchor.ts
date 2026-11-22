@@ -31,7 +31,8 @@ export interface ReconnectAnchorSlots
 
 /**
  * An edge end's grab area (`data-flow-part="reconnect-anchor"`, `data-end`): an SVG circle at the
- * end, inside `Flow.Edge`. With `reconnection()`, a press on it moves that end to another handle.
+ * end, inside `Flow.Edge`. With `reconnection()`, a press on it moves that end to another handle;
+ * an end its edge's `reconnectable` keeps fixed (`false`, or the other end's name) draws none.
  * Transparent by default; give it its radius (`r`, default 10) and look.
  */
 export const ReconnectAnchor: FlowComponent<
@@ -47,6 +48,15 @@ export const ReconnectAnchor: FlowComponent<
         const view = useFlowValue(context, () => {
             const engine = context.engine.value;
             const id = edgeId();
+            // `reconnectable: "source"` (or `"target"`, or false): no anchor at the other end
+            if (
+                !context.model.is("edge-reconnectable", {
+                    edgeId: id,
+                    end: props.end,
+                })
+            ) {
+                return undefined;
+            }
             return engine
                 ? {
                       attributes: engine.adapter.attributes(
