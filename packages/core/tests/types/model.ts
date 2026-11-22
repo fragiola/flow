@@ -75,6 +75,13 @@ export function typedData(): void {
         const title: string = node.data.title;
         use(title);
     }
+    // the neighbours are the registry's nodes
+    for (const incomer of model.get("incomers-by", { nodeId: "a" })) {
+        if (incomer.type === "task") use(incomer.data.title);
+    }
+    use(model.get("outgoers-by", { nodeId: "a" }).length);
+    // @ts-expect-error the neighbours of a node, by its id
+    model.get("outgoers-by", { id: "a" });
 }
 
 export function results(model: FlowModel): void {

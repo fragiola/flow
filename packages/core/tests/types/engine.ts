@@ -64,6 +64,32 @@ export function coreKeys(): void {
         easing: (t) => t,
     });
     createFlowEngine(createFlowModel(), { autoPan: false, panOnDrag: true });
+    const near: readonly { id: string }[] = engine.get("intersecting-nodes", {
+        nodeId: "a",
+        partial: false,
+    });
+    const framed: Viewport | undefined = engine.get("viewport-for-bounds", {
+        bounds: { x: 0, y: 0, width: 10, height: 10 },
+        padding: 0.2,
+    });
+    use([
+        near,
+        framed,
+        engine.get("intersecting-nodes", {
+            rect: { x: 0, y: 0, width: 1, height: 1 },
+        }),
+        engine.get("edge-toolbar-by", {
+            edgeId: "e",
+            position: "source",
+            offset: { x: 0, y: -8 },
+        })?.anchorX,
+        engine.get("node-toolbar-by", { nodeIds: ["a", "b"], side: "bottom" }),
+        engine.get("node-toolbar-by", { nodeId: "a" }),
+    ]);
+    // @ts-expect-error a toolbar stands at the label or an end
+    engine.get("edge-toolbar-by", { edgeId: "e", position: "middle" });
+    // @ts-expect-error viewport-for-bounds needs its bounds
+    engine.get("viewport-for-bounds", { padding: 0 });
     // @ts-expect-error a duration is a number of milliseconds
     engine.run("zoom-out", { duration: "fast" });
     // @ts-expect-error not a scroll mode
