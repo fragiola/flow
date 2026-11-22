@@ -7,7 +7,7 @@
         readonly edgeId: string;
         /** the point of the edge it stands at */
         readonly position: "label" | "source" | "target";
-        /** where it is anchored (its centre), in pixels relative to the root */
+        /** where it is anchored (its `alignX` / `alignY` point), in pixels relative to the root */
         readonly anchor: EdgeToolbarPosition;
     }
 
@@ -17,8 +17,14 @@
         edgeId?: string | undefined;
         /** the point of the edge it stands at: its label point, its source or its target end; default `"label"` */
         position?: "label" | "source" | "target" | undefined;
+        /** a flow point it stands at instead (absolute flow coordinates); wins over `position` */
+        point?: XY | undefined;
         /** a screen offset from that point, in pixels; default `{ x: 0, y: 0 }` */
         offset?: XY | undefined;
+        /** which of its edges goes at the point across: its left (`"start"`), centre (default) or right */
+        alignX?: "start" | "center" | "end" | undefined;
+        /** which of its edges goes at the point down: its top (`"start"`), centre (default) or bottom */
+        alignY?: "start" | "center" | "end" | undefined;
         /** whether it is shown; default while its edge is selected (`selection()`) */
         open?: boolean | undefined;
         /** your buttons */
@@ -29,8 +35,8 @@
 <!--
     @component
     A toolbar on an edge (`data-flow-part="toolbar"`, `data-flow-id` its edge's id), outside the
-    zoom: rendered in `Flow.Root` (a portal), centred at the point `edge-toolbar-by` gives (the
-    edge's label point or one of its ends), so it keeps its size at any zoom. Presses and the wheel
+    zoom: rendered in `Flow.Root` (a portal), at the point `edge-toolbar-by` gives (the edge's
+    label point, one of its ends or its `point`; its centre there, or the side `alignX` / `alignY` say), so it keeps its size at any zoom. Presses and the wheel
     over it are left to it. It renders only its children (your buttons).
 -->
 <script lang="ts">
@@ -48,7 +54,10 @@
     let {
         edgeId: edgeIdProp,
         position = "label",
+        point,
         offset,
+        alignX,
+        alignY,
         open,
         children,
         render,
@@ -70,7 +79,10 @@
         const anchor = engine.get("edge-toolbar-by", {
             edgeId,
             position,
+            point: plain(point),
             offset: plain(offset),
+            alignX,
+            alignY,
         });
         return anchor
             ? {

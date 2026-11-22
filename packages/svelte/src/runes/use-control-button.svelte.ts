@@ -2,6 +2,7 @@
 // refuses it (`engine.can`), following the view.
 import type { EngineActionKey } from "@fragiola/flow";
 import { useFlowContext } from "../context.js";
+import { plain } from "../utils/plain.svelte.js";
 import { flowValue } from "./internal.svelte.js";
 
 /** What a control button shows. */
@@ -15,17 +16,14 @@ export function useControlButton(
     part: string,
     action: EngineActionKey,
     disabledProp: () => boolean | null | undefined,
-    duration: () => number | undefined = () => undefined,
+    fields: () => object = () => ({}),
 ): {
     readonly state: ControlButtonState;
     readonly props: Record<string, unknown>;
 } {
     const context = useFlowContext(part);
-    // its `duration` when given (an absent one is the engine's default)
-    const payload = () => {
-        const value = duration();
-        return value === undefined ? {} : { duration: value };
-    };
+    // the fields its props give (an absent one is the engine's default)
+    const payload = () => givenPayload(fields());
     const allowed = flowValue(context, () =>
         context.engine ? context.engine.can(action, payload() as never) : false,
     );
@@ -47,6 +45,18 @@ export function useControlButton(
             };
         },
     };
+}
+
+/**
+ * @internal a control's payload: the fields its props give (an absent one is the engine's
+ * default), without a `$state` proxy
+ */
+export function givenPayload<P extends object>(fields: P): Partial<P> {
+    return Object.fromEntries(
+        Object.entries(fields)
+            .filter(([, value]) => value !== undefined)
+            .map(([name, value]) => [name, plain(value)]),
+    ) as Partial<P>;
 }
 
 /** `ZoomIn` → `zoom-in`. */
