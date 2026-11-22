@@ -1,9 +1,9 @@
-// Where a node's toolbar goes (NodeToolbar geometry): beside one side of the node on the screen,
-// outside the zoom, so it keeps its size whatever the zoom.
+// Where a node's toolbar goes (NodeToolbar geometry): beside one side of the node (or of several
+// nodes' bounds) on the screen, outside the zoom, so it keeps its size whatever the zoom.
 import type { Rect, Viewport } from "../geometry/types";
 import type { NodeToolbarPayload, NodeToolbarPosition } from "./verbs";
 
-/** A toolbar's anchor for a node's absolute box. */
+/** A toolbar's anchor for a node's absolute box (or several nodes' bounds). */
 export function nodeToolbarPosition(
     rect: Rect,
     viewport: Viewport,

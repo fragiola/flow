@@ -34,6 +34,10 @@ export {
     FlowEdgePathDirective,
 } from "./lib/directives/edge-path.directive";
 export {
+    type EdgeToolbarState,
+    FlowEdgeToolbarDirective,
+} from "./lib/directives/edge-toolbar.directive";
+export {
     type EdgesItemContext,
     type EdgesState,
     FlowEdgesDirective,

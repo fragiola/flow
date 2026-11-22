@@ -42,16 +42,21 @@ import type {
 } from "../features/types";
 import {
     boundsOf,
+    contains,
     cornerInside,
     intersectionOf,
     nodeBox,
     overlaps,
+    sharesArea,
 } from "../geometry/rect";
 import type { EdgePath, Rect, Viewport } from "../geometry/types";
 import {
+    type ViewportForBoundsOptions,
+    viewportForBounds,
+} from "../geometry/viewport-for-bounds";
+import {
     centeredOn,
     clampZoom,
-    fitBounds,
     keptInExtent,
     type Size,
     toFlow,
@@ -72,6 +77,7 @@ import { type AutoPanOptions, autoPanOffset } from "./auto-pan";
 import { backgroundPattern } from "./background-pattern";
 import { asElement, pressTargetOf, viewOf } from "./dom";
 import { edgeEnds, type PathOptions, pathOf } from "./edge-geometry";
+import { edgeToolbarPosition } from "./edge-toolbar";
 import type { FlowEngineEvent } from "./events";
 import { Measurements } from "./measurements";
 import { nodeToolbarPosition } from "./node-toolbar";
@@ -84,6 +90,7 @@ import {
 import { TAP_TOLERANCE } from "./tap";
 import type {
     BackgroundPatternPayload,
+    EdgeToolbarPayload,
     EngineActionKey,
     EngineActionPayload,
     EngineActionResult,
@@ -465,6 +472,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 return ok({ interactive });
             },
             "cancel-gesture": (_payload, dryRun) => {
+                this.dropEnded();
                 if (
                     !this.press &&
                     !this.pinch &&
@@ -537,6 +545,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                     Array.isArray(nodeIds) ? nodeIds : undefined,
                 );
             },
+            "intersecting-nodes": (p) => this.intersectingNodes(p),
+            "viewport-for-bounds": (p) => this.viewportForBoundsRead(p),
             "screen-to-flow": (p) => {
                 const point = pointOf(p);
                 return point ? this.toFlow(point) : undefined;
@@ -565,12 +575,36 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                     payloadRecord(p) as BackgroundPatternPayload,
                 ),
             "node-toolbar-by": (p) => {
-                const request = payloadRecord(
-                    p,
-                ) as unknown as NodeToolbarPayload;
-                const rect = this.knownRect(String(request.nodeId));
+                const request = payloadRecord(p) as NodeToolbarPayload;
+                const many = Array.isArray(request.nodeIds)
+                    ? request.nodeIds.filter(
+                          (nodeId): nodeId is string =>
+                              typeof nodeId === "string",
+                      )
+                    : [];
+                const rect =
+                    many.length > 0
+                        ? this.boundsOf(many)
+                        : typeof request.nodeId === "string"
+                          ? this.knownRect(request.nodeId)
+                          : undefined;
                 return rect
                     ? nodeToolbarPosition(rect, this.current, request)
+                    : undefined;
+            },
+            "edge-toolbar-by": (p) => {
+                const request = payloadRecord(
+                    p,
+                ) as unknown as EdgeToolbarPayload;
+                const path =
+                    typeof request.edgeId === "string"
+                        ? this.edgePath(request.edgeId)
+                        : undefined;
+                return path
+                    ? edgeToolbarPosition(path, this.current, {
+                          ...request,
+                          offset: pointOf(request.offset),
+                      })
                     : undefined;
             },
         } satisfies {
@@ -791,14 +825,70 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         }
         const bounds = this.boundsOf(payload.nodeIds);
         if (!bounds) return fail("refused", "no node has a size yet");
-        const viewport = fitBounds(
-            bounds,
-            size,
-            payload.padding ?? 0.1,
-            payload.minZoom ?? this.minZoom,
-            payload.maxZoom ?? this.maxZoom,
+        return this.apply(
+            this.framing(bounds, size, payload),
+            dryRun,
+            duration,
         );
-        return this.apply(viewport, dryRun, duration);
+    }
+
+    /**
+     * The viewport that frames `bounds` in the root (`viewportForBounds`): `fit-view`'s and
+     * `viewport-for-bounds`'; its own zoom limits default to the engine's (which still bound it).
+     */
+    private framing(
+        bounds: Rect,
+        size: Size,
+        options: ViewportForBoundsOptions,
+    ): Viewport {
+        return viewportForBounds(bounds, size.width, size.height, {
+            padding: options.padding ?? 0.1,
+            minZoom: options.minZoom ?? this.minZoom,
+            maxZoom: options.maxZoom ?? this.maxZoom,
+        });
+    }
+
+    /** `viewport-for-bounds`: the viewport `fit-view` would set for a flow rectangle. */
+    private viewportForBoundsRead(payload: unknown): Viewport | undefined {
+        const record = payloadRecord(payload);
+        const bounds = payloadRecord(record.bounds);
+        const size = this.rootSize();
+        if (
+            size.width <= 0 ||
+            size.height <= 0 ||
+            !finite(bounds.x) ||
+            !finite(bounds.y) ||
+            !finite(bounds.width) ||
+            !finite(bounds.height) ||
+            bounds.width < 0 ||
+            bounds.height < 0
+        ) {
+            return undefined;
+        }
+        return Object.freeze(
+            this.kept(
+                this.framing(
+                    {
+                        x: bounds.x,
+                        y: bounds.y,
+                        width: bounds.width,
+                        height: bounds.height,
+                    },
+                    size,
+                    {
+                        padding: finite(record.padding)
+                            ? record.padding
+                            : undefined,
+                        minZoom: finite(record.minZoom)
+                            ? record.minZoom
+                            : undefined,
+                        maxZoom: finite(record.maxZoom)
+                            ? record.maxZoom
+                            : undefined,
+                    },
+                ),
+            ),
+        );
     }
 
     private focusNode(
@@ -1099,6 +1189,41 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 return rect ? [rect] : [];
             }),
         );
+    }
+
+    /**
+     * `intersecting-nodes`: the shown nodes of known size whose box shares area with a node's box
+     * or a rectangle (`partial: false`: lies inside it), the node itself left out.
+     */
+    private intersectingNodes(payload: unknown): readonly FlowNode[] {
+        const record = payloadRecord(payload);
+        const nodeId =
+            typeof record.nodeId === "string" ? record.nodeId : undefined;
+        const rect = payloadRecord(record.rect);
+        const area =
+            nodeId !== undefined
+                ? this.knownRect(nodeId)
+                : finite(rect.x) &&
+                    finite(rect.y) &&
+                    finite(rect.width) &&
+                    finite(rect.height) &&
+                    rect.width >= 0 &&
+                    rect.height >= 0
+                  ? {
+                        x: rect.x,
+                        y: rect.y,
+                        width: rect.width,
+                        height: rect.height,
+                    }
+                  : undefined;
+        if (!area) return [];
+        const partial = record.partial !== false;
+        return this.model.get("all-nodes").filter((node) => {
+            if (node.id === nodeId || node.hidden === true) return false;
+            const box = this.knownRect(node.id);
+            if (!box) return false;
+            return partial ? sharesArea(box, area) : contains(area, box);
+        });
     }
 
     /** A handle with its absolute centre (once it and its node are measured). */
@@ -1423,6 +1548,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     private pointerDown(event: PointerEvent): void {
         if (this.destroyed) return;
+        this.dropEnded();
         const client = { x: event.clientX, y: event.clientY };
         // only touch pointers pinch: the others are never tracked
         if (event.pointerType === "touch") {
@@ -1549,6 +1675,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     /** A key went down or up in the root's document: the activation keys read it. */
     private keyHeld(event: KeyboardEvent, down: boolean): void {
+        this.dropEnded();
         // a connection a tap started waits without a press, often with focus outside the root (the
         // handle's press kept it from moving): Escape anywhere in the page cancels it
         if (down && event.key === "Escape" && this.following && !this.press) {
@@ -1612,6 +1739,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     private pointerMove(event: PointerEvent): void {
         if (this.destroyed) return;
+        this.dropEnded();
         const client = { x: event.clientX, y: event.clientY };
         if (this.pointers.has(event.pointerId))
             this.pointers.set(event.pointerId, client);
@@ -1737,6 +1865,14 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             return;
         }
         if (this.press?.pointerId === event.pointerId) this.cancelPress();
+    }
+
+    /**
+     * Forgets a gesture going on without a press that ended by itself (a keyboard connection whose
+     * handle lost focus or whose node went away): its `active()` answers false.
+     */
+    private dropEnded(): void {
+        if (this.following?.active?.() === false) this.following = undefined;
     }
 
     /** Ends the gesture a tap started without committing. */
@@ -1887,6 +2023,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     private keyDown(event: KeyboardEvent): void {
         if (this.destroyed) return;
+        this.dropEnded();
         if (
             event.key === "Escape" &&
             (this.press || this.pinch || this.following)
@@ -1897,9 +2034,29 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             event.preventDefault();
             return;
         }
+        // a gesture going on without a press (a keyboard connection) takes the keys first
+        const following = this.following;
+        if (following?.keydown) {
+            const taken = following.keydown(event);
+            if (
+                this.following === following &&
+                following.active?.() === false
+            ) {
+                this.following = undefined;
+            }
+            if (taken) {
+                event.preventDefault();
+                return;
+            }
+        }
         const target = this.target(event.target);
         if (target.kind === "other") return;
-        if (this.features.keydown(event, target)) event.preventDefault();
+        const taken = this.features.keydown(event, target);
+        if (typeof taken === "object") {
+            this.cancelFollowing();
+            this.following = taken;
+        }
+        if (taken) event.preventDefault();
     }
 
     private focusIn(event: FocusEvent): void {
@@ -1934,7 +2091,9 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 const nodeId = id("nodeId");
                 const node =
                     nodeId === undefined ? undefined : this.node(nodeId);
-                into[ID_ATTRIBUTE] = nodeId;
+                // an edge's toolbar stands for its edge
+                into[ID_ATTRIBUTE] =
+                    nodeId ?? (part === "toolbar" ? id("edgeId") : undefined);
                 if (part !== "resizer" && part !== "toolbar") {
                     into["data-selected"] = flag(node?.selected === true);
                 }

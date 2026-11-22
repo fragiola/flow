@@ -6,7 +6,7 @@
 import type { Viewport } from "../geometry/types";
 import type { HandleType } from "../state/queries";
 
-/** How a move was made. */
+/** How a move, a connection or a resize was made: with the pointer or with the keyboard. */
 export type MoveSource = "pointer" | "keyboard";
 
 /** An event of `engine.subscribe`. */
@@ -34,18 +34,36 @@ export type FlowEngineEvent =
           readonly nodeIds: readonly string[];
       }
     | {
-          /** a connection started from a handle (`connection()`) */
+          /**
+           * a connection started from a handle (`connection()`): dragged or tapped (`input:
+           * "pointer"`), or Enter on a focused handle (`"keyboard"`, with `keyboard()`)
+           */
           readonly type: "connect-start";
           readonly nodeId: string;
           readonly handleId: string | undefined;
           readonly handleType: HandleType;
+          readonly input: MoveSource;
       }
     | {
-          /** a connection was dropped on a handle: an edge was added (`edge.add`) */
+          /**
+           * a keyboard connection points at another target handle (the arrows, Tab): the
+           * `index`-th of the `count` handles the model accepts, nearest first (`index` -1 and no
+           * handle when it accepts none), for the app's live region
+           */
+          readonly type: "connect-target";
+          readonly nodeId: string | undefined;
+          readonly handleId: string | undefined;
+          readonly handleType: HandleType | undefined;
+          readonly index: number;
+          readonly count: number;
+      }
+    | {
+          /** a connection was dropped on a handle (or Enter chose it): an edge was added (`edge.add`) */
           readonly type: "connect";
           readonly edgeId: string;
           readonly source: string;
           readonly target: string;
+          readonly input: MoveSource;
       }
     | {
           /**
@@ -54,6 +72,7 @@ export type FlowEngineEvent =
            */
           readonly type: "connect-cancel";
           readonly refused: boolean;
+          readonly input: MoveSource;
       }
     | {
           /** an edge's end was dragged (`reconnection()`) */
@@ -75,11 +94,12 @@ export type FlowEngineEvent =
           readonly refused: boolean;
       }
     | {
-          /** a node was resized (`resize()`) */
+          /** a node was resized (`resize()`): by a drag, or by the arrows on a focused resize handle */
           readonly type: "resize";
           readonly nodeId: string;
           readonly width: number;
           readonly height: number;
+          readonly source: MoveSource;
       }
     | {
           /** a box selection ended with these selected (`selection()`) */

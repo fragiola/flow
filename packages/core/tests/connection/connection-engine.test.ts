@@ -118,8 +118,15 @@ describe("drawing a connection", () => {
                 nodeId: "a",
                 handleId: "out",
                 handleType: "source",
+                input: "pointer",
             },
-            { type: "connect", edgeId: "edge-1", source: "a", target: "b" },
+            {
+                type: "connect",
+                edgeId: "edge-1",
+                source: "a",
+                target: "b",
+                input: "pointer",
+            },
         ]);
     });
 
@@ -186,6 +193,7 @@ describe("drawing a connection", () => {
         expect(flow.events.at(-1)).toEqual({
             type: "connect-cancel",
             refused: true,
+            input: "pointer",
         });
         // c is still fine
         pointer(flow.handle("a", "source", "out"), "pointerdown", at(100, 25));
@@ -240,6 +248,7 @@ describe("drawing a connection", () => {
         expect(flow.events.at(-1)).toEqual({
             type: "connect-cancel",
             refused: false,
+            input: "pointer",
         });
         pointer(flow.handle("a", "source", "out"), "pointerdown", at(100, 25));
         pointer(flow.root, "pointermove", at(200, 300));
@@ -247,6 +256,7 @@ describe("drawing a connection", () => {
         expect(flow.events.at(-1)).toEqual({
             type: "connect-cancel",
             refused: false,
+            input: "pointer",
         });
         expect(flow.model.get("all-edges")).toEqual([]);
         expect(flow.commits).toEqual([]);

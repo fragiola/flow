@@ -8,10 +8,13 @@
 // from a top or left edge moves the parent's top-left corner, so its children move back by as much
 // and stay where they are on screen (a parent holding a child that is not draggable keeps its top
 // and left edges). It works on the node's absolute box, so the `nodeOrigin` is applied once, when
-// the box becomes a position. Each step is transient, the release the final one.
+// the box becomes a position. Each step is transient, the release the final one. With
+// `keyboard()`, the arrows on a focused resize handle move its sides by the keyboard's step, the
+// same rules kept, each key one final step (offered through the host's keyboard links).
 import { flag } from "../attributes/part-attributes";
 import type { BatchEntry } from "../commands/types";
 import type { FlowNode, XY } from "../document/types";
+import { keyboardLinks } from "../features/keyboard-links";
 import type {
     FeatureEngine,
     FeatureEngineHost,
@@ -304,6 +307,7 @@ export function resizeEngine(
                     nodeId: start.nodeId,
                     width: last.rect.width,
                     height: last.rect.height,
+                    source: "pointer",
                 });
             },
             cancel: () => {
@@ -317,6 +321,74 @@ export function resizeEngine(
         };
     };
 
+    /** Whether a resize may start from a handle at `position` now. */
+    const resizable = (
+        position: string | undefined,
+    ): position is ResizePosition =>
+        RESIZE_POSITIONS.includes(position as ResizePosition) &&
+        host.interactive() &&
+        resizing === undefined;
+
+    /** What a resize of a measured node starts from: its position, its box, its children. */
+    const startOf = (nodeId: string): Start | undefined => {
+        const node = model.get("node-by", { id: nodeId }) as
+            | FlowNode
+            | undefined;
+        const rect = host.nodeRect(nodeId);
+        if (!node || !rect || !host.measured(nodeId)) return undefined;
+        const children = (model.get("all-nodes") as readonly FlowNode[]).filter(
+            (child) => child.parentId === nodeId,
+        );
+        return { nodeId, position: node.position, rect, children };
+    };
+
+    // with keyboard(): the arrows on a focused resize handle move its sides, one final step each
+    keyboardLinks(host).resize = {
+        step: (nodeId, position, delta) => {
+            if (!resizable(position)) return false;
+            // the arrow moves none of this handle's sides: not the resizer's key
+            const horizontal =
+                position.includes("left") || position.includes("right");
+            const vertical =
+                position.startsWith("top") || position.startsWith("bottom");
+            if (
+                !(horizontal && delta.x !== 0) &&
+                !(vertical && delta.y !== 0)
+            ) {
+                return false;
+            }
+            const start = startOf(nodeId);
+            if (!start) return false;
+            const limits = limitsOf(nodeId);
+            const rect = kept(
+                start,
+                resizedRect(start.rect, position, delta, limits),
+                position,
+                limits,
+            );
+            const from = start.rect;
+            // at a limit the key is still the resizer's, and nothing runs
+            if (
+                rect.x === from.x &&
+                rect.y === from.y &&
+                rect.width === from.width &&
+                rect.height === from.height
+            ) {
+                return true;
+            }
+            if (!run(stepOf(start, rect), false).ok) return true;
+            host.changed();
+            host.emit({
+                type: "resize",
+                nodeId,
+                width: rect.width,
+                height: rect.height,
+                source: "keyboard",
+            });
+            return true;
+        },
+    };
+
     return {
         is: {
             resizing: () => resizing !== undefined,
@@ -325,28 +397,16 @@ export function resizeEngine(
         },
         pointerdown: (event, target) => {
             const { nodeId, position } = target;
-            if (
-                target.kind !== "resize-handle" ||
-                nodeId === undefined ||
-                !RESIZE_POSITIONS.includes(position as ResizePosition) ||
-                !host.interactive() ||
-                resizing !== undefined
-            ) {
+            if (target.kind !== "resize-handle" || !resizable(position)) {
                 return undefined;
             }
-            const node = model.get("node-by", { id: nodeId }) as
-                | FlowNode
-                | undefined;
-            const rect = host.nodeRect(nodeId);
-            if (!node || !rect || !host.measured(nodeId)) return undefined;
-            const children = (
-                model.get("all-nodes") as readonly FlowNode[]
-            ).filter((child) => child.parentId === nodeId);
-            return gestureFor(
-                { nodeId, position: node.position, rect, children },
-                position as ResizePosition,
-                { x: event.clientX, y: event.clientY },
-            );
+            const start = nodeId === undefined ? undefined : startOf(nodeId);
+            return start
+                ? gestureFor(start, position, {
+                      x: event.clientX,
+                      y: event.clientY,
+                  })
+                : undefined;
         },
         attributes: (part, payload, into) => {
             if (part === "node" || part === "resizer") {

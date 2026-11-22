@@ -1,10 +1,10 @@
 ---
 title: Path helpers
-description: The edge path functions the engine draws with, bezier, smooth step, step and straight, each with its label point, and the geometry types they share.
+description: The edge path functions the engine draws with, bezier, simple bezier, smooth step, step and straight, each with its label point, and the types they share.
 ---
 
-The engine draws the built-in edge types (`bezier`, `smoothstep`, `step`, `straight`) with four
-pure functions, exported so an app can draw its own edge types from the same geometry. Each takes
+The engine draws the built-in edge types (`bezier`, `simplebezier`, `smoothstep`, `step`,
+`straight`) with five pure functions, exported so an app can draw its own edge types from the same geometry. Each takes
 the two ends (and, for the curved and orthogonal ones, the sides they leave and enter by) and
 returns a `PathResult`: the SVG path data and the point a label goes at, in the middle of the path (a bezier's at its
 parameter t = 0.5, the others halfway along their length).
@@ -134,6 +134,14 @@ label is the curve's middle.
 | option | type | description |
 | --- | --- | --- |
 | `curvature` | `number` | the share of the distance along a side its control point stands out by; default `0.5` |
+
+## `simpleBezierPath`
+
+`simpleBezierPath(options)` (the `simplebezier` type): one cubic curve whose control points lie on
+each end's side axis, halfway to where the other end projects on that axis. It has no least reach
+and no `curvature`: two ends on one line draw a straight curve, and an end whose other end is
+behind it turns back at once. A side and its opposite give the same curve. The label is the
+curve's middle. `SimpleBezierPathOptions` is the `PathEnds` below.
 
 ## `smoothStepPath` and `stepPath`
 

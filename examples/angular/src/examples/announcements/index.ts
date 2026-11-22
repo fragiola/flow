@@ -18,7 +18,8 @@ import { styles } from "./styles";
 // (`engine.subscribe`: nodes moved, an edge connected, something removed), and the app writes it,
 // in its own words and language, into a live region a screen reader reads (`role="status"`). The
 // log beside it shows the same messages. Try it with the keyboard: Tab to a node, move it with the
-// arrows, delete it with Delete.
+// arrows, delete it with Delete; or Tab to a handle and press Enter: each target the connection
+// points at is announced (`connect-target`, its `index` of `count`) until Enter connects.
 
 interface Types extends FlowTypes {
     readonly nodes: { room: { label: string } };
@@ -49,8 +50,16 @@ const nodes: FlowNodeInput<Types>[] = [
 
 type Model = FlowModel<Types, typeof features>;
 
-/** The app's words for an engine event, or nothing for one it keeps quiet about. */
-function describe(event: FlowEngineEvent, model: Model): string | undefined {
+/**
+ * The app's words for an engine event, or nothing for one it keeps quiet about. `startedFrom`:
+ * the node a keyboard connection has just started from, said with its first target (both come
+ * at once, and a live region reads only the last message) with the keys to use.
+ */
+function describe(
+    event: FlowEngineEvent,
+    model: Model,
+    startedFrom?: string,
+): string | undefined {
     const name = (id: string) => model.get("node-by", { id })?.data.label ?? id;
     const names = (ids: readonly string[]) => ids.map(name).join(", ");
     switch (event.type) {
@@ -58,11 +67,24 @@ function describe(event: FlowEngineEvent, model: Model): string | undefined {
             return `Moved ${names(event.nodeIds)}${event.source === "keyboard" ? " with the keyboard" : ""}.`;
         case "drag-cancel":
             return `Put ${names(event.nodeIds)} back.`;
+        case "connect-target": {
+            const target =
+                event.nodeId === undefined
+                    ? "No handle accepts this connection."
+                    : `Target ${event.index + 1} of ${event.count}: ${name(event.nodeId)}.`;
+            if (startedFrom === undefined) return target;
+            const keys =
+                event.nodeId === undefined
+                    ? "Escape to cancel."
+                    : "Tab for the next, Enter to connect, Escape to cancel.";
+            return `Connecting from ${name(startedFrom)}. ${target} ${keys}`;
+        }
         case "connect":
-            return `Connected ${name(event.source)} to ${name(event.target)}.`;
+            return `Connected ${name(event.source)} to ${name(event.target)}${event.input === "keyboard" ? " with the keyboard" : ""}.`;
         case "connect-cancel":
-            return event.refused
-                ? "That connection is not allowed."
+            if (event.refused) return "That connection is not allowed.";
+            return event.input === "keyboard"
+                ? "Connection cancelled."
                 : undefined;
         case "remove": {
             const parts = [
@@ -119,8 +141,20 @@ function describe(event: FlowEngineEvent, model: Model): string | undefined {
                             [class]="styles.node"
                         >
                             {{ node.data.label }}
-                            <div flowHandle type="target" side="top" [class]="styles.handle"></div>
-                            <div flowHandle type="source" side="bottom" [class]="styles.handle"></div>
+                            <div
+                                flowHandle
+                                type="target"
+                                side="top"
+                                [attr.aria-label]="node.data.label + ' input'"
+                                [class]="styles.handle"
+                            ></div>
+                            <div
+                                flowHandle
+                                type="source"
+                                side="bottom"
+                                [attr.aria-label]="node.data.label + ' output'"
+                                [class]="styles.handle"
+                            ></div>
                         </div>
                     </ng-template>
                 </div>
@@ -160,9 +194,19 @@ export default class Announcements {
         effect((onCleanup) => {
             const engine = this.flow.current?.engine;
             if (!engine) return;
+            // a keyboard connection that has just started, until its first target
+            let startedFrom: string | undefined;
             onCleanup(
                 engine.subscribe((event) => {
-                    const message = describe(event, this.model);
+                    if (event.type === "connect-start") {
+                        startedFrom =
+                            event.input === "keyboard"
+                                ? event.nodeId
+                                : undefined;
+                    }
+                    const message = describe(event, this.model, startedFrom);
+                    if (event.type === "connect-target")
+                        startedFrom = undefined;
                     if (message)
                         this.log.update((previous) =>
                             [message, ...previous].slice(0, 6),

@@ -12,7 +12,9 @@ import {
 import type { ConnectionPayload } from "../commands/types";
 import type { XY } from "../document/types";
 import type { FlowHandle } from "../engine/adapter";
+import type { MoveSource } from "../engine/events";
 import type { Connection } from "../engine/verbs";
+import type { KeyboardConnection } from "../features/keyboard-links";
 import type { FeatureEngineHost, FeatureGesture } from "../features/types";
 import { bezierPath } from "../geometry/bezier-path";
 import { oppositeSide } from "../geometry/path-format";
@@ -76,6 +78,20 @@ export class ConnectSession {
             : this.host.model.can("edge.add", ends);
     }
 
+    /** Whether a connection from `from` may end at `handle` (the model not asked yet). */
+    private eligible(from: FlowHandle, handle: FlowHandle): boolean {
+        if (!handle.center || !handle.connectable) return false;
+        const same =
+            handle.nodeId === from.nodeId &&
+            handle.type === from.type &&
+            handle.handleId === from.handleId;
+        if (same) return false;
+        if (this.mode === "strict" && handle.type === from.type) return false;
+        return this.host.model.is("node-connectable", {
+            nodeId: handle.nodeId,
+        });
+    }
+
     /** The eligible handle nearest to a flow point, within the radius. */
     private nearest(start: ConnectStart, point: XY): FlowHandle | undefined {
         const { from } = start;
@@ -83,19 +99,7 @@ export class ConnectSession {
         let best: FlowHandle | undefined;
         let bestDistance = Number.POSITIVE_INFINITY;
         for (const handle of this.host.handles()) {
-            if (!handle.center || !handle.connectable) continue;
-            const same =
-                handle.nodeId === from.nodeId &&
-                handle.type === from.type &&
-                handle.handleId === from.handleId;
-            if (same) continue;
-            if (this.mode === "strict" && handle.type === from.type) continue;
-            if (
-                !this.host.model.is("node-connectable", {
-                    nodeId: handle.nodeId,
-                })
-            )
-                continue;
+            if (!handle.center || !this.eligible(from, handle)) continue;
             const d = Math.hypot(
                 handle.center.x - point.x,
                 handle.center.y - point.y,
@@ -106,6 +110,115 @@ export class ConnectSession {
             }
         }
         return best;
+    }
+
+    /** The connection state of a keyboard connection from `from` pointing at `to` (or nowhere). */
+    private aimAt(
+        from: FlowHandle & { center: XY },
+        to: FlowHandle | undefined,
+    ): void {
+        const toPoint = to?.center ?? from.center;
+        const toSide = to?.side ?? oppositeSide(from.side);
+        const { path } = bezierPath({
+            source: from.center,
+            sourceSide: from.side,
+            target: toPoint,
+            targetSide: toSide,
+        });
+        this.state = Object.freeze({
+            from,
+            fromPoint: from.center,
+            toPoint,
+            toSide,
+            to,
+            status: to ? "valid" : null,
+            path,
+            reconnecting: undefined,
+        });
+        this.host.changed();
+    }
+
+    /**
+     * A connection drawn with the keyboard from a measured handle (`keyboard()` with
+     * `connection()`): its targets are the eligible handles `model.can("edge.add", …)` accepts
+     * (a vetoed one is skipped), nearest to it first; it points at the first, `next` walks them
+     * round, `connect` adds the edge to the one pointed at. Nothing when a connection is under way.
+     */
+    keyboard(from: FlowHandle): KeyboardConnection | undefined {
+        const center = from.center;
+        if (this.state !== null || !center) return undefined;
+        const start: ConnectStart = { from };
+        const targets = this.host
+            .handles()
+            .filter(
+                (handle) =>
+                    this.eligible(from, handle) && this.valid(start, handle),
+            )
+            .map((handle) => ({
+                handle,
+                distance: Math.hypot(
+                    (handle.center?.x ?? 0) - center.x,
+                    (handle.center?.y ?? 0) - center.y,
+                ),
+            }))
+            .sort((a, b) => a.distance - b.distance)
+            .map(({ handle }) => handle);
+        const source = { ...from, center };
+        let index = targets.length > 0 ? 0 : -1;
+        let open = true;
+        const aim = () => {
+            const to = targets[index];
+            this.aimAt(source, to);
+            this.host.emit({
+                type: "connect-target",
+                nodeId: to?.nodeId,
+                handleId: to?.handleId,
+                handleType: to?.type,
+                index,
+                count: targets.length,
+            });
+        };
+        this.started(start, "keyboard");
+        aim();
+        const finish = () => {
+            open = false;
+            this.state = null;
+            this.host.changed();
+        };
+        return {
+            next: (by) => {
+                if (!open || targets.length < 2) return;
+                index = (index + by + targets.length) % targets.length;
+                aim();
+            },
+            connect: () => {
+                if (!open) return;
+                const to = targets[index];
+                finish();
+                if (to) {
+                    const ends = this.ends(from, to);
+                    const result = this.host.model.run("edge.add", ends);
+                    if (result.ok) {
+                        const { edgeId } = result.value as { edgeId: string };
+                        this.host.emit({
+                            type: "connect",
+                            edgeId,
+                            source: ends.source,
+                            target: ends.target,
+                            input: "keyboard",
+                        });
+                        return;
+                    }
+                }
+                this.cancelled(start, to !== undefined, "keyboard");
+            },
+            cancel: () => {
+                if (!open) return;
+                finish();
+                this.cancelled(start, false, "keyboard");
+            },
+            open: () => open,
+        };
     }
 
     private update(start: ConnectStart, client: XY): void {
@@ -139,7 +252,7 @@ export class ConnectSession {
         this.host.changed();
     }
 
-    private started(start: ConnectStart): void {
+    private started(start: ConnectStart, input: MoveSource = "pointer"): void {
         if (start.reconnecting) {
             this.host.emit({
                 type: "reconnect-start",
@@ -152,6 +265,7 @@ export class ConnectSession {
                 nodeId: start.from.nodeId,
                 handleId: start.from.handleId,
                 handleType: start.from.type,
+                input,
             });
         }
     }
@@ -230,6 +344,7 @@ export class ConnectSession {
                                 edgeId,
                                 source: ends.source,
                                 target: ends.target,
+                                input: "pointer",
                             });
                             return;
                         }
@@ -246,7 +361,11 @@ export class ConnectSession {
         };
     }
 
-    private cancelled(start: ConnectStart, refused: boolean): void {
+    private cancelled(
+        start: ConnectStart,
+        refused: boolean,
+        input: MoveSource = "pointer",
+    ): void {
         if (start.reconnecting) {
             this.host.emit({
                 type: "reconnect-cancel",
@@ -254,7 +373,7 @@ export class ConnectSession {
                 refused,
             });
         } else {
-            this.host.emit({ type: "connect-cancel", refused });
+            this.host.emit({ type: "connect-cancel", refused, input });
         }
     }
 

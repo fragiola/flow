@@ -55,10 +55,13 @@ export interface EdgeContextValue {
 
 export const EdgeKey: InjectionKey<EdgeContextValue> = Symbol("FlowEdge");
 
-/** A label `Flow.EdgeLabel` hands to the HTML layer of `Flow.Edges`, which renders it. */
+/**
+ * A label `Flow.EdgeLabel` (or a toolbar `Flow.EdgeToolbar`, which teleports from there into the
+ * root) hands to the HTML layer of `Flow.Edges`, which renders it.
+ */
 export interface EdgeLabelEntry {
-    /** its key among the layer's labels */
-    readonly key: number;
+    /** its key among the layer's entries */
+    readonly key: number | string;
     /** its edge (the outlet provides it again to the label's content) */
     readonly edgeId: () => string;
     /** renders the label's element (null: nothing yet) */

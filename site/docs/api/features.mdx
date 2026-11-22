@@ -235,12 +235,21 @@ arrows move the selection (or the focused node), the delete keys (`deleteKeys`: 
 Backspace by default) remove it (`selection.remove` with `selection()`), Enter and Space select, Escape clears the selection. See
 [Keyboard and accessibility](/docs/guides/keyboard).
 
+With `connection()` installed too, handles take focus (`tabindex="0"` in a connectable handle's
+part attributes) and Enter or Space on one starts a keyboard connection: Tab, Shift + Tab or the
+arrows walk the target handles `model.can("edge.add")` accepts, nearest first (the one pointed at
+is the connection's `to`, `data-valid`, announced by a `"connect-target"` event), Enter or Space
+connect, Escape cancels (`input: "keyboard"` on the connection events). With `resize()` installed
+too, resize handles take focus and the arrows move a focused handle's sides by `step` (`fastStep`
+with Shift) in one `node.resize` step, within the resizer's limits (a `"resize"` event with
+`source: "keyboard"`). Without both, nothing changes in the tab order.
+
 `KeyboardOptions`:
 
 | option | type | default | description |
 | --- | --- | --- | --- |
-| `step` | `number` | `5` | how far an arrow moves a node, in flow units |
-| `fastStep` | `number` | `20` | how far Shift with an arrow moves it |
+| `step` | `number` | `5` | how far an arrow moves a node (with `resize()`, a focused resize handle's sides), in flow units |
+| `fastStep` | `number` | `20` | how far Shift with an arrow moves it (or the sides) |
 | `deleteKeys` | `string[]` | `["Delete", "Backspace"]` | the keys (`KeyboardEvent.key` or `.code`) that remove the selection; `[]` for none |
 
 ## `minimap()`

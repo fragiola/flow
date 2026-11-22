@@ -4,6 +4,9 @@ import {
     ɵbeforeInputs as beforeInputs,
     ɵbindAttributes as bindAttributes,
     ɵbindStructuralStyle as bindStructuralStyle,
+    type ɵFlowContext as FlowContext,
+    ɵflowValue as flowValue,
+    ɵinjectFlowContext as injectFlowContext,
     ɵinjectHost as injectHost,
     ɵinjectNodeContext as injectNodeContext,
     ɵpartOwnerId as partOwnerId,
@@ -86,15 +89,28 @@ const PLACE: Record<ResizePosition, StructuralStyle> = {
 
 const ATTRIBUTES = partAttributes("resize-handle");
 
-/** @internal binds a resize handle onto `element` */
+/**
+ * @internal binds a resize handle of the node `nodeId` onto `element`: the engine's record
+ * (`data-position`, and `tabindex` with `keyboard()`: the arrows resize)
+ */
 export function bindResizeHandle(
     element: HTMLElement,
+    context: FlowContext,
+    nodeId: () => string | undefined,
     position: () => ResizePosition | undefined,
 ): void {
-    bindAttributes(element, () => ({
-        ...ATTRIBUTES,
-        "data-position": position(),
-    }));
+    const attributes = flowValue(context, () => {
+        const id = nodeId();
+        const at = position();
+        const engine = context.engine();
+        return engine && id !== undefined && at !== undefined
+            ? engine.adapter.attributes("resize-handle", {
+                  nodeId: id,
+                  position: at,
+              })
+            : { ...ATTRIBUTES, "data-position": at };
+    });
+    bindAttributes(element, attributes);
     bindStructuralStyle(element, () => {
         const at = position();
         return {
@@ -108,8 +124,9 @@ export function bindResizeHandle(
 /**
  * A grab area of a `[flowNodeResizer]` (`data-flow-part="resize-handle"`, `data-position`), on
  * the app's element: `<div flowResizeHandle position="bottom-right">`. A press on it resizes its
- * node from that corner or side (`resize()`). Placed on its corner (centred) or along its side;
- * give it its size (a side's thickness) and look.
+ * node from that corner or side (`resize()`); with `keyboard()` too it takes focus and the arrows
+ * move that corner or side. Placed on its corner (centred) or along its side; give it its size (a
+ * side's thickness) and look.
  */
 @Directive({ selector: "[flowResizeHandle]", exportAs: "flowResizeHandle" })
 export class FlowResizeHandleDirective {
@@ -138,6 +155,11 @@ export class FlowResizeHandleDirective {
     });
 
     constructor() {
-        bindResizeHandle(injectHost(), this.at);
+        bindResizeHandle(
+            injectHost(),
+            injectFlowContext("[flowResizeHandle]"),
+            this.id,
+            this.at,
+        );
     }
 }

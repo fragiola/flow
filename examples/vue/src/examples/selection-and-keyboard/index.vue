@@ -4,20 +4,23 @@ import type {
     FlowNodeInput,
     FlowTypes,
 } from "@fragiola/flow-vue";
+import { connection } from "@fragiola/flow-vue/connection";
 import { drag } from "@fragiola/flow-vue/drag";
 import { keyboard } from "@fragiola/flow-vue/keyboard";
 import { selection } from "@fragiola/flow-vue/selection";
 
 // `selection()` selects with a click, adds with Shift (or Ctrl/Cmd) and draws a box with Shift and
-// a drag on the canvas; `keyboard()` makes nodes and edges focusable: Tab moves through them,
-// Enter or Space selects, the arrows move the selection (Shift for a bigger step), Delete removes
-// it and Escape clears it. The package names nothing: each node and edge gets its name here.
+// a drag on the canvas; `keyboard()` makes nodes and edges focusable: Tab moves through them, Enter
+// or Space selects, the arrows move the selection (Shift for a bigger step), Delete removes it and
+// Escape clears it. With `connection()` too, Tab also reaches the handles: Enter on one starts a
+// connection, Tab (or the arrows) points at the next handle that accepts it, Enter draws the edge
+// and Escape cancels. The package names nothing: each node, handle and edge gets its name here.
 
 export interface Types extends FlowTypes {
     readonly nodes: { task: { label: string } };
 }
 
-const features = [selection(), drag(), keyboard()] as const;
+const features = [selection(), drag(), connection(), keyboard()] as const;
 
 const nodes: FlowNodeInput<Types>[] = [
     {
@@ -105,15 +108,26 @@ const Flow = typedFlow<Types, typeof features>();
                     :class="styles.node"
                 >
                     {{ node.data.label }}
-                    <Flow.Handle type="target" side="left" :class="styles.handle" />
-                    <Flow.Handle type="source" side="right" :class="styles.handle" />
+                    <Flow.Handle
+                        type="target"
+                        side="left"
+                        :aria-label="`${node.data.label} input`"
+                        :class="styles.handle"
+                    />
+                    <Flow.Handle
+                        type="source"
+                        side="right"
+                        :aria-label="`${node.data.label} output`"
+                        :class="styles.handle"
+                    />
                 </Flow.Node>
             </Flow.Nodes>
+            <Flow.ConnectionLine :class="styles.connection" />
         </Flow.Viewport>
         <Flow.SelectionBox :class="styles.box" />
         <SelectionStatus />
         <p :class="styles.hint">
-            Shift + drag draws a box · Tab, arrows, Delete, Escape
+            Shift + drag draws a box · Tab, arrows, Delete, Escape · Enter on a handle connects
         </p>
     </Flow.Root>
 </template>

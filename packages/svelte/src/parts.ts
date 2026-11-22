@@ -7,6 +7,7 @@ export { default as Controls } from "./components/controls.svelte";
 export { default as Edge } from "./components/edge.svelte";
 export { default as EdgeLabel } from "./components/edge-label.svelte";
 export { default as EdgePath } from "./components/edge-path.svelte";
+export { default as EdgeToolbar } from "./components/edge-toolbar.svelte";
 export { default as Edges } from "./components/edges.svelte";
 export { default as FitView } from "./components/fit-view.svelte";
 export { default as Handle } from "./components/handle.svelte";

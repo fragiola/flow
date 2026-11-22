@@ -82,6 +82,7 @@ const MODULE_PAGES: Record<string, string> = {
     "./components/edge": "primitives/edge",
     "./components/edge-label": "primitives/edge-label",
     "./components/edge-path": "primitives/edge-path",
+    "./components/edge-toolbar": "primitives/edge-toolbar",
     "./components/edges": "primitives/edges",
     "./components/fit-view": "primitives/fit-view",
     "./components/handle": "primitives/handle",
@@ -401,6 +402,7 @@ describe("the React reference", () => {
                 "Edge",
                 "EdgeLabel",
                 "EdgePath",
+                "EdgeToolbar",
                 "Edges",
                 "FitView",
                 "Handle",
@@ -1420,16 +1422,21 @@ describe("the core reference", () => {
     });
 
     it("has a row for every field of the engine's payloads and reads", () => {
-        const checked = expectRows("engine", "engine/verbs.ts", [
-            "FitViewPayload",
-            "ZoomStepPayload",
-            "BackgroundPatternPayload",
-            "BackgroundPattern",
-            "NodeToolbarPayload",
-            "NodeToolbarPosition",
-            "Connection",
-            "MinimapView",
-        ]);
+        const checked =
+            expectRows("engine", "engine/verbs.ts", [
+                "FitViewPayload",
+                "ZoomStepPayload",
+                "BackgroundPatternPayload",
+                "BackgroundPattern",
+                "NodeToolbarPayload",
+                "NodeToolbarPosition",
+                "Connection",
+                "MinimapView",
+                "ViewportForBoundsPayload",
+            ]) +
+            expectRows("engine", "geometry/viewport-for-bounds.ts", [
+                "ViewportForBoundsOptions",
+            ]);
         expect(checked).toBeGreaterThan(30);
     });
 
@@ -1480,6 +1487,7 @@ describe("the core reference", () => {
         const mdx = page("path-helpers");
         for (const helper of [
             "bezierPath",
+            "simpleBezierPath",
             "smoothStepPath",
             "stepPath",
             "straightPath",

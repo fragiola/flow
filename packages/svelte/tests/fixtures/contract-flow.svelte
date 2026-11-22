@@ -47,6 +47,11 @@
                         bind:ref={refs["reconnect-anchor"]}
                         {...at("reconnect-anchor")}
                     />
+                    <Flow.EdgeToolbar
+                        open
+                        bind:ref={refs["edge-toolbar"]}
+                        {...at("edge-toolbar")}
+                    />
                 </Flow.Edge>
             {/snippet}
         </Flow.Edges>

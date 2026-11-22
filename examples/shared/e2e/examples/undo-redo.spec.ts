@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { handle, node, openExample, part } from "../helpers";
-import { boxOf, dragBy, dragTo } from "./helpers";
+import { boxOf, dragBy, dragTo, expectNamedHandles } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
     await openExample(page, "undo-redo");
@@ -49,4 +49,8 @@ test("a connection and a deletion are steps; the shortcuts undo them", async ({
     await expect(part(page, "edge")).toHaveCount(1);
     await page.keyboard.press("ControlOrMeta+Shift+z");
     await expect(part(page, "edge")).toHaveCount(2);
+});
+
+test("every handle a keyboard reaches has a name", async ({ page }) => {
+    await expectNamedHandles(page, 2);
 });

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { handle, node, openExample, part } from "../helpers";
-import { dragTo, press } from "./helpers";
+import { dragTo, expectNamedHandles, press } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
     await openExample(page, "workflow-builder");
@@ -71,4 +71,8 @@ test("removing a step shows what it leaves unconnected", async ({ page }) => {
     await expect(inspector.getByTestId("issues")).toContainText(
         "Ask for a review: Nothing leads to this step.",
     );
+});
+
+test("every handle a keyboard reaches has a name", async ({ page }) => {
+    await expectNamedHandles(page, 6);
 });

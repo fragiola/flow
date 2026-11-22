@@ -84,6 +84,8 @@ for (const [id, count] of [
     ["gestures/viewport-options", 12],
     ["gestures/click-to-connect-and-drag-handles", 4],
     ["gestures/origin-extent-and-z-order", 4],
+    ["gestures/keyboard-and-toolbars", 4],
+    ["api/graph-and-geometry-helpers", 6],
 ] as const) {
     test(`${id} renders its flow without an error`, async ({ page }) => {
         const errors: string[] = [];
@@ -101,3 +103,37 @@ for (const [id, count] of [
         expect(errors).toEqual([]);
     });
 }
+
+test("the helpers scenario lists a node's neighbours and what it overlaps", async ({
+    page,
+}) => {
+    await page.goto("/?scenario=api/graph-and-geometry-helpers");
+    await expect(
+        page.locator('[data-flow-part="node"]:not([data-measured])'),
+    ).toHaveCount(0);
+    const store = page.locator('[data-flow-part="node"][data-flow-id="store"]');
+    await store.click();
+    await expect(page.getByTestId("helper-selected")).toHaveText("Store");
+    await expect(page.getByTestId("incomers")).toHaveText("Parse, Validate");
+    await expect(page.getByTestId("outgoers")).toHaveText("Notify");
+    await expect(page.getByTestId("intersecting")).toHaveText("none");
+    // drag the sticky note over Store: they overlap
+    const sticky = page.locator(
+        '[data-flow-part="node"][data-flow-id="sticky"]',
+    );
+    const from = await center(sticky);
+    const to = await center(store);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(to.x + 10, to.y + 10, { steps: 10 });
+    await page.mouse.up();
+    await store.click({ position: { x: 4, y: 4 } });
+    await expect(page.getByTestId("helper-selected")).toHaveText("Store");
+    await expect(page.getByTestId("intersecting")).toHaveText("Sticky");
+    // every edge is a simple bezier: one curve
+    for (const path of await page
+        .locator('[data-flow-part="edge-path"]')
+        .all()) {
+        expect(await path.getAttribute("d")).toMatch(/^M[^C]+C[^C]+$/);
+    }
+});

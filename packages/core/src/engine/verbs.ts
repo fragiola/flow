@@ -28,6 +28,31 @@ export interface FitViewPayload {
     duration?: number | undefined;
 }
 
+/** What `viewport-for-bounds` takes: a flow rectangle and `fit-view`'s framing options. */
+export interface ViewportForBoundsPayload {
+    /** the flow rectangle to frame */
+    bounds: Rect;
+    /** the share of the root's size kept free on every side; default 0.1 */
+    padding?: number | undefined;
+    /** the least zoom it may pick (within the engine's limits); default the engine's `minZoom` */
+    minZoom?: number | undefined;
+    /** the greatest zoom it may pick (within the engine's limits); default the engine's `maxZoom` */
+    maxZoom?: number | undefined;
+}
+
+/**
+ * What `intersecting-nodes` takes: a node (its box) or a flow rectangle, and whether a node that
+ * only overlaps it counts.
+ */
+export interface IntersectingNodesPayload {
+    /** the node whose box the others are compared with (it is left out); wins over `rect` */
+    nodeId?: string | undefined;
+    /** a rectangle in absolute flow coordinates, without `nodeId` */
+    rect?: Rect | undefined;
+    /** any shared area counts (`true`, the default); `false`: only a node wholly inside */
+    partial?: boolean | undefined;
+}
+
 /** A zoom by a step around a point (`zoom-in`, `zoom-out`). */
 export interface ZoomStepPayload {
     /** the factor; default the engine's `zoomStep` (1.2) */
@@ -77,9 +102,12 @@ export interface BackgroundPattern {
     readonly strokeWidth: number;
 }
 
-/** Where a node's toolbar goes (`node-toolbar-by`). */
+/** Where a node's toolbar goes (`node-toolbar-by`): beside one node, or beside several nodes' bounds. */
 export interface NodeToolbarPayload {
-    nodeId: string;
+    /** the node it stands beside (without `nodeIds`) */
+    nodeId?: string | undefined;
+    /** the nodes whose bounds it stands beside (their measured boxes); wins over `nodeId` when not empty */
+    nodeIds?: readonly string[] | undefined;
     /** the node's side it stands on; default `"top"` */
     side?: HandleSide | undefined;
     /** where along that side; default `"center"` */
@@ -99,6 +127,21 @@ export interface NodeToolbarPosition {
     readonly anchorX: number;
     readonly anchorY: number;
 }
+
+/** Where an edge's toolbar goes (`edge-toolbar-by`). */
+export interface EdgeToolbarPayload {
+    edgeId: string;
+    /** the point of the edge it stands at: its label point (default), its source or its target end */
+    position?: "label" | "source" | "target" | undefined;
+    /** a screen offset from that point, in pixels; default `{ x: 0, y: 0 }` */
+    offset?: XY | undefined;
+}
+
+/**
+ * An edge toolbar's anchor on the screen (relative to the root, outside the zoom): the toolbar's
+ * centre goes there (`anchorX`, `anchorY` are 0.5).
+ */
+export type EdgeToolbarPosition = NodeToolbarPosition;
 
 /** The selection box (`selection-box`, `selection()`): on the screen, relative to the root. */
 export type SelectionBox = Rect;
@@ -238,6 +281,23 @@ export interface EngineGetMap<T extends FlowTypes = AnyTypes> {
         payload: { nodeIds?: string[] | undefined };
         result: Rect | undefined;
     };
+    /**
+     * the viewport that frames a flow rectangle in the root, as `fit-view` would set it (padding,
+     * zoom limits and translate extent kept); undefined while the root has no size
+     */
+    "viewport-for-bounds": {
+        payload: ViewportForBoundsPayload;
+        result: Viewport | undefined;
+    };
+    /**
+     * the nodes whose box (measured or given) shares some area with a node's box or a rectangle
+     * (`partial: false`: lies wholly inside it), in the document's order; hidden nodes, nodes of
+     * unknown size and the node itself are left out
+     */
+    "intersecting-nodes": {
+        payload: IntersectingNodesPayload;
+        result: readonly FlowNode<T>[];
+    };
     /** a client point (a pointer's `clientX`, `clientY`) as a flow point */
     "screen-to-flow": { payload: XY; result: XY };
     /** a flow point as a client point */
@@ -267,10 +327,21 @@ export interface EngineGetMap<T extends FlowTypes = AnyTypes> {
         payload: BackgroundPatternPayload;
         result: BackgroundPattern;
     };
-    /** where a node's toolbar goes, outside the zoom */
+    /**
+     * where a node's toolbar goes, outside the zoom: beside a node, or beside several nodes'
+     * bounds (`nodeIds`); undefined until one of them has a size
+     */
     "node-toolbar-by": {
         payload: NodeToolbarPayload;
         result: NodeToolbarPosition | undefined;
+    };
+    /**
+     * where an edge's toolbar goes, outside the zoom: at its label point or one of its ends, until
+     * its path is drawn (undefined before)
+     */
+    "edge-toolbar-by": {
+        payload: EdgeToolbarPayload;
+        result: EdgeToolbarPosition | undefined;
     };
     /** the selection box being drawn, or null (`selection()`) */
     "selection-box": { payload: NoPayload; result: SelectionBox | null };

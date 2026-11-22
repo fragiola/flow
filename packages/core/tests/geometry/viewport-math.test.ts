@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
     centeredOn,
-    fitBounds,
     keptInExtent,
     toFlow,
     toScreen,
@@ -48,24 +47,6 @@ describe("the viewport's math", () => {
             y: 290,
             zoom: 1,
         });
-    });
-
-    it("fits bounds with padding, within the zoom limits", () => {
-        const bounds = { x: 0, y: 0, width: 100, height: 50 };
-        expect(fitBounds(bounds, size, 0.1, 0.5, 2)).toEqual({
-            x: 300,
-            y: 250,
-            zoom: 2,
-        });
-        expect(fitBounds(bounds, size, 0.1, 0.5, 10)).toEqual({
-            x: 80,
-            y: 140,
-            zoom: 6.4,
-        });
-        expect(
-            fitBounds({ x: 0, y: 0, width: 0, height: 0 }, size, 0.1, 0.5, 2)
-                .zoom,
-        ).toBe(2);
     });
 
     it("keeps the view inside a translate extent", () => {

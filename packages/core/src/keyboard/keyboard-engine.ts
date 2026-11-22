@@ -7,9 +7,22 @@
 // - the delete keys (`deleteKeys`: Delete and Backspace by default) remove the selection
 //   (`selection.remove`), or without `selection()` the focused node or edge;
 // - Escape clears the selection (a gesture under way is cancelled by the engine first).
+// With `connection()`, handles take focus too (`tabindex` in their attributes) and Enter or Space
+// on one starts a keyboard connection (Tab, Shift + Tab or the arrows walk the targets the model
+// accepts, nearest first; Enter or Space connect; Escape cancels); with `resize()`, resize handles
+// take focus and the arrows move their sides. Both are reached through the host's keyboard links,
+// never by importing those features.
 import type { FlowEdge, FlowNode, XY } from "../document/types";
 import { movedRoots, runMoves } from "../engine/node-moves";
-import type { FeatureEngine, FeatureEngineHost } from "../features/types";
+import {
+    type KeyboardConnection,
+    keyboardLinks,
+} from "../features/keyboard-links";
+import type {
+    FeatureEngine,
+    FeatureEngineHost,
+    FeatureGesture,
+} from "../features/types";
 import { centeredOn, viewRect } from "../geometry/viewport-math";
 import type { KeyboardOptions } from "./keyboard";
 
@@ -20,12 +33,103 @@ const ARROWS: Readonly<Record<string, XY>> = {
     ArrowRight: { x: 1, y: 0 },
 };
 
+/** The keys that walk a keyboard connection's targets: the next one, or the previous one. */
+const TARGET_STEPS: Readonly<Record<string, 1 | -1>> = {
+    ArrowRight: 1,
+    ArrowDown: 1,
+    ArrowLeft: -1,
+    ArrowUp: -1,
+};
+
+/** Enter or Space, without a modifier (Shift aside), not a held key's repeat. */
+function activates(event: KeyboardEvent): boolean {
+    return (
+        (event.key === "Enter" || event.key === " ") &&
+        !event.repeat &&
+        !event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey
+    );
+}
+
+/** Whether a key event comes from inside `element` (the handle a connection started at). */
+function from(element: Element | undefined, event: KeyboardEvent): boolean {
+    const target = event.target;
+    return (
+        element === undefined ||
+        (typeof target === "object" &&
+            target !== null &&
+            element.contains(target as Node))
+    );
+}
+
+/**
+ * The gesture of a keyboard connection, given to the engine (it goes on without a press). Only the
+ * keys of its source handle are its own: Tab and Shift + Tab or the arrows walk its targets, Enter
+ * or Space connect, Escape (the engine's) cancels, as a press anywhere does. It also cancels when
+ * focus leaves the handle (a field clicked, a toolbar button) and when its node goes away (a
+ * delete key removed it), so a key elsewhere is never taken.
+ */
+function connectionGesture(
+    connection: KeyboardConnection,
+    source: Element | undefined,
+    nodeId: string,
+    model: FeatureEngineHost["model"],
+): FeatureGesture {
+    const stops: (() => void)[] = [];
+    const release = () => {
+        for (const stop of stops.splice(0)) stop();
+    };
+    const cancel = () => {
+        release();
+        connection.cancel();
+    };
+    if (source) {
+        const left = () => cancel();
+        source.addEventListener("focusout", left);
+        stops.push(() => source.removeEventListener("focusout", left));
+    }
+    stops.push(
+        model.subscribe(() => {
+            if (!model.get("node-by", { id: nodeId })) cancel();
+        }),
+    );
+    return {
+        move: () => {},
+        end: cancel,
+        cancel,
+        active: () => connection.open(),
+        keydown: (event) => {
+            if (!from(source, event)) return false;
+            if (event.altKey || event.ctrlKey || event.metaKey) return false;
+            if (event.key === "Tab") {
+                connection.next(event.shiftKey ? -1 : 1);
+                return true;
+            }
+            const step = TARGET_STEPS[event.key];
+            if (step !== undefined) {
+                connection.next(step);
+                return true;
+            }
+            if (activates(event)) {
+                release();
+                connection.connect();
+                return true;
+            }
+            // a held Enter's repeats neither connect nor reach the page
+            if (event.key === "Enter" || event.key === " ") return event.repeat;
+            return false;
+        },
+    };
+}
+
 /** The engine side of `keyboard()`. */
 export function keyboardEngine(
     host: FeatureEngineHost,
     options: KeyboardOptions,
 ): FeatureEngine {
     const { model } = host;
+    const links = keyboardLinks(host);
 
     const move = (
         direction: XY,
@@ -126,10 +230,45 @@ export function keyboardEngine(
         },
         keydown: (event, target) => {
             if (!host.interactive()) return false;
+            // Enter or Space on a focused handle starts a keyboard connection (`connection()`)
+            if (
+                target.kind === "handle" &&
+                target.handle !== undefined &&
+                links.connect !== undefined &&
+                activates(event)
+            ) {
+                const connection = links.connect.start(target.handle);
+                return connection
+                    ? connectionGesture(
+                          connection,
+                          target.element,
+                          target.handle.nodeId,
+                          model,
+                      )
+                    : false;
+            }
             const nodeId = target.kind === "node" ? target.nodeId : undefined;
             const edgeId = target.kind === "edge" ? target.edgeId : undefined;
             const onEntity = nodeId !== undefined || edgeId !== undefined;
             const direction = ARROWS[event.key];
+            // the arrows on a focused resize handle move its sides (`resize()`)
+            if (
+                direction &&
+                target.kind === "resize-handle" &&
+                target.nodeId !== undefined &&
+                target.position !== undefined &&
+                links.resize !== undefined
+            ) {
+                if (event.altKey || event.ctrlKey || event.metaKey)
+                    return false;
+                const distance = event.shiftKey
+                    ? options.fastStep
+                    : options.step;
+                return links.resize.step(target.nodeId, target.position, {
+                    x: direction.x * distance,
+                    y: direction.y * distance,
+                });
+            }
             if (direction) {
                 if (event.altKey || event.ctrlKey || event.metaKey)
                     return false;
@@ -170,6 +309,22 @@ export function keyboardEngine(
                 return any && model.run("selection.clear", {}).ok;
             }
             return false;
+        },
+        attributes: (part, payload, into) => {
+            // a handle takes focus only with `connection()` too, a resize handle with `resize()`:
+            // an app without them keeps its tab order
+            if (part === "handle" && links.connect !== undefined) {
+                const nodeId = payload.nodeId;
+                if (
+                    payload.connectable !== false &&
+                    typeof nodeId === "string" &&
+                    model.is("node-connectable", { nodeId })
+                ) {
+                    into.tabindex = "0";
+                }
+            } else if (part === "resize-handle" && links.resize !== undefined) {
+                into.tabindex = "0";
+            }
         },
         focus: (target) => {
             if (target.kind !== "node" || target.nodeId === undefined) return;

@@ -258,8 +258,11 @@ export interface ComposedFeatureEngine {
     tap(event: PointerEvent, target: PressTarget): boolean | FeatureGesture;
     /** the first feature whose hook takes the wheel: whether one did */
     wheel(event: WheelEvent, target: PressTarget): boolean;
-    /** the first feature whose hook takes a key: whether one did */
-    keydown(event: KeyboardEvent, target: PressTarget): boolean;
+    /** the first feature whose hook takes a key: whether one did, or the gesture it started */
+    keydown(
+        event: KeyboardEvent,
+        target: PressTarget,
+    ): boolean | FeatureGesture;
     focus(target: PressTarget): void;
     attributes(
         part: string,
@@ -320,8 +323,15 @@ export function featureEngine(
         },
         wheel: (event, target) =>
             list.some((engine) => engine.wheel?.(event, target) === true),
-        keydown: (event, target) =>
-            list.some((engine) => engine.keydown?.(event, target) === true),
+        keydown: (event, target) => {
+            for (const engine of list) {
+                const taken = engine.keydown?.(event, target);
+                if (taken === true || (taken && typeof taken === "object")) {
+                    return taken;
+                }
+            }
+            return false;
+        },
         focus: (target) => {
             for (const engine of list) engine.focus?.(target);
         },

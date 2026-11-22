@@ -29,6 +29,11 @@ export type {
     EdgePathSlots,
     EdgePathState,
 } from "./components/edge-path";
+export type {
+    EdgeToolbarProps,
+    EdgeToolbarSlots,
+    EdgeToolbarState,
+} from "./components/edge-toolbar";
 export type { EdgesProps, EdgesSlots, EdgesState } from "./components/edges";
 export type { FitViewProps, FitViewSlots } from "./components/fit-view";
 export type { HandleProps, HandleSlots } from "./components/handle";

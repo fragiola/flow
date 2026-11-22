@@ -4,6 +4,7 @@ import { FlowControlsDirective } from "./directives/controls.directive";
 import { FlowEdgeDirective } from "./directives/edge.directive";
 import { FlowEdgeLabelDirective } from "./directives/edge-label.directive";
 import { FlowEdgePathDirective } from "./directives/edge-path.directive";
+import { FlowEdgeToolbarDirective } from "./directives/edge-toolbar.directive";
 import {
     FlowEdgesDirective,
     FlowEdgesItemDirective,
@@ -52,4 +53,5 @@ export const FLOW = [
     FlowFitViewDirective,
     FlowToggleInteractiveDirective,
     FlowNodeToolbarDirective,
+    FlowEdgeToolbarDirective,
 ] as const;

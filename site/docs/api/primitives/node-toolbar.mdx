@@ -7,7 +7,9 @@ description: Flow.NodeToolbar places your buttons next to a node, outside the zo
 portalled into `Flow.Root`, outside the zoom, at the anchor `node-toolbar-by` gives: on the node's
 `side`, aligned to its `align`, `offset` pixels away. So it keeps its size at any zoom and follows
 the node as it moves. By default it is shown while its node is selected (`selection()`); `open`
-decides instead. Presses and the wheel over it are left to it. It renders only your children.
+decides instead. With `nodeIds` it stands beside several nodes' bounds (a toolbar for the
+selection), anywhere in the root, shown while every one of them is selected. Presses and the wheel
+over it are left to it. It renders only your children.
 
 <Example id="node-toolbar" />
 
@@ -121,10 +123,11 @@ every `div` attribute.
 | prop | type | default | description |
 | --- | --- | --- | --- |
 | `nodeId` | `string` | the enclosing `Flow.Node`'s | its node |
+| `nodeIds` | `readonly string[]` | none | several nodes it stands beside (their bounds) instead of one: when not empty it wins over `nodeId`, needs no enclosing node, and the toolbar is shown while every one of them is selected |
 | `side` | `HandleSide` | `"top"` | the node's side it stands on |
 | `align` | `"start" \| "center" \| "end"` | `"center"` | where along that side |
 | `offset` | `number` | `10` | the gap between the node and the toolbar, in pixels |
-| `open` | `boolean` | while its node is selected | whether it is shown |
+| `open` | `boolean` | while its node (every node of `nodeIds`) is selected | whether it is shown |
 | `children` | `ReactNode` | none | your buttons |
 
 ## State
@@ -133,7 +136,8 @@ every `div` attribute.
 
 | field | type | description |
 | --- | --- | --- |
-| `nodeId` | `string` | its node |
+| `nodeId` | `string \| undefined` | its node (undefined for several nodes' toolbar) |
+| `nodeIds` | `readonly string[]` | the nodes it stands beside: `nodeIds`, or its one node |
 | `position` | `NodeToolbarPosition` | its anchor, in pixels relative to the root ([engine reads](/docs/api/engine)) |
 | `side` | `HandleSide` | the side it stands on |
 
@@ -142,7 +146,7 @@ every `div` attribute.
 | attribute | value |
 | --- | --- |
 | `data-flow-part` | `"toolbar"` |
-| `data-flow-id` | its node's id |
+| `data-flow-id` | its node's id (none for several nodes') |
 
 ## Structural style
 

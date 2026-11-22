@@ -209,6 +209,8 @@ the result is the viewport it ends at (zoom limits and extent kept), and every f
 | `"edge-path-by"` | `{ edgeId }` | its `EdgePath` (path, label point, ends and sides), undefined until both nodes have a size; an app type gets the bezier |
 | `"node-rect-by"` | `{ nodeId }` | its absolute box (size 0 until measured or given) |
 | `"nodes-bounds"` | `{ nodeIds? }` | the box of the nodes (or some); none without a node |
+| `"intersecting-nodes"` | `IntersectingNodesPayload` | the nodes whose box (measured or given) shares some area with a node's box or a flow rectangle (`partial: false`: lies wholly inside it), in the document's order; hidden nodes, nodes of unknown size and the node itself are left out |
+| `"viewport-for-bounds"` | `ViewportForBoundsPayload` | the viewport that frames a flow rectangle in the root, as `fit-view` would set it (padding, zoom limits and translate extent kept); undefined while the root has no size |
 | `"screen-to-flow"` | `XY` | a client point as a flow point (a drop's position) |
 | `"flow-to-screen"` | `XY` | a flow point as a client point |
 | `"visible-nodes"` | none | the nodes in view, plus those not measured yet |
@@ -217,11 +219,39 @@ the result is the viewport it ends at (zoom limits and extent kept), and every f
 | `"node-z-index-by"` | `{ nodeId }` | a node's structural `z-index` among the nodes: its `zIndex` (a selected node and its descendants raised with `elevateNodesOnSelect`), always above its parent's |
 | `"handles-by"` | `{ nodeId }` | a node's registered handles (`FlowHandle[]`), with their centres |
 | `"background-pattern"` | `BackgroundPatternPayload` | one tile of a background pattern at the current viewport |
-| `"node-toolbar-by"` | `NodeToolbarPayload` | where a node's toolbar goes, outside the zoom |
+| `"node-toolbar-by"` | `NodeToolbarPayload` | where a node's toolbar goes, outside the zoom: beside a node, or beside several nodes' bounds (`nodeIds`); undefined until one of them has a size |
+| `"edge-toolbar-by"` | `EdgeToolbarPayload` | where an edge's toolbar goes, outside the zoom (an `EdgeToolbarPosition`): at its label point or one of its ends; undefined until the edge is drawn |
 | `"selection-box"` | none | the box being drawn (a root-relative `SelectionBox`), or null (`selection()`; `undefined` without it) |
 | `"dragging-node-ids"` | none | the nodes being dragged (`drag()`) |
 | `"connection"` | none | the `Connection` being drawn, or null (`connection()`; `undefined` without it) |
 | `"minimap-view"` | `{ width, height }` | what a minimap of that many pixels draws (`minimap()`) |
+
+`IntersectingNodesPayload`:
+
+| field | type | description |
+| --- | --- | --- |
+| `nodeId` | `string` | the node whose box the others are compared with (it is left out); wins over `rect` |
+| `rect` | `Rect` | a rectangle in absolute flow coordinates, without `nodeId` |
+| `partial` | `boolean` | any shared area counts (default `true`); `false`: only a node wholly inside |
+
+`ViewportForBoundsPayload`:
+
+| field | type | description |
+| --- | --- | --- |
+| `bounds` | `Rect` | the flow rectangle to frame |
+| `padding` | `number` | the share of the root's size kept free on every side; default 0.1 |
+| `minZoom` | `number` | the least zoom it may pick (within the engine's limits); default the engine's `minZoom` |
+| `maxZoom` | `number` | the greatest zoom it may pick (within the engine's limits); default the engine's `maxZoom` |
+
+The same framing is a pure function, `viewportForBounds(bounds, width, height, options?)`: the
+viewport that shows `bounds` whole and centred in a root of `width` × `height` pixels (a server
+render, a thumbnail, a saved view), with no engine. Its `ViewportForBoundsOptions`:
+
+| option | type | description |
+| --- | --- | --- |
+| `padding` | `number` | the share of the root's size kept free on every side; default 0.1 |
+| `minZoom` | `number` | the least zoom it may pick; default 0.5 |
+| `maxZoom` | `number` | the greatest zoom it may pick; default 2 |
 
 `BackgroundPatternPayload`:
 
@@ -249,7 +279,8 @@ the result is the viewport it ends at (zoom limits and extent kept), and every f
 
 | field | type | description |
 | --- | --- | --- |
-| `nodeId` | `string` | the node |
+| `nodeId` | `string` | the node it stands beside (without `nodeIds`) |
+| `nodeIds` | `string[]` | the nodes whose bounds it stands beside (their measured boxes); wins over `nodeId` when not empty |
 | `side` | `HandleSide` | the side it stands on; default `"top"` |
 | `align` | `"start" \| "center" \| "end"` | where along that side; default `"center"` |
 | `offset` | `number` | the gap to the node, in pixels; default 10 |
@@ -262,6 +293,18 @@ the result is the viewport it ends at (zoom limits and extent kept), and every f
 | `y` | `number` | the anchor's top |
 | `anchorX` | `number` | which point of the toolbar goes there, as a share of its width (`0.5`: its centre) |
 | `anchorY` | `number` | the same along its height (`1`: its bottom) |
+
+`EdgeToolbarPayload`:
+
+| field | type | description |
+| --- | --- | --- |
+| `edgeId` | `string` | the edge |
+| `position` | `"label" \| "source" \| "target"` | the point of the edge it stands at: its label point (default) or one of its ends |
+| `offset` | `XY` | a screen offset from that point, in pixels; default `{ x: 0, y: 0 }` |
+
+`EdgeToolbarPosition` is a `NodeToolbarPosition` whose `anchorX` and `anchorY` are `0.5`: the
+toolbar's centre goes to the point. The `toolbar` part's attributes take `{ edgeId }` for an
+edge's toolbar (its `data-flow-id`), `{ nodeId }` for a node's, nothing for several nodes'.
 
 `Connection`, the connection being drawn:
 
@@ -317,13 +360,14 @@ viewport from it.
 | `"drag-start"` | `nodeIds` | a drag of these nodes started (`drag()`) |
 | `"nodes-move"` | `nodeIds`, `source` | nodes were dropped after a drag, or moved by the arrows; `source` is a `MoveSource`, `"pointer"` or `"keyboard"` |
 | `"drag-cancel"` | `nodeIds` | a drag was cancelled: its nodes went back |
-| `"connect-start"` | `nodeId`, `handleId`, `handleType` | a connection started from a handle (`connection()`) |
-| `"connect"` | `edgeId`, `source`, `target` | a connection was dropped on a handle: an edge was added |
-| `"connect-cancel"` | `refused` | a connection ended without an edge; `refused`: on a handle `model.can("edge.add")` refused |
+| `"connect-start"` | `nodeId`, `handleId`, `handleType`, `input` | a connection started from a handle (`connection()`); `input` (a `MoveSource`): `"pointer"` (a drag or a tap) or `"keyboard"` (Enter on a focused handle, with `keyboard()`) |
+| `"connect-target"` | `nodeId`, `handleId`, `handleType`, `index`, `count` | a keyboard connection points at another target: the `index`-th of the `count` handles the model accepts, nearest first (`index` -1 and no handle when it accepts none), for your live region |
+| `"connect"` | `edgeId`, `source`, `target`, `input` | a connection was dropped on a handle (or Enter chose it): an edge was added |
+| `"connect-cancel"` | `refused`, `input` | a connection ended without an edge; `refused`: on a handle `model.can("edge.add")` refused |
 | `"reconnect-start"` | `edgeId`, `end` | an edge's end was grabbed (`reconnection()`) |
 | `"reconnect"` | `edgeId`, `source`, `target` | an edge was reconnected |
 | `"reconnect-cancel"` | `edgeId`, `refused` | a reconnection ended with the edge as it was |
-| `"resize"` | `nodeId`, `width`, `height` | a node was resized (`resize()`) |
+| `"resize"` | `nodeId`, `width`, `height`, `source` | a node was resized (`resize()`): by a drag (`source: "pointer"`), or by the arrows on a focused resize handle (`"keyboard"`, with `keyboard()`) |
 | `"box-select"` | `nodeIds`, `edgeIds` | a box selection ended with these selected (`selection()`) |
 | `"remove"` | `nodeIds`, `edgeIds` | a delete key (`deleteKeys`: Delete or Backspace by default) removed these (`keyboard()`) |
 

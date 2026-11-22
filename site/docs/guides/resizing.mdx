@@ -194,6 +194,7 @@ import { NodeResizer, RESIZE_POSITIONS, ResizeHandle } from "@fragiola/flow-reac
 </NodeResizer>;
 
 <NodeResizer>
+    {/* aria-hidden: a pointer-only grip; with keyboard(), name it instead (below) */}
     <ResizeHandle position="bottom-right" aria-hidden className="size-3 cursor-nwse-resize" />
 </NodeResizer>;
 ```
@@ -276,6 +277,95 @@ import { FLOW_RESIZE, RESIZE_POSITIONS } from "@fragiola/flow-angular/resize";
 
 A corner is drawn above the two sides it joins, so a press on it resizes both dimensions.
 
+## From the keyboard
+
+Install `keyboard()` beside `resize()` and every resize handle takes focus (`tabindex="0"`, from
+the engine: without both features nothing changes in the tab order). On a focused handle, the
+arrows move the sides that handle moves, by the keyboard's `step` (5 flow units by default),
+Shift + arrow by its `fastStep` (20):
+
+| handle | keys that resize |
+| --- | --- |
+| `left`, `right` | Arrow Left, Arrow Right |
+| `top`, `bottom` | Arrow Up, Arrow Down |
+| a corner | the four arrows, each moving one of its two sides |
+
+Every limit holds as for a drag: `minWidth` to `maxHeight`, the resizer's own, the aspect ratio,
+the parent's box and its children. At a limit the key does nothing (and the page does not scroll);
+an arrow across the handle's sides, or with Ctrl, Alt or ⌘, is left to the page. Each press is one
+final `node.resize` (one undo step) and a `resize` event with `source: "keyboard"`.
+
+A focused handle needs a name a screen reader can read. A default `NodeResizer` (no children)
+renders eight handles that cannot be named, all focusable once `keyboard()` is installed: pass
+your own `ResizeHandle` children with an `aria-label` each (`aria-hidden` on a focusable element
+hides what has focus):
+
+<Framework name="react">
+
+```tsx
+import { keyboard } from "@fragiola/flow-react/keyboard";
+import { NodeResizer, ResizeHandle, resize } from "@fragiola/flow-react/resize";
+
+const features = [selection(), drag(), resize(), keyboard()] as const;
+
+<NodeResizer>
+    <ResizeHandle position="right" aria-label={`Width of ${node.data.title}`} className="w-1.5 focus-visible:outline-2" />
+    <ResizeHandle position="bottom" aria-label={`Height of ${node.data.title}`} className="h-1.5 focus-visible:outline-2" />
+    <ResizeHandle position="bottom-right" aria-label={`Size of ${node.data.title}`} className="size-2.5 focus-visible:outline-2" />
+</NodeResizer>;
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import { NodeResizer, ResizeHandle } from "@fragiola/flow-vue/resize";
+</script>
+
+<template>
+    <NodeResizer>
+        <ResizeHandle position="right" :aria-label="`Width of ${node.data.title}`" class="w-1.5 focus-visible:outline-2" />
+        <ResizeHandle position="bottom" :aria-label="`Height of ${node.data.title}`" class="h-1.5 focus-visible:outline-2" />
+        <ResizeHandle position="bottom-right" :aria-label="`Size of ${node.data.title}`" class="size-2.5 focus-visible:outline-2" />
+    </NodeResizer>
+</template>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<script lang="ts">
+    import { NodeResizer, ResizeHandle } from "@fragiola/flow-svelte/resize";
+</script>
+
+<NodeResizer>
+    <ResizeHandle position="right" aria-label="Width of {node.data.title}" class="w-1.5 focus-visible:outline-2" />
+    <ResizeHandle position="bottom" aria-label="Height of {node.data.title}" class="h-1.5 focus-visible:outline-2" />
+    <ResizeHandle position="bottom-right" aria-label="Size of {node.data.title}" class="size-2.5 focus-visible:outline-2" />
+</NodeResizer>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowNodeResizer>
+    <div flowResizeHandle position="right" [attr.aria-label]="'Width of ' + node.data.title" class="w-1.5 focus-visible:outline-2"></div>
+    <div flowResizeHandle position="bottom" [attr.aria-label]="'Height of ' + node.data.title" class="h-1.5 focus-visible:outline-2"></div>
+    <div flowResizeHandle position="bottom-right" [attr.aria-label]="'Size of ' + node.data.title" class="size-2.5 focus-visible:outline-2"></div>
+</div>
+```
+
+</Framework>
+
+Say the new size in your live region from the `resize` event
+([Keyboard and accessibility](/docs/guides/keyboard#announce-what-happened)).
+
 ## Show the handles while selected
 
 Render the resizer only when the node should be resizable, or hide it with a style on the node's
@@ -298,7 +388,7 @@ Render the resizer only when the node should be resizable, or hide it with a sty
 
 `node.resize` is transient during the drag and final on the release, like a drag's moves: an undo
 history makes one step of it, and the engine's `resize` event (`{ nodeId, width, height }`) tells
-the final size.
+the final size (`source`: `"pointer"` for a drag, `"keyboard"` for an arrow).
 
 ```ts
 engine.subscribe((event) => {

@@ -95,7 +95,8 @@ export interface PartPayloadMap {
     "resize-handle": { nodeId: string; position: string };
     resizer: { nodeId: string };
     "minimap-node": { nodeId: string };
-    toolbar: { nodeId: string };
+    /** a node's toolbar (`nodeId`), several nodes' (neither: no id) or an edge's (`edgeId`) */
+    toolbar: { nodeId?: string | undefined; edgeId?: string | undefined };
 }
 
 /** What only an adapter calls on an engine. */

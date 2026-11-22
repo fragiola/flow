@@ -76,6 +76,7 @@ describe("resizing a node", () => {
             nodeId: "n",
             width: 130,
             height: 70,
+            source: "pointer",
         });
         expect(flow.engine.is("resizing")).toBe(false);
     });

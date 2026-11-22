@@ -4,6 +4,12 @@
 
 export const styles = {
     remove: "palette-danger grid size-6 place-items-center rounded-full bg-palette-base text-palette-contrast shadow-(--fl-node-shadow) hover:bg-palette-base-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-palette-ring [&_svg]:size-3.5",
+    toolbar:
+        "palette-raised flex items-center gap-1 rounded-(--fl-control-radius) border border-palette-line bg-palette-base p-1 shadow-(--fl-node-shadow)",
+    action: "grid size-7 place-items-center rounded-(--fl-control-radius) text-palette-accent hover:bg-palette-soft focus-visible:outline-2 focus-visible:outline-palette-ring [&_svg]:size-4",
+    danger: "palette-danger grid size-7 place-items-center rounded-(--fl-control-radius) text-palette-accent hover:bg-palette-soft focus-visible:outline-2 focus-visible:outline-palette-ring [&_svg]:size-4",
+    edgeGroup: "cursor-pointer",
+    edgeHit: "fill-none stroke-transparent stroke-[16px]",
     edge: "fill-none stroke-(--fl-edge-color) stroke-(length:--fl-edge-width) [stroke-dasharray:var(--fl-edge-dash)] data-selected:stroke-(--fl-edge-selected) data-selected:stroke-(length:--fl-edge-selected-width)",
     label: "flex items-center",
     text: "palette-raised rounded-(--fl-control-radius) border border-(--fl-node-line) bg-palette-base px-1.5 py-0.5 text-xs text-palette-accent",

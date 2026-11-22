@@ -592,6 +592,36 @@ For a large flow, read only what you need with `model.get("node-edges-by", { nod
 "target" })` in a `model.subscribe` listener instead: `useNodes` re-renders on every change of any
 node.
 
+When the handle does not matter, ask for the nodes at the other end of a node's edges directly:
+`incomers-by` gives the nodes its incoming edges come from, `outgoers-by` the nodes its outgoing
+edges go to, each node once, in the document's order (a self loop makes a node its own incomer and
+outgoer):
+
+```ts
+const upstream = model.get("incomers-by", { nodeId: "review" }); // FlowNode<Types>[]
+const downstream = model.get("outgoers-by", { nodeId: "review" });
+const isFirstStep = upstream.length === 0; // nothing comes into it
+```
+
+## Nodes that overlap
+
+The engine knows every node's box on the flow (its measured or given size, the root's
+`nodeOrigin`, a child inside its parent), so it answers which nodes overlap one, or a rectangle of
+yours: `intersecting-nodes` with a `nodeId` (that node is left out) or a `rect` in flow
+coordinates, and `partial: false` for only the nodes wholly inside. A drop on another node, say:
+
+```ts
+engine.subscribe((event) => {
+    if (event.type !== "nodes-move" || event.nodeIds.length !== 1) return;
+    const [nodeId] = event.nodeIds;
+    const [target] = engine.get("intersecting-nodes", { nodeId });
+    if (target) model.run("edge.add", { source: target.id, target: nodeId });
+});
+```
+
+Hidden nodes and nodes not measured yet are never in the answer. A parent and its children
+overlap; filter on `parentId` when that is not what you mean.
+
 ## Add nodes from a palette
 
 <Example id="add-nodes" />

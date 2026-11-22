@@ -9,13 +9,15 @@ import {
 import { connection } from "@fragiola/flow-react/connection";
 import { drag } from "@fragiola/flow-react/drag";
 import { selection } from "@fragiola/flow-react/selection";
-import { XIcon } from "lucide-react";
+import { RefreshCwIcon, Trash2Icon, XIcon } from "lucide-react";
 import { Badge } from "#/components/atoms/badge";
 import { styles } from "./styles";
 
 // `Flow.EdgeLabel` is HTML placed at the edge's label point (halfway along its path), in flow
 // coordinates: it pans and zooms with the edge. It may hold anything: text from the edge's data, a
 // badge, a button. A button in a label keeps its own clicks (it never starts a gesture).
+// `Flow.EdgeToolbar` stands at the same point but outside the zoom (it keeps its size), moved up by
+// `offset`, and shows while its edge is selected: click an edge for its actions.
 
 interface Types extends FlowTypes {
     readonly nodes: { stage: { label: string } };
@@ -69,6 +71,7 @@ const edges: FlowEdgeInput<Types>[] = [
         target: "lint",
         type: "status",
         data: { status: "failing" },
+        selected: true,
     },
     {
         id: "test-deploy",
@@ -100,9 +103,57 @@ function RemoveButton({ edge }: { edge: FlowEdge<Types> }) {
     );
 }
 
+/** The selected edge's actions: flip a status, remove the edge. */
+function EdgeActions({ edge }: { edge: FlowEdge<Types> }) {
+    const { model } = useFlow<Types, typeof features>();
+    return (
+        <Flow.EdgeToolbar
+            offset={{ x: 0, y: -36 }}
+            role="toolbar"
+            aria-label={`${edge.source} to ${edge.target}: actions`}
+            className={styles.toolbar}
+        >
+            {edge.type === "status" && (
+                <button
+                    type="button"
+                    aria-label={
+                        edge.data?.status === "failing"
+                            ? "Mark it passing"
+                            : "Mark it failing"
+                    }
+                    onClick={() =>
+                        model.run("edge.set-data", {
+                            edgeId: edge.id,
+                            data: {
+                                status:
+                                    edge.data?.status === "failing"
+                                        ? "passing"
+                                        : "failing",
+                            },
+                        })
+                    }
+                    className={styles.action}
+                >
+                    <RefreshCwIcon />
+                </button>
+            )}
+            <button
+                type="button"
+                aria-label="Remove it"
+                onClick={() => model.run("edge.remove", { edgeId: edge.id })}
+                className={styles.danger}
+            >
+                <Trash2Icon />
+            </button>
+        </Flow.EdgeToolbar>
+    );
+}
+
 function renderEdge(edge: FlowEdge<Types>) {
     return (
-        <Flow.Edge<Types> edge={edge}>
+        <Flow.Edge<Types> edge={edge} className={styles.edgeGroup}>
+            {/* a wide transparent path: a bigger target for a click */}
+            <Flow.EdgePath className={styles.edgeHit} />
             <Flow.EdgePath className={styles.edge} />
             <Flow.EdgeLabel className={styles.label}>
                 {edge.type === "text" && (
@@ -118,6 +169,7 @@ function renderEdge(edge: FlowEdge<Types>) {
                 )}
                 {edge.type === "removable" && <RemoveButton edge={edge} />}
             </Flow.EdgeLabel>
+            <EdgeActions edge={edge} />
         </Flow.Edge>
     );
 }

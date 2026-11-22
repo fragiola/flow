@@ -115,6 +115,8 @@ export type {
     BackgroundPatternPayload,
     BackgroundVariant,
     Connection,
+    EdgeToolbarPayload,
+    EdgeToolbarPosition,
     EngineActionKey,
     EngineActionMap,
     EngineActionPayload,
@@ -127,10 +129,12 @@ export type {
     EngineIsMap,
     EngineIsPayload,
     FitViewPayload,
+    IntersectingNodesPayload,
     MinimapView,
     NodeToolbarPayload,
     NodeToolbarPosition,
     SelectionBox,
+    ViewportForBoundsPayload,
     ZoomStepPayload,
 } from "./engine/verbs";
 export type { ViewportEasing } from "./engine/viewport-animation";
@@ -163,6 +167,10 @@ export {
     bezierPath,
 } from "./geometry/bezier-path";
 export {
+    type SimpleBezierPathOptions,
+    simpleBezierPath,
+} from "./geometry/simple-bezier-path";
+export {
     type SmoothStepPathOptions,
     type StepPathOptions,
     smoothStepPath,
@@ -180,6 +188,10 @@ export type {
     Rect,
     Viewport,
 } from "./geometry/types";
+export {
+    type ViewportForBoundsOptions,
+    viewportForBounds,
+} from "./geometry/viewport-for-bounds";
 export {
     type CommandArgs,
     createFlowModel,

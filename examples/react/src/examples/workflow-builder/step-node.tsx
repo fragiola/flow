@@ -56,6 +56,7 @@ export function renderStep(step: Step) {
                     type="target"
                     side="top"
                     handleId="in"
+                    aria-label={`${step.data.title} input`}
                     className={styles.port}
                 />
             )}
@@ -67,6 +68,7 @@ export function renderStep(step: Step) {
                         side="bottom"
                         handleId={branch}
                         title={branch}
+                        aria-label={`${step.data.title} output: ${branch}`}
                         className={styles.branchPort(branch)}
                         style={{ left }}
                     />
@@ -76,6 +78,7 @@ export function renderStep(step: Step) {
                     type="source"
                     side="bottom"
                     handleId="out"
+                    aria-label={`${step.data.title} output`}
                     className={styles.port}
                 />
             )}

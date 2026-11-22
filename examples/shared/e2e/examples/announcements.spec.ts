@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { handle, node, openExample } from "../helpers";
+import { handle, node, openExample, part } from "../helpers";
 import { dragBy, dragTo } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
@@ -29,4 +29,46 @@ test("the live region says what moved, connected or was removed", async ({
     await expect(
         page.getByRole("list", { name: "Earlier" }).getByRole("listitem"),
     ).toHaveCount(3);
+});
+
+test("a keyboard connection is announced step by step", async ({ page }) => {
+    const region = page.getByRole("status");
+    // hall → kitchen exists: the targets are the hall's own input and the garden's
+    await handle(page, "hall", "source").focus();
+    await page.keyboard.press("Enter");
+    // the live region itself says where it starts, the first target and the keys (connect-start
+    // and the first connect-target come at once: a separate message would be replaced at once)
+    await expect(region).toHaveText(
+        /^\s*Connecting from Hall\. Target 1 of 2: (Hall|Garden)\. Tab for the next, Enter to connect, Escape to cancel\.\s*$/,
+    );
+    const first = (await region.textContent())
+        ?.trim()
+        .match(/Target 1 of 2: (\w+)\./)?.[1];
+    await page.keyboard.press("Tab");
+    await expect(region).toHaveText(/Target 2 of 2: /);
+    const second = (await region.textContent())
+        ?.trim()
+        .match(/: (\w+)\.$/)?.[1];
+    expect(second).not.toBe(first);
+    // round the list: back to the first
+    await page.keyboard.press("Tab");
+    await expect(region).toHaveText(`Target 1 of 2: ${first}.`);
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Enter");
+    await expect(region).toHaveText(
+        `Connected Hall to ${second} with the keyboard.`,
+    );
+    await expect(part(page, "edge")).toHaveCount(2);
+});
+
+test("Escape cancels a keyboard connection, and says so", async ({ page }) => {
+    const region = page.getByRole("status");
+    await handle(page, "garden", "source").focus();
+    await page.keyboard.press("Enter");
+    await expect(region).toHaveText(
+        /^\s*Connecting from Garden\. Target 1 of 3: \w+\. Tab for the next/,
+    );
+    await page.keyboard.press("Escape");
+    await expect(region).toHaveText("Connection cancelled.");
+    await expect(part(page, "edge")).toHaveCount(1);
 });

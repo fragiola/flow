@@ -18,6 +18,10 @@ export type {
     EdgeLabelState,
 } from "./components/edge-label";
 export type { EdgePathProps, EdgePathState } from "./components/edge-path";
+export type {
+    EdgeToolbarProps,
+    EdgeToolbarState,
+} from "./components/edge-toolbar";
 export type { EdgesProps, EdgesState } from "./components/edges";
 export type { FitViewProps } from "./components/fit-view";
 export type { HandleProps } from "./components/handle";

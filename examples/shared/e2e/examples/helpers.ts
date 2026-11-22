@@ -94,3 +94,22 @@ export function near(actual: number, expected: number, tolerance = 1.5) {
         `${actual} ≈ ${expected}`,
     ).toBeLessThanOrEqual(tolerance);
 }
+
+/**
+ * Expects every focusable handle and resize handle of the stage to carry an accessible name
+ * (`keyboard()` makes them take focus, and a screen reader reads a focused one by its name), and
+ * at least `least` of them shown.
+ */
+export async function expectNamedHandles(page: Page, least = 1) {
+    const focusable = page
+        .getByTestId("stage")
+        .locator(
+            ':is([data-flow-part="handle"], [data-flow-part="resize-handle"])[tabindex="0"]',
+        )
+        // a hidden one (a resizer shown only while selected) takes no focus and has no name
+        .filter({ visible: true });
+    expect(await focusable.count()).toBeGreaterThanOrEqual(least);
+    for (const element of await focusable.all()) {
+        await expect(element).toHaveAccessibleName(/\S/);
+    }
+}

@@ -1,12 +1,12 @@
 ---
 title: Custom edges
-description: Draw the four built-in edge types, an edge type of your own from the path's ends, and HTML labels that pan and zoom with their edge.
+description: Draw the five built-in edge types, an edge type of your own from the path's ends, HTML labels that pan and zoom with their edge, and an edge toolbar.
 ---
 
 An edge is an SVG group you render from `Flow.Edges`' children function. The engine computes its
-path once both nodes have a size, and recomputes it whenever they move or change size. Four edge
-types are drawn by the core: `bezier` (an edge with no `type`), `smoothstep`, `step` and
-`straight`. Any other type is yours: the engine gives you the path's ends and the sides they leave
+path once both nodes have a size, and recomputes it whenever they move or change size. Five edge
+types are drawn by the core: `bezier` (an edge with no `type`), `simplebezier`, `smoothstep`,
+`step` and `straight`. Any other type is yours: the engine gives you the path's ends and the sides they leave
 and enter by, and you draw the `d`. Strokes, colours, markers and labels are yours too.
 
 <Example id="edge-types" />
@@ -73,14 +73,19 @@ type. Give the path its stroke: it is unfilled, and has no colour of its own.
 ```ts
 const edges: FlowEdgeInput<Types>[] = [
     { id: "a-b", source: "a", target: "b" }, // bezier
+    { id: "a-c", source: "a", target: "c", type: "simplebezier" },
     { id: "b-c", source: "b", target: "c", type: "smoothstep" },
     { id: "c-d", source: "c", target: "d", type: "step" },
     { id: "d-e", source: "d", target: "e", type: "straight" },
 ];
 ```
 
+`simplebezier` is one curve whose control points stand halfway between the ends, each on its own
+end's axis: with no least reach, a target behind its source makes it turn back at once, where
+`bezier` keeps a loop out of the node ([path helpers](/docs/api/path-helpers#simplebezierpath)).
 Their shape is the root's `pathOptions`: `curvature` (bezier, default 0.5), `borderRadius` (smooth
-step corners, default 5) and `offset` (how far a step leaves its node before turning, default 20).
+step corners, default 5) and `offset` (how far a step leaves its node before turning, default 20);
+`simplebezier` takes none.
 
 <Framework name="react">
 
@@ -574,6 +579,151 @@ listeners and `injectFlow` keep working there, as written.
 
 Labels render in an HTML layer of `Flow.Edges` (SVG holds no HTML), so they sit above the edges
 and below the nodes.
+
+## A toolbar on an edge
+
+`Flow.EdgeToolbar`, inside `Flow.Edge`, holds your buttons for that edge. Unlike a label it stands
+outside the zoom, so it keeps its size at any zoom, and by default it shows only while its edge is
+selected. It is centred on the edge's label point (`position="source"` or `"target"` for an end),
+moved by `offset` screen pixels, and follows the edge as its nodes move and the view pans or zooms:
+
+<Example id="edge-labels" />
+
+<Framework name="react">
+
+```tsx title="edge-actions.tsx"
+import { Flow, type FlowEdge, useFlow } from "@fragiola/flow-react";
+import { RefreshCwIcon, Trash2Icon } from "lucide-react";
+
+export function EdgeActions({ edge }: { edge: FlowEdge<Types> }) {
+    const { model } = useFlow<Types, typeof features>();
+    return (
+        <Flow.EdgeToolbar offset={{ x: 0, y: -36 }} role="toolbar" aria-label={`${edge.source} to ${edge.target}: actions`}>
+            {edge.type === "status" && (
+                <button
+                    type="button"
+                    aria-label="Flip the status"
+                    onClick={() =>
+                        model.run("edge.set-data", {
+                            edgeId: edge.id,
+                            data: { status: edge.data?.status === "failing" ? "passing" : "failing" },
+                        })
+                    }
+                >
+                    <RefreshCwIcon />
+                </button>
+            )}
+            <button type="button" aria-label="Remove it" onClick={() => model.run("edge.remove", { edgeId: edge.id })}>
+                <Trash2Icon />
+            </button>
+        </Flow.EdgeToolbar>
+    );
+}
+
+// in renderEdge: <Flow.Edge edge={edge}><Flow.EdgePath /><EdgeActions edge={edge} /></Flow.Edge>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="edge-actions.vue"
+<script setup lang="ts">
+import { type FlowEdge, typedFlow, useFlow } from "@fragiola/flow-vue";
+import { RefreshCwIcon, Trash2Icon } from "@lucide/vue";
+
+const Flow = typedFlow<Types, typeof features>();
+const props = defineProps<{ edge: FlowEdge<Types> }>();
+const { model } = useFlow<Types, typeof features>();
+
+function flip() {
+    const { edge } = props;
+    if (edge.type !== "status") return;
+    model.run("edge.set-data", {
+        edgeId: edge.id,
+        data: { status: edge.data?.status === "failing" ? "passing" : "failing" },
+    });
+}
+</script>
+
+<template>
+    <Flow.EdgeToolbar :offset="{ x: 0, y: -36 }" role="toolbar" :aria-label="`${edge.source} to ${edge.target}: actions`">
+        <button v-if="edge.type === 'status'" type="button" aria-label="Flip the status" @click="flip">
+            <RefreshCwIcon />
+        </button>
+        <button type="button" aria-label="Remove it" @click="model.run('edge.remove', { edgeId: edge.id })">
+            <Trash2Icon />
+        </button>
+    </Flow.EdgeToolbar>
+</template>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="edge-actions.svelte"
+<script lang="ts">
+    import { type FlowEdge, typedFlow, useFlow } from "@fragiola/flow-svelte";
+    import { RefreshCwIcon, Trash2Icon } from "@lucide/svelte";
+
+    const Flow = typedFlow<Types, typeof features>();
+    let { edge }: { edge: FlowEdge<Types> } = $props();
+    const flow = useFlow<Types, typeof features>();
+
+    function flip(): void {
+        if (edge.type !== "status") return;
+        flow.model.run("edge.set-data", {
+            edgeId: edge.id,
+            data: { status: edge.data?.status === "failing" ? "passing" : "failing" },
+        });
+    }
+</script>
+
+<Flow.EdgeToolbar offset={{ x: 0, y: -36 }} role="toolbar" aria-label="{edge.source} to {edge.target}: actions">
+    {#if edge.type === "status"}
+        <button type="button" aria-label="Flip the status" onclick={flip}><RefreshCwIcon /></button>
+    {/if}
+    <button type="button" aria-label="Remove it" onclick={() => flow.model.run("edge.remove", { edgeId: edge.id })}>
+        <Trash2Icon />
+    </button>
+</Flow.EdgeToolbar>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<!-- inside <ng-template [flowEdgesItem]="model" let-edge>; flip() and remove() run edge.set-data and edge.remove -->
+<svg:g [flowEdge]="edge">
+    <svg:path flowEdgePath />
+    <xhtml:div
+        flowEdgeToolbar
+        [offset]="{ x: 0, y: -36 }"
+        role="toolbar"
+        [attr.aria-label]="edge.source + ' to ' + edge.target + ': actions'"
+    >
+        @if (edge.type === "status") {
+            <button type="button" aria-label="Flip the status" (click)="flip(edge)">
+                <svg lucideRefreshCw aria-hidden="true"></svg>
+            </button>
+        }
+        <button type="button" aria-label="Remove it" (click)="remove(edge)">
+            <svg lucideTrash2 aria-hidden="true"></svg>
+        </button>
+    </xhtml:div>
+</svg:g>
+```
+
+In Angular, the toolbar is HTML inside the edge's SVG group: write it with the `xhtml:` prefix,
+as an edge label.
+
+</Framework>
+
+`open` shows it whatever the selection (a toolbar always beside an end, `position="target"`), and
+`edgeId` places one outside its edge's group. Its props and state are on the
+[`EdgeToolbar` page](/docs/api/primitives/edge-toolbar).
 
 ## Arrowheads
 

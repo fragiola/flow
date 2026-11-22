@@ -3,9 +3,16 @@ import type { ExampleMeta } from "../meta-types";
 export default {
     title: "Node toolbar",
     description:
-        "A toolbar above the selected node, outside the zoom: duplicate, recolour or delete it.",
+        "A toolbar above the selected note, outside the zoom, and one below the selection for several notes: duplicate, recolour or delete.",
     level: "building-blocks",
     order: 3,
-    features: ["Flow.NodeToolbar", "node.add", "node.set-data", "node.remove"],
+    features: [
+        "Flow.NodeToolbar",
+        "nodeIds",
+        "node.add",
+        "node.set-data",
+        "node.remove",
+        "selection.remove",
+    ],
     docs: "/docs/api/primitives/node-toolbar",
 } satisfies ExampleMeta;

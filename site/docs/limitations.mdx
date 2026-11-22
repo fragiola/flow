@@ -13,10 +13,8 @@ something missing from this page? [Open an issue](https://github.com/fragiola/fl
 
 | xyflow | here | what to do instead |
 | --- | --- | --- |
-| **A toolbar for several nodes** (`NodeToolbar` with a list of node ids). | `Flow.NodeToolbar` stands next to one node. | Render one per node, or place your own panel at `engine.get("nodes-bounds", { nodeIds })` through `flow-to-screen` (client points: subtract the root's client rect for a panel inside the root). |
 | **Edges above nodes** (an edge's `zIndex` over a node's, xyflow's per-level layers). | `zIndex`, `elevateNodesOnSelect` and `elevateEdgesOnSelect` order nodes among nodes and edges among edges; every edge is drawn below every node. | Draw what must sit over the nodes (a highlighted path, a label) in a layer of yours above `Flow.Nodes`, inside `Flow.Viewport`, from `engine.get("edge-path-by", { edgeId })`. |
 | **A node origin per node** (`origin` on a node). | `nodeOrigin` is the root's, for every node on the flow; a child's position stays its top-left corner in its parent. | Compute the corner yourself for the few nodes that need another anchor. |
-| **Keyboard connections and resizing.** | Drawing an edge and resizing a node are pointer gestures. | Offer commands: a menu that runs `edge.add` between two chosen nodes, fields that run `node.resize` (see [Keyboard and accessibility](/docs/guides/keyboard)). |
 
 ## On purpose
 
@@ -44,6 +42,17 @@ something missing from this page? [Open an issue](https://github.com/fragiola/fl
   may place a node outside it (`extent: "parent"` is kept by both). With a `nodeOrigin` other than
   the top-left corner, `node.set-parent` keeps a node's place as if it were the corner, and
   `expandParent` grows a parent around its origin.
+- **A keyboard connection's targets are fixed when it starts**: a handle rendered while it waits
+  is not offered, and a rule that changes meanwhile is checked again only by the final `edge.add`.
+  It does not scroll its target into view, and a pointer press while it waits only cancels it.
+- **An edge's end is moved with a pointer only**: reconnection has no keyboard path. Remove the
+  edge and draw it again from the keyboard, or offer a menu that runs `edge.reconnect`.
+- **Handles and resize handles take focus only with `keyboard()` and their feature**
+  (`connection()`, `resize()`): give them a name (`aria-label`) once they do, or a screen reader
+  reads nothing. A default `NodeResizer`'s eight handles cannot be named: once `keyboard()` is
+  installed, pass your own `ResizeHandle` children, each with its `aria-label`.
+- **A toolbar for several nodes (`nodeIds`) shows while every one of them is selected**: for the
+  selection, pass the selected nodes' ids; a node's own toolbar still shows beside it.
 - **A reconnect anchor is drawn under its node's handle** (edges come before nodes), so the mouse
   grabs it beside the handle.
 - **On touch, a finger beside a handle lands on the handle** (Chromium's touch adjustment), so an

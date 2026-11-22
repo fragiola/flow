@@ -61,6 +61,8 @@ interface Case {
     structural?: [string, string, string];
     /** its element is rendered elsewhere than its component (a layer, the root) */
     elsewhere?: boolean;
+    /** the place in the flow given the props, when not its part's (the edge's toolbar) */
+    slot?: string;
 }
 
 /** The flow every case renders, with the primitive `slot` given `given`. */
@@ -118,6 +120,16 @@ function flowWith(slot: string, given: Given): VNodeChild {
                                                         slots(
                                                             "reconnect-anchor",
                                                         ),
+                                                    ),
+                                                    h(
+                                                        Flow.EdgeToolbar,
+                                                        {
+                                                            open: true,
+                                                            ...attrs(
+                                                                "edge-toolbar",
+                                                            ),
+                                                        },
+                                                        slots("edge-toolbar"),
                                                     ),
                                                 ],
                                             }),
@@ -348,6 +360,14 @@ const CASES: Case[] = [
         structural: ["position", "static", "absolute"],
         elsewhere: true,
     },
+    {
+        // the edge's toolbar: the same part
+        part: "toolbar",
+        slot: "edge-toolbar",
+        tag: "div",
+        structural: ["position", "static", "absolute"],
+        elsewhere: true,
+    },
     { part: "minimap", tag: "svg" },
     { part: "minimap-node", tag: "rect" },
     { part: "minimap-mask", tag: "path" },
@@ -373,7 +393,7 @@ function find(container: HTMLElement, marker = "case"): HTMLElement {
 }
 
 async function mount(c: Case, given: Given) {
-    const view = await render(() => flowWith(c.part, given));
+    const view = await render(() => flowWith(c.slot ?? c.part, given));
     await c.setup?.(view.container);
     return view;
 }

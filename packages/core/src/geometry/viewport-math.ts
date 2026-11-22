@@ -1,5 +1,5 @@
 // The viewport's math (D4): converting points between the screen and the flow, zooming around a
-// point, fitting bounds, and keeping the view inside a translate extent. Screen points here are
+// point, centring, and keeping the view inside a translate extent. Screen points here are
 // relative to the root's top-left corner, in pixels.
 import type { XY } from "../document/types";
 import type { Rect, Viewport } from "./types";
@@ -67,39 +67,6 @@ export function centeredOn(center: XY, zoom: number, size: Size): Viewport {
         y: size.height / 2 - center.y * zoom,
         zoom,
     };
-}
-
-/**
- * The viewport that shows `bounds` whole and centred, `padding` (a share of the root's size) kept
- * free on every side, its zoom between `minZoom` and `maxZoom`.
- */
-export function fitBounds(
-    bounds: Rect,
-    size: Size,
-    padding: number,
-    minZoom: number,
-    maxZoom: number,
-): Viewport {
-    const room = Math.max(0, 1 - 2 * padding);
-    const zoomX =
-        bounds.width > 0
-            ? (size.width * room) / bounds.width
-            : Number.POSITIVE_INFINITY;
-    const zoomY =
-        bounds.height > 0
-            ? (size.height * room) / bounds.height
-            : Number.POSITIVE_INFINITY;
-    const fitting = Math.min(zoomX, zoomY);
-    const zoom = clampZoom(
-        Number.isFinite(fitting) ? fitting : maxZoom,
-        minZoom,
-        maxZoom,
-    );
-    return centeredOn(
-        { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 },
-        zoom,
-        size,
-    );
 }
 
 /**

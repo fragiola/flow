@@ -28,6 +28,19 @@ export function overlaps(a: Rect, b: Rect): boolean {
     );
 }
 
+/**
+ * Whether two rectangles share some area: touching sides do not, a rectangle of no size strictly
+ * inside the other does.
+ */
+export function sharesArea(a: Rect, b: Rect): boolean {
+    return (
+        a.x < b.x + b.width &&
+        b.x < a.x + a.width &&
+        a.y < b.y + b.height &&
+        b.y < a.y + a.height
+    );
+}
+
 /** Whether `inner` lies wholly inside `outer`. */
 export function contains(outer: Rect, inner: Rect): boolean {
     return (

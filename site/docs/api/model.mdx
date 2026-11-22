@@ -251,6 +251,8 @@ order: compare them by identity.
 | `"all-edges"` | none | every edge, in drawing order |
 | `"node-edges-by"` | `{ nodeId, handleType?, handleId? }` | the edges that start or end at a node; with `handleType` (`HandleType`: `"source"` or `"target"`) only those that start or end there; with `handleId` only those at that handle |
 | `"connected-edges-by"` | `{ nodeIds }` | the edges that touch any of the nodes (an edge between two of them once) |
+| `"incomers-by"` | `{ nodeId }` | the nodes edges come from into a node (the sources of the edges that end at it), in the document's order, each once; a self loop makes it its own incomer |
+| `"outgoers-by"` | `{ nodeId }` | the nodes a node's edges go to (the targets of the edges that start at it), in the document's order, each once; a self loop makes it its own outgoer |
 | `"absolute-position-by"` | `{ nodeId }` | a node's position in flow coordinates (with sub-flows, its parents' positions added) |
 | `"flow-json"` | none | the document as JSON: a writable copy, every id present (`FlowDocumentJson<T>`): what `createFlowModel` takes back |
 | `"commands"` | none | every installed command with its description and JSON Schemas (`CommandInfo[]`) |

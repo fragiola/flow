@@ -6,6 +6,7 @@ import {
     type FlowTypes,
 } from "@fragiola/flow-angular";
 import { drag } from "@fragiola/flow-angular/drag";
+import { keyboard } from "@fragiola/flow-angular/keyboard";
 import {
     FLOW_RESIZE,
     RESIZE_POSITIONS,
@@ -14,10 +15,12 @@ import {
 import { selection } from "@fragiola/flow-angular/selection";
 import { styles } from "./styles";
 
-// `resize()` and `flowNodeResizer`: a handle on each corner and side of the node; dragging one resizes
-// the node (`node.resize`, its `width` and `height` written to the document). Each resizer has its
-// own limits over the feature's; the photo keeps its aspect ratio. The handles show while the node
-// is selected (a style on the node's `data-selected`).
+// `resize()` and `flowNodeResizer`: a handle on each corner and side of the node; dragging one
+// resizes the node (`node.resize`, its `width` and `height` written to the document). Each resizer
+// has its own limits over the feature's; the photo keeps its aspect ratio. The handles show while
+// the node is selected (a style on the node's `data-selected`). With `keyboard()` each handle takes
+// focus: Tab to one and use the arrows (Shift for a bigger step); each has its own name, the
+// default handles have none.
 
 interface Types extends FlowTypes {
     readonly nodes: {
@@ -30,6 +33,7 @@ const features = [
     selection(),
     drag(),
     resize({ minWidth: 80, minHeight: 60 }),
+    keyboard(),
 ] as const;
 
 const nodes: FlowNodeInput<Types>[] = [
@@ -68,7 +72,7 @@ const nodes: FlowNodeInput<Types>[] = [
             <div flowViewport>
                 <div flowNodes>
                     <ng-template [flowNodesItem]="model" let-node>
-                        <div [flowNode]="node" [class]="styles.node">
+                        <div [flowNode]="node" [attr.aria-label]="node.data.label" [class]="styles.node">
                             <span [class]="styles.title">{{ node.data.label }}</span>
                             @if (node.type === "note") {
                                 <p [class]="styles.text">{{ node.data.text }}</p>
@@ -82,14 +86,24 @@ const nodes: FlowNodeInput<Types>[] = [
                                     [class]="styles.resizer"
                                 >
                                     @for (position of positions; track position) {
-                                        <div flowResizeHandle [position]="position" [class]="styles.resizeHandle"></div>
+                                        <div
+                                            flowResizeHandle
+                                            [position]="position"
+                                            [attr.aria-label]="'Resize ' + node.id + ': ' + position"
+                                            [class]="styles.resizeHandle"
+                                        ></div>
                                     }
                                 </div>
                             } @else {
                                 <div role="img" aria-label="A placeholder photo" [class]="styles.photo"></div>
                                 <div flowNodeResizer keepAspectRatio [class]="styles.resizer">
                                     @for (position of positions; track position) {
-                                        <div flowResizeHandle [position]="position" [class]="styles.resizeHandle"></div>
+                                        <div
+                                            flowResizeHandle
+                                            [position]="position"
+                                            [attr.aria-label]="'Resize ' + node.id + ': ' + position"
+                                            [class]="styles.resizeHandle"
+                                        ></div>
                                     }
                                 </div>
                             }

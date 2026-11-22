@@ -111,8 +111,18 @@
                     class={styles.node}
                 >
                     {node.data.label}
-                    <Flow.Handle type="target" side="top" class={styles.handle} />
-                    <Flow.Handle type="source" side="bottom" class={styles.handle} />
+                    <Flow.Handle
+                        type="target"
+                        side="top"
+                        aria-label="{node.data.label} input"
+                        class={styles.handle}
+                    />
+                    <Flow.Handle
+                        type="source"
+                        side="bottom"
+                        aria-label="{node.data.label} output"
+                        class={styles.handle}
+                    />
                 </Flow.Node>
             {/snippet}
         </Flow.Nodes>

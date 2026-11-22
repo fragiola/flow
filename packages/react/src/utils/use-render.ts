@@ -95,6 +95,25 @@ export type DataAttributes = {
 
 type AnyProps = Record<string, unknown>;
 
+/** A part's attributes as React props: its `data-*` and, when it takes focus, `tabIndex`. */
+export type AttributeProps = DataAttributes & {
+    readonly tabIndex?: number | undefined;
+};
+
+/**
+ * A part's attributes from the engine (`engine.adapter.attributes`) as React props: the record
+ * holds DOM attribute names, and React takes `tabindex` as `tabIndex` (a number; it warns on the
+ * lowercase name). The one place an engine record becomes props.
+ */
+export function attributeProps(
+    attributes: Readonly<Record<string, string | undefined>>,
+): AttributeProps {
+    const { tabindex, ...rest } = attributes;
+    return tabindex === undefined
+        ? (rest as DataAttributes)
+        : { ...(rest as DataAttributes), tabIndex: Number(tabindex) };
+}
+
 interface RenderOptions<State> {
     state: State;
     /** the primitive's own props: ARIA, data-*, handlers, children */

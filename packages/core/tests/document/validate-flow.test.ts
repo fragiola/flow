@@ -10,6 +10,20 @@ describe("validateFlow", () => {
         expect(validateFlow({ version: 1, nodes: [], edges: [] })).toEqual([]);
     });
 
+    it("takes every built-in edge type", () => {
+        for (const type of [
+            "bezier",
+            "simplebezier",
+            "smoothstep",
+            "step",
+            "straight",
+        ]) {
+            const json = chain();
+            json.edges = json.edges.map((edge) => ({ ...edge, type }));
+            expect(validateFlow(json), type).toEqual([]);
+        }
+    });
+
     it("reports every schema problem with its JSON path", () => {
         expect(
             validateFlow({

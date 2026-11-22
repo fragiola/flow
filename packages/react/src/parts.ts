@@ -7,6 +7,7 @@ export { Controls } from "./components/controls";
 export { Edge } from "./components/edge";
 export { EdgeLabel } from "./components/edge-label";
 export { EdgePath } from "./components/edge-path";
+export { EdgeToolbar } from "./components/edge-toolbar";
 export { Edges } from "./components/edges";
 export { FitView } from "./components/fit-view";
 export { Handle } from "./components/handle";

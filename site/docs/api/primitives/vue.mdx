@@ -146,8 +146,9 @@ What differs from React, part by part:
   swaps the engine in place.
 - **`Flow.EdgeLabel`** renders nothing where it is written: it hands its content to `Flow.Edges`,
   whose HTML layer renders it with its edge (a `Teleport` out of an SVG would keep creating SVG
-  elements). **`Flow.NodeToolbar`** is a `Teleport` to the root. For both, a template `ref` reaches
-  no element: use the `render` slot.
+  elements). **`Flow.NodeToolbar`** is a `Teleport` to the root; so is **`Flow.EdgeToolbar`**, which
+  inside `Flow.Edges` teleports from their HTML layer, as a label renders there. For all three, a
+  template `ref` reaches no element: use the `render` slot.
 - **`MiniMap`** and **`NodeResizer`** come from `@fragiola/flow-vue/minimap` and
   `@fragiola/flow-vue/resize`, with `MiniMapNode`, `MiniMapMask`, `ResizeHandle` and
   `RESIZE_POSITIONS`.
@@ -157,7 +158,8 @@ The props, slots and state of each part are typed by its exports: `RootProps`, `
 `BackgroundProps`, `BackgroundSlots`, `BackgroundState`; `NodesProps`, `NodesSlots`, `NodesState`;
 `NodeProps`, `NodeSlots`; `HandleProps`, `HandleSlots`; `EdgesProps`, `EdgesSlots`, `EdgesState`;
 `EdgeProps`, `EdgeSlots`; `EdgePathProps`, `EdgePathSlots`, `EdgePathState`; `EdgeLabelProps`,
-`EdgeLabelSlots`, `EdgeLabelState`; `ReconnectAnchorProps`, `ReconnectAnchorSlots`,
+`EdgeLabelSlots`, `EdgeLabelState`; `EdgeToolbarProps`, `EdgeToolbarSlots`, `EdgeToolbarState`;
+`ReconnectAnchorProps`, `ReconnectAnchorSlots`,
 `ReconnectAnchorState`; `ConnectionLineProps`, `ConnectionLineSlots`, `ConnectionLineState`;
 `SelectionBoxProps`, `SelectionBoxSlots`, `SelectionBoxState`; `NodeToolbarProps`,
 `NodeToolbarSlots`, `NodeToolbarState`; `ControlsProps`, `ControlsSlots`, `ControlsState`;

@@ -64,6 +64,15 @@ export async function eventTypes(page: Page): Promise<string[]> {
     ).map((text) => (JSON.parse(text) as { type: string }).type);
 }
 
+/** The engine's events the fixture logged, whole. */
+export async function events(
+    page: Page,
+): Promise<({ type: string } & Record<string, unknown>)[]> {
+    return (
+        await page.getByTestId("events").locator("li").allTextContents()
+    ).map((text) => JSON.parse(text));
+}
+
 /** The centre of an element on screen. */
 export async function center(locator: Locator) {
     const box = await locator.boundingBox();

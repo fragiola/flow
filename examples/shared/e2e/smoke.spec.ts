@@ -51,8 +51,10 @@ for (const example of EXAMPLES) {
             const focusable = page
                 .getByTestId("stage")
                 .locator(
-                    '[data-flow-part="node"][tabindex="0"], [data-flow-part="edge"][tabindex="0"], button',
-                );
+                    ':is([data-flow-part="node"], [data-flow-part="edge"], [data-flow-part="handle"], [data-flow-part="resize-handle"])[tabindex="0"], button',
+                )
+                // a hidden one (a resizer shown only while selected) takes no focus
+                .filter({ visible: true });
             for (const element of await focusable.all()) {
                 await expect(element).toHaveAccessibleName(/.+/);
             }

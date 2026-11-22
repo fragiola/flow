@@ -31,6 +31,11 @@ import { createRoot } from "react-dom/client";
 //   ?origin=0.5    every node's position is its box's centre (`nodeOrigin: { x: 0.5, y: 0.5 }`)
 //   ?panOnDrag=0,1 the mouse buttons that pan the pane (here the primary and the middle one)
 //   ?duration=300  the zoom and fit-view buttons animate for 300 ms
+//   ?edgeToolbar=1 the edge ab has a `Flow.EdgeToolbar` (shown while ab is selected) holding a
+//                  `remove ab` button, 24 px above its label point
+//   ?nodeToolbar=1 a `Flow.NodeToolbar` for a and b (`nodeIds`), shown while both are selected
+//   ?edgeType=simplebezier  the edge ab's `type`
+//   ?field=1       a text field (`Note`) beside the root, outside it
 //
 // `reconnection({ radius: 30 })`: a press on an edge's stroke within 30 px of an end moves that end,
 // which is how a finger reconnects (a finger beside a handle lands on the handle).
@@ -52,6 +57,10 @@ const dragHandle = params.get("dragHandle") === "1";
 const origin = Number(params.get("origin")) || undefined;
 const panOnDrag = params.get("panOnDrag")?.split(",").map(Number);
 const duration = Number(params.get("duration")) || undefined;
+const edgeToolbar = params.get("edgeToolbar") === "1";
+const nodeToolbar = params.get("nodeToolbar") === "1";
+const edgeType = params.get("edgeType") ?? undefined;
+const field = params.get("field") === "1";
 
 const features = [
     selection({ boxOnDrag: params.get("boxOnDrag") === "1" }),
@@ -93,7 +102,11 @@ const nodes: FlowNodeInput[] = [
     },
 ];
 
-const edges: FlowEdgeInput[] = [{ id: "ab", source: "a", target: "b" }];
+const edges: FlowEdgeInput[] = [
+    edgeType
+        ? { id: "ab", source: "a", target: "b", type: edgeType }
+        : { id: "ab", source: "a", target: "b" },
+];
 
 function State() {
     const viewport = useViewport();
@@ -126,63 +139,103 @@ function Fixture() {
         [engine],
     );
     return (
-        <Flow.Root
-            features={features}
-            defaultNodes={nodes}
-            defaultEdges={edges}
-            defaultViewport={{ x: 100, y: 100, zoom: 1 }}
-            nodeOrigin={origin ? { x: origin, y: origin } : undefined}
-            panOnDrag={panOnDrag}
-            flowRef={flow}
-            data-testid="root"
-        >
-            <Flow.Background variant="dots" gap={20} size={2} />
-            <Flow.Viewport>
-                <Flow.Edges>
-                    {(edge) => (
-                        <Flow.Edge edge={edge} aria-label={`Edge ${edge.id}`}>
-                            <Flow.EdgePath />
-                            <Flow.ReconnectAnchor end="source" />
-                            <Flow.ReconnectAnchor end="target" />
-                        </Flow.Edge>
-                    )}
-                </Flow.Edges>
-                <Flow.Nodes>
-                    {(node) => (
-                        <Flow.Node node={node} aria-label={`Node ${node.id}`}>
-                            {node.id}
-                            {dragHandle &&
-                                (node.id === "a" || node.id === "b") && (
-                                    <span data-flow-drag-handle="">grip</span>
+        <>
+            <Flow.Root
+                features={features}
+                defaultNodes={nodes}
+                defaultEdges={edges}
+                defaultViewport={{ x: 100, y: 100, zoom: 1 }}
+                nodeOrigin={origin ? { x: origin, y: origin } : undefined}
+                panOnDrag={panOnDrag}
+                flowRef={flow}
+                data-testid="root"
+            >
+                <Flow.Background variant="dots" gap={20} size={2} />
+                <Flow.Viewport>
+                    <Flow.Edges>
+                        {(edge) => (
+                            <Flow.Edge
+                                edge={edge}
+                                aria-label={`Edge ${edge.id}`}
+                            >
+                                <Flow.EdgePath />
+                                <Flow.ReconnectAnchor end="source" />
+                                <Flow.ReconnectAnchor end="target" />
+                                {edgeToolbar && (
+                                    <Flow.EdgeToolbar
+                                        offset={{ x: 0, y: -24 }}
+                                        aria-label={`Edge ${edge.id} toolbar`}
+                                    >
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                flow.current?.model.run(
+                                                    "edge.remove",
+                                                    { edgeId: edge.id },
+                                                )
+                                            }
+                                        >
+                                            remove {edge.id}
+                                        </button>
+                                    </Flow.EdgeToolbar>
                                 )}
-                            {node.type === "box" && (
-                                <>
-                                    <Flow.Handle type="target" side="top" />
-                                    <Flow.Handle type="source" side="bottom" />
-                                </>
-                            )}
-                            {node.id === "c" && <NodeResizer />}
-                        </Flow.Node>
-                    )}
-                </Flow.Nodes>
-                <Flow.ConnectionLine />
-            </Flow.Viewport>
-            <Flow.SelectionBox />
-            <Flow.Controls>
-                <Flow.ZoomIn duration={duration}>zoom in</Flow.ZoomIn>
-                <Flow.ZoomOut duration={duration}>zoom out</Flow.ZoomOut>
-                <Flow.FitView duration={duration}>fit view</Flow.FitView>
-                <Flow.ToggleInteractive>lock</Flow.ToggleInteractive>
-            </Flow.Controls>
-            <MiniMap width={200} height={150} aria-label="Minimap" />
-            <ol data-testid="events" data-flow-no-gesture="">
-                {events.map((event, index) => (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: a log
-                    <li key={index}>{JSON.stringify(event)}</li>
-                ))}
-            </ol>
-            <State />
-        </Flow.Root>
+                            </Flow.Edge>
+                        )}
+                    </Flow.Edges>
+                    <Flow.Nodes>
+                        {(node) => (
+                            <Flow.Node
+                                node={node}
+                                aria-label={`Node ${node.id}`}
+                            >
+                                {node.id}
+                                {dragHandle &&
+                                    (node.id === "a" || node.id === "b") && (
+                                        <span data-flow-drag-handle="">
+                                            grip
+                                        </span>
+                                    )}
+                                {node.type === "box" && (
+                                    <>
+                                        <Flow.Handle type="target" side="top" />
+                                        <Flow.Handle
+                                            type="source"
+                                            side="bottom"
+                                        />
+                                    </>
+                                )}
+                                {node.id === "c" && <NodeResizer />}
+                            </Flow.Node>
+                        )}
+                    </Flow.Nodes>
+                    <Flow.ConnectionLine />
+                </Flow.Viewport>
+                {nodeToolbar && (
+                    <Flow.NodeToolbar
+                        nodeIds={["a", "b"]}
+                        aria-label="a and b toolbar"
+                    >
+                        a and b
+                    </Flow.NodeToolbar>
+                )}
+                <Flow.SelectionBox />
+                <Flow.Controls>
+                    <Flow.ZoomIn duration={duration}>zoom in</Flow.ZoomIn>
+                    <Flow.ZoomOut duration={duration}>zoom out</Flow.ZoomOut>
+                    <Flow.FitView duration={duration}>fit view</Flow.FitView>
+                    <Flow.ToggleInteractive>lock</Flow.ToggleInteractive>
+                </Flow.Controls>
+                <MiniMap width={200} height={150} aria-label="Minimap" />
+                <ol data-testid="events" data-flow-no-gesture="">
+                    {events.map((event, index) => (
+                        // biome-ignore lint/suspicious/noArrayIndexKey: a log
+                        <li key={index}>{JSON.stringify(event)}</li>
+                    ))}
+                </ol>
+                <State />
+            </Flow.Root>
+            {field && <input aria-label="Note" data-testid="field" />}
+        </>
     );
 }
 

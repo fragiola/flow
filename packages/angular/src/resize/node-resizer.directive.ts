@@ -99,7 +99,7 @@ export class FlowNodeResizerDirective {
         defaultContent(host, (document) =>
             RESIZE_POSITIONS.map((position) => {
                 const handle = document.createElement("div");
-                bindResizeHandle(handle, () => position);
+                bindResizeHandle(handle, this.context, this.id, () => position);
                 return handle;
             }),
         );
