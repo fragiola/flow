@@ -289,7 +289,7 @@ export interface InternalNode<T extends FlowTypes = AnyTypes> {
     readonly id: string;
     /** the document's node */
     readonly node: FlowNode<T>;
-    /** its position in absolute flow coordinates (its parents' added; `absolute-position-by`) */
+    /** its position in absolute flow coordinates: its parent's box's top-left corner plus its own (each origin applied) */
     readonly absolutePosition: XY;
     /** its box in absolute flow coordinates, `nodeOrigin` applied, size 0 until known (`node-rect-by`) */
     readonly rect: Rect;

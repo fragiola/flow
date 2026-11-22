@@ -6,6 +6,7 @@
 // moved to another level's layer (it remounts).
 import { afterEach, describe, expect, it } from "vitest";
 import type { FlowJson } from "../../src/document/types";
+import { staticGeometry } from "../../src/geometry/static-geometry";
 import { selection } from "../../src/selection/selection";
 import { subflows } from "../../src/subflows/subflows";
 import { flowOf, mount, unmountAll } from "./harness";
@@ -182,6 +183,56 @@ describe("render-layers", () => {
         });
     });
 
+    it("keeps the edge of a selected group's children above the group, below them, as the static geometry", () => {
+        const json: FlowJson = {
+            version: 1,
+            nodes: [
+                { id: "g", type: "group", position: { x: 0, y: 0 }, data: {} },
+                {
+                    id: "a",
+                    type: "default",
+                    position: { x: 10, y: 10 },
+                    parentId: "g",
+                    data: {},
+                },
+                {
+                    id: "b",
+                    type: "default",
+                    position: { x: 100, y: 10 },
+                    parentId: "g",
+                    data: {},
+                },
+            ],
+            edges: [{ id: "ab", source: "a", target: "b" }],
+        };
+        const flow = mount(json, {
+            features: [subflows(), selection()],
+            sizes: { g: [200, 100], a: [50, 50], b: [50, 50] },
+        });
+        flow.model.run("selection.set", { nodeIds: ["g"] });
+        const layers = [
+            { level: 0, zIndex: -4, nodeIds: ["g"], edgeIds: [] },
+            { level: 1, zIndex: -2, nodeIds: ["a", "b"], edgeIds: ["ab"] },
+        ];
+        expect(flow.engine.get("render-layers")).toEqual(layers);
+        expect(zs(flow.engine, ["g", "a", "b"])).toEqual({
+            g: -3,
+            a: -1,
+            b: -1,
+        });
+        const sized = flow.model.get("flow-json");
+        const geometry = staticGeometry({
+            ...sized,
+            nodes: sized.nodes.map((node) => ({
+                ...node,
+                width: node.id === "g" ? 200 : 50,
+                height: node.id === "g" ? 100 : 50,
+            })),
+        });
+        expect(geometry.layers).toEqual(layers);
+        expect(geometry.nodeZIndexes).toEqual({ g: -3, a: -1, b: -1 });
+    });
+
     it("follows the drawn edges: a hidden edge or an unmeasured node's edge is in no level", () => {
         const json = flat({
             edges: [
@@ -243,6 +294,20 @@ describe("adapter.refocus", () => {
         const after = edgeElement(flow, "ab");
         flow.engine.adapter.refocus(after);
         expect(document.activeElement).toBe(after);
+    });
+
+    it("forgets a part blurred while it stays in the document", async () => {
+        const flow = mount(flat(), { sizes });
+        const before = edgeElement(flow, "ab");
+        before.focus();
+        // the user clicks outside: focus goes to the body, the edge stays
+        before.blur();
+        expect(document.activeElement).toBe(document.body);
+        await Promise.resolve();
+        before.remove();
+        const after = edgeElement(flow, "ab");
+        flow.engine.adapter.refocus(after);
+        expect(document.activeElement).toBe(document.body);
     });
 
     it("leaves focus alone for another part, or when something else has it", () => {

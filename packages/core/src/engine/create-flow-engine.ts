@@ -1279,9 +1279,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         return {
             id: node.id,
             node,
-            absolutePosition: this.model.get("absolute-position-by", {
-                nodeId,
-            }) ?? { x: rect.x, y: rect.y },
+            // the engine's own layout, as `node-rect-by` (each origin applied)
+            absolutePosition: this.absolutePosition(node),
             rect,
             measured: this.isMeasured(node),
             zIndex: this.nodeZ(nodeId),
@@ -1419,7 +1418,9 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             cache.nodes === nodes &&
             cache.edges === edges &&
             cache.options === this.options &&
-            cache.revision === this.revision &&
+            // the view counts only when it culls the edges (`onlyRenderVisible`)
+            (cache.revision === this.revision ||
+                !(this.options.onlyRenderVisible ?? false)) &&
             cache.geometry === this.geometryVersion
         ) {
             return cache.layering;
@@ -1769,6 +1770,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             ["dblclick", (event) => this.doubleClick(event as MouseEvent)],
             ["keydown", (event) => this.keyDown(event as KeyboardEvent)],
             ["focusin", (event) => this.focusIn(event as FocusEvent)],
+            ["focusout", (event) => this.focusOut(event as FocusEvent)],
             ["contextmenu", (event) => this.contextMenu(event as MouseEvent)],
         ];
         for (const [type, listener, options] of listeners) {
@@ -2515,6 +2517,25 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         const target = this.target(event.target);
         if (target.kind === "node" || target.kind === "edge")
             this.features.focus(target);
+    }
+
+    /**
+     * Focus left a part: a blur (the part still in the document) forgets it, so a later remount
+     * does not take focus back; a removal (an edge moving to another level's layer) keeps it. The
+     * check waits a microtask, as a removal may tell `focusout` before the part leaves.
+     */
+    private focusOut(event: FocusEvent): void {
+        const left = asElement(event.target);
+        const last = this.lastFocus;
+        if (!left || !last) return;
+        const check = () => {
+            if (this.lastFocus === last && left.isConnected)
+                this.lastFocus = undefined;
+        };
+        const view = viewOf(left);
+        if (view && typeof view.queueMicrotask === "function")
+            view.queueMicrotask(check);
+        else check();
     }
 
     /** `adapter.refocus`: a remounted part that had focus, focus lost since, takes it back. */

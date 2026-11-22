@@ -273,5 +273,14 @@ describe("a node's own origin", () => {
             width: 20,
             height: 20,
         });
+        // internal-node-by agrees with node-rect-by (the engine's layout)
+        expect(
+            flow.engine.get("internal-node-by", { nodeId: "c" })
+                ?.absolutePosition,
+        ).toEqual({ x: 10, y: 60 });
+        expect(
+            flow.engine.get("internal-node-by", { nodeId: "p" })
+                ?.absolutePosition,
+        ).toEqual({ x: 100, y: 100 });
     });
 });
