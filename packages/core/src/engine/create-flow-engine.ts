@@ -51,6 +51,7 @@ import {
 } from "../geometry/rect";
 import type { EdgePath, Rect, Viewport } from "../geometry/types";
 import {
+    isFitPadding,
     type ViewportForBoundsOptions,
     viewportForBounds,
 } from "../geometry/viewport-for-bounds";
@@ -987,11 +988,21 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     ): CommandResult<unknown> {
         const duration = durationOf(payload);
         if (typeof duration !== "number") return duration;
+        if (payload.padding !== undefined && !isFitPadding(payload.padding)) {
+            return fail(
+                "invalid_payload",
+                'padding must be a number, a "<n>px" string, or { top, right, bottom, left } of them',
+                "/padding",
+            );
+        }
         const size = this.rootSize();
         if (size.width <= 0 || size.height <= 0) {
             return fail("refused", "the root has no size yet");
         }
-        const bounds = this.boundsOf(payload.nodeIds);
+        const bounds = this.boundsOf(
+            payload.nodeIds,
+            payload.includeHidden === true,
+        );
         if (!bounds) return fail("refused", "no node has a size yet");
         return this.apply(
             this.framing(bounds, size, payload),
@@ -1044,7 +1055,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                     },
                     size,
                     {
-                        padding: finite(record.padding)
+                        padding: isFitPadding(record.padding)
                             ? record.padding
                             : undefined,
                         minZoom: finite(record.minZoom)
@@ -1364,12 +1375,13 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     private boundsOf(
         nodeIds: readonly unknown[] | undefined,
+        includeHidden = false,
     ): Rect | undefined {
         const ids =
             nodeIds?.filter((id): id is string => typeof id === "string") ??
             this.model
                 .get("all-nodes")
-                .filter((node) => node.hidden !== true)
+                .filter((node) => includeHidden || node.hidden !== true)
                 .map((node) => node.id);
         return boundsOf(
             ids.flatMap((id) => {

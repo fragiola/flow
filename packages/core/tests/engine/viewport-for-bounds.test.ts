@@ -103,3 +103,59 @@ describe("viewport-for-bounds", () => {
         ).toBeUndefined();
     });
 });
+
+describe("fit-view padding and includeHidden", () => {
+    const json = () => {
+        const flow = flowOf({ a: [0, 0], h: [700, 0] });
+        flow.nodes[1] = {
+            ...flow.nodes[1],
+            hidden: true,
+            width: 100,
+            height: 100,
+        } as (typeof flow.nodes)[1];
+        return flow;
+    };
+
+    it("fits with each side's padding, as viewport-for-bounds frames it", () => {
+        const { engine } = mount(json(), {
+            sizes: { a: [100, 100] },
+            engine: { maxZoom: 10 },
+        });
+        const padding = { left: "200px", top: 0.25 } as const;
+        // 800 × 600 root: 600 × 450 room right of 200 px and under 150 px, zoom 4.5
+        const fitted = engine.run("fit-view", { padding });
+        expect(fitted).toEqual({
+            ok: true,
+            value: { x: 275, y: 150, zoom: 4.5 },
+        });
+        expect(
+            engine.get("viewport-for-bounds", {
+                bounds: { x: 0, y: 0, width: 100, height: 100 },
+                padding,
+            }),
+        ).toEqual({ x: 275, y: 150, zoom: 4.5 });
+    });
+
+    it("fits the hidden nodes too with includeHidden", () => {
+        const { engine } = mount(json(), { sizes: { a: [100, 100] } });
+        expect(engine.check("fit-view", { padding: 0 })).toEqual({
+            ok: true,
+            value: { x: 300, y: 200, zoom: 2 },
+        });
+        // (0, 0) to (800, 100) fills the root's 800 px width
+        expect(
+            engine.check("fit-view", { padding: 0, includeHidden: true }),
+        ).toEqual({ ok: true, value: { x: 0, y: 250, zoom: 1 } });
+    });
+
+    it("refuses a padding it cannot read", () => {
+        const { engine } = mount(json(), { sizes: { a: [100, 100] } });
+        const run = engine.run as (key: string, payload: unknown) => unknown;
+        for (const padding of ["wide", { middle: 1 }, { top: "1em" }]) {
+            expect(run("fit-view", { padding })).toMatchObject({
+                ok: false,
+                error: { code: "invalid_payload", path: "/padding" },
+            });
+        }
+    });
+});

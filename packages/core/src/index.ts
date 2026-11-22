@@ -203,6 +203,8 @@ export type {
     Viewport,
 } from "./geometry/types";
 export {
+    type FitPadding,
+    type PaddingValue,
     type ViewportForBoundsOptions,
     viewportForBounds,
 } from "./geometry/viewport-for-bounds";

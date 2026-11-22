@@ -11,6 +11,7 @@ import type {
     XY,
 } from "../document/types";
 import type { EdgePath, HandleSide, Rect, Viewport } from "../geometry/types";
+import type { FitPadding } from "../geometry/viewport-for-bounds";
 import type { NoPayload } from "../state/queries";
 import type { FlowHandle } from "./adapter";
 import type {
@@ -21,10 +22,15 @@ import type {
 
 /** Options of `fit-view` (and of the `fitView` engine option). */
 export interface FitViewPayload {
-    /** the share of the root's size kept free on every side; default 0.1 */
-    padding?: number | undefined;
+    /**
+     * the room kept free on every side (a number: a share of the root's size), or each side's
+     * (`{ top, right, bottom, left }`, a `"<n>px"` string in pixels); default 0.1
+     */
+    padding?: FitPadding | undefined;
     /** only these nodes; default every node that is not hidden */
     nodeIds?: string[] | undefined;
+    /** without `nodeIds`, the hidden nodes of known size too; default false */
+    includeHidden?: boolean | undefined;
     /** the least zoom it may pick (within the engine's limits); default the engine's `minZoom` */
     minZoom?: number | undefined;
     /** the greatest zoom it may pick (within the engine's limits); default the engine's `maxZoom` */
@@ -37,8 +43,8 @@ export interface FitViewPayload {
 export interface ViewportForBoundsPayload {
     /** the flow rectangle to frame */
     bounds: Rect;
-    /** the share of the root's size kept free on every side; default 0.1 */
-    padding?: number | undefined;
+    /** the room kept free on every side, or each side's, as `fit-view`'s; default 0.1 */
+    padding?: FitPadding | undefined;
     /** the least zoom it may pick (within the engine's limits); default the engine's `minZoom` */
     minZoom?: number | undefined;
     /** the greatest zoom it may pick (within the engine's limits); default the engine's `maxZoom` */
