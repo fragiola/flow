@@ -69,13 +69,17 @@ export function useNode<T extends FlowTypes = AnyTypes>(
         if (!engine) {
             // the static geometry (origin applied), as the engine places it before measuring
             const rect = staticGeometry?.nodeRects[nodeId];
+            // no rect (no static geometry): its absolute position, its parents' added
+            const at = rect
+                ? undefined
+                : model.get("absolute-position-by", { nodeId });
             return {
                 attributes: {
                     ...partAttributes("node", nodeId),
                     "data-selected": flag(node.selected === true),
                 },
-                x: rect?.x ?? node.position.x,
-                y: rect?.y ?? node.position.y,
+                x: rect?.x ?? at?.x ?? node.position.x,
+                y: rect?.y ?? at?.y ?? node.position.y,
                 zIndex: staticGeometry?.nodeZIndexes[nodeId],
                 focusable: false,
             };
