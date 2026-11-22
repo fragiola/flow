@@ -3,6 +3,7 @@ import {
     type EdgePath,
     type FlowEdge,
     type FlowTypes,
+    flag,
     type PartAttributes,
     partAttributes,
 } from "@fragiola/flow";
@@ -92,8 +93,8 @@ export function useEdge<T extends FlowTypes = AnyTypes>(
                       focusable: engine.is("edge-focusable", { edgeId }),
                   }
                 : {
-                      attributes: partAttributes("edge", edgeId),
-                      path: undefined,
+                      attributes: edgeAttributes(context, "edge", edgeId),
+                      path: staticEdgePath(context, edgeId),
                       reconnecting: false,
                       focusable: false,
                   };
@@ -131,7 +132,39 @@ export function useEdgePath(
 ): ComputedRef<EdgePath | undefined> {
     return useFlowValue(
         context,
-        () => context.engine.value?.get("edge-path-by", { edgeId: edgeId() }),
+        () => {
+            const engine = context.engine.value;
+            return engine
+                ? engine.get("edge-path-by", { edgeId: edgeId() })
+                : staticEdgePath(context, edgeId());
+        },
         sameEdgePath,
     );
+}
+
+/** An edge's path before the engine exists: the static geometry's (absent until both sizes are known). */
+function staticEdgePath(
+    context: FlowContextValue,
+    edgeId: string,
+): EdgePath | undefined {
+    return context.geometry.value?.edgePaths[edgeId];
+}
+
+/**
+ * @internal the attributes of an edge's part (`edge`, `edge-path`, `edge-label`): the engine's, or
+ * before it exists the same from the model (its id, `data-selected`, `data-animated`)
+ */
+export function edgeAttributes(
+    context: FlowContextValue,
+    part: "edge" | "edge-path" | "edge-label",
+    edgeId: string,
+): PartAttributes {
+    const engine = context.engine.value;
+    if (engine) return engine.adapter.attributes(part, { edgeId });
+    const edge = context.model.get("edge-by", { id: edgeId });
+    return {
+        ...partAttributes(part, edgeId),
+        "data-selected": flag(edge?.selected === true),
+        "data-animated": flag(edge?.animated === true),
+    };
 }
