@@ -146,6 +146,7 @@ export type {
     EngineIsMap,
     EngineIsPayload,
     FitViewPayload,
+    InternalNode,
     IntersectingNodesPayload,
     MinimapView,
     NodeToolbarPayload,
@@ -155,6 +156,11 @@ export type {
     ZoomStepPayload,
 } from "./engine/verbs";
 export type { ViewportEasing } from "./engine/viewport-animation";
+export {
+    type KeyPressKeys,
+    type KeyPressTarget,
+    watchKeyPress,
+} from "./engine/watch-key-press";
 export {
     FEATURE_KEYS,
     type FeatureKeyKind,
@@ -238,6 +244,9 @@ export type {
     ModelIsKey,
     ModelIsMap,
     ModelIsPayload,
+    NodeConnection,
+    NodeData,
     NoPayload,
     QueryArgs,
 } from "./state/queries";
+export { sameFlowValue } from "./state/same-flow-value";
