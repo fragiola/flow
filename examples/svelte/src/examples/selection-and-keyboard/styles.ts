@@ -17,5 +17,7 @@ export const styles = {
     lines: "text-(--fl-grid-color) [display:var(--fl-grid-lines)]",
     cross: "text-(--fl-grid-color) [display:var(--fl-grid-cross)]",
     box: "border border-(--fl-selection-line) bg-(--fl-selection-bg)",
+    nodesSelection:
+        "cursor-grab rounded-(--fl-node-radius) border border-dashed border-(--fl-selection-line) bg-(--fl-selection-bg) data-dragging:cursor-grabbing",
     hint: "absolute bottom-3 start-3 text-xs text-palette-accent/85",
 };

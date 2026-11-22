@@ -96,7 +96,13 @@ describe("the Angular examples", () => {
     it("are every example of examples/react, with the same ids", () => {
         // Angular is a complete framework (examples/shared/e2e/available.ts): it ships every example
         expect(slugs.length).toBeGreaterThan(0);
-        expect(slugs).toEqual(listExampleSlugs(examplesApp("react")));
+        // #36: React's examples this app has not got yet; its #36 helper adds them and empties this
+        const aheadInReact = ["connected-data"];
+        expect(slugs).toEqual(
+            listExampleSlugs(examplesApp("react")).filter(
+                (slug) => !aheadInReact.includes(slug),
+            ),
+        );
     });
 
     it("import only what a consumer can copy", () => {
