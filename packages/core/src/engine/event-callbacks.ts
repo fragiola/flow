@@ -2,7 +2,8 @@
 // cannot drift: React's `onNodeClick`, Svelte's `onnodeclick`, Vue's `@node-click`, Angular's
 // `(nodeClick)` all come from `NodeClick`. The names follow React Flow's callbacks where it has
 // one (`onMoveStart`, `onInit`, `onSelectionStart`, `onDelete`); `viewport-change` has its own
-// callback (`onViewportChange(viewport, gesture)`) and is not here.
+// callback (`onViewportChange(viewport, gesture)`) and is not here, nor `minimap-click` (the
+// minimap part's own `onClick(event, point)`).
 import type { FlowEngineEventType } from "./events";
 
 /** The engine events a root calls back, each with its callback's name (after `on`). */
@@ -40,7 +41,7 @@ export const ENGINE_EVENT_CALLBACKS = Object.freeze({
     "resize-cancel": "ResizeCancel",
     remove: "Delete",
 } as const satisfies Record<
-    Exclude<FlowEngineEventType, "viewport-change">,
+    Exclude<FlowEngineEventType, "viewport-change" | "minimap-click">,
     string
 >);
 

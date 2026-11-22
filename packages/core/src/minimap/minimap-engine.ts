@@ -99,6 +99,28 @@ function contains(box: DOMRect, client: XY): boolean {
     );
 }
 
+/**
+ * The options a minimap part gave (`engine.adapter.setPartOptions("minimap", "", { inversePan,
+ * zoomStep })`: the `MiniMap` primitive's props) over the feature's: one set for the root's
+ * minimaps.
+ */
+function effective(
+    host: FeatureEngineHost,
+    options: MinimapOptions,
+): { inversePan: boolean; zoomStep: number } {
+    const own = host.partOptions("minimap", "") ?? {};
+    return {
+        inversePan:
+            typeof own.inversePan === "boolean"
+                ? own.inversePan
+                : options.inversePan,
+        zoomStep:
+            typeof own.zoomStep === "number" && Number.isFinite(own.zoomStep)
+                ? own.zoomStep
+                : options.zoomStep,
+    };
+}
+
 /** The engine side of `minimap()`. */
 export function minimapEngine(
     host: FeatureEngineHost,
@@ -152,14 +174,10 @@ export function minimapEngine(
             },
         },
         pointerdown: (event, target) => {
-            if (
-                target.kind !== "minimap" ||
-                !options.pannable ||
-                !target.element
-            )
-                return undefined;
+            if (target.kind !== "minimap" || !target.element) return undefined;
             const box = target.element.getBoundingClientRect();
             if (box.width <= 0 || box.height <= 0) return undefined;
+            const { inversePan } = effective(host, options);
             // the view box at the press: a drag keeps it, though the view it shows moves
             const { viewBox } = minimapView(
                 host,
@@ -183,7 +201,7 @@ export function minimapEngine(
                     x: clientX,
                     y: clientY,
                 });
-                const target = options.inversePan
+                const target = inversePan
                     ? {
                           x: start.x - (point.x - pressed.x),
                           y: start.y - (point.y - pressed.y),
@@ -195,16 +213,33 @@ export function minimapEngine(
                 );
             };
             // an inverse pan grabs the minimap: the press keeps the view where it is
-            if (!options.inversePan) centre(event.clientX, event.clientY);
+            if (options.pannable && !inversePan) {
+                centre(event.clientX, event.clientY);
+            }
             let moved = false;
             return {
                 move: (moving) => {
+                    if (!options.pannable) return;
                     moved = true;
                     centre(moving.clientX, moving.clientY);
                 },
-                end: () => {},
+                end: (released) => {
+                    // a tap (within the tap distance): `minimap-click` at the point under it
+                    const distance = Math.hypot(
+                        released.clientX - event.clientX,
+                        released.clientY - event.clientY,
+                    );
+                    if (distance > host.tapDistance("node")) return;
+                    const client = { x: released.clientX, y: released.clientY };
+                    host.emit({
+                        type: "minimap-click",
+                        point: pointOn(box, viewBox, client),
+                        client,
+                        event: released,
+                    });
+                },
                 cancel: () => {
-                    host.setViewport(origin);
+                    if (options.pannable) host.setViewport(origin);
                 },
                 active: () => moved,
             };
@@ -219,7 +254,9 @@ export function minimapEngine(
             const zoom =
                 viewport.zoom *
                 Math.exp(
-                    (-event.deltaY * scale * options.zoomStep) /
+                    (-event.deltaY *
+                        scale *
+                        effective(host, options).zoomStep) /
                         (10 * WHEEL_RATE),
                 );
             host.setViewport(

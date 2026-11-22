@@ -104,6 +104,13 @@ export type FlowEngineEvent =
           readonly type: "pane-click";
       } & FlowPointerInfo)
     | ({
+          /**
+           * a tap on a minimap (`minimap()`): `point` is the flow point under it on the minimap
+           * (`minimap-point-to-flow`), not the one behind it in the root
+           */
+          readonly type: "minimap-click";
+      } & FlowPointerInfo)
+    | ({
           /** a double click whose two presses were taps on a node */
           readonly type: "node-double-click";
           readonly nodeId: string;
