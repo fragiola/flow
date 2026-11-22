@@ -389,8 +389,9 @@ point, client, event }`, a `FlowPointerInfo`), `box-select-start { client, point
 `selection-drag` (each step), `selection-drag-end { nodeIds, client, point }` (a
 `SelectionDragStep`) for a drag of the `nodes-selection` part (instead of `drag-start`; the drop
 still tells `nodes-move` first, a cancel `drag-cancel`), and `selection-context-menu` on that part;
-#36: `minimap-click { point, client, event }` (a `FlowPointerInfo`: a tap on the minimap, its flow
-point; the root captures the pointer, so the DOM's `click` never reaches the minimap), not in
+#36: `minimap-click { element, point, client, event }` (a `FlowPointerInfo` and the tapped minimap
+element: a tap on a minimap, its flow point through that minimap's box; each adapter's `MiniMap`
+calls its callback only when `element` is its own; the root captures the pointer, so the DOM's `click` never reaches the minimap), not in
 `ENGINE_EVENT_CALLBACKS` (no root callback: each adapter's `MiniMap` tells it).
 
 **The adapter contract** (`engine.adapter`, what `Flow.*` primitives call; an app never does):
@@ -619,7 +620,8 @@ Decisions of #36 in React (the first adapter; Vue, Svelte, Angular follow):
 
 - **`MiniMap`'s `onClick` is the engine's `minimap-click`**: the root captures the pointer, so a
   DOM click never reaches the minimap; the contract test gives it `onDoubleClick` instead.
-- **One set of minimap part options per root** (id `""`): every `MiniMap` shares them.
+- **One set of minimap part options per root** (id `""`): every `MiniMap` shares them, the last to
+  set them wins, and unmounting one clears them (documented on the limitations page).
 - **No `ResizeLine`**: a side `ResizeHandle` spans its side; `direction` is the resizer's (the
   engine keeps it per node), so `ResizeHandle` takes none.
 - **Parity lists while the others catch up**: `AHEAD_IN_REACT` in `site/tests/docs-reference.test.ts`
@@ -990,7 +992,7 @@ and the eight feature entries as ng-packagr secondary entry points (`/minimap` a
 | `useFlowRef()` | `injectFlowRef()` (`createFlowRef()` in a field) |
 | `useFlowStore`, `useNodeId`, `useNodesData`, `useNodeConnections`, `useInternalNode`, `useKeyPress` (#36) | `injectFlowStore`, `injectNodeId`, `injectNodesData`, `injectNodeConnections`, `injectInternalNode`, `injectKeyPress`: signals (`src/lib/inject/inject-*.ts`), their arguments values, signals or getters (`ValueOrSignal`) |
 | `useOnViewportChange` (#36) | `injectOnViewportChange(options)`: it returns nothing, its options read at each event |
-| `MiniMap`'s `onClick(event, point)` (#36) | `flowMiniMap`'s output `(minimapClick)`: the engine's `minimap-click` event (`point`, `client`, `event`) |
+| `MiniMap`'s `onClick(event, point)` (#36) | `flowMiniMap`'s output `(minimapClick)`: the engine's `minimap-click` event (`element`, `point`, `client`, `event`), its own taps only |
 | `<Flow.Root<Types, typeof features>>` | inferred from the inputs (`[model]`); a child types `injectFlow<Types, typeof features>()` |
 
 Decisions of the Angular adapter (#15):

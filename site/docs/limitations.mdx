@@ -70,8 +70,9 @@ something missing from this page? [Open an issue](https://github.com/fragiola/fl
   selects their text.
 - **`fit-view`'s own `minZoom` and `maxZoom` narrow the engine's limits**, never widen them.
 - **A minimap's `inversePan` and `zoomStep` are one set per root**: they are the engine's minimap
-  part options, so two `MiniMap`s in one root share the last one's: they cannot pan or zoom
-  differently.
+  part options, so several `MiniMap`s on one root share one set: the last to set them wins (they
+  cannot pan or zoom differently), and removing one clears them for the others, which fall back to
+  `minimap()`'s options. Their taps stay apart: each calls only its own click callback.
 - **`useKeyPress` reads every key on its target, typing included**: a combo held in a text field
   counts too. Check `document.activeElement` (or give the hook a `target` of your own) where that
   matters.

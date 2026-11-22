@@ -136,10 +136,14 @@ pointer. `inversePan` makes a drag move the view the other way, as grabbing the 
 press then does not centre it. `zoomStep` sets how fast its wheel zooms (`10`, the default, is the
 flow's own wheel; `20` twice as fast). Both default to `minimap()`'s options, and are sent to the
 engine as the minimap's part options (`engine.adapter.setPartOptions("minimap", "", …)`): one set
-per root, so two minimaps in one root share the last one's.
+per root, so several minimaps on one root share one set of options: the last to set them wins, and
+removing one of them clears them (the others fall back to `minimap()`'s options until they set
+theirs again).
 
 A tap on the minimap (a press released without dragging) is the engine's `minimap-click`, with the
-flow point under the pointer: centre the view there with an animation, add a node there. The root
+flow point under the pointer on that minimap: centre the view there with an animation, add a node
+there. The event names the tapped minimap (`element`), so with several minimaps on one root only
+the tapped one's callback runs. The root
 captures the pointer at every press, so a DOM `click` listener on the minimap's element hears
 nothing: use the minimap's own callback.
 
@@ -233,7 +237,8 @@ In Svelte, `onclick` is the minimap's own callback, `(event, point)`, not the DO
 ```
 
 In Angular, the `minimapClick` output emits the whole `minimap-click` event:
-`{ point, client, event }` (the flow point, the client point and the DOM event). A `(click)` on
+`{ element, point, client, event }` (the tapped minimap, the flow point, the client point and the
+DOM event). A `(click)` on
 the element hears nothing.
 
 </Framework>
