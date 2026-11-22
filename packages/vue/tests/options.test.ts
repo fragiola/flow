@@ -10,6 +10,7 @@ import { h, shallowRef } from "vue";
 import { DRAG_HANDLE_ATTRIBUTE, Flow } from "../src/index";
 import {
     click,
+    drag,
     installLayout,
     part,
     render,
@@ -246,6 +247,80 @@ describe("the viewport and gesture options (#25)", () => {
         elevate.value = true;
         await settle();
         expect(order()).toEqual(["e3", "e1", "e2"]);
+    });
+
+    it("takes a number's text for duration and pan-on-scroll-speed", async () => {
+        const { container } = await render(() =>
+            h(
+                TestFlow,
+                { defaultNodes: [task("a")], panOnScrollSpeed: "2" },
+                () => [
+                    h(Flow.ZoomIn, { "data-testid": "in", duration: "300" }),
+                ],
+            ),
+        );
+        expect(last().options.panOnScrollSpeed).toBe(2);
+        const button = container.querySelector(
+            '[data-testid="in"]',
+        ) as HTMLElement;
+        expect(button).not.toBeDisabled();
+        await click(button);
+        expect(last().run).toHaveBeenLastCalledWith("zoom-in", {
+            duration: 300,
+        });
+    });
+
+    it("keeps the nodes' z-index inside their layer (isolation), so a raised node never covers the connection line", async () => {
+        const { container } = await render(() =>
+            h(TestFlow, { defaultNodes: [task("a")] }),
+        );
+        expect(part(container, "nodes").style.isolation).toBe("isolate");
+    });
+
+    it("raises a node selected by a click, and lowers it when the pane's click clears the selection", async () => {
+        const { container } = await render(() =>
+            h(TestFlow, {
+                features,
+                defaultNodes: [task("a"), task("b", 0, 200)],
+            }),
+        );
+        const z = (id: string) => part(container, "node", id).style.zIndex;
+        expect(z("a")).toBe("0");
+        const root = part(container, "root");
+        await drag(part(container, "node", "a"), root, [
+            { clientX: 50, clientY: 20 },
+        ]);
+        expect(z("a")).toBe("10000");
+        expect(z("b")).toBe("0");
+        await drag(part(container, "viewport"), root, [
+            { clientX: 600, clientY: 500 },
+        ]);
+        expect(z("a")).toBe("0");
+    });
+
+    it("draws the edges in view with onlyRenderVisible: an edge panned out leaves, and comes back", async () => {
+        const { container } = await render(() =>
+            h(TestFlow, {
+                defaultNodes: [task("a"), task("b", 0, 200)],
+                defaultEdges: [{ id: "ab", source: "a", target: "b" }],
+                onlyRenderVisible: true,
+            }),
+        );
+        const edges = () =>
+            container.querySelectorAll('[data-flow-part="edge"]').length;
+        expect(edges()).toBe(1);
+        const root = part(container, "root");
+        const viewport = part(container, "viewport");
+        await drag(viewport, root, [
+            { clientX: 700, clientY: 300 },
+            { clientX: 700, clientY: -1500 },
+        ]);
+        expect(edges()).toBe(0);
+        await drag(viewport, root, [
+            { clientX: 700, clientY: 300 },
+            { clientX: 700, clientY: 2100 },
+        ]);
+        expect(edges()).toBe(1);
     });
 
     it("re-exports the drag handle attribute", () => {

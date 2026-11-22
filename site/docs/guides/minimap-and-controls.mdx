@@ -173,8 +173,8 @@ the next one from where the view is. The example's buttons take 200 ms:
 </Flow.FitView>
 ```
 
-In Vue, bind it (`:duration="200"`): a plain `duration="200"` is a string, which the engine refuses,
-so the button stays disabled.
+In Vue, `:duration="200"` and a plain `duration="200"` are the same: the attribute's text is taken
+as its number (as the root's `pan-on-scroll-speed`).
 
 </Framework>
 

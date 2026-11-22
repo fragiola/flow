@@ -46,6 +46,8 @@ import { createEngineFacade } from "../utils/engine-facade";
 import {
     definePrimitive,
     type FlowComponent,
+    NUMBER_PROP,
+    numberProp,
     type PrimitiveProps,
     type SlotFunction,
 } from "../utils/primitive";
@@ -70,31 +72,37 @@ export interface RootState {
 }
 
 /** The engine's options a root takes as props: each one that changes applies at once. */
-export type RootEngineProps = Pick<
-    FlowEngineOptions,
-    | "minZoom"
-    | "maxZoom"
-    | "translateExtent"
-    | "panOnDrag"
-    | "panOnScroll"
-    | "zoomOnScroll"
-    | "zoomOnPinch"
-    | "zoomOnDoubleClick"
-    | "zoomStep"
-    | "interactive"
-    | "onlyRenderVisible"
-    | "pathOptions"
-    | "autoPan"
-    | "panActivationKey"
-    | "panOnScrollMode"
-    | "panOnScrollSpeed"
-    | "zoomActivationKey"
-    | "easing"
-    | "nodeOrigin"
-    | "nodeExtent"
-    | "elevateNodesOnSelect"
-    | "elevateEdgesOnSelect"
->;
+export type RootEngineProps = Omit<
+    Pick<
+        FlowEngineOptions,
+        | "minZoom"
+        | "maxZoom"
+        | "translateExtent"
+        | "panOnDrag"
+        | "panOnScroll"
+        | "zoomOnScroll"
+        | "zoomOnPinch"
+        | "zoomOnDoubleClick"
+        | "zoomStep"
+        | "interactive"
+        | "onlyRenderVisible"
+        | "pathOptions"
+        | "autoPan"
+        | "panActivationKey"
+        | "panOnScrollMode"
+        | "panOnScrollSpeed"
+        | "zoomActivationKey"
+        | "easing"
+        | "nodeOrigin"
+        | "nodeExtent"
+        | "elevateNodesOnSelect"
+        | "elevateEdgesOnSelect"
+    >,
+    "panOnScrollSpeed"
+> & {
+    /** the factor of the wheel's pixels when it pans; the attribute's text is its number */
+    panOnScrollSpeed?: number | `${number}` | undefined;
+};
 
 export interface RootProps<
     T extends FlowTypes = AnyTypes,
@@ -243,7 +251,9 @@ function warnOnce(): (message: string) => void {
  * (`easing`) is itself, and `null` (`:pan-activation-key="null"`: none) is not `undefined` (the
  * default).
  */
-function optionKeys(options: RootEngineProps): Record<string, unknown> {
+function optionKeys(
+    options: Partial<FlowEngineOptions>,
+): Record<string, unknown> {
     return Object.fromEntries(
         Object.entries(options).map(([key, value]) => [
             key,
@@ -255,7 +265,7 @@ function optionKeys(options: RootEngineProps): Record<string, unknown> {
 }
 
 /** A key that changes when an engine option's value does (but a function's: `easing` is watched). */
-function optionsKey(options: RootEngineProps): string {
+function optionsKey(options: Partial<FlowEngineOptions>): string {
     return JSON.stringify(optionKeys(options), (_key, value) =>
         value === undefined ? "undefined" : value,
     );
@@ -334,10 +344,15 @@ const RootFlow = definePrimitive<AnyRootProps, RootSlots, RootEmits<AnyTypes>>(
             },
         );
 
-        const engineProps = (): RootEngineProps =>
+        const engineProps = (): Partial<FlowEngineOptions> =>
             Object.fromEntries(
-                ENGINE_PROPS.map((name) => [name, plain(props[name])]),
-            ) as RootEngineProps;
+                ENGINE_PROPS.map((name) => [
+                    name,
+                    name === "panOnScrollSpeed"
+                        ? numberProp(props[name])
+                        : plain(props[name]),
+                ]),
+            ) as Partial<FlowEngineOptions>;
         const start = plain(
             props.viewport ?? props.defaultViewport ?? DEFAULT_VIEWPORT,
         );
@@ -592,6 +607,8 @@ const RootFlow = definePrimitive<AnyRootProps, RootSlots, RootEmits<AnyTypes>>(
             // a bare attribute is `true`, mouse buttons (`:pan-on-drag="[1, 2]"`) stay a list
             panOnDrag: [Boolean, Array] as PropType<unknown>,
             autoPan: [Boolean, Object] as PropType<unknown>,
+            // `pan-on-scroll-speed="2"` is its number
+            panOnScrollSpeed: NUMBER_PROP,
         },
         emits: ROOT_EMITS,
     },

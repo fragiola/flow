@@ -5,6 +5,8 @@ import {
 import {
     definePrimitive,
     type FlowComponent,
+    NUMBER_PROP,
+    numberProp,
     type PrimitiveProps,
     type SlotFunction,
 } from "../utils/primitive";
@@ -13,8 +15,11 @@ import { type RenderSlot, renderElement } from "../utils/render";
 export interface FitViewProps extends PrimitiveProps {
     /** disabled even when the engine would run its action */
     disabled?: boolean | undefined;
-    /** how long its viewport change animates, in milliseconds (the root's `easing`); default 0: at once */
-    duration?: number | undefined;
+    /**
+     * how long its viewport change animates, in milliseconds (the root's `easing`); default 0: at
+     * once. The attribute's text is its number (`duration="300"`)
+     */
+    duration?: number | `${number}` | undefined;
 }
 
 export interface FitViewSlots extends RenderSlot<ControlButtonState> {
@@ -35,7 +40,7 @@ export const FitView: FlowComponent<FitViewProps, FitViewSlots> =
                 "FitView",
                 "fit-view",
                 () => props.disabled,
-                () => props.duration,
+                () => numberProp(props.duration) as number | undefined,
             );
             return () => {
                 const current = state.value;
@@ -50,5 +55,9 @@ export const FitView: FlowComponent<FitViewProps, FitViewSlots> =
                 });
             };
         },
-        { booleans: ["disabled"] },
+        {
+            booleans: ["disabled"],
+            // `duration="300"` is its number
+            types: { duration: NUMBER_PROP },
+        },
     );

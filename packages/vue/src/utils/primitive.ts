@@ -106,3 +106,16 @@ export function definePrimitive<
         },
     }) as unknown as FlowComponent<Props, Slots, Emits>;
 }
+
+/**
+ * A number prop that also takes its attribute's text (`duration="300"`), as Angular's inputs do:
+ * a numeric string is its number, anything else is left for the engine to judge.
+ */
+export function numberProp(value: unknown): unknown {
+    if (typeof value !== "string" || value.trim() === "") return value;
+    const number = Number(value);
+    return Number.isNaN(number) ? value : number;
+}
+
+/** The prop type of {@link numberProp}'s props. */
+export const NUMBER_PROP = [Number, String] as PropType<unknown>;
