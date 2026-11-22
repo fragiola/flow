@@ -49,7 +49,7 @@ test("the photo keeps its aspect ratio", async ({ page }) => {
     const after = await boxOf(photo);
     expect(after.width).toBeGreaterThan(before.width);
     near(after.width / after.height, before.width / before.height, 0.02);
-    await expect(part(page, "resizer")).toHaveCount(2);
+    await expect(part(page, "resizer")).toHaveCount(3);
 });
 
 test("the arrows on a focused handle resize by a step, Shift by a bigger one, within the limits", async ({
@@ -85,4 +85,18 @@ test("the arrows on a focused handle resize by a step, Shift by a bigger one, wi
 
 test("every resize handle a keyboard reaches has a name", async ({ page }) => {
     await expectNamedHandles(page, 8);
+});
+
+test("the banner resizes across only, from its two sides", async ({ page }) => {
+    const banner = node(page, "banner");
+    await press(page, banner);
+    await expect(banner).toHaveAttribute("data-selected", "");
+    await expect(
+        banner.locator('[data-flow-part="resize-handle"]'),
+    ).toHaveCount(2);
+    const before = await boxOf(banner);
+    await dragBy(page, corner(page, "banner", "right"), 60, 40);
+    const after = await boxOf(banner);
+    near(after.width - before.width, 60, 2);
+    near(after.height, before.height, 1);
 });

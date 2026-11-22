@@ -152,3 +152,44 @@ test("Escape cancels a keyboard connection", async ({ page }) => {
     ).toHaveCount(0);
     await expect(part(page, "edge")).toHaveCount(5);
 });
+
+test("a box around two nodes leaves a rectangle around them, which drags them both", async ({
+    page,
+}) => {
+    const rect = part(page, "nodes-selection");
+    await expect(rect).toHaveCount(0);
+    const docs = await boxOf(node(page, "docs"));
+    const ship = await boxOf(node(page, "ship"));
+    const from = { x: docs.x - 15, y: docs.y - 15 };
+    await dragFrom(
+        page,
+        from,
+        ship.x + ship.width + 15 - from.x,
+        ship.y + ship.height + 15 - from.y,
+        { modifiers: ["Shift"] },
+    );
+    await expect(status(page)).toContainText("2 nodes");
+    await expect(rect).toBeVisible();
+    // around both nodes
+    const around = await boxOf(rect);
+    expect(Math.abs(around.x - docs.x)).toBeLessThan(2);
+    expect(
+        Math.abs(around.x + around.width - (ship.x + ship.width)),
+    ).toBeLessThan(2);
+    await dragFrom(
+        page,
+        { x: around.x + around.width / 2, y: around.y + around.height / 2 },
+        40,
+        30,
+    );
+    const docs2 = await boxOf(node(page, "docs"));
+    const ship2 = await boxOf(node(page, "ship"));
+    expect(Math.abs(docs2.x - docs.x - 40)).toBeLessThan(2);
+    expect(Math.abs(ship2.y - ship.y - 30)).toBeLessThan(2);
+    await expect(status(page)).toContainText("2 nodes");
+    await expect(rect).toBeVisible();
+    // Escape clears the selection and the rectangle
+    await node(page, "docs").focus();
+    await page.keyboard.press("Escape");
+    await expect(rect).toHaveCount(0);
+});
