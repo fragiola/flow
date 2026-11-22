@@ -77,35 +77,43 @@ test("the minimap shows every node, and a drag in it pans the flow", async ({
     expect(after.x).not.toBe(zoomed.x);
 });
 
+type Sampler = { zooms: number[]; stop: boolean };
+
 test("the zoom buttons animate their change", async ({ page }) => {
     const before = (await settled(page)).zoom;
-    // the zoom the viewport is drawn at, every frame for half a second after the press
-    const sampling = page.getByTestId("stage").evaluate(
+    const stage = page.getByTestId("stage");
+    // the zoom the viewport is drawn at, every frame: installed (a first frame drawn) before the press
+    await stage.evaluate(
         (stage) =>
-            new Promise<number[]>((resolve) => {
+            new Promise<void>((ready) => {
                 const viewport = stage.querySelector(
                     '[data-flow-part="viewport"]',
                 );
-                const zooms: number[] = [];
-                const end = performance.now() + 500;
+                const sampler: Sampler = { zooms: [], stop: false };
+                (window as unknown as { sampler: Sampler }).sampler = sampler;
                 const step = () => {
                     if (viewport) {
-                        zooms.push(
+                        sampler.zooms.push(
                             new DOMMatrixReadOnly(
                                 getComputedStyle(viewport).transform,
                             ).a,
                         );
                     }
-                    if (performance.now() < end) requestAnimationFrame(step);
-                    else resolve(zooms);
+                    if (sampler.zooms.length === 1) ready();
+                    if (!sampler.stop) requestAnimationFrame(step);
                 };
                 requestAnimationFrame(step);
             }),
     );
     await page.getByRole("button", { name: "Zoom in" }).click();
-    const zooms = await sampling;
-    const after = zooms.at(-1) ?? before;
+    const after = (await settled(page)).zoom;
+    const zooms = await page.evaluate(() => {
+        const sampler = (window as unknown as { sampler: Sampler }).sampler;
+        sampler.stop = true;
+        return sampler.zooms;
+    });
     near(after, before * 1.2, 0.01);
+    near(zooms.at(-1) ?? 0, after, 0.0001);
     // frames between the two zooms: it went there step by step
     const between = zooms.filter(
         (zoom) => zoom > before + 0.001 && zoom < after - 0.001,

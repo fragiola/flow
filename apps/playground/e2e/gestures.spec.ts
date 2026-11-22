@@ -17,29 +17,57 @@ import {
 
 const PANE = { x: 700, y: 260 };
 
-/** The zooms the viewport element is drawn at, one per frame, while `act` runs and `ms` after. */
-async function framesOf(page: Page, act: () => Promise<void>, ms = 600) {
-    await page.evaluate((ms) => {
-        const viewport = document.querySelector('[data-flow-part="viewport"]');
-        const seen: number[] = [];
-        (window as unknown as { zooms: number[] }).zooms = seen;
-        const end = performance.now() + ms;
-        const step = () => {
-            if (viewport) {
-                seen.push(
-                    new DOMMatrixReadOnly(getComputedStyle(viewport).transform)
-                        .a,
+type Sampler = { zooms: number[]; stop: boolean };
+
+/**
+ * The zooms the viewport element is drawn at, one per frame, from before `act` until the view has
+ * settled: the sampler is installed (and has drawn a first frame) before `act` runs, and stops once
+ * the engine's viewport stays the same across two polls and the last frame drew it.
+ */
+async function framesOf(page: Page, act: () => Promise<void>) {
+    await page.evaluate(
+        () =>
+            new Promise<void>((ready) => {
+                const viewport = document.querySelector(
+                    '[data-flow-part="viewport"]',
                 );
-            }
-            if (performance.now() < end) requestAnimationFrame(step);
-        };
-        requestAnimationFrame(step);
-    }, ms);
-    await act();
-    await page.waitForTimeout(ms);
-    return page.evaluate(
-        () => (window as unknown as { zooms: number[] }).zooms,
+                const sampler: Sampler = { zooms: [], stop: false };
+                (window as unknown as { sampler: Sampler }).sampler = sampler;
+                const step = () => {
+                    if (viewport) {
+                        sampler.zooms.push(
+                            new DOMMatrixReadOnly(
+                                getComputedStyle(viewport).transform,
+                            ).a,
+                        );
+                    }
+                    if (sampler.zooms.length === 1) ready();
+                    if (!sampler.stop) requestAnimationFrame(step);
+                };
+                requestAnimationFrame(step);
+            }),
     );
+    await act();
+    let last = Number.NaN;
+    await expect
+        .poll(async () => {
+            const { zoom } = await viewportOf(page);
+            const drawn = await page.evaluate(
+                () =>
+                    (
+                        window as unknown as { sampler: Sampler }
+                    ).sampler.zooms.at(-1) ?? Number.NaN,
+            );
+            const settled = zoom === last && Math.abs(drawn - zoom) < 1e-4;
+            last = zoom;
+            return settled;
+        })
+        .toBe(true);
+    return page.evaluate(() => {
+        const sampler = (window as unknown as { sampler: Sampler }).sampler;
+        sampler.stop = true;
+        return sampler.zooms;
+    });
 }
 
 test("a node dragged to the root's edge pans the viewport, and stays under the pointer", async ({
@@ -80,6 +108,8 @@ test("the zoom and fit-view buttons animate with a duration", async ({
     const end = fit.at(-1) ?? 0;
     expect(new Set(fit.map((zoom) => zoom.toFixed(4))).size).toBeGreaterThan(3);
     expect(end).not.toBeCloseTo(1.2, 2);
+    // the last frame drawn is the engine's final viewport
+    expect(end).toBeCloseTo((await viewportOf(page)).zoom, 4);
 });
 
 test("without a duration the buttons apply at once", async ({ page }) => {
@@ -245,15 +275,15 @@ test("a selected node is drawn above the nodes it overlaps", async ({
                     ?.getAttribute("data-flow-id"),
             overlap,
         );
-    expect(await topAt()).toBe("b");
+    await expect.poll(topAt).toBe("b");
     // select a by its uncovered left part: it rises above b
     await page.mouse.click((a?.x ?? 0) + 8, (a?.y ?? 0) + 8);
     await expect(node(page, "a")).toHaveAttribute("data-selected", "");
-    expect(await topAt()).toBe("a");
+    await expect.poll(topAt).toBe("a");
     // deselected, it goes back under
     await page.mouse.click(PANE.x, PANE.y);
     await expect(node(page, "a")).not.toHaveAttribute("data-selected", "");
-    expect(await topAt()).toBe("b");
+    await expect.poll(topAt).toBe("b");
 });
 
 test("the connection line from a selected node is drawn above it (the nodes' layer isolates their z-index)", async ({
