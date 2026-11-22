@@ -25,6 +25,11 @@ import {
     vi,
 } from "vitest";
 import { withSourceCondition } from "../../../scripts/source-condition.ts";
+import {
+    type AnyTypes,
+    createFlowRef,
+    type FlowFeatures,
+} from "../src/index.js";
 import TestFlow from "./fixtures/test-flow.svelte";
 import { installLayout, part, render, settle, task } from "./flow";
 
@@ -233,5 +238,36 @@ describe("the render levels", () => {
         expect(after).not.toBe(before);
         expect(after.closest('[data-flow-part="edges-layer"]')).not.toBe(null);
         expect(document.activeElement).toBe(after);
+    });
+
+    it("gives the focus back to an edge the engine moves to another level and back (selection.set)", async () => {
+        const { features, nodes, edges } = flow();
+        const ref = createFlowRef<AnyTypes, FlowFeatures>();
+        const { container } = await render(TestFlow, {
+            features,
+            defaultNodes: nodes,
+            defaultEdges: edges(false),
+            flowRef: ref,
+        });
+        const before = part(container, "edge", "ab");
+        before.focus();
+        expect(document.activeElement).toBe(before);
+        ref.current?.model.run("selection.set", { edgeIds: ["ab"] });
+        await settle();
+        const raised = part(container, "edge", "ab");
+        // drawn again in the level's own SVG: a new element, the focus given back
+        expect(raised).not.toBe(before);
+        expect(
+            raised.closest('[data-flow-part="edges-layer"]'),
+        ).toHaveAttribute("data-level", "1");
+        expect(document.activeElement).toBe(raised);
+        // unselected: one level again, the edge back in the edges' SVG, its focus kept
+        ref.current?.model.run("selection.clear");
+        await settle();
+        const back = part(container, "edge", "ab");
+        expect(container.querySelector('[data-flow-part="edges-layer"]')).toBe(
+            null,
+        );
+        expect(document.activeElement).toBe(back);
     });
 });
