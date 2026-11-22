@@ -130,6 +130,7 @@ throws a `TypeError` naming both.
 | `features` | `F` | the opt-in features, each from its own entry (`[selection(), drag()]`), fixed for the model's life (see [Features](/docs/api/features)) |
 | `createId` | `CreateId` | generates the id of a node or edge given without one: `(kind: IdKind) => string`, `IdKind` being `"node"` or `"edge"`; default `` `${kind}-${n}` `` (no global `crypto`). An id in use is skipped and asked again |
 | `freeze` | `boolean` | freeze the document and every node and edge in it (default `true`) |
+| `defaultEdgeOptions` | `DefaultEdgeOptions<T>` | the fields every `edge.add` fills in where its payload leaves them out, before any middleware sees it (`{ type: "smoothstep", data: { weight: 1 } }`: a connection's new edges are smooth steps); never an id nor an end. The document's own edges load as they are. An invalid one throws a `TypeError` when the model is created |
 
 ## `validateFlow` and `FlowValidationError`
 
@@ -284,7 +285,7 @@ model.run("batch", { commands: [...back] }, { meta: { undo: true } });
 | `"edge-selectable"` | `{ edgeId }` | it may be selected |
 | `"edge-deletable"` | `{ edgeId }` | it may be removed |
 | `"edge-hidden"` | `{ edgeId }` | it is hidden |
-| `"edge-reconnectable"` | `{ edgeId }` | its ends may be moved (`reconnectable`, default true) |
+| `"edge-reconnectable"` | `{ edgeId, end? }` | its ends may be moved (`reconnectable`, default true): one of them at least, or the `end` given (`"source"`, `"target"`) |
 | `"node-selected"` | `{ nodeId }` | it is selected (`selection()`) |
 | `"edge-selected"` | `{ edgeId }` | it is selected (`selection()`) |
 

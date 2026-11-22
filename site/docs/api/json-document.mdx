@@ -149,6 +149,7 @@ for the user's gestures and for your code alike:
 | `connectable` | `true` | edges may start or end at it (`edge.add`, `edge.reconnect`) |
 | `deletable` | `true` | it may be removed (`node.remove`, `selection.remove`) |
 | `hidden` | `false` | it is not shown (its edges neither) |
+| `focusable` | `true` | it takes DOM focus with `keyboard()` (`node-focusable`; the engine's `nodesFocusable` turns every node's off) |
 
 The fields of `selection()` (`SelectionFields`, on nodes and edges alike):
 
@@ -191,7 +192,8 @@ Its flags (`EdgeFlags`):
 | `selectable` | `true` | it may be selected |
 | `deletable` | `true` | it may be removed (`edge.remove`, `selection.remove`); removing a node removes its edges whatever their flag |
 | `hidden` | `false` | it is not drawn |
-| `reconnectable` | `true` | its ends may be moved (`edge.reconnect`) |
+| `reconnectable` | `true` | its ends may be moved (`edge.reconnect`): both (`true`), none (`false`), or only its `"source"` or its `"target"` end (the reconnect anchor of the other end draws nothing, and a press near it grabs nothing) |
+| `focusable` | `true` | it takes DOM focus with `keyboard()` (`edge-focusable`; the engine's `edgesFocusable` turns every edge's off) |
 
 The rules beyond the fields: one edge per pair of handles and direction (a second is refused), a
 self loop is allowed (forbid it in a middleware), and every `source`, `target` and `parentId` names
