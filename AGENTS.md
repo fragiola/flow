@@ -202,9 +202,9 @@ the playground, `examples/shared` and `examples/react`), and **never runs `playw
 in one PR. `main` has no required checks: a skipped job blocks nothing.
 
 **Shards: none.** Shard a suite only when its test step alone passes about 3 minutes. Measured
-locally (4 workers; CI runs 2): the playground's 152 tests (76 per browser) in ~35 s, each
-examples app's 191 tests (95 smoke runs: 19 examples × 5 themes) in ~20 to ~45 s, its embed build
-included (measured after #28; Angular and React the slower).
+locally (4 workers; CI runs 2): the playground's 182 tests (91 per browser) in ~46 s, each
+examples app's 203 tests (100 smoke runs: 20 examples × 5 themes) in ~22 to ~55 s, its embed build
+included (measured after #33; Angular and React the slower).
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
@@ -364,9 +364,9 @@ size); features: `selection-box` (selection),
 `viewport-change { viewport, gesture }`, `drag-start`, `nodes-move { nodeIds, source: "pointer" |
 "keyboard" }`, `drag-cancel`, `connect-start { nodeId, handleId, handleType, input }`,
 `connect-target { nodeId, handleId, handleType, index, count }` (#27, keyboard only),
-`connect { edgeId, source, target, input }`, `connect-cancel { refused, input, from, to, client,
+`connect { edgeId, source, target, input }`, `connect-cancel { refused, input, dropped, from, to, client,
 point }` (#27: `input` is a `MoveSource`, `"pointer"` or `"keyboard"`; #32: where it ended, a
-`ConnectionDrop`), `reconnect-start`, `reconnect`, `reconnect-cancel { edgeId, end, refused, from,
+`ConnectionDrop`), `reconnect-start`, `reconnect`, `reconnect-cancel { edgeId, end, refused, dropped, from,
 to, client, point }`, `resize { nodeId, width, height, source }` (#27: `source`), `box-select`,
 `remove { nodeIds, edgeIds }`; #32: `viewport-change-start` / `viewport-change-end { viewport,
 gesture }`, `ready`, `node-click` / `edge-click` / `pane-click`, the `*-double-click` and
@@ -1962,7 +1962,8 @@ none of xyflow's code):
   feature acts; nothing is installed again). `drag`: node drags and the arrows; `connect`: drags,
   taps, Enter on a handle (whose `tabindex` goes); `select`: taps, the box, Enter/Space and a
   drag's select-on-drag; `reconnect` (and `connect`: moving an end connects it anew, so the lock,
-  which turns `connect` off, stops reconnection too, as React Flow's does). A resize and the delete keys follow `interactive` only.
+  which turns `connect` off, stops reconnection too, as React Flow's does: one under way is
+  cancelled). A resize and the delete keys follow `interactive` only.
   Turning a kind off cancels only a gesture of that kind (`FeatureGesture.kind`); `interactive:
   false` cancels everything, as before. No engine option per kind (React Flow's
   `nodesDraggable`, … props): the switches are `set-interactive`'s, the Controls' lock in #33.
@@ -2001,14 +2002,19 @@ none of xyflow's code):
   flags; never an id or an end), validated once against the edge schema (a `TypeError`), merged
   under every `edge.add` payload in the bus before the middleware (runs, dry runs, batch steps).
   `commands-to` merges it under the wanted edges too, so a controlled edge the defaults filled is
-  synced once, not on every render. The document's edges load as they are (React Flow also applies
+  synced once, not on every render: under a new edge every default, under an edge the model holds
+  only the defaults it holds the same value for (a document edge, loaded without them, is not
+  rewritten by them when the controlled list changes). The document's edges load as they are (React Flow also applies
   them when rendering; ours are data in the document).
 - **Resize steps are the transient `node.resize` commands** (`model.subscribe`, `onNodesChange`):
   no `resize-step` event; `resize-start` (at the size it starts from) and `resize-cancel` frame
   them, `resize` stays the end.
-- **The cancel events tell where they ended** (`ConnectionDrop`: `from`, `to`, `client`, `point`):
-  a release's point, a cancel's last pointer point (Escape), a keyboard connection's target centre
-  (or its start's) with `client` from `host.toClient`. `reconnect-cancel` names the moved `end`.
+- **The cancel events tell where they ended** (`ConnectionDrop`: `dropped`, `from`, `to`, `client`,
+  `point`): a release's point, a cancel's last pointer point (Escape), a keyboard connection's
+  target centre (or its start's) with `client` from `host.toClient`. `reconnect-cancel` names the
+  moved `end`. `dropped` is `true` for a release (or a keyboard confirm) and `false` for a cancel
+  (Escape, `cancel-gesture`, the lock, a `pointercancel`), so "drop on the canvas adds a node"
+  adds nothing on a cancel (React Flow's `onConnectEnd` fires on release only).
 - **`ready`** is told once per engine, at the first measurement flush with a sized root, every
   shown node measured and a pending `fitView` done (`is("ready")`). Known limit: an empty flow whose
   root measured 0 × 0 when attached is not ready until something is measured again (the root is

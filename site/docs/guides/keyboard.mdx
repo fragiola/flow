@@ -90,7 +90,10 @@ A node that is not draggable does not move, and one that is not deletable stays.
 edges it would remove (a removed node's edges among them). It answers `true` (remove them),
 `false` (keep everything) or a `{ nodes, edges }` subset (only those), or a promise of one: the key
 is taken at once, and when the promise settles what is still there goes, in one step (a node
-removed meanwhile is skipped). Your confirmation, a dialog of your app, waits there:
+removed meanwhile is skipped). Your confirmation, a dialog of your app, waits there. With a
+`beforeDelete`, the delete runs as one `batch` of `node.remove` and `edge.remove`, not
+`selection.remove`: a middleware watching `selection.remove` does not see it
+([Limitations](/docs/limitations)).
 
 ```ts
 const features = [
