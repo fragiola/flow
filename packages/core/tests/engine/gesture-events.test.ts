@@ -399,10 +399,17 @@ describe("ready", () => {
         });
         await Promise.resolve();
         expect(flow.engine.is("ready")).toBe(false);
+        // a reactive read (the adapters' subscription) sees it turn true
+        const read: boolean[] = [];
+        const stop = flow.engine.adapter.subscribe(() =>
+            read.push(flow.engine.is("ready")),
+        );
         flow.sizes.set("b", [10, 10]);
         flow.observer()?.trigger([flow.node("b")]);
         await Promise.resolve();
+        stop();
         expect(flow.engine.is("ready")).toBe(true);
+        expect(read.at(-1)).toBe(true);
         expect(only(flow.events, "ready")).toEqual([{ type: "ready" }]);
         flow.observer()?.trigger([flow.node("a")]);
         await Promise.resolve();

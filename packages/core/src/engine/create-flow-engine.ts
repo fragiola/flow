@@ -584,9 +584,11 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         if (keys.some((key) => before[key] !== next[key])) {
             // the gestures a switch turned off stop: every one with `interactive`, else those of
             // that kind (a pan, a resize or another kind's gesture goes on)
+            // (a reconnection needs `connect` too, so `connect` off stops one as well)
             const off = (kind: InteractionKind | undefined) =>
                 (before.interactive && !next.interactive) ||
-                (kind !== undefined && before[kind] && !next[kind]);
+                (kind !== undefined && before[kind] && !next[kind]) ||
+                (kind === "reconnect" && before.connect && !next.connect);
             if (off(this.press?.gesture?.kind)) this.cancelPress();
             if (off(this.following?.kind)) this.cancelFollowing();
             this.interactivity = next;
@@ -1567,6 +1569,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             (this.pendingFit === undefined || nodes.length === 0)
         ) {
             this.ready = true;
+            // a reactive read of `is("ready")` sees it
+            this.notify({ measured: true });
             this.emit({ type: "ready" });
         }
     }
