@@ -13,6 +13,7 @@ import type { ComposedFeatures } from "../features/registry";
 import type { FlowReader } from "../features/types";
 import { cloneJson } from "./clone-json";
 import { type CommandsToPayload, commandsTo } from "./commands-to";
+import type { NodeConnection, NodeData } from "./queries";
 
 /** What a key reads: the document, and the model's features and commands. */
 export interface QueryContext {
@@ -54,6 +55,25 @@ function neighbours(
         : reader.nodes().filter((node) => ids.has(node.id));
 }
 
+/**
+ * The edges that start or end at a node (`nodeId`), only those that start (`handleType:
+ * "source"`) or end (`"target"`) there with `handleType`, only those at `handleId` with it.
+ */
+function nodeEdges(reader: FlowReader, payload: unknown): readonly FlowEdge[] {
+    const nodeId = stringOf(payload, "nodeId");
+    const handleType = stringOf(payload, "handleType");
+    const handleId = stringOf(payload, "handleId");
+    const at = (edge: FlowEdge, end: "source" | "target") =>
+        edge[end] === nodeId &&
+        (handleType === undefined || handleType === end) &&
+        (handleId === undefined ||
+            edge[end === "source" ? "sourceHandle" : "targetHandle"] ===
+                handleId);
+    return reader
+        .edges()
+        .filter((edge) => at(edge, "source") || at(edge, "target"));
+}
+
 /** The core's `get` keys. */
 export const CORE_GET: Readonly<
     Record<string, (context: QueryContext, payload: unknown) => unknown>
@@ -68,19 +88,27 @@ export const CORE_GET: Readonly<
     },
     "all-nodes": ({ reader }) => reader.nodes(),
     "all-edges": ({ reader }) => reader.edges(),
-    "node-edges-by": ({ reader }, payload) => {
-        const nodeId = stringOf(payload, "nodeId");
-        const handleType = stringOf(payload, "handleType");
-        const handleId = stringOf(payload, "handleId");
-        const at = (edge: FlowEdge, end: "source" | "target") =>
-            edge[end] === nodeId &&
-            (handleType === undefined || handleType === end) &&
-            (handleId === undefined ||
-                edge[end === "source" ? "sourceHandle" : "targetHandle"] ===
-                    handleId);
-        return reader
-            .edges()
-            .filter((edge) => at(edge, "source") || at(edge, "target"));
+    "node-edges-by": ({ reader }, payload) => nodeEdges(reader, payload),
+    "node-connections-by": ({ reader }, payload): readonly NodeConnection[] =>
+        nodeEdges(reader, payload).map((edge) => ({
+            edgeId: edge.id,
+            source: edge.source,
+            sourceHandle: edge.sourceHandle,
+            target: edge.target,
+            targetHandle: edge.targetHandle,
+        })),
+    "nodes-data-by": ({ reader }, payload): readonly NodeData[] => {
+        const list =
+            typeof payload === "object" && payload !== null
+                ? (payload as { nodeIds?: unknown }).nodeIds
+                : undefined;
+        if (!Array.isArray(list)) return [];
+        return list.flatMap((id) => {
+            const node = typeof id === "string" ? reader.node(id) : undefined;
+            return node
+                ? [{ id: node.id, type: node.type, data: node.data }]
+                : [];
+        });
     },
     "connected-edges-by": ({ reader }, payload) => {
         const list =

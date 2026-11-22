@@ -279,6 +279,27 @@ export type EngineActionPayload<K extends EngineActionKey> =
 export type EngineActionResult<K extends EngineActionKey> =
     EngineActionMap[K]["result"];
 
+/**
+ * A node as the engine knows it on screen (`internal-node-by`, what `useInternalNode` gives): the
+ * document's node, its absolute place and box, whether its size is known, its z-index and its
+ * registered handles.
+ */
+export interface InternalNode<T extends FlowTypes = AnyTypes> {
+    readonly id: string;
+    /** the document's node */
+    readonly node: FlowNode<T>;
+    /** its position in absolute flow coordinates (its parents' added; `absolute-position-by`) */
+    readonly absolutePosition: XY;
+    /** its box in absolute flow coordinates, `nodeOrigin` applied, size 0 until known (`node-rect-by`) */
+    readonly rect: Rect;
+    /** its size is known: measured, or given by the document (`node-measured`) */
+    readonly measured: boolean;
+    /** its structural `z-index` (`node-z-index-by`) */
+    readonly zIndex: number;
+    /** its registered handles, with their centres and bounds (`handles-by`) */
+    readonly handles: readonly FlowHandle[];
+}
+
 /** What `engine.get(key, payload)` reads: facts of this flow on screen. */
 export interface EngineGetMap<T extends FlowTypes = AnyTypes> {
     /** the viewport */
@@ -339,6 +360,11 @@ export interface EngineGetMap<T extends FlowTypes = AnyTypes> {
      * `elevateNodesOnSelect`), always above its parent's
      */
     "node-z-index-by": { payload: { nodeId: string }; result: number };
+    /** a node on screen: its node, absolute place and box, size known, z-index and handles */
+    "internal-node-by": {
+        payload: { nodeId: string };
+        result: InternalNode<T> | undefined;
+    };
     /** a node's registered handles, with their centres */
     "handles-by": {
         payload: { nodeId: string };

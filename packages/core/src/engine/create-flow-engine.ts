@@ -106,6 +106,7 @@ import type {
     EngineIsKey,
     EngineIsPayload,
     FitViewPayload,
+    InternalNode,
     NodeToolbarPayload,
     ZoomStepPayload,
 } from "./verbs";
@@ -662,12 +663,10 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             "drawn-edges": () => this.drawnEdges(),
             "node-z-index-by": (p) =>
                 this.nodeZ(String(payloadRecord(p).nodeId)),
-            "handles-by": (p) => {
-                const nodeId = String(payloadRecord(p).nodeId);
-                return this.measurements
-                    .handlesOf(nodeId)
-                    .map((handle) => this.placed(handle));
-            },
+            "handles-by": (p) =>
+                this.handlesOf(String(payloadRecord(p).nodeId)),
+            "internal-node-by": (p) =>
+                this.internalNode(String(payloadRecord(p).nodeId)),
             "background-pattern": (p) =>
                 backgroundPattern(
                     this.current,
@@ -1237,6 +1236,31 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         const parent =
             node.parentId === undefined ? undefined : this.node(node.parentId);
         return parent ? this.boxOf(parent) : TOP_LEFT;
+    }
+
+    /** A node's registered handles, placed. */
+    private handlesOf(nodeId: string): readonly FlowHandle[] {
+        return this.measurements
+            .handlesOf(nodeId)
+            .map((handle) => this.placed(handle));
+    }
+
+    /** A node as the engine knows it on screen (`internal-node-by`). */
+    private internalNode(nodeId: string): InternalNode | undefined {
+        const node = this.node(nodeId);
+        if (!node) return undefined;
+        const rect = this.boxOf(node);
+        return {
+            id: node.id,
+            node,
+            absolutePosition: this.model.get("absolute-position-by", {
+                nodeId,
+            }) ?? { x: rect.x, y: rect.y },
+            rect,
+            measured: this.sizeOf(node) !== undefined,
+            zIndex: this.nodeZ(nodeId),
+            handles: this.handlesOf(nodeId),
+        };
     }
 
     /** A node's absolute box, its size zero until known. */
