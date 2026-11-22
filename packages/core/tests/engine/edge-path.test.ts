@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// `edge-path-by` (D9): an edge's path, label point and ends for the four built-in types, at its
+// `edge-path-by` (D9): an edge's path, label point and ends for the five built-in types, at its
 // handles' centres or its nodes' default sides, on fixed fixtures with our own expected values.
 import { afterEach, describe, expect, it } from "vitest";
 import type { FlowJson } from "../../src/document/types";
@@ -8,7 +8,14 @@ import { mount, unmountAll } from "./harness";
 
 afterEach(unmountAll);
 
-const TYPES = ["bezier", "smoothstep", "step", "straight", "custom"] as const;
+const TYPES = [
+    "bezier",
+    "simplebezier",
+    "smoothstep",
+    "step",
+    "straight",
+    "custom",
+] as const;
 
 const json: FlowJson = {
     version: 1,
@@ -92,6 +99,25 @@ describe("edge-path-by", () => {
             path: "M100,25 L300,125",
             label: { x: 200, y: 75 },
         });
+    });
+
+    it("draws a simple bezier, which the bezier's curvature does not change", () => {
+        expect(flow().get("edge-path-by", { edgeId: "simplebezier" })).toEqual({
+            ...ends,
+            path: "M100,25 C200,25 200,125 300,125",
+            label: { x: 200, y: 75 },
+        });
+        const engine = mount(json, {
+            sizes: { a: [100, 50], b: [100, 50], c: [100, 50], d: [100, 50] },
+            handles,
+            engine: { pathOptions: { curvature: 0.25 } },
+        }).engine;
+        expect(engine.get("edge-path-by", { edgeId: "bezier" })?.path).toBe(
+            "M100,25 C150,25 250,125 300,125",
+        );
+        expect(
+            engine.get("edge-path-by", { edgeId: "simplebezier" })?.path,
+        ).toBe("M100,25 C200,25 200,125 300,125");
     });
 
     it("gives an app's type the bezier, for its own primitive to redraw from the ends", () => {

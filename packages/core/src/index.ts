@@ -165,6 +165,10 @@ export {
     bezierPath,
 } from "./geometry/bezier-path";
 export {
+    type SimpleBezierPathOptions,
+    simpleBezierPath,
+} from "./geometry/simple-bezier-path";
+export {
     type SmoothStepPathOptions,
     type StepPathOptions,
     smoothStepPath,

@@ -83,7 +83,7 @@ export interface Types extends FlowTypes {
 </Framework>
 
 `nodes` names each node type and the shape of its `data`; `edges` names your edge types and
-theirs. The built-in edge types (`bezier`, `smoothstep`, `step`, `straight`) are always allowed,
+theirs. The built-in edge types (`bezier`, `simplebezier`, `smoothstep`, `step`, `straight`) are always allowed,
 with any JSON object as data; an edge with no `type` is a `bezier`. A node's `data` is required
 (a JSON object), an edge's is optional.
 

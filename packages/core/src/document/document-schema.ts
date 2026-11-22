@@ -185,7 +185,7 @@ export const edgeSchema = {
             type: "string",
             minLength: 1,
             description:
-                'how it is drawn: "bezier" (the default), "smoothstep", "step", "straight" or an app type',
+                'how it is drawn: "bezier" (the default), "simplebezier", "smoothstep", "step", "straight" or an app type',
         },
         data: dataSchema,
         zIndex: zIndexSchema,

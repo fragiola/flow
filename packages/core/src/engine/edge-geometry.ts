@@ -3,6 +3,7 @@
 // a target enters by the top), and its path by its type.
 import type { FlowEdge, XY } from "../document/types";
 import { bezierPath } from "../geometry/bezier-path";
+import { simpleBezierPath } from "../geometry/simple-bezier-path";
 import { smoothStepPath, stepPath } from "../geometry/smooth-step-path";
 import { straightPath } from "../geometry/straight-path";
 import type { EdgePath, HandleSide, PathEnds, Rect } from "../geometry/types";
@@ -112,6 +113,8 @@ export function pathOf(
             };
         case "straight":
             return { ...ends, ...straightPath(ends) };
+        case "simplebezier":
+            return { ...ends, ...simpleBezierPath(ends) };
         default:
             return {
                 ...ends,

@@ -42,7 +42,7 @@ const edge: FlowEdgeInput<Types> = {
     target: "parse",                // the node it ends at
     sourceHandle: "out",            // optional: the source node's handle
     targetHandle: "in",             // optional: the target node's handle
-    type: "smoothstep",             // bezier (default), smoothstep, step, straight, or your own
+    type: "smoothstep",             // bezier (default), simplebezier, smoothstep, step, straight, or yours
     data: { weight: 1 },            // optional
     zIndex: 1,                      // optional: drawn above the edges with less (default 0)
     selectable: true,

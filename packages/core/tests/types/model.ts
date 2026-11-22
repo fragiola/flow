@@ -61,6 +61,7 @@ export function typedData(): void {
         data: { weight: 1 },
     });
     model.run("edge.add", { source: "a", target: "b", type: "smoothstep" });
+    model.run("edge.add", { source: "a", target: "b", type: "simplebezier" });
     // @ts-expect-error: a dependency's weight is a number
     model.run("edge.add", {
         source: "a",

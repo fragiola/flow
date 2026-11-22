@@ -4,9 +4,9 @@ description: Draw the four built-in edge types, an edge type of your own from th
 ---
 
 An edge is an SVG group you render from `Flow.Edges`' children function. The engine computes its
-path once both nodes have a size, and recomputes it whenever they move or change size. Four edge
-types are drawn by the core: `bezier` (an edge with no `type`), `smoothstep`, `step` and
-`straight`. Any other type is yours: the engine gives you the path's ends and the sides they leave
+path once both nodes have a size, and recomputes it whenever they move or change size. Five edge
+types are drawn by the core: `bezier` (an edge with no `type`), `simplebezier`, `smoothstep`,
+`step` and `straight`. Any other type is yours: the engine gives you the path's ends and the sides they leave
 and enter by, and you draw the `d`. Strokes, colours, markers and labels are yours too.
 
 <Example id="edge-types" />

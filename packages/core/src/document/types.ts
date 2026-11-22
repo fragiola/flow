@@ -29,7 +29,12 @@ export interface AnyTypes extends FlowTypes {
 }
 
 /** The edge types the core draws (its own path math): any other type is the app's. */
-export type BuiltInEdgeType = "bezier" | "smoothstep" | "step" | "straight";
+export type BuiltInEdgeType =
+    | "bezier"
+    | "simplebezier"
+    | "smoothstep"
+    | "step"
+    | "straight";
 
 /** The node types of a registry. */
 export type NodeTypeOf<T extends FlowTypes> = T extends {

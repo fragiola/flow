@@ -1485,6 +1485,7 @@ describe("the core reference", () => {
         const mdx = page("path-helpers");
         for (const helper of [
             "bezierPath",
+            "simpleBezierPath",
             "smoothStepPath",
             "stepPath",
             "straightPath",
