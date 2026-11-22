@@ -467,15 +467,16 @@ engine's state attributes from `engine.adapter.attributes(part, payload)`):
 | `ReconnectAnchor` | `circle` `reconnect-anchor` | an end's grab area (`end`), transparent, `r` 10 |
 | `ConnectionLine` | `svg` `connection-line` | while a connection is drawn; default child `path` `connection-path`, or a children function |
 | `SelectionBox` | `div` `selection-box` | while a box is drawn, root-relative |
+| `NodesSelection` | `div` `nodes-selection` | #36: inside `Viewport` after `Nodes`, at `selection-rect` (null: nothing); structural `position: absolute; top: 0; left: 0; transform: translate(x, y); width; height`; state `{ rect, dragging }`; the engine drags it |
 | `Background` | `svg` `background` | `background-pattern`: `pattern` `background-pattern`, `circle`/`path` `background-mark` in `currentColor`, `rect` `background-fill` |
 | `Controls` | `div` `controls` | a group for the buttons |
-| `ZoomIn`, `ZoomOut`, `FitView` | `button` `zoom-in`, `zoom-out`, `fit-view` | run their action (with their `duration` prop, #25); `disabled` / `data-disabled` while `!engine.can(...)` |
+| `ZoomIn`, `ZoomOut`, `FitView` | `button` `zoom-in`, `zoom-out`, `fit-view` | run their action (with their `duration` prop, #25; #36: `FitView`'s `padding`, `nodeIds`, `includeHidden`, `minZoom`, `maxZoom`, only those given); `disabled` / `data-disabled` while `!engine.can(...)` |
 | `ToggleInteractive` | `button` `toggle-interactive` | `set-interactive`; #33: switches `drag`, `connect` and `select` (React Flow's interactive button), locked (`aria-pressed`) while none of them is allowed (`interactive-by`); `data-interactive` while unlocked |
 | `NodeToolbar` | `div` `toolbar` | portal into the root at `node-toolbar-by` (outside the zoom); `open`, default while its node is selected; #28: `nodeIds` (not empty: beside their bounds, no enclosing node needed, no `data-flow-id`, shown while every one is selected) |
-| `EdgeToolbar` | `div` `toolbar` | #28: portal into the root at `edge-toolbar-by` (outside the zoom, its centre on the point); `edgeId` (default the enclosing `Edge`'s), `position` (`"label"` / `"source"` / `"target"`), `offset` (`XY`), `open`, default while its edge is selected; `data-flow-id` its edge's id |
-| `MiniMap` (`/minimap`) | `svg` `minimap` | `width` × `height` (200 × 150), `minimap-view`; children default: a `MiniMapNode` per node and the `MiniMapMask` |
+| `EdgeToolbar` | `div` `toolbar` | #28: portal into the root at `edge-toolbar-by` (outside the zoom, its centre on the point); `edgeId` (default the enclosing `Edge`'s), `position` (`"label"` / `"source"` / `"target"`), `offset` (`XY`), `open`, default while its edge is selected; #36: `point` (a flow `XY`), `alignX` / `alignY`; `data-flow-id` its edge's id |
+| `MiniMap` (`/minimap`) | `svg` `minimap` | `width` × `height` (200 × 150), `minimap-view`; children default: a `MiniMapNode` per node and the `MiniMapMask`; #36: `inversePan`, `zoomStep` (`setPartOptions("minimap", "", …)`), `onClick(event, point)` (the `minimap-click` event, not the DOM click) |
 | `MiniMapNode`, `MiniMapMask` | `rect` `minimap-node`, `path` `minimap-mask` | a node's box; the mask (`fill-rule="evenodd"`) |
-| `NodeResizer` (`/resize`) | `div` `resizer` | `setPartOptions("resizer", nodeId, { minWidth, … })`; default children: a `ResizeHandle` at each corner and side |
+| `NodeResizer` (`/resize`) | `div` `resizer` | `setPartOptions("resizer", nodeId, { minWidth, … })` (#36: `direction`); default children: a `ResizeHandle` at each corner and side |
 | `ResizeHandle` | `div` `resize-handle` | `data-position`; placed on its corner or along its side; #28: the engine's record (`resize-handle { nodeId, position }`: `tabindex` with `keyboard()` + `resize()`, as `tabIndex`) |
 
 **Root props:** `model`, or `defaultNodes` / `defaultEdges` (read once) and the controlled `nodes` /
@@ -506,6 +507,22 @@ render, an action refused before the mount); part hooks `useNode(node)`, `useEdg
 `useViewport()`, `useConnection()`, `useSelection()` (`{ nodes, edges }`), `useNodes()`,
 `useEdges()`. `createFlowRef<T, F>()` / `useFlowRef<T, F>()`: `ref.current` is `{ model, engine }`
 while the root is mounted.
+
+Selecting hooks (#36, on `useFlowValue`; each re-renders only when its value changes, render-count
+tests in `tests/hooks.test.tsx`; the other adapters mirror them):
+
+- `useFlowStore<S, T, F>(selector: ({ model, engine }) => S, equal = Object.is)`.
+- `useNodeId(): string | null` (the enclosing `Flow.Node`'s; the parts' own lookup is
+  `usePartNodeId` in `context.ts`).
+- `useNodesData<T>(id): NodeData<T> | null`, `useNodesData<T>(ids): readonly NodeData<T>[]`
+  (`nodes-data-by`, `sameFlowValue`).
+- `useNodeConnections({ id?, handleId?, type? } = {}): readonly NodeConnection[]`
+  (`node-connections-by` with `handleType: type`; throws outside a node without `id`).
+- `useInternalNode<T>(id): InternalNode<T> | undefined` (`internal-node-by`, `sameFlowValue`).
+- `useKeyPress(keys, { target? }): boolean` (`watchKeyPress` on `target`, default the root
+  element's `ownerDocument.defaultView`; re-listens only when the keys' JSON changes).
+- `useOnViewportChange({ onStart?, onChange?, onEnd? })`: `(viewport, gesture)` from the engine's
+  three viewport events, the latest callbacks, no re-render.
 
 Decisions of the adapter (#5):
 
@@ -563,9 +580,9 @@ Decisions of the adapter (#5):
   what follows the layer in the viewport (the connection line drawn from it, the app's overlays);
   a node's z-index orders the nodes only (playground E2E `gestures.spec.ts`, the adapters'
   `options` tests). The core's `nodeZ` answers a node without a parent without walking a chain
-  (it is read per node on every pan frame). `ZoomIn`, `ZoomOut`, `FitView` take `duration` only (the payload
-  has it when given: `can` and `run` get `{ duration }`, or `{}`); `FitView`'s other payload
-  fields (`padding`, `nodeIds`) stay the engine's defaults. The edges' own filter is gone: `Edges`
+  (it is read per node on every pan frame). `ZoomIn`, `ZoomOut`, `FitView` take `duration` (the payload
+  has it when given: `can` and `run` get `{ duration }`, or `{}`); #36 adds `FitView`'s other
+  payload fields the same way (`givenPayload` in `use-control-button.ts`). The edges' own filter is gone: `Edges`
   renders `drawn-edges`, which applies `onlyRenderVisible` itself. `DRAG_HANDLE_ATTRIBUTE`
   reaches the package through `export *`. Tested through a wrapped engine
   (`tests/options.test.tsx`: `vi.mock` of the core's `createFlowEngine`, its frozen engine and
@@ -581,6 +598,16 @@ share is under [Decisions taken during implementation](#decisions-taken-during-i
   `node-focusable` / `edge-focusable`.
 - **`EdgeToolbar` portals from inside the SVG `Edge`**: `createPortal` takes the container's
   namespace, so its `div` is HTML (no layer needed, unlike Vue).
+
+Decisions of #36 in React (the first adapter; Vue, Svelte, Angular follow):
+
+- **`MiniMap`'s `onClick` is the engine's `minimap-click`**: the root captures the pointer, so a
+  DOM click never reaches the minimap; the contract test gives it `onDoubleClick` instead.
+- **One set of minimap part options per root** (id `""`): every `MiniMap` shares them.
+- **No `ResizeLine`**: a side `ResizeHandle` spans its side; `direction` is the resizer's (the
+  engine keeps it per node), so `ResizeHandle` takes none.
+- **Parity lists while the others catch up**: `AHEAD_IN_REACT` in `site/tests/docs-reference.test.ts`
+  and the three adapters' `tests/index.test.ts` leave `NodesSelection` out; each helper empties it.
 
 For the playground and examples (#6, see [The playground and the examples](#the-playground-and-the-examples-issue-6)): wrap the flow in a sized element (the root fills it); put
 `Edges` before `Nodes` inside `Viewport`, and `Background`, `SelectionBox`, `Controls`, `MiniMap`
@@ -1026,7 +1053,8 @@ while its app is written (the test uses a fake one).
 the authoring guide): Basics `basic`, `custom-nodes`, `edge-types`, `edge-labels`, `backgrounds`,
 `read-only`; Interaction `selection-and-keyboard`, `connection-validation`, `edge-reconnect`,
 `snap-to-grid`, `minimap-and-controls`; Building blocks `sub-flows`, `node-resizer`,
-`node-toolbar`, `add-nodes`, `save-and-restore`, `undo-redo`, `announcements`, `context-menu` (#33); Apps
+`node-toolbar`, `add-nodes`, `save-and-restore`, `undo-redo`, `announcements`, `context-menu` (#33),
+`connected-data` (#36); Apps
 `workflow-builder` (the landing's showcase). `_kit/persistence.ts` and `_kit/undo.ts` are the
 copyable app policy. Epic #26's options where they are natural (#25): `custom-nodes`' preview drags
 only by its title bar (`data-flow-drag-handle`, `styles.dragHandle` and `styles.grip` from the
@@ -1035,6 +1063,13 @@ the same in the four apps; the shared specs cover both. #28: `edge-types` draws 
 `node-toolbar` adds the selection's toolbar (`nodeIds`, below the notes), `edge-labels` an
 `EdgeToolbar` on the selected edge, `selection-and-keyboard` keyboard connections (it installs
 `connection()` and names its handles) and `announcements` each step of one (`connect-target`).
+#36: `selection-and-keyboard` adds `Flow.NodesSelection` (drag the box's rectangle);
+`node-resizer` a `banner` node (`direction="horizontal"`, left and right handles; 3 resizers);
+`edge-types` gives `smoothstep` `animated` + `pathOptions.borderRadius` and `step`
+`pathOptions.stepPosition: 0.25`; `connected-data` (new) sums its inputs with
+`useNodeConnections` + `useNodesData` (test ids `sum-total`, `sum-sources`, `value-<id>`).
+Until their #36 helpers land, `examples/{vue,svelte,angular}` hold only the copied `styles.ts`
+of the changed examples, and their `tests/examples.test.ts` skip `connected-data`.
 
 **Theme tokens** (`--fl-*`; `tests/themes.test.ts` holds the list, `e2e/themes.spec.ts` checks the
 shapes differ on computed styles): shape `font`, `font-size`, `title-weight`, `node-padding`,
@@ -1053,7 +1088,8 @@ feature`, `gestures/viewport-options`, `gestures/click-to-connect-and-drag-handl
 `gestures/origin-extent-and-z-order` (#25: every option of Epic #26 behind a control),
 `gestures/keyboard-and-toolbars` and `api/graph-and-geometry-helpers` (#28: keyboard connections
 and resizing with a live region, the edge and selection toolbars; neighbours, overlaps, framing
-and `simplebezier` edges), `performance/five-hundred-nodes`, `api/commands`), the inspector
+and `simplebezier` edges), `api/selecting-hooks` (#36: every selecting hook on screen),
+`performance/five-hundred-nodes`, `api/commands`), the inspector
 (`src/inspector/flow-inspector.tsx`: viewport, gestures under way, selection, engine events, the
 document) and `fixtures/basic`, the unstyled flow its specs drive (`src/fixture/flow-fixture.tsx`:
 every feature, an 800 × 500 root at the page's corner, the viewport at `{ x: 100, y: 100, zoom:
@@ -1061,7 +1097,9 @@ every feature, an 800 × 500 root at the page's corner, the viewport at `{ x: 10
 `boxOnDrag=1`, `snap=20`, and since #25 `clickToConnect=1`, `dragHandle=1` (a `grip` drag handle in a and b),
 `origin=0.5` (`nodeOrigin`), `panOnDrag=0,1`, `duration=300` (the controls), and since #28
 `edgeToolbar=1` (an `EdgeToolbar` on ab), `nodeToolbar=1` (a `NodeToolbar` for a and b),
-`edgeType=simplebezier` (ab's type), `field=1` (a text field beside the root)). Its suite runs on
+`edgeType=simplebezier` (ab's type), `field=1` (a text field beside the root), and since #36
+`inversePan=1`, `direction=horizontal` (c's resizer), `animated=1` (ab), `nodesSelection=1`;
+`minimap-clicks` logs `MiniMap`'s `onClick`). Its suite runs on
 Chromium and Firefox: pan, wheel, double-click and pinch zoom, drag (selection, cancel, extent,
 snap), connect, reconnect, box select, resize, keyboard and minimap, and (`e2e/gestures.spec.ts`,
 #25) auto-pan, animated controls, the middle-button and Space pans, click-to-connect, drag handles,
@@ -1069,7 +1107,9 @@ snap), connect, reconnect, box select, resize, keyboard and minimap, and (`e2e/g
 (#28) keyboard connections and resizing (`e2e/keyboard.spec.ts`), the edge toolbar, the
 several-nodes toolbar and `simplebezier` (`e2e/toolbars.spec.ts`), each with the mouse and with fingers
 (`e2e/helpers.ts` `touch`: Chromium's real touch input through the DevTools protocol, touch
-pointer events in Firefox), and the 500-node scenario's re-render count.
+pointer events in Firefox), and the 500-node scenario's re-render count; #36's
+`e2e/part-options.spec.ts` (inverse minimap pan and its click, a horizontal resizer, the
+selection rectangle's drag, `data-animated`) and the selecting hooks scenario (`scenarios.spec.ts`).
 
 Decisions of #6:
 
