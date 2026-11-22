@@ -5,7 +5,9 @@
 // app's document, so a flag that stops a user (`draggable`, `deletable`, `connectable`) does not
 // stop them: the step is unlocked and locked again in the same batch; a middleware still vetoes.
 // Every adapter asks the core, so none re-implements the diff. What no command can express (a
-// node's type, a removed data key, a size given back to measurement, an edge's path options)
+// node's type, a removed data key, a size given back to measurement, a node's declared geometry
+// (`initialWidth`, `initialHeight`, `handles`, `sourcePosition`, `targetPosition`, `origin`), an
+// edge's path options)
 // replaces the entity: removed and added again with the same id, its edges with it. The drawing order is not synced.
 import type { BatchEntry } from "../commands/types";
 import { edgeFlag, nodeFlag, reconnectableEnd } from "../document/flags";
@@ -34,6 +36,16 @@ const NODE_FLAGS = [
     "hidden",
     "focusable",
 ] as const satisfies readonly (keyof NodeFlags)[];
+
+/** A node's declared geometry: no command sets it, so a change replaces the node. */
+const NODE_GEOMETRY = [
+    "initialWidth",
+    "initialHeight",
+    "handles",
+    "sourcePosition",
+    "targetPosition",
+    "origin",
+] as const satisfies readonly (keyof FlowNodeInput)[];
 
 const EDGE_FLAGS = [
     "selectable",
@@ -190,6 +202,7 @@ export function commandsTo(
                 next.width !== node.width || next.height !== node.height;
             if (
                 next.type !== node.type ||
+                NODE_GEOMETRY.some((key) => !sameJson(node[key], next[key])) ||
                 dataPatch(node.data as Json, next.data as Json) === undefined ||
                 (resized &&
                     (next.width === undefined || next.height === undefined))

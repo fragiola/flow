@@ -3,7 +3,7 @@
 // registry narrows each type's `data`. A feature's fields (`selected`, `parentId`, …) are declared
 // here, optional: the document format stays whole, and a field of a feature that is not installed
 // is a validation issue (never dropped silently).
-import type { Rect } from "../geometry/types";
+import type { HandleSide, Rect } from "../geometry/types";
 
 /** A point or an offset in flow coordinates: x grows to the right, y grows down. */
 export interface XY {
@@ -131,6 +131,27 @@ export interface SubflowFields {
     readonly expandParent?: boolean;
 }
 
+/**
+ * A handle a node declares in the document, for its edges to be drawn before it is rendered and
+ * measured (a server render): used only until a handle of that node, type and id is measured.
+ */
+export interface DeclaredHandle {
+    /** its id among the node's handles of its type (none: the node's default handle) */
+    readonly id?: string;
+    /** whether edges start (`source`) or end (`target`) at it */
+    readonly type: "source" | "target";
+    /** the side of the node it sits on: the direction an edge leaves or enters by */
+    readonly position: HandleSide;
+    /** its box's left edge, relative to the node box's left edge, in flow units */
+    readonly x: number;
+    /** its box's top edge, relative to the node box's top edge, in flow units */
+    readonly y: number;
+    /** its box's width; default 0 (an edge's end is the box's centre) */
+    readonly width?: number;
+    /** its box's height; default 0 */
+    readonly height?: number;
+}
+
 /** What every node has, whatever its type. */
 export interface NodeFields extends NodeFlags, SelectionFields, SubflowFields {
     /** its top-left corner, in flow coordinates (relative to its parent with sub-flows) */
@@ -139,6 +160,24 @@ export interface NodeFields extends NodeFlags, SelectionFields, SubflowFields {
     readonly width?: number;
     /** its height, when the document gives one (the engine measures the rendered one) */
     readonly height?: number;
+    /** its width until it is measured (a server render, `fit-view` on init); `width` wins */
+    readonly initialWidth?: number;
+    /** its height until it is measured (a server render, `fit-view` on init); `height` wins */
+    readonly initialHeight?: number;
+    /**
+     * its handles, declared for its edges to be drawn before it is measured; a measured handle of
+     * the same type and id always wins
+     */
+    readonly handles?: DeclaredHandle[];
+    /** the side its edges leave by when no handle gives one; default `"bottom"` */
+    readonly sourcePosition?: HandleSide;
+    /** the side its edges enter by when no handle gives one; default `"top"` */
+    readonly targetPosition?: HandleSide;
+    /**
+     * the point of its box its `position` stands at, as shares of its size, over the engine's
+     * `nodeOrigin` (a child's position stays its box's top-left corner)
+     */
+    readonly origin?: XY;
     /** its place in the nodes' stacking order (an integer): a greater one is drawn above; default 0 */
     readonly zIndex?: number;
 }
