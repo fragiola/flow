@@ -897,6 +897,35 @@ Decisions of the Svelte adapter (#12):
   runs the pinned 5.57.3); the gestures' real feel is checked by the Svelte examples' shared specs (#13: they passed
   with no adapter fix).
 
+Svelte's #36 (React's, see the React section): `MiniMap`'s `inversePan`, `zoomStep` and `onclick(event,
+point)`, `NodeResizer`'s `direction`, `FitView`'s `padding`, `nodeIds`, `includeHidden`,
+`minZoom`, `maxZoom`, `EdgeToolbar`'s `point`, `alignX`, `alignY`, `Flow.NodesSelection`
+(`components/nodes-selection.svelte`, its `children` snippet given `{ state }`), and the runes
+`useFlowStore(selector, equal = Object.is)`, `useNodeId()`, `useNodesData(idOrIds)`,
+`useNodeConnections(options)`, `useInternalNode(id)`, `useKeyPress(keys, options)` (each a
+`FlowValue` on `flowValue`, arguments a value or a getter: `MaybeGetter`) and
+`useOnViewportChange(options)` (`runes/use-*.svelte.ts`). Tests: `tests/part-options.test.ts`,
+`tests/hooks.test.ts` (a probe's `$effect.pre` counts the notifications), the contract's
+`nodes-selection` case, the type fixture.
+
+- **`MiniMap`'s `onclick` is the engine's `minimap-click`** (React's `onClick`): the DOM `onclick`
+  is left out of its props; the contract test gives the minimap `ondblclick` instead.
+- **`useOnViewportChange`'s callbacks are lowercase** (`onstart`, `onchange`, `onend`), as the
+  adapter's other callbacks; they are read at each event (pass a getter to follow props).
+- **`useNodeId()` returns a plain `string | null`**, not a `FlowValue`: a `Flow.Node`'s id never
+  changes (keyed `{#each}`). The parts' own lookup is `usePartNodeId` in `context.ts` (React's
+  rename); `findFlowContext` / `findNodeContext` read a context that may be missing.
+- **`useNodeConnections` throws when called** outside a `Flow.Node` without an `id` (React throws
+  at render).
+- **`useKeyPress` works outside a root** (with a `target`), and listens again only when the keys'
+  JSON or the target change (`$derived` of both).
+- **A control's payload is `givenPayload`** (`use-control-button.svelte.ts`): the given fields,
+  each through `plain` (a `$state` proxy of `nodeIds` or `padding` never reaches the engine);
+  `ZoomIn` / `ZoomOut` pass `{ duration }` the same way.
+- **Gotcha, a template's `{f(x.current)}` is no render count**: once the value had changed, Svelte
+  (5.57.3) called `f` again on every later revision although `x.current` stayed equal (the DOM was
+  untouched); the probes count with an `$effect.pre` instead.
+
 ## The Angular adapter (Issue #15)
 
 `@fragiola/flow-angular` is the React adapter in Angular 22 (signals, standalone, zoneless,
@@ -1299,6 +1328,13 @@ Decisions of #13:
   (`$derived(viewport.current && flow.engine.can(…))`).
 - **Known limits:** the docs' `svelte` fences are compiled, not type-checked; the kit tests render
   on the server only (no client event test); the native select's option list is unthemed.
+
+#36 in the Svelte examples (React's): `selection-and-keyboard` renders `Flow.NodesSelection`
+after the connection line; `node-resizer` the `banner` (`direction="horizontal"`, left and right
+`ResizeHandle`s); `edge-types` the step's `stepPosition` and the animated smooth step;
+`connected-data` (new: `index.svelte`, `number-body.svelte`, `sum-body.svelte`) sums its inputs
+with `useNodeConnections` + `useNodesData(() => connections.current.map(…))`. `tests/examples.test.ts`
+compares every React example again; the shared specs pass unchanged (215).
 
 ## The Angular examples and the Angular docs (Issue #16)
 
