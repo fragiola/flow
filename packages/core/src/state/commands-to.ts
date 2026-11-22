@@ -125,21 +125,36 @@ export function commandsTo(
 ): BatchEntry[] {
     const nodesWanted = target.nodes;
     // the wanted edges as `edge.add` would store them (`defaultEdgeOptions` under what they give),
-    // so an edge the defaults filled in is not synced back forever
+    // so an edge the defaults filled in is not synced back forever. An edge the model holds takes
+    // a default only where it holds that default's value: a document edge, loaded without the
+    // defaults, is not rewritten by them
     const edgesWanted =
         defaultEdge === undefined || target.edges === undefined
             ? target.edges
-            : target.edges.map(
-                  (edge) =>
-                      ({
-                          ...defaultEdge,
-                          ...Object.fromEntries(
-                              Object.entries(edge).filter(
-                                  ([, value]) => value !== undefined,
+            : target.edges.map((edge) => {
+                  const held =
+                      edge.id === undefined ? undefined : reader.edge(edge.id);
+                  const filled = Object.fromEntries(
+                      Object.entries(defaultEdge).filter(
+                          ([key, value]) =>
+                              held === undefined ||
+                              sameJson(
+                                  (held as unknown as Record<string, unknown>)[
+                                      key
+                                  ],
+                                  value,
                               ),
+                      ),
+                  );
+                  return {
+                      ...filled,
+                      ...Object.fromEntries(
+                          Object.entries(edge).filter(
+                              ([, value]) => value !== undefined,
                           ),
-                      }) as FlowEdgeInput,
-              );
+                      ),
+                  } as FlowEdgeInput;
+              });
     const currentNodes = reader.nodes();
     const currentEdges = reader.edges();
     if (

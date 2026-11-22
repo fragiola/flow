@@ -89,6 +89,36 @@ describe("defaultEdgeOptions", () => {
             { defaultEdgeOptions: { type: "step" } },
         );
         expect(model.get("edge-by", { id: "e" })?.type).toBeUndefined();
+        // a controlled sync that gives the same edge again (in a new list) rewrites nothing
+        expect(
+            model.get("commands-to", {
+                edges: [{ id: "e", source: "a", target: "b" }],
+            }),
+        ).toEqual([]);
+        expect(
+            createFlowModel(
+                {
+                    ...nodes(),
+                    edges: [{ id: "e", source: "a", target: "b" }],
+                },
+                { defaultEdgeOptions: { deletable: false } },
+            ).get("commands-to", {
+                edges: [
+                    { id: "e", source: "a", target: "b" },
+                    { id: "f", source: "b", target: "c" },
+                ],
+            }),
+        ).toEqual([
+            {
+                command: "edge.add",
+                payload: {
+                    id: "f",
+                    source: "b",
+                    target: "c",
+                    deletable: false,
+                },
+            },
+        ]);
     });
 
     it("refuses ends, ids and fields the edge schema refuses", () => {
