@@ -459,7 +459,8 @@ A node's `position` is its box's top-left corner. The root's `nodeOrigin` moves 
 shares of the node's size: `{ x: 0.5, y: 0.5 }` stands every node on its centre, which suits a
 layout that computes centres (a circle, a force layout). The engine applies it everywhere a box
 is drawn or measured (edges, handles, the minimap, `fit-view`, the selection box, drags and
-resizes); a child of a sub-flow keeps its top-left corner inside its parent.
+resizes); a child of a sub-flow keeps its top-left corner inside its parent. A node's own `origin`
+overrides `nodeOrigin` for that node ([A node's own origin](/docs/concepts/nodes-and-edges#a-nodes-own-origin)).
 
 <Framework name="react">
 
@@ -495,8 +496,10 @@ resizes); a child of a sub-flow keeps its top-left corner inside its parent.
 
 </Framework>
 
-The first render, before the engine measures anything (and a server render), places nodes by
-their top-left corner: an origin applies from the next frame.
+The first render, before the engine measures anything (and a server render), places nodes from
+the document's [static geometry](/docs/guides/server-rendering): an origin applies to a node
+whose size the document gives (`width` / `height`, or `initialWidth` / `initialHeight`); one of
+unknown size moves into place once measured.
 
 ## Read what is wired into a node
 

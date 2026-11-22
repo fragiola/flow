@@ -10,7 +10,7 @@ CSS-in-JS. A boolean state attribute is present (`""`) or absent, never `"false"
 ## Parts and ids
 
 Every element carries `data-flow-part`, the part it is: `root`, `viewport`, `nodes`, `node`,
-`handle`, `edges`, `edge`, `edge-path`, `edge-label`, `reconnect-anchor`, `connection-line`
+`handle`, `edges` (with an `edges-layer` per render level when an edge stands above nodes), `edge`, `edge-path`, `edge-label`, `reconnect-anchor`, `connection-line`
 (and its default `connection-path`), `selection-box`, `background` (with `background-pattern`,
 `background-mark`, `background-fill` inside), `controls`, `zoom-in`, `zoom-out`, `fit-view`,
 `toggle-interactive`, `toolbar`, `minimap`, `minimap-node`, `minimap-mask`, `resizer`,
@@ -32,7 +32,8 @@ handle's `handleId`. There is no path attribute: a flow is a graph, not a tree.
 | `zoom-in`, `zoom-out`, `fit-view` | `data-disabled` (and `disabled`) while the engine refuses the action |
 | `toggle-interactive` | `data-interactive`, and `aria-pressed` while the flow is locked |
 | `toolbar`, `resizer` | `data-flow-id` (its node); a resizer has `data-resizing` too |
-| `resize-handle` | `data-position` (`top-left`, `top`, `top-right`, `right`, `bottom-right`, `bottom`, `bottom-left`, `left`) |
+| `resize-handle` | `data-position` (`top-left`, `top`, `top-right`, `right`, `bottom-right`, `bottom`, `bottom-left`, `left`), `data-variant` (`handle`, or `line` on a side), `data-direction` (its own `direction`, when it has one) |
+| `edges-layer` | `data-level` (its render level, 0 the lowest; [z-order](/docs/concepts/nodes-and-edges#z-order)) |
 | `minimap-node` | `data-flow-id`, `data-selected` |
 | `nodes-selection` | `data-dragging` (the selection is dragged by it) |
 
