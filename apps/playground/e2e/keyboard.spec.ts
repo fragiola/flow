@@ -253,6 +253,28 @@ test("the arrows on a focused resize handle move its sides, Shift by a bigger st
 }) => {
     const right = resizeHandle(page, "right");
     await expect(right).toHaveAttribute("tabindex", "0");
+    // what the page sees of each key after the engine (the window hears it last)
+    await page.evaluate(() => {
+        const seen: { key: string; prevented: boolean }[] = [];
+        (window as unknown as { seen: typeof seen }).seen = seen;
+        window.addEventListener("keydown", (event) => {
+            if (event.key.startsWith("Arrow")) {
+                seen.push({
+                    key: event.key,
+                    prevented: event.defaultPrevented,
+                });
+            }
+        });
+    });
+    const seen = () =>
+        page.evaluate(
+            () =>
+                (
+                    window as unknown as {
+                        seen: { key: string; prevented: boolean }[];
+                    }
+                ).seen,
+        );
     await right.focus();
     await page.keyboard.press("ArrowRight");
     await expect.poll(async () => (await nodeOf(page, "c")).width).toBe(165);
@@ -260,13 +282,19 @@ test("the arrows on a focused resize handle move its sides, Shift by a bigger st
     await expect.poll(async () => (await nodeOf(page, "c")).width).toBe(185);
     await page.keyboard.press("ArrowLeft");
     await expect.poll(async () => (await nodeOf(page, "c")).width).toBe(180);
-    // across the side: not the resizer's, nothing changes
+    // across the side: not the resizer's, nothing changes and the key is left to the page
     await page.keyboard.press("ArrowUp");
     expect(await nodeOf(page, "c")).toMatchObject({
         width: 180,
         height: 80,
         position: { x: 0, y: 200 },
     });
+    expect(await seen()).toEqual([
+        { key: "ArrowRight", prevented: true },
+        { key: "ArrowRight", prevented: true },
+        { key: "ArrowLeft", prevented: true },
+        { key: "ArrowUp", prevented: false },
+    ]);
     // a corner moves both its sides
     await resizeHandle(page, "bottom-right").focus();
     await page.keyboard.press("ArrowDown");

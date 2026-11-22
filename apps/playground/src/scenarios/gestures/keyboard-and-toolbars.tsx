@@ -10,7 +10,12 @@ import {
 import { connection } from "@fragiola/flow-react/connection";
 import { drag } from "@fragiola/flow-react/drag";
 import { keyboard } from "@fragiola/flow-react/keyboard";
-import { NodeResizer, resize } from "@fragiola/flow-react/resize";
+import {
+    NodeResizer,
+    RESIZE_POSITIONS,
+    ResizeHandle,
+    resize,
+} from "@fragiola/flow-react/resize";
 import { selection } from "@fragiola/flow-react/selection";
 import { useEffect, useState } from "react";
 import { FlowInspector } from "../../inspector/flow-inspector";
@@ -196,7 +201,17 @@ export default function KeyboardAndToolbars() {
                                 className={handle}
                             />
                             {item.type === "resizable" && (
-                                <NodeResizer className="[&>[data-flow-part=resize-handle]]:size-2.5 [&>[data-flow-part=resize-handle]]:bg-(--fl-edge-selected) [&>[data-flow-part=resize-handle]:focus-visible]:outline-2 [&>[data-flow-part=resize-handle]:focus-visible]:outline-(--fl-focus-line)" />
+                                <NodeResizer>
+                                    {/* named: with keyboard() each handle takes focus, and the default ones have no name */}
+                                    {RESIZE_POSITIONS.map((position) => (
+                                        <ResizeHandle
+                                            key={position}
+                                            position={position}
+                                            aria-label={`Resize ${String(item.data.label)}: ${position}`}
+                                            className="size-2.5 bg-(--fl-edge-selected) focus-visible:outline-2 focus-visible:outline-(--fl-focus-line)"
+                                        />
+                                    ))}
+                                </NodeResizer>
                             )}
                         </Flow.Node>
                     )}
