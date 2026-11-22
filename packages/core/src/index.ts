@@ -68,6 +68,7 @@ export type {
     EdgeFields,
     EdgeFlags,
     EdgeOf,
+    EdgePathOptions,
     EdgeTypeOf,
     FlowDocument,
     FlowDocumentJson,

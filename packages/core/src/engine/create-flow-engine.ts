@@ -1475,8 +1475,12 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             handle: (nodeId, type, handleId) =>
                 this.handleOf(nodeId, type, handleId),
         });
+        // the edge's own path options over the engine's
         return ends
-            ? pathOf(edge.type, ends, this.options.pathOptions ?? {})
+            ? pathOf(edge.type, ends, {
+                  ...this.options.pathOptions,
+                  ...edge.pathOptions,
+              })
             : undefined;
     }
 
@@ -2458,6 +2462,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                         : this.model.get("edge-by", { id: edgeId });
                 into[ID_ATTRIBUTE] = edgeId;
                 into["data-selected"] = flag(edge?.selected === true);
+                into["data-animated"] = flag(edge?.animated === true);
                 break;
             }
             case "handle": {

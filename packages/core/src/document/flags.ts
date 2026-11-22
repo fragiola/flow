@@ -6,12 +6,12 @@ export function nodeFlag(node: NodeFlags, flag: keyof NodeFlags): boolean {
 }
 
 /**
- * An edge's flag in effect: its own value, else the default (`hidden` false, the others true);
- * `reconnectable` is true unless it is false (one end is still reconnectable).
+ * An edge's flag in effect: its own value, else the default (`hidden` and `animated` false, the
+ * others true); `reconnectable` is true unless it is false (one end is still reconnectable).
  */
 export function edgeFlag(edge: EdgeFlags, flag: keyof EdgeFlags): boolean {
     if (flag === "reconnectable") return edge.reconnectable !== false;
-    return edge[flag] ?? flag !== "hidden";
+    return edge[flag] ?? (flag !== "hidden" && flag !== "animated");
 }
 
 /** Whether an edge's end may be moved (`reconnectable`: true, or that end's name). */

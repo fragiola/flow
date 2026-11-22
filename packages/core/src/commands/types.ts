@@ -54,6 +54,7 @@ export interface EdgeFlagsPayload {
     hidden?: boolean;
     reconnectable?: boolean | "source" | "target";
     focusable?: boolean;
+    animated?: boolean;
 }
 
 /** Where an edge goes: its nodes and, optionally, their handles. */

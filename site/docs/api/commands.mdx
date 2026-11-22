@@ -319,11 +319,13 @@ Adds an edge from a source node to a target node, optionally between two of thei
 | `type` | `string` | no | how it is drawn: "bezier" (the default), "simplebezier", "smoothstep", "step", "straight" or an app type |
 | `data` | `object` | no | the app's data, a JSON object typed by the node or edge type |
 | `zIndex` | `integer` | no | its place in the stacking order of its layer (nodes among nodes, edges among edges): a greater one is drawn above; default 0 |
+| `pathOptions` | `object` | no | the shape of its path, over the engine's path options: each built-in type reads its own keys (bezier: curvature; smoothstep: borderRadius, offset, stepPosition, centerX, centerY; step: the same but borderRadius) |
 | `selectable` | `boolean` | no | it may be selected (`selection.set`); default true |
 | `deletable` | `boolean` | no | it may be removed (`edge.remove`, `selection.remove`); default true |
 | `hidden` | `boolean` | no | it is not shown; default false |
 | `reconnectable` | `boolean \| "source" \| "target"` | no | its ends may be moved to other nodes or handles (`edge.reconnect`): both (true), none (false), or only its "source" or its "target" end; default true |
 | `focusable` | `boolean` | no | it takes DOM focus (with the keyboard feature); default true |
+| `animated` | `boolean` | no | it is drawn animated (the app's CSS animates its data-animated parts); default false |
 | `selected` | `boolean` | no | it is selected (requires the selection feature) |
 
 **Result** (`{ edgeId: string }`)
@@ -408,7 +410,7 @@ model.run("edge.set-data", {
 
 ### `edge.set-flags`
 
-Sets some of an edge's flags (selectable, deletable, hidden, reconnectable, focusable); the others stay. An edge made unselectable is deselected.
+Sets some of an edge's flags (selectable, deletable, hidden, reconnectable, focusable, animated); the others stay. An edge made unselectable is deselected.
 
 **Payload** (`EdgeFlagsPayload`)
 
@@ -420,6 +422,7 @@ Sets some of an edge's flags (selectable, deletable, hidden, reconnectable, focu
 | `hidden` | `boolean` | no | it is not shown; default false |
 | `reconnectable` | `boolean \| "source" \| "target"` | no | its ends may be moved to other nodes or handles (`edge.reconnect`): both (true), none (false), or only its "source" or its "target" end; default true |
 | `focusable` | `boolean` | no | it takes DOM focus (with the keyboard feature); default true |
+| `animated` | `boolean` | no | it is drawn animated (the app's CSS animates its data-animated parts); default false |
 
 **Result** (`{ edgeId: string }`)
 

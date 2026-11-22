@@ -101,6 +101,52 @@ export const edgeFlagProperties = {
         description:
             "it takes DOM focus (with the keyboard feature); default true",
     },
+    animated: {
+        type: "boolean",
+        description:
+            "it is drawn animated (the app's CSS animates its data-animated parts); default false",
+    },
+} as const;
+
+/** An edge's `pathOptions`: the shape of its path, each built-in type reading its own keys. */
+export const edgePathOptionsSchema = {
+    type: "object",
+    description:
+        "the shape of its path, over the engine's path options: each built-in type reads its own keys (bezier: curvature; smoothstep: borderRadius, offset, stepPosition, centerX, centerY; step: the same but borderRadius)",
+    properties: {
+        curvature: {
+            type: "number",
+            description:
+                "bezier: the share of the distance a control point stands out by",
+        },
+        borderRadius: {
+            type: "number",
+            minimum: 0,
+            description: "smoothstep: the corners' radius, in flow units",
+        },
+        offset: {
+            type: "number",
+            description:
+                "smoothstep and step: how far an end stands out before turning, in flow units",
+        },
+        stepPosition: {
+            type: "number",
+            minimum: 0,
+            description:
+                "smoothstep and step: where the turn sits between the source (0) and the target (1); above 1 counts as 1",
+        },
+        centerX: {
+            type: "number",
+            description:
+                "smoothstep and step: the x of a vertical turn, in flow coordinates",
+        },
+        centerY: {
+            type: "number",
+            description:
+                "smoothstep and step: the y of a horizontal turn, in flow coordinates",
+        },
+    },
+    additionalProperties: false,
 } as const;
 
 const selected = {
@@ -199,6 +245,7 @@ export const edgeSchema = {
         },
         data: dataSchema,
         zIndex: zIndexSchema,
+        pathOptions: edgePathOptionsSchema,
         ...edgeFlagProperties,
         selected,
     },

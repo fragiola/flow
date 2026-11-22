@@ -18,6 +18,12 @@ export interface PathOptions {
     readonly borderRadius?: number | undefined;
     /** smooth step and step: how far an end stands out before turning; default 20 */
     readonly offset?: number | undefined;
+    /** smooth step and step: where the turn sits between the source (0) and the target (1); default 0.5 */
+    readonly stepPosition?: number | undefined;
+    /** smooth step and step: the x of a vertical turn, in flow coordinates; default none */
+    readonly centerX?: number | undefined;
+    /** smooth step and step: the y of a horizontal turn, in flow coordinates; default none */
+    readonly centerY?: number | undefined;
 }
 
 /** What the edge geometry reads of the engine. */
@@ -104,12 +110,21 @@ export function pathOf(
                     ...ends,
                     borderRadius: options.borderRadius,
                     offset: options.offset,
+                    stepPosition: options.stepPosition,
+                    centerX: options.centerX,
+                    centerY: options.centerY,
                 }),
             };
         case "step":
             return {
                 ...ends,
-                ...stepPath({ ...ends, offset: options.offset }),
+                ...stepPath({
+                    ...ends,
+                    offset: options.offset,
+                    stepPosition: options.stepPosition,
+                    centerX: options.centerX,
+                    centerY: options.centerY,
+                }),
             };
         case "straight":
             return { ...ends, ...straightPath(ends) };

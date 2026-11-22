@@ -89,7 +89,10 @@ export interface NodeFlags {
     readonly focusable?: boolean;
 }
 
-/** An edge's permission flags; an absent flag is its default (`hidden` false, the others true). */
+/**
+ * An edge's permission and display flags; an absent flag is its default (`hidden` and `animated`
+ * false, the others true).
+ */
 export interface EdgeFlags {
     /** it may be selected (`selection.set`); default true */
     readonly selectable?: boolean;
@@ -104,6 +107,8 @@ export interface EdgeFlags {
     readonly reconnectable?: boolean | "source" | "target";
     /** it takes DOM focus (with `keyboard()`); default true */
     readonly focusable?: boolean;
+    /** it is drawn animated (`data-animated` on its parts: the app's CSS animates it); default false */
+    readonly animated?: boolean;
 }
 
 /** The fields the `selection()` feature owns on a node and on an edge. */
@@ -150,6 +155,26 @@ export type FlowNode<T extends FlowTypes = AnyTypes> = {
     [K in NodeTypeOf<T>]: NodeOf<K, NodeDataOf<T, K>>;
 }[NodeTypeOf<T>];
 
+/**
+ * The shape of one edge's path, over the engine's `pathOptions`: each built-in type reads its own
+ * (bezier `curvature`; smooth step `borderRadius`, `offset`, `stepPosition`, `centerX`,
+ * `centerY`; step the same but `borderRadius`), the others are ignored.
+ */
+export interface EdgePathOptions {
+    /** bezier: the share of the distance a control point stands out by */
+    readonly curvature?: number;
+    /** smooth step: the corners' radius, in flow units */
+    readonly borderRadius?: number;
+    /** smooth step and step: how far an end stands out before turning, in flow units */
+    readonly offset?: number;
+    /** smooth step and step: where the turn sits between the source (0) and the target (1) */
+    readonly stepPosition?: number;
+    /** smooth step and step: the x of a vertical turn, in flow coordinates */
+    readonly centerX?: number;
+    /** smooth step and step: the y of a horizontal turn, in flow coordinates */
+    readonly centerY?: number;
+}
+
 /** What every edge has, whatever its type. */
 export interface EdgeFields extends EdgeFlags, SelectionFields {
     /** the node it starts at */
@@ -162,6 +187,8 @@ export interface EdgeFields extends EdgeFlags, SelectionFields {
     readonly targetHandle?: string;
     /** its place in the edges' drawing order (an integer): a greater one is drawn above; default 0 */
     readonly zIndex?: number;
+    /** the shape of its path, over the engine's `pathOptions` (its type's keys) */
+    readonly pathOptions?: EdgePathOptions;
 }
 
 /** An edge of type `K` and data `D`. */
