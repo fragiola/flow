@@ -14,6 +14,7 @@ import {
     type XY,
 } from "@fragiola/flow-angular";
 import { drag } from "@fragiola/flow-angular/drag";
+import { keyboard } from "@fragiola/flow-angular/keyboard";
 import { selection } from "@fragiola/flow-angular/selection";
 import { styles } from "./styles";
 
@@ -21,15 +22,18 @@ import { styles } from "./styles";
 // `(nodeContextMenu)` on a node, `(selectionContextMenu)` on one of several selected nodes,
 // `(paneContextMenu)` on the canvas, each with the client point (`client`), the flow point
 // (`point`) and the DOM event, whose default the example prevents to show its menu instead of the
-// browser's. The menu stands at the client point inside the frame; a click on the canvas, Escape,
-// a pan or a choice closes it. `(nodeDoubleClick)` marks a task done. These come from the engine's
-// own taps: a right click that ended a pan opens nothing.
+// browser's. The menu stands at the client point inside the frame; a click on the canvas or a
+// node, Escape, a pan, focus leaving it or a choice closes it, and focus goes back to the task (or
+// the canvas) it was opened on. With `keyboard()` tasks take focus, so the menu key (or Shift +
+// F10) opens a task's menu too; the arrows walk its items. `(nodeDoubleClick)` marks a task done,
+// as the menu's first item does. These come from the engine's own taps: a right click that ended
+// a pan opens nothing.
 
 interface Types extends FlowTypes {
     readonly nodes: { task: { label: string; done: boolean } };
 }
 
-const features = [selection(), drag()] as const;
+const features = [selection(), drag(), keyboard()] as const;
 
 const nodes: FlowNodeInput<Types>[] = [
     {
@@ -75,8 +79,9 @@ let added = 0;
                 (selectionContextMenu)="onSelection($event)"
                 (paneContextMenu)="onPane($event)"
                 (paneClick)="close()"
+                (nodeClick)="close()"
                 (moveStart)="close()"
-                (nodeDoubleClick)="toggleDone($event)"
+                (nodeDoubleClick)="toggleDone($event.nodeId)"
             >
                 <svg flowBackground variant="dots" [size]="2" [class]="styles.dots"></svg>
                 <svg flowBackground variant="lines" [class]="styles.lines"></svg>
@@ -106,12 +111,21 @@ let added = 0;
                     [style.left.px]="menu.at.x"
                     [style.top.px]="menu.at.y"
                     [class]="styles.menu"
-                    (keydown)="onKeyDown($event)"
+                    (keydown)="onMenuKey($event)"
+                    (focusout)="onFocusOut($event)"
                 >
                     @switch (menu.kind) {
                         @case ("node") {
                             <button
                                 #first
+                                type="button"
+                                role="menuitem"
+                                [class]="styles.item"
+                                (click)="toggleDone(menu.nodeId); close()"
+                            >
+                                {{ isDone(menu.nodeId) ? "Mark not done" : "Mark done" }}
+                            </button>
+                            <button
                                 type="button"
                                 role="menuitem"
                                 [class]="styles.item"
@@ -215,19 +229,67 @@ export default class ContextMenu {
         }));
     }
 
+    /** Closes the menu, giving focus back to the task it was opened on (or the canvas). */
     protected close(): void {
+        const menu = this.menu();
+        if (!menu) return;
+        const frame = this.frame().nativeElement;
+        const opener =
+            (menu.kind === "node"
+                ? frame.querySelector<HTMLElement>(
+                      `[data-flow-part="node"][data-flow-id="${menu.nodeId}"]`,
+                  )
+                : undefined) ??
+            frame.querySelector<HTMLElement>('[data-flow-part="root"]');
         this.menu.set(null);
+        opener?.focus({ preventScroll: true });
     }
 
-    protected onKeyDown(event: KeyboardEvent): void {
-        if (event.key === "Escape") this.close();
+    /** The arrows, Home and End walk the menu's items; Escape closes it. */
+    protected onMenuKey(event: KeyboardEvent): void {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            this.close();
+            return;
+        }
+        const menu = event.currentTarget as HTMLElement;
+        const items = [
+            ...menu.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+        ];
+        const at = items.indexOf(document.activeElement as HTMLElement);
+        const next =
+            event.key === "ArrowDown"
+                ? (at + 1) % items.length
+                : event.key === "ArrowUp"
+                  ? (at - 1 + items.length) % items.length
+                  : event.key === "Home"
+                    ? 0
+                    : event.key === "End"
+                      ? items.length - 1
+                      : -1;
+        if (next < 0) return;
+        event.preventDefault();
+        items[next]?.focus();
     }
 
-    protected toggleDone(event: FlowEngineEventOf<"node-double-click">): void {
-        const node = this.model.get("node-by", { id: event.nodeId });
+    /** Focus left the menu (Tab, a click elsewhere): it closes. */
+    protected onFocusOut(event: FocusEvent): void {
+        const menu = event.currentTarget as HTMLElement;
+        if (!menu.contains(event.relatedTarget as Node | null)) {
+            this.menu.set(null);
+        }
+    }
+
+    /** The task is marked done (the menu's first item tells which way it goes). */
+    protected isDone(nodeId: string): boolean {
+        return this.model.get("node-by", { id: nodeId })?.data.done === true;
+    }
+
+    protected toggleDone(nodeId: string): void {
+        const node = this.model.get("node-by", { id: nodeId });
         if (node)
             this.model.run("node.set-data", {
-                nodeId: node.id,
+                nodeId,
                 data: { done: !node.data.done },
             });
     }
