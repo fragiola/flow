@@ -195,7 +195,7 @@ describe("keyboard connections", () => {
             },
         ]);
         key(out, "Enter");
-        expect(events.at(-1)).toEqual({
+        expect(events.at(-1)).toMatchObject({
             type: "connect-cancel",
             refused: false,
             input: "keyboard",
@@ -209,7 +209,7 @@ describe("keyboard connections", () => {
         key(out, "Enter");
         model.use(() => veto("changed my mind"));
         key(out, "Enter");
-        expect(events.at(-1)).toEqual({
+        expect(events.at(-1)).toMatchObject({
             type: "connect-cancel",
             refused: true,
             input: "keyboard",
@@ -225,7 +225,7 @@ describe("keyboard connections", () => {
         key(out, "Enter");
         const escaped = key(out, "Escape");
         expect(escaped.defaultPrevented).toBe(true);
-        expect(events.at(-1)).toEqual({
+        expect(events.at(-1)).toMatchObject({
             type: "connect-cancel",
             refused: false,
             input: "keyboard",
@@ -344,7 +344,7 @@ describe("a waiting keyboard connection keeps to its handle", () => {
         key(out, "Enter");
         expect(engine.is("connecting")).toBe(true);
         field.focus();
-        expect(events.at(-1)).toEqual({
+        expect(events.at(-1)).toMatchObject({
             type: "connect-cancel",
             refused: false,
             input: "keyboard",
@@ -386,7 +386,7 @@ describe("a waiting keyboard connection keeps to its handle", () => {
             nodeIds: ["a"],
             edgeIds: [],
         });
-        expect(events.at(-2)).toEqual({
+        expect(events.at(-2)).toMatchObject({
             type: "connect-cancel",
             refused: false,
             input: "keyboard",

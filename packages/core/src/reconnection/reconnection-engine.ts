@@ -2,7 +2,8 @@
 // `reconnect-anchor`, `data-end`), or on the edge within `radius` pixels of one of its ends, drags
 // that end; the connection line runs from the edge's other end (the session of
 // `connection()`, shared through the host), valid when `model.can("edge.reconnect", …)`, and a
-// drop there reconnects the edge.
+// drop there reconnects the edge. An edge whose `reconnectable` names one end moves that end only:
+// a press near its other end, or on that end's anchor, is not taken.
 import { connectSessionOf } from "../connect-session/connect-session";
 import type { FlowEdge } from "../document/types";
 import type { FlowHandle } from "../engine/adapter";
@@ -44,6 +45,8 @@ export function reconnectionEngine(
                 type: fixed,
                 side: fixed === "source" ? path.sourceSide : path.targetSide,
                 connectable: true,
+                connectableStart: true,
+                connectableEnd: true,
                 center: fixed === "source" ? path.source : path.target,
                 bounds: undefined,
             }
@@ -59,7 +62,7 @@ export function reconnectionEngine(
             if (
                 target.kind !== "edge" ||
                 target.edgeId === undefined ||
-                !host.interactive() ||
+                !host.allows("reconnect") ||
                 session.current() !== null ||
                 !host.model.is("edge-reconnectable", { edgeId: target.edgeId })
             ) {
@@ -75,14 +78,26 @@ export function reconnectionEngine(
                 const screen = toScreen(host.viewport(), point);
                 return Math.hypot(screen.x - pointer.x, screen.y - pointer.y);
             };
-            // a reconnect anchor names its end; a press on the edge itself must be near one
+            const movable = (which: "source" | "target") =>
+                host.model.is("edge-reconnectable", {
+                    edgeId: edge.id,
+                    end: which,
+                });
+            // a reconnect anchor names its end; a press on the edge itself must be near one (an
+            // end that may move)
             let end = target.end;
             if (end === undefined) {
-                const toTarget = near(path.target);
-                const toSource = near(path.source);
+                const toTarget = movable("target")
+                    ? near(path.target)
+                    : Number.POSITIVE_INFINITY;
+                const toSource = movable("source")
+                    ? near(path.source)
+                    : Number.POSITIVE_INFINITY;
                 if (Math.min(toTarget, toSource) > options.radius)
                     return undefined;
                 end = toTarget <= toSource ? "target" : "source";
+            } else if (!movable(end)) {
+                return undefined;
             }
             const from = fixedEnd(edge, end);
             if (!from) return undefined;

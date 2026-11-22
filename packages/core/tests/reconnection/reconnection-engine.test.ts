@@ -110,7 +110,7 @@ describe("reconnecting an edge", () => {
         expect(flow.engine.get("connection")?.status).toBe("invalid");
         pointer(flow.root, "pointerup", at(298, 222));
         expect(flow.model.get("edge-by", { id: "e" })?.target).toBe("b");
-        expect(flow.events.at(-1)).toEqual({
+        expect(flow.events.at(-1)).toMatchObject({
             type: "reconnect-cancel",
             edgeId: "e",
             refused: true,

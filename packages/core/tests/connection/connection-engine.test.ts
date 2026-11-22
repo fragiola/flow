@@ -190,7 +190,7 @@ describe("drawing a connection", () => {
         ).toBe("");
         pointer(flow.root, "pointerup", at(295, 25));
         expect(flow.model.get("all-edges")).toEqual([]);
-        expect(flow.events.at(-1)).toEqual({
+        expect(flow.events.at(-1)).toMatchObject({
             type: "connect-cancel",
             refused: true,
             input: "pointer",
@@ -245,7 +245,7 @@ describe("drawing a connection", () => {
         pointer(flow.root, "pointermove", at(295, 25));
         key(flow.root, "Escape");
         expect(flow.engine.get("connection")).toBeNull();
-        expect(flow.events.at(-1)).toEqual({
+        expect(flow.events.at(-1)).toMatchObject({
             type: "connect-cancel",
             refused: false,
             input: "pointer",
@@ -253,7 +253,7 @@ describe("drawing a connection", () => {
         pointer(flow.handle("a", "source", "out"), "pointerdown", at(100, 25));
         pointer(flow.root, "pointermove", at(200, 300));
         pointer(flow.root, "pointerup", at(200, 300));
-        expect(flow.events.at(-1)).toEqual({
+        expect(flow.events.at(-1)).toMatchObject({
             type: "connect-cancel",
             refused: false,
             input: "pointer",

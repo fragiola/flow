@@ -21,8 +21,14 @@ describe("panning", () => {
         expect(engine.get("viewport")).toEqual({ x: 30, y: -10, zoom: 1 });
         expect(engine.is("panning")).toBe(false);
         expect(captured.size).toBe(0);
-        expect(events.at(-1)).toEqual({
+        expect(events.at(-2)).toEqual({
             type: "viewport-change",
+            viewport: { x: 30, y: -10, zoom: 1 },
+            gesture: true,
+        });
+        // the release ends the pan's move
+        expect(events.at(-1)).toEqual({
+            type: "viewport-change-end",
             viewport: { x: 30, y: -10, zoom: 1 },
             gesture: true,
         });

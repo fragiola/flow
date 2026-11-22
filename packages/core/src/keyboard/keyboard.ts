@@ -2,8 +2,26 @@
 // arrows move the selected nodes (`node.move`), the delete keys (Delete and Backspace by default)
 // remove the selection (`selection.remove`), Escape ends what is under way. Its model side is the core's and the
 // selection's commands; its engine side (`keyboard-engine.ts`) reads `options`.
+import type { FlowEdge, FlowNode } from "../document/types";
 import type { FlowFeature } from "../features/types";
 import { keyboardEngine } from "./keyboard-engine";
+
+/** What a `beforeDelete` decides: all (`true`), none (`false`), or only some of them. */
+export type DeleteDecision =
+    | boolean
+    | {
+          readonly nodes: readonly FlowNode[];
+          readonly edges: readonly FlowEdge[];
+      };
+
+/**
+ * Asked before a delete key removes anything, with the nodes and edges it would remove (a removed
+ * node's edges among them): its answer, or a promise of it, decides what goes.
+ */
+export type BeforeDelete = (
+    nodes: readonly FlowNode[],
+    edges: readonly FlowEdge[],
+) => DeleteDecision | Promise<DeleteDecision>;
 
 /** Options of {@link keyboard}: read by its engine side. */
 export interface KeyboardOptions {
@@ -19,6 +37,14 @@ export interface KeyboardOptions {
      * `["Delete", "Backspace"]`; `[]` for none
      */
     readonly deleteKeys: readonly string[];
+    /** a node that takes focus is panned into view when it is not wholly in it; default true */
+    readonly panOnFocus: boolean;
+    /**
+     * asked before a delete key removes anything: `true` removes all, `false` nothing, a
+     * `{ nodes, edges }` subset only those; a promise waits (the key is taken at once), and when it
+     * settles only what is still there goes; default none: everything goes
+     */
+    readonly beforeDelete: BeforeDelete | undefined;
 }
 
 /** The keyboard feature, as `keyboard()` makes it. */
@@ -34,6 +60,8 @@ export function keyboard(
         deleteKeys: Object.freeze([
             ...(options.deleteKeys ?? ["Delete", "Backspace"]),
         ]),
+        panOnFocus: options.panOnFocus ?? true,
+        beforeDelete: options.beforeDelete,
     });
     return Object.freeze({
         name: "keyboard",

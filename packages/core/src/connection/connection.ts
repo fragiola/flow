@@ -4,6 +4,7 @@
 // `model.can("edge.add", …)` (D7: a middleware's veto marks the target invalid and refuses the
 // drop). Its engine side (`connection-engine.ts`: the gesture, the line's points, the nearest
 // handle within `radius`, the `connection` engine key) reads `options`.
+import type { BuiltInEdgeType } from "../document/types";
 import type { FlowFeature } from "../features/types";
 import { connectionEngine } from "./connection-engine";
 
@@ -24,6 +25,13 @@ export interface ConnectionOptions {
      * ends it (elsewhere, or Escape, cancels it); default false
      */
     readonly clickToConnect: boolean;
+    /**
+     * how far (in pixels) a press on a handle moves before it draws a connection; default 1
+     * (with `clickToConnect`, a press within the tap distance stays a tap whatever it is)
+     */
+    readonly threshold: number;
+    /** the connection line's path, one of the built-in edge types; default `"bezier"` */
+    readonly lineType: BuiltInEdgeType;
 }
 
 /** The connection feature, as `connection()` makes it. */
@@ -37,6 +45,8 @@ export function connection(
         radius: options.radius ?? 20,
         mode: options.mode ?? "strict",
         clickToConnect: options.clickToConnect ?? false,
+        threshold: options.threshold ?? 1,
+        lineType: options.lineType ?? "bezier",
     });
     return Object.freeze({
         name: "connection",

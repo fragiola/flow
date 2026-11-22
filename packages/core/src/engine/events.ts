@@ -3,11 +3,52 @@
 // the app turns an event into its own words for its own live region, or syncs a controlled
 // viewport from it.
 
+import type { XY } from "../document/types";
 import type { Viewport } from "../geometry/types";
 import type { HandleType } from "../state/queries";
 
 /** How a move, a connection or a resize was made: with the pointer or with the keyboard. */
 export type MoveSource = "pointer" | "keyboard";
+
+/** A handle a connection's events name: its node, its id and its type. */
+export interface ConnectionEnd {
+    readonly nodeId: string;
+    readonly handleId: string | undefined;
+    readonly type: HandleType;
+}
+
+/**
+ * Where a connection or a reconnection ended without an edge: the handle it came from (`from`;
+ * for a reconnection, the edge's fixed end), the handle it was over (`to`, none when it was over
+ * nothing), and the drop point as a client point (`clientX`, `clientY`: a new node goes there) and
+ * as a flow point. A keyboard connection's points are its target's (or its start's) centre.
+ */
+export interface ConnectionDrop {
+    readonly from: ConnectionEnd;
+    readonly to: ConnectionEnd | undefined;
+    readonly client: XY;
+    readonly point: XY;
+}
+
+/**
+ * Where a tap, a double click or a context menu happened: the flow point and the client point,
+ * and the DOM event (an app prevents a context menu's default with it).
+ */
+export interface FlowPointerInfo {
+    /** the flow point */
+    readonly point: XY;
+    /** the client point (`clientX`, `clientY`) */
+    readonly client: XY;
+    /** the event that ended it: the tap's `pointerup`, the `dblclick`, the `contextmenu` */
+    readonly event: MouseEvent;
+}
+
+/** A viewport change of a gesture or an animation, at its start or its end. */
+interface ViewportMove {
+    readonly viewport: Viewport;
+    /** a pan, a zoom, a pinch or auto-pan (`true`), or an action (`false`) */
+    readonly gesture: boolean;
+}
 
 /** An event of `engine.subscribe`. */
 export type FlowEngineEvent =
@@ -17,6 +58,72 @@ export type FlowEngineEvent =
           readonly viewport: Viewport;
           readonly gesture: boolean;
       }
+    | ({
+          /**
+           * the viewport starts changing: the first change of a pan, a wheel, a pinch, an
+           * animation or an action (an action that does not animate starts and ends at once)
+           */
+          readonly type: "viewport-change-start";
+      } & ViewportMove)
+    | ({
+          /**
+           * the viewport stopped changing: the pan or pinch was released, the animation ended or
+           * stopped, the wheel rested for 150 ms
+           */
+          readonly type: "viewport-change-end";
+      } & ViewportMove)
+    | {
+          /** the root has a size and every shown node was measured, once per engine */
+          readonly type: "ready";
+      }
+    | ({
+          /** a tap (a press released within the tap distance, no gesture started) on a node */
+          readonly type: "node-click";
+          readonly nodeId: string;
+      } & FlowPointerInfo)
+    | ({
+          /** a tap on an edge */
+          readonly type: "edge-click";
+          readonly edgeId: string;
+      } & FlowPointerInfo)
+    | ({
+          /** a tap on the pane */
+          readonly type: "pane-click";
+      } & FlowPointerInfo)
+    | ({
+          /** a double click whose two presses were taps on a node */
+          readonly type: "node-double-click";
+          readonly nodeId: string;
+      } & FlowPointerInfo)
+    | ({
+          /** a double click whose two presses were taps on an edge */
+          readonly type: "edge-double-click";
+          readonly edgeId: string;
+      } & FlowPointerInfo)
+    | ({
+          /** a double click whose two presses were taps on the pane */
+          readonly type: "pane-double-click";
+      } & FlowPointerInfo)
+    | ({
+          /** a context menu on a node (not one of several selected nodes) */
+          readonly type: "node-context-menu";
+          readonly nodeId: string;
+      } & FlowPointerInfo)
+    | ({
+          /** a context menu on an edge */
+          readonly type: "edge-context-menu";
+          readonly edgeId: string;
+      } & FlowPointerInfo)
+    | ({
+          /** a context menu on the pane */
+          readonly type: "pane-context-menu";
+      } & FlowPointerInfo)
+    | ({
+          /** a context menu on a selected node while several nodes are selected: the selection's */
+          readonly type: "selection-context-menu";
+          readonly nodeIds: readonly string[];
+          readonly edgeIds: readonly string[];
+      } & FlowPointerInfo)
     | {
           /** a drag of these nodes started (`drag()`) */
           readonly type: "drag-start";
@@ -65,15 +172,15 @@ export type FlowEngineEvent =
           readonly target: string;
           readonly input: MoveSource;
       }
-    | {
+    | ({
           /**
            * a connection ended without an edge: dropped nowhere, cancelled, or (`refused`) on a
-           * handle `model.can("edge.add", …)` refused
+           * handle `model.can("edge.add", …)` refused; where it ended (`ConnectionDrop`)
            */
           readonly type: "connect-cancel";
           readonly refused: boolean;
           readonly input: MoveSource;
-      }
+      } & ConnectionDrop)
     | {
           /** an edge's end was dragged (`reconnection()`) */
           readonly type: "reconnect-start";
@@ -87,11 +194,27 @@ export type FlowEngineEvent =
           readonly source: string;
           readonly target: string;
       }
-    | {
-          /** a reconnection ended with the edge as it was (`refused`: dropped on a refused handle) */
+    | ({
+          /**
+           * a reconnection ended with the edge as it was (`refused`: dropped on a refused handle);
+           * `from` is the edge's fixed end, `to` the handle it was over
+           */
           readonly type: "reconnect-cancel";
           readonly edgeId: string;
+          readonly end: "source" | "target";
           readonly refused: boolean;
+      } & ConnectionDrop)
+    | {
+          /** a resize of a node started (`resize()`, a drag of a resize handle past its press) */
+          readonly type: "resize-start";
+          readonly nodeId: string;
+          readonly width: number;
+          readonly height: number;
+      }
+    | {
+          /** a resize was cancelled: the node is back at its size */
+          readonly type: "resize-cancel";
+          readonly nodeId: string;
       }
     | {
           /** a node was resized (`resize()`): by a drag, or by the arrows on a focused resize handle */
@@ -102,13 +225,20 @@ export type FlowEngineEvent =
           readonly source: MoveSource;
       }
     | {
+          /** a selection box started (`selection()`): the pointer moved past its press */
+          readonly type: "box-select-start";
+          /** where it started, as a client point and as a flow point */
+          readonly client: XY;
+          readonly point: XY;
+      }
+    | {
           /** a box selection ended with these selected (`selection()`) */
           readonly type: "box-select";
           readonly nodeIds: readonly string[];
           readonly edgeIds: readonly string[];
       }
     | {
-          /** Delete or Backspace removed these (`keyboard()`) */
+          /** a delete key removed these (`keyboard()`, after its `beforeDelete`) */
           readonly type: "remove";
           readonly nodeIds: readonly string[];
           readonly edgeIds: readonly string[];
@@ -116,3 +246,9 @@ export type FlowEngineEvent =
 
 /** The type of an engine event. */
 export type FlowEngineEventType = FlowEngineEvent["type"];
+
+/** The event of a type. */
+export type FlowEngineEventOf<K extends FlowEngineEventType> = Extract<
+    FlowEngineEvent,
+    { readonly type: K }
+>;

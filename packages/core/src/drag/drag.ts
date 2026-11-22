@@ -12,6 +12,11 @@ export interface DragOptions {
     readonly snapGrid: readonly [number, number] | undefined;
     /** how far (in pixels) a press moves before it is a drag; default 1 */
     readonly threshold: number;
+    /**
+     * a drag of a node that is not selected selects it first (it is then dragged alone); false
+     * drags it unselected, the selection kept; default true
+     */
+    readonly selectOnDrag: boolean;
 }
 
 /** The drag feature, as `drag()` makes it. */
@@ -27,6 +32,7 @@ export function drag(options: Partial<DragOptions> = {}): DragFeature {
               ])
             : undefined,
         threshold: options.threshold ?? 1,
+        selectOnDrag: options.selectOnDrag ?? true,
     });
     return Object.freeze({
         name: "drag",

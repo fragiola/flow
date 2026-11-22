@@ -15,13 +15,15 @@ import type {
 } from "../commands/types";
 import type { FlowEdge, FlowNode, XY } from "../document/types";
 import type { FlowHandle, PressTarget } from "../engine/adapter";
+import type { AutoPanGesture } from "../engine/auto-pan";
 import type { FlowEngineEvent } from "../engine/events";
+import type { InteractionKind } from "../engine/interactivity";
 import type {
     EngineActionKey,
     EngineGetKey,
     EngineIsKey,
 } from "../engine/verbs";
-import type { EdgePath, Rect, Viewport } from "../geometry/types";
+import type { EdgePath, PathEnds, Rect, Viewport } from "../geometry/types";
 import type { ValidationIssue } from "../schema/types";
 import type { Draft } from "../state/draft";
 import type { ModelGetKey, ModelIsKey } from "../state/queries";
@@ -82,9 +84,16 @@ export interface FeatureGesture {
      * is active and its pointer nears the root's edge, the engine pans the viewport every frame
      * (the `autoPan` option) and calls `move` again with the pointer's last event, so `move` must
      * read the flow point from the client point each time (`host.toFlow`), never from a delta
-     * divided by the zoom
+     * divided by the zoom; its kind (`"node"`, `"connect"`, `"selection"`, `"resize"`) lets the
+     * app turn it off for that gesture alone (`autoPan: { connect: false }`)
      */
-    readonly autoPan?: boolean | undefined;
+    readonly autoPan?: boolean | AutoPanGesture | undefined;
+    /**
+     * the `set-interactive` switch the gesture belongs to (`"drag"`, `"connect"`, `"select"`,
+     * `"reconnect"`): turning it off cancels the gesture; one without a kind (a pan, a resize)
+     * stops only with `interactive`
+     */
+    readonly kind?: InteractionKind | undefined;
 }
 
 /**
@@ -158,6 +167,22 @@ export interface FeatureEngineHost {
     nodeElement(nodeId: string): HTMLElement | undefined;
     /** whether the flow's gestures and keys may change it (the Controls' interactivity toggle) */
     interactive(): boolean;
+    /**
+     * whether the gestures and keys of one kind may change the flow (`set-interactive`'s per-kind
+     * switches: `drag`, `connect`, `select`, `reconnect`), `interactive()` included
+     */
+    allows(kind: InteractionKind): boolean;
+    /**
+     * how far (in pixels) a press may move and still be a tap: on the pane (`paneClickDistance`)
+     * or on anything else (`nodeClickDistance`)
+     */
+    tapDistance(on: "pane" | "node"): number;
+    /** whether nodes (`nodesFocusable`) or edges (`edgesFocusable`) take focus at all */
+    focusable(kind: "node" | "edge"): boolean;
+    /** a flow point as a client point (the inverse of `toFlow`) */
+    toClient(point: XY): XY;
+    /** the path of a built-in edge type (an app type: the bezier) between two ends, with the engine's `pathOptions` */
+    path(type: string | undefined, ends: PathEnds): EdgePath;
     /** options an adapter gave a part (`engine.adapter.setPartOptions`: a resizer's limits) */
     partOptions(
         part: string,
