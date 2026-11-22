@@ -257,7 +257,10 @@ Error codes: `unknown_command`, `invalid_payload` (schema, or a field of a featu
 `node-edges-by { nodeId, handleType?, handleId? }`, `connected-edges-by { nodeIds }`,
 `incomers-by { nodeId }`, `outgoers-by { nodeId }` (#27: the nodes at the other end of the
 edges that end at a node / start from it, in the document's node order, each once),
-`absolute-position-by { nodeId }`, `flow-json`, `commands`; `selected-nodes`, `selected-edges`
+`absolute-position-by { nodeId }`, `flow-json`, `commands`; #36: `node-connections-by { nodeId,
+handleType?, handleId? }` (`node-edges-by` as `NodeConnection`s: `edgeId`, `source`,
+`sourceHandle`, `target`, `targetHandle`) and `nodes-data-by { nodeIds }` (`NodeData`: `id`,
+`type`, `data`, in the order asked, unknown ids left out), for the hooks; `selected-nodes`, `selected-edges`
 (`selection()`); `node-children-by { nodeId }`, `node-parent-by { nodeId }` (`subflows()`). `is`:
 `node-draggable`, `node-selectable`, `node-connectable`, `node-deletable`, `node-hidden`
 `{ nodeId }`; `edge-selectable`, `edge-deletable`, `edge-hidden`, `edge-reconnectable`
@@ -358,6 +361,8 @@ size; #35: `fit-view`'s padding forms); features: `selection-box` (selection), `
 of the selected nodes while two or more were selected by a box, until the selection changes
 otherwise, or whenever two or more are selected with `selection({ rect: "always" })`; null
 otherwise and while a box is drawn),
+`internal-node-by { nodeId }` (#36: an `InternalNode`, `id`, `node`, `absolutePosition`, `rect`,
+`measured`, `zIndex`, `handles`; undefined for an unknown node),
 `dragging-node-ids` (drag), `connection` (connection: `from`, `fromPoint`, `toPoint`, `toSide`,
 `to`, `status` valid/invalid/null, `path`, `reconnecting`), `minimap-view { width, height }`
 (minimap: `viewBox`, `viewBoxAttribute`, `scale`, `nodes`, `view`, `maskPath` for
@@ -383,7 +388,10 @@ point, client, event }`, a `FlowPointerInfo`), `box-select-start { client, point
 `resize-start { nodeId, width, height }`, `resize-cancel { nodeId }`; #35: `selection-drag-start`,
 `selection-drag` (each step), `selection-drag-end { nodeIds, client, point }` (a
 `SelectionDragStep`) for a drag of the `nodes-selection` part (instead of `drag-start`; the drop
-still tells `nodes-move` first, a cancel `drag-cancel`), and `selection-context-menu` on that part.
+still tells `nodes-move` first, a cancel `drag-cancel`), and `selection-context-menu` on that part;
+#36: `minimap-click { point, client, event }` (a `FlowPointerInfo`: a tap on the minimap, its flow
+point; the root captures the pointer, so the DOM's `click` never reaches the minimap), not in
+`ENGINE_EVENT_CALLBACKS` (no root callback: each adapter's `MiniMap` tells it).
 
 **The adapter contract** (`engine.adapter`, what `Flow.*` primitives call; an app never does):
 
@@ -422,13 +430,21 @@ still tells `nodes-move` first, a cancel `drag-cancel`), and `selection-context-
   Inside a node, fields, buttons, links and `data-flow-no-gesture` start no gesture;
   `data-flow-no-wheel` keeps its wheel; a node holding a `data-flow-drag-handle` element
   (`DRAG_HANDLE_ATTRIBUTE`, #24) drags only from it.
-- `setPartOptions("resizer", nodeId, { minWidth, … } | null)`: a resizer's own limits.
+- `setPartOptions("resizer", nodeId, { minWidth, … } | null)`: a resizer's own limits (#35: and
+  `direction`).
+- `setPartOptions("minimap", "", { inversePan?, zoomStep? } | null)` (#36): a `MiniMap`'s props
+  over `minimap()`'s, one set per root (several minimaps share it), set on mount and change, `null`
+  on unmount.
 - `setOptions(partial)`: root props that change (`minZoom`, `panOnDrag`, `pathOptions`,
   `interactive`, …).
 - `subscribe(listener)` / `getSnapshot()`: the view changed (`{ viewport, measured, gesture }`):
   edges, the connection line, the selection box, the minimap, toolbars and state attributes
   re-render from it; node and edge data from `model.subscribe`. Measurements are told once per
   task (the root window's microtask), so a mount re-renders once.
+- **The hooks' helpers** (#36, core exports): `watchKeyPress(target, keys, onChange) => stop` (the
+  combo matcher every `useKeyPress` uses: `"Shift"`, `"Meta+s"`, a list = any of them, `key` or
+  `code` without case, forgotten on the window's `blur` and Meta's release) and
+  `sameFlowValue(a, b)` (arrays and plain records compared deep, the rest by identity).
 - `settings.onlyRenderVisible`: render `visible-nodes` instead of every node (the edges' list,
   `drawn-edges`, applies it itself: #25's adapters render it and filter nothing).
 
@@ -1146,8 +1162,8 @@ the same in the four apps; the shared specs cover both. #28: `edge-types` draws 
 `edge-types` gives `smoothstep` `animated` + `pathOptions.borderRadius` and `step`
 `pathOptions.stepPosition: 0.25`; `connected-data` (new) sums its inputs with
 `useNodeConnections` + `useNodesData` (test ids `sum-total`, `sum-sources`, `value-<id>`).
-Until their #36 helpers land, `examples/{vue,svelte,angular}` hold only the copied `styles.ts`
-of the changed examples, and their `tests/examples.test.ts` skip `connected-data`.
+The Vue, Svelte and Angular apps have every one of these (their own sections below), with no
+parity filter left.
 
 **Theme tokens** (`--fl-*`; `tests/themes.test.ts` holds the list, `e2e/themes.spec.ts` checks the
 shapes differ on computed styles): shape `font`, `font-size`, `title-weight`, `node-padding`,
@@ -2219,3 +2235,35 @@ Epic #34):
   `nodesDraggable`-like props are `set-interactive`'s switches; `onConnectEnd` is
   `onConnect` + `onConnectCancel`; the known limits of #32).
 
+Decisions of the components, helpers and hooks (#35 core, #36 adapters and docs, Epic #37; React
+Flow's API studied, none of xyflow's code):
+
+- **Hook names per adapter**: React's names for Vue's composables (computed refs; value, ref or
+  getter arguments) and Svelte's runes (`FlowValue`, `useNodeId` the id itself, lowercase
+  `onstart` / `onchange` / `onend`); Angular's are `injectFlowStore`, `injectNodeId`,
+  `injectNodesData`, `injectNodeConnections`, `injectInternalNode`, `injectKeyPress`,
+  `injectOnViewportChange`, returning signals. All read core keys (`nodes-data-by`,
+  `node-connections-by`, `internal-node-by`) and share `watchKeyPress` / `sameFlowValue`;
+  `useKeyPress` reads the root's window, never the global one, and does not skip typing in fields.
+- **The selection rectangle is a box's by default**: `selection-rect` exists after a box selected
+  two or more nodes, until the selection changes otherwise; `selection({ rect: "always" })` for any
+  selection of two or more. Its drag replaces `drag-start` with `selection-drag-start` / `-drag` /
+  `-drag-end`; a cancel is `drag-cancel`, as a node drag's. No focus or keys on it.
+- **A resize snaps with `resize({ snap })` only**, independent of `drag({ snapGrid })`; a resizer's
+  `direction` is the whole `NodeResizer`'s (no `ResizeLine`, no per-handle direction).
+- **`animated` is an `EdgeFlags` flag** (default false, `edge.set-flags`), shown as `data-animated`
+  on `edge`, `edge-path`, `edge-label`; the motion is the app's CSS.
+- **An edge's `pathOptions` is one flat object** (the engine's keys, each type reading its own),
+  merged over the engine's key by key; a change in a controlled sync replaces the edge.
+- **`minimap-click` is an engine event**, since the root captures the pointer and a DOM `click`
+  never reaches the minimap; no root callback (outside `ENGINE_EVENT_CALLBACKS`), each `MiniMap`
+  tells it (React `onClick(event, point)`, Vue `click`, Svelte `onclick`, Angular `minimapClick`
+  with the whole event). A minimap's `inversePan` / `zoomStep` are one part option set per root.
+- **Geometry**: bezier's `labelOffset` is the label point's distance from the source, both
+  positive, as React Flow's; the step turn's `stepPosition` is counted between the points that
+  stand `offset` out from the ends, a non-finite `stepPosition`, `centerX` or `centerY` ignored.
+- **Docs**: `api/primitives/hooks.mdx` (a section per selecting hook, four frameworks),
+  `path-helpers.mdx`, `concepts/viewport.mdx` (what fit-view frames), `guides/custom-edges.mdx`
+  (an edge's own shape, animated edges), `guides/selection.mdx` (the selection rectangle), the
+  primitives' pages and `limitations.mdx` (`ResizeLine`, keys on the rectangle, the per-root
+  minimap options, `useKeyPress` and typing).
