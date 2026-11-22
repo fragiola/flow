@@ -1,5 +1,6 @@
 import { partAttributes } from "@fragiola/flow";
-import { useNodeId } from "../context";
+import { useFlowValue } from "../composables/internal";
+import { useFlowContext, useNodeId } from "../context";
 import {
     definePrimitive,
     type FlowComponent,
@@ -100,7 +101,8 @@ const PLACE: Record<ResizePosition, Record<string, string>> = {
 
 /**
  * A grab area of a `NodeResizer` (`data-flow-part="resize-handle"`, `data-position`): a press on
- * it resizes its node from that corner or side (`resize()`). Placed on its corner (centred) or
+ * it resizes its node from that corner or side (`resize()`); with `keyboard()` too it takes focus
+ * and the arrows move that corner or side. Placed on its corner (centred) or
  * along its side; give it its size (a side's thickness) and look.
  */
 export const ResizeHandle: FlowComponent<ResizeHandleProps, ResizeHandleSlots> =
@@ -109,6 +111,20 @@ export const ResizeHandle: FlowComponent<ResizeHandleProps, ResizeHandleSlots> =
         ["position", "nodeId", "as"],
         (props, { attrs, slots }) => {
             const nodeId = useNodeId("ResizeHandle", () => props.nodeId);
+            const context = useFlowContext("ResizeHandle");
+            // the engine's record: `data-position`, and `tabindex` with `keyboard()` (arrows resize)
+            const attributes = useFlowValue(context, () => {
+                const engine = context.engine.value;
+                return engine
+                    ? engine.adapter.attributes("resize-handle", {
+                          nodeId: nodeId(),
+                          position: props.position,
+                      })
+                    : {
+                          ...partAttributes("resize-handle"),
+                          "data-position": props.position,
+                      };
+            });
             return () => {
                 const state: ResizeHandleState = {
                     nodeId: nodeId(),
@@ -120,10 +136,7 @@ export const ResizeHandle: FlowComponent<ResizeHandleProps, ResizeHandleSlots> =
                     attrs,
                     render: slots.render,
                     state,
-                    props: {
-                        ...partAttributes("resize-handle"),
-                        "data-position": props.position,
-                    },
+                    props: { ...attributes.value },
                     style: {
                         position: "absolute",
                         pointerEvents: "auto",
