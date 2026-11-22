@@ -350,6 +350,35 @@ describe("the render levels (#39)", () => {
         expect(document.activeElement).toBe(edge);
     });
 
+    it("keeps the focus of a level-0 edge when the levels come and go (its SVG moves)", async () => {
+        const flow = createFlowRef<AnyTypes, FlowFeatures>();
+        const { container } = await render(TestFlow, {
+            features,
+            flowRef: flow,
+            defaultNodes: NODES,
+            defaultEdges: EDGES,
+        });
+        const edge = part(container, "edge", "ab") as unknown as SVGGElement;
+        edge.setAttribute("tabindex", "0");
+        edge.focus();
+        expect(document.activeElement).toBe(edge);
+        // another edge selected: two levels, level 0's SVG moves into its wrapper
+        flow.current?.model.run("selection.set", { edgeIds: ["ac"] });
+        await settle();
+        expect(wrappers(container)).toHaveLength(2);
+        expect(edge.closest('[data-flow-part="edges-layer"]')).toHaveAttribute(
+            "data-level",
+            "0",
+        );
+        expect(document.activeElement).toBe(edge);
+        // unselected: one level again, the SVG back in the app's element
+        flow.current?.model.run("selection.clear");
+        await settle();
+        expect(wrappers(container)).toHaveLength(0);
+        expect(part(container, "edge", "ab")).toBe(edge);
+        expect(document.activeElement).toBe(edge);
+    });
+
     it("calls refocus with each edge's element once it is drawn", async () => {
         const { container } = await render(TestFlow, {
             features,

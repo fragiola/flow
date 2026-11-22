@@ -109,7 +109,8 @@ export class SlotViews<C extends object> {
     /**
      * Brings the views to `items`, in their order before each one's anchor: a key that stays keeps
      * its view and its elements, moved when its anchor is elsewhere now (`moved` is told the root
-     * elements that changed parent: one that had focus lost it).
+     * elements that changed parent, and the one put back in its parent that had focus: either
+     * lost it).
      */
     sync(
         items: readonly SlotItem<C>[],
@@ -139,6 +140,7 @@ export class SlotViews<C extends object> {
                 byAnchor.set(at, list);
             }
             const changed: Element[] = [];
+            const active = this.anchor.ownerDocument.activeElement;
             for (const [anchor, ordered] of byAnchor) {
                 // in order, from the last: each view's elements before the next one's
                 let next: Node = anchor;
@@ -162,8 +164,9 @@ export class SlotViews<C extends object> {
                             next.parentNode?.insertBefore(node, next);
                             if (
                                 before !== slot.box &&
-                                before !== node.parentNode &&
-                                node.nodeType === 1
+                                node.nodeType === 1 &&
+                                (before !== node.parentNode ||
+                                    (active !== null && node.contains(active)))
                             ) {
                                 changed.push(node as Element);
                             }

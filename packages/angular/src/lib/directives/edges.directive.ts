@@ -202,8 +202,21 @@ export class FlowEdgesDirective {
         return { wrapper, svg };
     }
 
-    /** brings the elements to `count` levels */
+    /**
+     * brings the elements to `count` levels; level 0's SVG moving into or out of its wrapper
+     * takes the focus from an edge in it, given back after the move
+     */
     private arrange(count: number): void {
+        const active = this.host.ownerDocument.activeElement;
+        const focused =
+            active && active !== this.svg && this.svg.contains(active)
+                ? active
+                : undefined;
+        this.place(count);
+        if (focused) this.context.engine()?.adapter.refocus(focused);
+    }
+
+    private place(count: number): void {
         if (count <= 1) {
             for (const { wrapper } of this.levels) wrapper.remove();
             if (this.svg.parentNode !== this.host) this.host.prepend(this.svg);
