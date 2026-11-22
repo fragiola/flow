@@ -12,17 +12,18 @@ import { flowValue, type ValueOrSignal, valueNow } from "./internal";
  * A node's id, type and data (`nodes-data-by`), or null while it does not exist; given several
  * ids, each existing one's in the order given (React's `useNodesData`). The signal changes only
  * when one of them does (its type or its data, compared by value), not when a node moves or another
- * changes. The ids are a value, a signal or a getter (an input is followed). Call it in an
+ * changes. The ids are a value, a signal or a getter (an input is followed); an id not set yet (an
+ * input still `undefined`) gives null, as a single id does: only a list gives a list. Call it in an
  * injection context (a constructor or a field).
  */
 export function injectNodesData<T extends FlowTypes = AnyTypes>(
-    nodeId: ValueOrSignal<string>,
+    nodeId: ValueOrSignal<string | undefined>,
 ): Signal<NodeData<T> | null>;
 export function injectNodesData<T extends FlowTypes = AnyTypes>(
     nodeIds: ValueOrSignal<readonly string[]>,
 ): Signal<readonly NodeData<T>[]>;
 export function injectNodesData<T extends FlowTypes = AnyTypes>(
-    ids: ValueOrSignal<string | readonly string[]>,
+    ids: ValueOrSignal<string | readonly string[] | undefined>,
 ): Signal<NodeData<T> | null | readonly NodeData<T>[]> {
     const context = injectFlowContext("injectNodesData");
     const asked = computed(() => valueNow(ids));
@@ -37,7 +38,8 @@ export function injectNodesData<T extends FlowTypes = AnyTypes>(
         },
         sameFlowValue,
     );
+    // a list gives a list; a single id, or none yet, its node or null
     return computed(() =>
-        typeof asked() === "string" ? (list()[0] ?? null) : list(),
+        Array.isArray(asked()) ? list() : (list()[0] ?? null),
     );
 }

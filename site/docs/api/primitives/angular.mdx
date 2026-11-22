@@ -242,7 +242,7 @@ a constructor) of a component or directive inside the root. A value that changes
 | `useFlowRef()`, `createFlowRef()` | `injectFlowRef()`, `createFlowRef()`: a `FlowRef<T, F>` whose `current` is a signal's value |
 | `useFlowStore<S, T, F>(selector, equal?)` | `injectFlowStore<S, T, F>(selector, equal?)`: `Signal<S>`, `selector` given `{ model, engine }` (a `FlowRefValue<T, F>`), the signal changing only when `equal` (default `Object.is`) says the value did |
 | `useNodeId()` | `injectNodeId()`: `Signal<string \| null>`, the enclosing `[flowNode]`'s id |
-| `useNodesData<T>(id \| ids)` | `injectNodesData<T>(id \| ids)`: `Signal<NodeData<T> \| null>` for one id, `Signal<readonly NodeData<T>[]>` for several |
+| `useNodesData<T>(id \| ids)` | `injectNodesData<T>(id \| ids)`: `Signal<NodeData<T> \| null>` for one id (null too while the id is `undefined`, an input not set yet), `Signal<readonly NodeData<T>[]>` for several |
 | `useNodeConnections(options)` | `injectNodeConnections(options)`: `Signal<readonly NodeConnection[]>`; `InjectNodeConnectionsOptions` (`id`, `handleId`, `type`) as React's, an `id` needed outside `[flowNode]` |
 | `useInternalNode<T>(id)` | `injectInternalNode<T>(id)`: `Signal<InternalNode<T> \| undefined>` |
 | `useKeyPress(keys, options)` | `injectKeyPress(keys, options)`: `Signal<boolean>`; `InjectKeyPressOptions`' `target` (a value, a signal or a getter) defaults to the root's window |

@@ -11,6 +11,7 @@ import {
     inject,
     input,
     type Signal,
+    signal,
     untracked,
 } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
@@ -220,6 +221,27 @@ describe("injectNodesData", () => {
             flowOf(ref).model.run("node.remove", { nodeId: "a" }),
         );
         expect(values("first").at(-1)).toBeNull();
+    });
+
+    it("gives null for a single id not set yet, then the node once it is; a list stays a list", async () => {
+        const id = signal<string | undefined>(undefined);
+        const ids = signal<readonly string[]>(["a"]);
+        readers.first = () => injectNodesData(id);
+        readers.second = () => injectNodesData(ids);
+        await render(HookFlow, {
+            defaultNodes: [task("a", 0, 0, { data: { label: "A" } })],
+        });
+        expect(values("first").at(-1)).toBeNull();
+        expect(values("first")).not.toContainEqual([]);
+        await change(() => id.set("a"));
+        expect(values("first").at(-1)).toEqual({
+            id: "a",
+            type: "task",
+            data: { label: "A" },
+        });
+        expect(values("second").at(-1)).toEqual([
+            { id: "a", type: "task", data: { label: "A" } },
+        ]);
     });
 });
 
