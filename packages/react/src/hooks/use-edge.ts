@@ -113,15 +113,21 @@ export function useEdge<T extends FlowTypes = AnyTypes>(
 
 /**
  * @internal an edge part's attributes before the engine (the server render, the first client
- * render): its part, its id and `data-selected` from the document, as a node's
+ * render): its part, its id, `data-selected` and `data-animated` from the document, as the
+ * engine gives them
  */
 export function staticEdgeAttributes(
     part: string,
-    edge: { readonly id: string; readonly selected?: boolean | undefined },
+    edge: {
+        readonly id: string;
+        readonly selected?: boolean | undefined;
+        readonly animated?: boolean | undefined;
+    },
 ): PartAttributes {
     return {
         ...partAttributes(part, edge.id),
         "data-selected": flag(edge.selected === true),
+        "data-animated": flag(edge.animated === true),
     };
 }
 

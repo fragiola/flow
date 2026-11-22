@@ -31,10 +31,10 @@ export function EdgePath(props: EdgePathProps) {
     const attributes = useFlowValue(model, engine, () =>
         engine
             ? engine.adapter.attributes("edge-path", { edgeId })
-            : staticEdgeAttributes("edge-path", {
-                  id: edgeId,
-                  selected: model.get("edge-by", { id: edgeId })?.selected,
-              }),
+            : staticEdgeAttributes(
+                  "edge-path",
+                  model.get("edge-by", { id: edgeId }) ?? { id: edgeId },
+              ),
     );
     if (!path || !attributes) return null;
     return (

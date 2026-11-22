@@ -34,10 +34,10 @@ export function EdgeLabel(props: EdgeLabelProps) {
     const attributes = useFlowValue(model, engine, () =>
         engine
             ? engine.adapter.attributes("edge-label", { edgeId })
-            : staticEdgeAttributes("edge-label", {
-                  id: edgeId,
-                  selected: model.get("edge-by", { id: edgeId })?.selected,
-              }),
+            : staticEdgeAttributes(
+                  "edge-label",
+                  model.get("edge-by", { id: edgeId }) ?? { id: edgeId },
+              ),
     );
     if (!path || !attributes || !layer) return null;
     return createPortal(

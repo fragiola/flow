@@ -34,6 +34,25 @@ describe("a render with no engine", () => {
         expect(html).toContain("isolation:isolate");
     });
 
+    it("gives the edge parts data-selected and data-animated from the document, as the engine does", () => {
+        const html = renderToString(
+            <TestFlow
+                defaultNodes={[task("a"), task("b", 0, 200)]}
+                defaultEdges={[
+                    { id: "ab", source: "a", target: "b", animated: true },
+                ]}
+                zIndexMode="basic"
+            />,
+        );
+        expect(html).toMatch(
+            /data-flow-part="edge" data-flow-id="ab"[^>]* data-animated=""/,
+        );
+        expect(html).toMatch(
+            /data-flow-part="edge-path" data-flow-id="ab"[^>]* data-animated=""/,
+        );
+        expect(html).not.toContain("data-selected");
+    });
+
     it("draws no edge while one of its nodes has no size", () => {
         const html = renderToString(
             <TestFlow
