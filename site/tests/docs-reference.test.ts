@@ -580,7 +580,7 @@ describe("the React reference", () => {
  */
 const AHEAD_IN_REACT: Record<"vue" | "svelte" | "angular", readonly string[]> =
     {
-        vue: ["NodesSelection"],
+        vue: [],
         svelte: ["NodesSelection"],
         angular: ["NodesSelection"],
     };
