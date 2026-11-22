@@ -941,7 +941,8 @@ useOnViewportChange({
 </script>
 ```
 
-In Vue, the callbacks are read at each event (a reactive object's latest).
+In Vue, the options may be a value, a ref or a getter (`MaybeRefOrGetter`), and the callbacks are
+read at each event (a reactive object's, a ref's or a getter's latest).
 
 </Framework>
 

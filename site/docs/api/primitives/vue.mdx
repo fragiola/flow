@@ -202,7 +202,7 @@ prop as a getter (`() => props.node`): read in `setup`, its value would stay the
 | `useNodeConnections(options?)` | `useNodeConnections(optionsOrGetter?)` (`UseNodeConnectionsOptions`: `id`, `handleId`, `type`): `ComputedRef<readonly NodeConnection[]>`; it throws in `setup` outside a `Flow.Node` without an `id` |
 | `useInternalNode<T>(id)` | the id as a value, a ref or a getter: `ComputedRef<InternalNode<T> \| undefined>` |
 | `useKeyPress(keys, options?)` | the keys and the options (`UseKeyPressOptions`, `target`) as values, refs or getters: a read-only `Ref<boolean>`; the default target is the root element's window |
-| `useOnViewportChange(options)` | the same (`UseOnViewportChangeOptions`: `onStart`, `onChange`, `onEnd`, read at each event); it renders nothing and stops with the component |
+| `useOnViewportChange(options)` | the same (`UseOnViewportChangeOptions`: `onStart`, `onChange`, `onEnd`, read at each event; a value, a ref or a getter, `MaybeRefOrGetter`); it renders nothing and stops with the component |
 | `useFlowRef()`, `createFlowRef()` | the same names: a `FlowRef<T, F>` whose `value` is reactive |
 | `ControlButtonState` | the same: the state of `Flow.ZoomIn`, `Flow.ZoomOut` and `Flow.FitView` |
 

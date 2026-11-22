@@ -1,5 +1,5 @@
 import type { Viewport } from "@fragiola/flow";
-import { watchEffect } from "vue";
+import { type MaybeRefOrGetter, toValue, watchEffect } from "vue";
 import { useFlowContext } from "../context";
 
 export interface UseOnViewportChangeOptions {
@@ -14,20 +14,25 @@ export interface UseOnViewportChangeOptions {
 /**
  * Calls back on the viewport's changes of the enclosing `Flow.Root` (the engine's events), without
  * rendering anything: `gesture` is true for a pan, the wheel, a pinch or auto-pan, false for an
- * action. The callbacks of `options` are read at each event (a reactive object's latest).
+ * action. `options` is a value, a ref or a getter, and its callbacks are read at each event (a
+ * reactive object's, a ref's or a getter's latest).
  */
-export function useOnViewportChange(options: UseOnViewportChangeOptions): void {
+export function useOnViewportChange(
+    options: MaybeRefOrGetter<UseOnViewportChangeOptions>,
+): void {
     const context = useFlowContext("useOnViewportChange");
     watchEffect((onCleanup) => {
         const engine = context.engine.value;
         if (!engine) return;
         const stop = engine.subscribe((event) => {
+            // read at each event, never tracked by this effect
+            const now = toValue(options);
             if (event.type === "viewport-change-start") {
-                options.onStart?.(event.viewport, event.gesture);
+                now.onStart?.(event.viewport, event.gesture);
             } else if (event.type === "viewport-change") {
-                options.onChange?.(event.viewport, event.gesture);
+                now.onChange?.(event.viewport, event.gesture);
             } else if (event.type === "viewport-change-end") {
-                options.onEnd?.(event.viewport, event.gesture);
+                now.onEnd?.(event.viewport, event.gesture);
             }
         });
         onCleanup(stop);

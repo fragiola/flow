@@ -3,7 +3,14 @@
 // `internal-node-by`, `watchKeyPress`, the viewport events): React's `tests/hooks.test.tsx`.
 import { selection } from "@fragiola/flow/selection";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { type Component, defineComponent, h, nextTick, type Ref } from "vue";
+import {
+    type Component,
+    defineComponent,
+    h,
+    nextTick,
+    type Ref,
+    shallowRef,
+} from "vue";
 import {
     createFlowRef,
     Flow,
@@ -16,6 +23,7 @@ import {
     useNodeId,
     useNodesData,
     useOnViewportChange,
+    type Viewport,
 } from "../src/index";
 import { installLayout, pair, render, settle, TestFlow, task } from "./flow";
 
@@ -396,5 +404,45 @@ describe("useOnViewportChange", () => {
         );
         expect(calls).toEqual(["start 0 false", "change 70", "end 70"]);
         expect(renders).toBe(before);
+    });
+
+    it("takes a ref or a getter, read at each event", async () => {
+        const flow = createFlowRef();
+        const calls: string[] = [];
+        const options = shallowRef({
+            onEnd: (viewport: Viewport) => calls.push(`ref ${viewport.x}`),
+        });
+        let label = "first";
+        const Watcher = defineComponent({
+            setup() {
+                useOnViewportChange(options);
+                useOnViewportChange(() => ({
+                    onEnd: (viewport) => calls.push(`${label} ${viewport.x}`),
+                }));
+                return () => null;
+            },
+        });
+        await render(() =>
+            h(TestFlow, { flowRef: flow, defaultNodes: pair().nodes }, () => [
+                h(Watcher),
+            ]),
+        );
+        await change(() =>
+            flowOf(flow).engine.run("set-viewport", { x: 10, y: 0 }),
+        );
+        expect(calls).toEqual(["ref 10", "first 10"]);
+        options.value = {
+            onEnd: (viewport: Viewport) => calls.push(`new ref ${viewport.x}`),
+        };
+        label = "second";
+        await change(() =>
+            flowOf(flow).engine.run("set-viewport", { x: 20, y: 0 }),
+        );
+        expect(calls).toEqual([
+            "ref 10",
+            "first 10",
+            "new ref 20",
+            "second 20",
+        ]);
     });
 });

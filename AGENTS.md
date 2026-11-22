@@ -765,7 +765,8 @@ Decisions of #36 in Vue (React's props, part and hooks, mirrored):
   `Ref<boolean>`. Their ids and options take a value, a ref or a getter (`MaybeRefOrGetter`);
   `useNodeConnections` throws in `setup` outside a node without an `id`. `useKeyPress` and
   `useOnViewportChange` listen from a `watchEffect` (the root's element and engine exist only
-  once it is mounted); `useOnViewportChange` reads its callbacks at each event.
+  once it is mounted); `useOnViewportChange` takes a value, a ref or a getter
+  (`MaybeRefOrGetter`) and reads its callbacks at each event.
 - **The internal `useNodeId(part, getter)` of `context.ts` is `usePartNodeId`** (React's
   rename), leaving the name to the public composable. Tested in `tests/part-options.test.ts` and
   `tests/composables.test.ts` (render counts); no core change was needed.
