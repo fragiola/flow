@@ -536,17 +536,17 @@ engine's state attributes from `engine.adapter.attributes(part, payload)`):
 | --- | --- | --- |
 | `Root` | `div` `root` | owns the model (or takes `model`) and the engine, attaches the root; `position: relative; overflow: hidden` |
 | `Viewport` | `div` `viewport` | `attachViewport`: the engine writes its transform, React never does |
-| `Nodes` | `div` `nodes` | children function per node not hidden (`visible-nodes` with `onlyRenderVisible`), keyed by id; `isolation: isolate` (#25: the nodes' `z-index` stays inside the layer) |
-| `Node` | `div` `node` | `registerNode`; `transform: translate(x, y)` from `node-rect-by` (its `nodeOrigin` applied), `z-index` from `node-z-index-by` (#25), the document's `width`/`height`; `tabIndex` from `node-focusable` |
+| `Nodes` | `div` `nodes` | children function per node not hidden (`visible-nodes` with `onlyRenderVisible`), keyed by id; `isolation: isolate` (#25: the nodes' `z-index` stays inside the layer; #39: dropped while `render-layers` has several levels) |
+| `Node` | `div` `node` | `registerNode`; `transform: translate(x, y)` from `node-rect-by` (its origin applied), `z-index` from `node-z-index-by` (#25), the document's `width`/`height`; before the engine, #39: the static geometry's `nodeRects` / `nodeZIndexes`; `tabIndex` from `node-focusable` |
 | `Handle` | `div` `handle` | `registerHandle({ nodeId, handleId, type, side, connectable })`; centred on its side by default (a style may move it); the engine's record, `tabindex` as `tabIndex` (#28: with `keyboard()` + `connection()`) |
-| `Edges` | `div` + `svg` `edges` | children function per edge of `drawn-edges`, in its order (#25: shown, measured, by z-order); the `div` is the HTML layer labels portal into |
-| `Edge` | `g` `edge` | default child `EdgePath`; `pointer-events: visibleStroke`; `tabIndex` from `edge-focusable` |
+| `Edges` | `div` + `svg` `edges` | children function per edge of `drawn-edges`, in its order (#25: shown, measured, by z-order); the `div` is the HTML layer labels portal into; #39: `render-layers` (the static geometry's `layers` before the engine), one level today's DOM, several an `edges-layer` `div` per level (`data-level`, its `z-index`) with its `svg` and its labels' layer |
+| `Edge` | `g` `edge` | default child `EdgePath`; `pointer-events: visibleStroke`; `tabIndex` from `edge-focusable`; #39: `engine.adapter.refocus(element)` on mount |
 | `EdgePath` | `path` `edge-path` | `d` from `edge-path-by` (a `d` of your own draws an app type), `fill="none"` |
 | `EdgeLabel` | `div` `edge-label` | portal into the edges' HTML layer, centred on the label point |
 | `ReconnectAnchor` | `circle` `reconnect-anchor` | an end's grab area (`end`), transparent, `r` 10 |
 | `ConnectionLine` | `svg` `connection-line` | while a connection is drawn; default child `path` `connection-path`, or a children function |
 | `SelectionBox` | `div` `selection-box` | while a box is drawn, root-relative |
-| `NodesSelection` | `div` `nodes-selection` | #36: inside `Viewport` after `Nodes`, at `selection-rect` (null: nothing); structural `position: absolute; top: 0; left: 0; transform: translate(x, y); width; height`; state `{ rect, dragging }`; the engine drags it |
+| `NodesSelection` | `div` `nodes-selection` | #36: inside `Viewport` after `Nodes`, at `selection-rect` (null: nothing); structural `position: absolute; top: 0; left: 0; transform: translate(x, y); width; height`; state `{ rect, dragging }`; the engine drags it; #39: its record spread through `attributeProps` (`tabIndex` with `keyboard()`) |
 | `Background` | `svg` `background` | `background-pattern`: `pattern` `background-pattern`, `circle`/`path` `background-mark` in `currentColor`, `rect` `background-fill` |
 | `Controls` | `div` `controls` | a group for the buttons |
 | `ZoomIn`, `ZoomOut`, `FitView` | `button` `zoom-in`, `zoom-out`, `fit-view` | run their action (with their `duration` prop, #25; #36: `FitView`'s `padding`, `nodeIds`, `includeHidden`, `minZoom`, `maxZoom`, only those given); `disabled` / `data-disabled` while `!engine.can(...)` |
@@ -556,7 +556,7 @@ engine's state attributes from `engine.adapter.attributes(part, payload)`):
 | `MiniMap` (`/minimap`) | `svg` `minimap` | `width` × `height` (200 × 150), `minimap-view`; children default: a `MiniMapNode` per node and the `MiniMapMask`; #36: `inversePan`, `zoomStep` (`setPartOptions("minimap", "", …)`), `onClick(event, point)` (the `minimap-click` event, not the DOM click) |
 | `MiniMapNode`, `MiniMapMask` | `rect` `minimap-node`, `path` `minimap-mask` | a node's box; the mask (`fill-rule="evenodd"`) |
 | `NodeResizer` (`/resize`) | `div` `resizer` | `setPartOptions("resizer", nodeId, { minWidth, … })` (#36: `direction`); default children: a `ResizeHandle` at each corner and side |
-| `ResizeHandle` | `div` `resize-handle` | `data-position`; placed on its corner or along its side; #28: the engine's record (`resize-handle { nodeId, position }`: `tabindex` with `keyboard()` + `resize()`, as `tabIndex`) |
+| `ResizeHandle` | `div` `resize-handle` | `data-position`; placed on its corner or along its side; #28: the engine's record (`resize-handle { nodeId, position }`: `tabindex` with `keyboard()` + `resize()`, as `tabIndex`); #39: `direction` (`data-direction`, over the resizer's) and `variant` (`data-variant`, `line` on a side only), both in its state; `resizeHandleAttributes` without an engine |
 
 **Root props:** `model`, or `defaultNodes` / `defaultEdges` (read once) and the controlled `nodes` /
 `edges` with `onNodesChange` / `onEdgesChange`; `features` and `createId` (read once: a changed
@@ -607,8 +607,8 @@ Decisions of the adapter (#5):
 
 - **The engine is created in the root's layout effect** (the tree's), destroyed in its cleanup: a
   StrictMode double mount creates two and keeps the second (starting at the first one's viewport);
-  the first render and a server render have no engine (nodes at their model position with their
-  static attributes, no edge).
+  the first render and a server render have no engine: #39, they draw the static geometry (see
+  the SSR rule under the engine).
 - **Re-rendering:** `useFlowValue` reads a value again on every model commit and every
   `adapter.subscribe` notification, and keeps the last object while equal (records by their
   entries, edge paths by value), so a pan re-renders only what shows the viewport (the
@@ -652,9 +652,9 @@ Decisions of the adapter (#5):
   `setOptions` puts the default back) and keeps a function (`easing`) by identity (JSON drops it);
   an equal new object (`nodeOrigin={{ x: 0.5, y: 0.5 }}` on each render) sends nothing. The node's
   structural `z-index` is `node-z-index-by` (every node gets one, 0 by default, so each node is a
-  stacking context, as in xyflow); a render without an engine (the first, the server's) has none
-  and places nodes at `absolute-position-by`, which knows no `nodeOrigin` (the first client render
-  with the engine moves them). The `Nodes` layer is `isolation: isolate` (#25's review, all four
+  stacking context, as in xyflow); a render without an engine (the first, the server's) takes the
+  place and `z-index` from the static geometry (#39; before it, `absolute-position-by` and no
+  `z-index`). The `Nodes` layer is `isolation: isolate` (#25's review, all four
   adapters): without a stacking context of its own, a selected node's 10 000 would paint over
   what follows the layer in the viewport (the connection line drawn from it, the app's overlays);
   a node's z-index orders the nodes only (playground E2E `gestures.spec.ts`, the adapters'
@@ -684,10 +684,24 @@ Decisions of #36 in React (the first adapter; Vue, Svelte, Angular follow):
   DOM click never reaches the minimap; the contract test gives it `onDoubleClick` instead.
 - **One set of minimap part options per root** (id `""`): every `MiniMap` shares them, the last to
   set them wins, and unmounting one clears them (documented on the limitations page).
-- **No `ResizeLine`**: a side `ResizeHandle` spans its side; `direction` is the resizer's (the
-  engine keeps it per node), so `ResizeHandle` takes none.
+- **No `ResizeLine` part**: a side `ResizeHandle` spans its side; `direction` is the resizer's (the
+  engine keeps it per node). #39: a `ResizeHandle` takes its own `direction` (over the resizer's)
+  and `variant="line"` (a styling marker, side handles only), so React Flow's `NodeResizeControl`
+  line variant is a styled `ResizeHandle`.
 - **Parity lists while the others catch up**: `AHEAD_IN_REACT` in `site/tests/docs-reference.test.ts`
   and the three adapters' `tests/index.test.ts` leave `NodesSelection` out; each helper empties it.
+
+Decisions of #39 in React (Vue, Svelte, Angular follow):
+
+- **The root shares one static geometry** through its context while `engine` is null (computed again
+  only when the model's node or edge list, or the static options' JSON, changed), so the server's output and the first client render
+  are the same; `zIndexMode` is a root prop, forwarded to the engine and to `setOptions` like the
+  #24/#25/#33 options. `tests/server.test.tsx` (paths in `renderToString`), `tests/layers.test.tsx`
+  (one level keeps today's DOM; several: wrappers, labels in their level, the nodes layer without
+  isolation; refocus), `tests/options.test.tsx` (the `"auto"` default raises a selected edge;
+  `"basic"` keeps the old order).
+- **An edge that changes level remounts** (its `EdgeSlot` is under another level's `svg`): its
+  focus comes back through `refocus`; a node never moves.
 
 For the playground and examples (#6, see [The playground and the examples](#the-playground-and-the-examples-issue-6)): wrap the flow in a sized element (the root fills it); put
 `Edges` before `Nodes` inside `Viewport`, and `Background`, `SelectionBox`, `Controls`, `MiniMap`
@@ -833,6 +847,19 @@ Decisions of #36 in Vue (React's props, part and hooks, mirrored):
   rename), leaving the name to the public composable. Tested in `tests/part-options.test.ts` and
   `tests/composables.test.ts` (render counts); no core change was needed.
 
+Decisions of #39 in Vue (React's, see the React section and the engine's SSR rule):
+
+- **The root shares the static geometry** (`components/root.ts`, a computed over the model's
+  revision and the static options while there is no engine, kept while the lists and the options'
+  key are the same, provided through `context.ts`): before the engine, on the server too, nodes stand at
+  its rects and z-indexes and edges draw its paths; `zIndexMode` is a root prop (`z-index-mode` in
+  a template). `tests/ssr.test.ts` (`renderToString` holds the paths), `tests/hydration.test.ts`
+  (`createSSRApp` over the server's HTML: the same paths and places, no mismatch warning).
+- **Levels** (`components/edges.ts`): one level today's DOM; several, an `edges-layer` per level
+  with its `svg` and its own HTML layer, where its edges' labels render; `Flow.Nodes` without `isolation` then. An edge that changes level is a new slot
+  component (remounted); `Flow.Edge` calls `refocus` on mount. `tests/layers.test.ts`.
+- **`ResizeHandle`** takes `direction` and `variant` (in its slot state), as React's.
+
 ## The Svelte adapter (Issue #12)
 
 `@fragiola/flow-svelte` is the React adapter in Svelte 5 (runes mode), the first Svelte adapter of
@@ -974,7 +1001,7 @@ Decisions of the Svelte adapter (#12):
   --fail-on-warnings` is their check.
 - **Known limits:** jsdom lays nothing out, so the tests stub the layout (`tests/flow.ts`,
   React's); the flows under test are components (`tests/fixtures/`: snippets are written in
-  templates); no hydration test; the peer floor (5.29) is not exercised by a check (the smoke app
+  templates); the peer floor (5.29) is not exercised by a check (the smoke app
   runs the pinned 5.57.3); the gestures' real feel is checked by the Svelte examples' shared specs (#13: they passed
   with no adapter fix).
 
@@ -1003,6 +1030,14 @@ point)`, `NodeResizer`'s `direction`, `FitView`'s `padding`, `nodeIds`, `include
 - **A control's payload is `givenPayload`** (`use-control-button.svelte.ts`): the given fields,
   each through `plain` (a `$state` proxy of `nodeIds` or `padding` never reaches the engine);
   `ZoomIn` / `ZoomOut` pass `{ duration }` the same way.
+- **#39 in Svelte** (React's, see the React section and the engine's SSR rule): the root takes
+  `zIndexMode` and shares the static geometry through its context while there is no engine, so the
+  server render (`svelte/server`) and the first client render draw the same nodes and edge paths;
+  `tests/server.test.ts` (paths in `render(...).body`) and `tests/static.test.ts` (an SSR build of
+  the fixture hydrated: the elements kept, no mismatch warning, then the engine). `Flow.Edges`
+  renders one level as today, several as `edges-layer` wrappers each with its `svg` and its labels'
+  layer; `Flow.Nodes` drops `isolation` then; an edge that changes level remounts and `Flow.Edge`
+  calls `refocus` on mount. `ResizeHandle` takes `direction` and `variant` (in its snippet state).
 - **Gotcha, a template's `{f(x.current)}` is no render count**: once the value had changed, Svelte
   (5.57.3) called `f` again on every later revision although `x.current` stayed equal (the DOM was
   untouched); the probes count with an `$effect.pre` instead.
@@ -1175,8 +1210,19 @@ Decisions of the Angular adapter (#15):
   per engine in an `effect` and marks nothing. Tested in `tests/part-options.test.ts` and
   `tests/hooks.test.ts` (each signal's updates seen by an effect, React's render counts; a
   component of typed calls checked by `ngc`).
+- **#39 in Angular** (React's, see the React section and the engine's SSR rule): `flowRoot` takes
+  `zIndexMode` and, until its engine exists (after the first render), shares the static geometry:
+  the first browser render draws the nodes at their static place and the declared edges.
+  `[flowEdges]` renders one level as today (its SVG in the app's element); with several, an
+  `edges-layer` wrapper per level, each with its SVG and labels' layer, and an edge's view is
+  **moved** before its level's anchor (`utils/views.ts`: views placed by anchor), not recreated, so
+  it keeps its state; a moved edge that had focus gets it back (`refocus` from `[flowEdge]` too).
+  `flowNodes` drops `isolation` while layered. `flowResizeHandle` takes `direction` and `variant`
+  inputs (in its state); `flowNodesSelection` binds the engine's record (`tabindex` with
+  `keyboard()`).
 - **Known limits:** no server render nor hydration (the sibling Angular adapters do not support it
-  either; `[flowEdges]` adds its SVG in its constructor); jsdom lays nothing out, so the tests stub
+  either; `[flowEdges]` adds its SVG in its constructor; #39: the declared edges are in the
+  browser's first render); jsdom lays nothing out, so the tests stub
   the layout (`tests/flow.ts`, React's); a part that leaves the document while hidden must not be
   the first root element of a repeated view (an `@for` of `[flowMiniMapNode]`s: Angular would
   insert before a detached element; wrap it); a default content is added only when the app wrote
@@ -1905,7 +1951,7 @@ z-order (#24, Epic #26):
   the document's sizes, the resize's children rules) work in the parent's top-left box and know no
   origin; a child placed from its parent's corner keeps them exact, whatever the origin. xyflow
   applies the origin to children too; a per-node origin was not needed (the Epic: an engine option
-  only). One helper, `nodeBox(position, size, origin)` (`geometry/rect.ts`), turns a position and
+  only; Epic #40 adds the node's `origin` under the same child rule). One helper, `nodeBox(position, size, origin)` (`geometry/rect.ts`), turns a position and
   a size into a box; the engine's node box (`boxOf`: the parent's corner plus the position, then
   `nodeBox`) feeds `node-rect-by`, the handles' centres, edge ends, `nodes-bounds`, `fit-view`,
   `visible-nodes`, `visible-edges`, the minimap, `node-toolbar-by`, `focus-node`'s reveal, the
@@ -1968,7 +2014,7 @@ Decisions of the docs, examples and E2E of the new options (#25, part 2, Epic #2
   docs, identical in the four frameworks; `DRAG_HANDLE_ATTRIBUTE` is named for code that builds
   it.
 - **Edges over nodes and a per-node origin are "Not yet"** in `limitations.mdx` (a cost decision,
-  not a principle); the first render's top-left placement and missing `z-index`, the overridden
+  not a principle; Epic #40 closed both, and the first-render note); the first render's top-left placement and missing `z-index`, the overridden
   `z-index` and the gesture-only extent rectangle are known limits there.
 - **What the specs and the review changed in the packages**: the docs, examples and specs of this
   part passed on their first run, but the Epic's review then fixed the adapters and the core
@@ -2313,9 +2359,11 @@ Flow's API studied, none of xyflow's code):
 - **The selection rectangle is a box's by default**: `selection-rect` exists after a box selected
   two or more nodes, until the selection changes otherwise; `selection({ rect: "always" })` for any
   selection of two or more. Its drag replaces `drag-start` with `selection-drag-start` / `-drag` /
-  `-drag-end`; a cancel is `drag-cancel`, as a node drag's. No focus or keys on it.
+  `-drag-end`; a cancel is `drag-cancel`, as a node drag's. No focus or keys on it (Epic #40: it
+  takes focus with `keyboard()`).
 - **A resize snaps with `resize({ snap })` only**, independent of `drag({ snapGrid })`; a resizer's
-  `direction` is the whole `NodeResizer`'s (no `ResizeLine`, no per-handle direction).
+  `direction` is the whole `NodeResizer`'s (no `ResizeLine`, no per-handle direction; Epic #40: a
+  `ResizeHandle`'s own `direction` and `variant="line"`).
 - **`animated` is an `EdgeFlags` flag** (default false, `edge.set-flags`), shown as `data-animated`
   on `edge`, `edge-path`, `edge-label`; the motion is the app's CSS.
 - **An edge's `pathOptions` is one flat object** (the engine's keys, each type reading its own),
@@ -2332,3 +2380,48 @@ Flow's API studied, none of xyflow's code):
   (an edge's own shape, animated edges), `guides/selection.mdx` (the selection rectangle), the
   primitives' pages and `limitations.mdx` (`ResizeLine`, keys on the rectangle, the per-root
   minimap options, `useKeyPress` and typing).
+
+Decisions of Epic #40 (#38 core, #39 adapters and docs; React Flow v12's SSR, `zIndexMode`, node
+`origin` and `NodeResizeControl` studied as behaviour, none of xyflow's code):
+
+- **`zIndexMode` defaults to `"auto"`**, React Flow's current default. A visible change: a selected
+  edge is now raised (`elevateEdgesOnSelect` defaults to true in `"auto"`) and may cover the nodes
+  it crosses, and an edge between a group's children stands above the group. `"basic"` keeps the
+  order before the Epic (every edge below every node); the adapters' `options` tests cover both.
+- **One render level unless needed**: a level per distinct edge value above the lowest shown node
+  value, otherwise a single level, which is exactly the DOM before the Epic, so the parts, the
+  examples' CSS and the five themes keep working; the `edges-layer` wrappers (with `data-level`)
+  appear only while an edge stands above some node.
+- **Layering by stacking order, not per-level node wrappers** (a deviation from the Epic's "an
+  edges SVG and a nodes layer per level"): nodes stay in their one `nodes` layer, which drops its
+  isolation while there are several levels, and their z-indexes become negative ranks interleaved
+  with the edge layers. A node moving to another wrapper would remount in every framework (state,
+  focus, measurement, a gesture under way). An edge that changes level is remounted in React, Vue
+  and Svelte (moved in Angular) and gets its focus back through `adapter.refocus`.
+- **Declared handles until measured**: a `DeclaredHandle` is used only until a handle of that
+  node, type and id is measured; measured handles always win. Its point is the centre of its box
+  (`x + width / 2`, `y + height / 2`), the point the engine measures for a rendered handle, so the
+  static and the measured geometry are equal (React Flow uses the box's side instead).
+- **One pure function for the server and the first client render**: `src/geometry/` (no DOM, no
+  engine, a guard test) is what the engine falls back to before measurement and what the adapters
+  draw before the engine, with the same inputs, so there is no hydration mismatch and no jump.
+  `fitView` on init counts initial sizes and is not redone after measurement; edge labels are not
+  in the server HTML (they portal once mounted); Angular has no server render (its first browser
+  render draws the declared edges). All in `limitations.mdx`.
+- **The child origin rule**: a node's `origin` overrides `nodeOrigin` exactly where `nodeOrigin`
+  applies; a child keeps its top-left corner in its parent, a parent's origin moves its box and its
+  children. The model's own sub-flow rules (`absolute-position-by`, `expandParent`, the model's
+  `extent: "parent"` clamp, `node.set-parent`) ignore a per-node origin as they ignore
+  `nodeOrigin`: a known limit in `limitations.mdx`.
+- **Two more gaps closed, so no "Not yet" row is left**: a `ResizeHandle`'s own `direction` (over
+  its resizer's, read from `data-direction` at the press or the key) and `variant` (`data-variant`,
+  `line` a styling marker on side handles only, a corner always `handle`); and the selection
+  rectangle focusable with `keyboard()` (`tabindex`, the arrows moving the selection, a delete key
+  removing it, Escape clearing it, Enter and Space nothing; the app names it). `limitations.mdx`
+  loses its "Not yet" section.
+- **Docs**: `guides/server-rendering.mdx` (new), `concepts/nodes-and-edges.mdx` (sizes and handles
+  before measuring, a node's own origin, z-order and how it is drawn), `api/engine.mdx`
+  (`zIndexMode`, `render-layers`, `refocus`, the `edges-layer` part, static geometry),
+  `api/json-document.mdx` (the node fields, `DeclaredHandle`), the primitives' pages (`root`,
+  `edges`, `nodes`, `node`, `resize-handle`, `node-resizer`, `nodes-selection`), the resizing,
+  selection and keyboard guides, and `limitations.mdx`.
