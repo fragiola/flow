@@ -1502,7 +1502,7 @@ describe("the core reference", () => {
             expectRows("path-helpers", "geometry/straight-path.ts", [
                 "StraightPathOptions",
             ]) +
-            expectRows("path-helpers", "engine/edge-geometry.ts", [
+            expectRows("path-helpers", "geometry/edge-geometry.ts", [
                 "PathOptions",
             ]);
         expect(checked).toBeGreaterThan(15);

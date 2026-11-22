@@ -106,6 +106,8 @@ export interface PartPayloadMap {
     "resize-handle": { nodeId: string; position: string };
     resizer: { nodeId: string };
     "minimap-node": { nodeId: string };
+    /** one render level's edges layer (`render-layers`) */
+    "edges-layer": { level: number };
     /** a node's toolbar (`nodeId`), several nodes' (neither: no id) or an edge's (`edgeId`) */
     toolbar: { nodeId?: string | undefined; edgeId?: string | undefined };
 }
@@ -155,6 +157,13 @@ export interface FlowEngineAdapter {
             ? [payload: PartPayloadMap[P]]
             : [payload?: Readonly<Record<string, unknown>>]
     ): PartAttributes;
+    /**
+     * gives focus back to a part that was remounted (an edge moved to another render level's
+     * layer): when `element` is the part (`data-flow-part` and `data-flow-id`) that last had focus
+     * in the flow and focus was lost (its document's active element is its body, or none), it is
+     * focused again, without scrolling
+     */
+    refocus(element: Element): void;
     /** calls `listener` when the view changed (not the model: adapters subscribe to it); returns its remover */
     subscribe(listener: (change: ViewChange) => void): () => void;
     /** a number that changes whenever the view changes */

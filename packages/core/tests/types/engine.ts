@@ -11,6 +11,7 @@ import type { FlowEngineEventOf } from "../../src/engine/events";
 import type { Connection } from "../../src/engine/verbs";
 import { watchKeyPress } from "../../src/engine/watch-key-press";
 import type { EdgePath, Rect, Viewport } from "../../src/geometry/types";
+import type { RenderLayer } from "../../src/geometry/z-order";
 import { minimap } from "../../src/minimap/minimap";
 import { createFlowModel } from "../../src/model/create-flow-model";
 import { selection } from "../../src/selection/selection";
@@ -41,6 +42,7 @@ export const adapterSurface: Same<
     | "attributes"
     | "subscribe"
     | "getSnapshot"
+    | "refocus"
 > = true;
 
 export function coreKeys(): void {
@@ -49,7 +51,8 @@ export function coreKeys(): void {
     const path: EdgePath | undefined = engine.get("edge-path-by", {
         edgeId: "e",
     });
-    use([viewport, path]);
+    const layers: readonly RenderLayer[] = engine.get("render-layers");
+    use([viewport, path, layers]);
     engine.run("fit-view");
     engine.run("fit-view", { padding: 0.2, nodeIds: ["a"] });
     engine.run("zoom-in");
@@ -202,6 +205,9 @@ export function attributes(engine: FlowEngine): void {
             side: "right",
         }),
     );
+    use(engine.adapter.attributes("edges-layer", { level: 1 }));
     // @ts-expect-error a node's attributes need its id
     engine.adapter.attributes("node");
+    // @ts-expect-error an edges layer's attributes need its level
+    engine.adapter.attributes("edges-layer");
 }

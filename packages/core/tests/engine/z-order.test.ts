@@ -113,8 +113,10 @@ describe("the edges' drawing order", () => {
     it("draws the shown edges of measured nodes by zIndex, the document's order among equals", () => {
         const flow = mount(json(), { features: [selection()], sizes });
         expect(order(flow.engine)).toEqual(["ca", "bc", "ac", "ab"]);
-        // a selected edge keeps its place by default
+        // a selected edge is raised by default ("auto"), keeps its place in "basic"
         flow.model.run("selection.set", { edgeIds: ["bc"] });
+        expect(order(flow.engine)).toEqual(["ca", "ac", "ab", "bc"]);
+        flow.engine.adapter.setOptions({ zIndexMode: "basic" });
         expect(order(flow.engine)).toEqual(["ca", "bc", "ac", "ab"]);
     });
 

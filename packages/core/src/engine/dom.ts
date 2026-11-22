@@ -45,6 +45,7 @@ const PANE_PARTS = new Set([
     "background",
     "nodes",
     "edges",
+    "edges-layer",
 ]);
 
 const EDGE_PARTS = new Set(["edge", "edge-path", "edge-label"]);
