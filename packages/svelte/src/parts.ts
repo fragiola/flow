@@ -14,6 +14,7 @@ export { default as Handle } from "./components/handle.svelte";
 export { default as Node } from "./components/node.svelte";
 export { default as NodeToolbar } from "./components/node-toolbar.svelte";
 export { default as Nodes } from "./components/nodes.svelte";
+export { default as NodesSelection } from "./components/nodes-selection.svelte";
 export { default as ReconnectAnchor } from "./components/reconnect-anchor.svelte";
 export { default as Root } from "./components/root.svelte";
 export { default as SelectionBox } from "./components/selection-box.svelte";

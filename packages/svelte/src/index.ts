@@ -38,6 +38,10 @@ export type {
 } from "./components/node-toolbar.svelte";
 export type { NodesProps, NodesState } from "./components/nodes.svelte";
 export type {
+    NodesSelectionProps,
+    NodesSelectionState,
+} from "./components/nodes-selection.svelte";
+export type {
     ReconnectAnchorProps,
     ReconnectAnchorState,
 } from "./components/reconnect-anchor.svelte";
