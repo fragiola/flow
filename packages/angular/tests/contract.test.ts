@@ -23,6 +23,8 @@ interface Case {
     setup?: (container: HTMLElement) => Promise<void>;
     /** a structural style key it sets, which the app's style does not override */
     structural?: [string, string, string];
+    /** the place in the flow given the inputs, when not its part's (the edge's toolbar) */
+    slot?: string;
 }
 
 /** A connection from `a`'s source handle, under way. */
@@ -125,6 +127,13 @@ const CASES: Case[] = [
         tag: "div",
         structural: ["position", "static", "absolute"],
     },
+    {
+        // the edge's toolbar: the same part
+        part: "toolbar",
+        slot: "edge-toolbar",
+        tag: "div",
+        structural: ["position", "static", "absolute"],
+    },
     { part: "minimap", tag: "svg" },
     { part: "minimap-node", tag: "rect" },
     { part: "minimap-mask", tag: "path" },
@@ -150,7 +159,10 @@ function find(container: HTMLElement, marker = "case"): HTMLElement {
 }
 
 async function mount(c: Case, inputs: Record<string, unknown> = {}) {
-    const view = await render(ContractFlow, { target: c.part, ...inputs });
+    const view = await render(ContractFlow, {
+        target: c.slot ?? c.part,
+        ...inputs,
+    });
     await c.setup?.(view.container);
     return view;
 }

@@ -72,13 +72,15 @@ export function valueNow<T>(value: ValueOrSignal<T>): T | undefined {
 
 /**
  * The id of the node (or edge) a part belongs to: its own input, else the enclosing one's. A part
- * with neither is reported once rendered (React's "must be rendered inside Flow.Node").
+ * with neither is reported once rendered (React's "must be rendered inside Flow.Node"), unless
+ * `needed` answers false then (a toolbar of several nodes needs no node).
  */
 export function partOwnerId(
     part: string,
     own: () => string | undefined,
     around: NodeContext | EdgeContext | null,
     kind: "node" | "edge",
+    needed: () => boolean = () => true,
 ): Signal<string | undefined> {
     const id = computed(() => {
         const given = beforeInputs(undefined, own);
@@ -87,7 +89,7 @@ export function partOwnerId(
         return "nodeId" in around ? around.nodeId() : around.edgeId();
     });
     afterNextRender(() => {
-        if (id() === undefined) {
+        if (id() === undefined && needed()) {
             const where = kind === "node" ? "[flowNode]" : "[flowEdge]";
             const input = kind === "node" ? "nodeId" : "edgeId";
             throw new Error(

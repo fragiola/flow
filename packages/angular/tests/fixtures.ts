@@ -469,6 +469,7 @@ const contractFeatures = [selection(), connection(), resize(), minimap()];
                             <svg:path flowEdgePath #p="flowEdgePath" [attr.data-testid]="on('edge-path') ? 'case' : null" [class]="on('edge-path') ? classes() : null" [style]="on('edge-path') ? style() : null" (click)="on('edge-path') && clicked()" [attr.data-state]="on('edge-path') ? kind(p.state()) : null" />
                             <xhtml:div flowEdgeLabel #l="flowEdgeLabel" [attr.data-testid]="on('edge-label') ? 'case' : null" [class]="on('edge-label') ? classes() : null" [style]="on('edge-label') ? style() : null" (click)="on('edge-label') && clicked()" [attr.data-state]="on('edge-label') ? kind(l.state()) : null"></xhtml:div>
                             <svg:circle flowReconnectAnchor end="target" #a="flowReconnectAnchor" [attr.data-testid]="on('reconnect-anchor') ? 'case' : null" [class]="on('reconnect-anchor') ? classes() : null" [style]="on('reconnect-anchor') ? style() : null" (click)="on('reconnect-anchor') && clicked()" [attr.data-state]="on('reconnect-anchor') ? kind(a.state()) : null" />
+                            <xhtml:div flowEdgeToolbar [open]="true" #et="flowEdgeToolbar" [attr.data-testid]="on('edge-toolbar') ? 'case' : null" [class]="on('edge-toolbar') ? classes() : null" [style]="on('edge-toolbar') ? style() : null" (click)="on('edge-toolbar') && clicked()" [attr.data-state]="on('edge-toolbar') ? kind(et.state()) : null"></xhtml:div>
                         </svg:g>
                     </ng-template>
                 </div>
@@ -571,3 +572,69 @@ export class EarlyReader {
     `,
 })
 export class LabelFlow extends RootInputs {}
+
+/**
+ * #28: nodes `a` and `b`, an edge with a toolbar (`edgeToolbar`'s inputs), and with `nodeIds` a
+ * toolbar beside those nodes.
+ */
+@Component({
+    selector: "test-toolbar-flow",
+    imports: [FLOW],
+    template: `
+        <div flowRoot ${INPUTS}>
+            <div flowViewport>
+                <div flowEdges>
+                    <ng-template flowEdgesItem let-edge>
+                        <svg:g [flowEdge]="edge">
+                            <svg:path flowEdgePath />
+                            <xhtml:div flowEdgeToolbar data-testid="edge-toolbar" [open]="edgeToolbar().open" [position]="edgeToolbar().position" [offset]="edgeToolbar().offset">
+                                <xhtml:button type="button">x</xhtml:button>
+                            </xhtml:div>
+                        </svg:g>
+                    </ng-template>
+                </div>
+                <div flowNodes>
+                    <div *flowNodesItem="let node" [flowNode]="node">
+                        <div flowHandle type="target" side="top"></div>
+                        <div flowHandle type="source" side="bottom"></div>
+                    </div>
+                </div>
+            </div>
+            @if (nodeIds(); as ids) {
+                <div flowNodeToolbar data-testid="nodes-toolbar" [nodeIds]="ids"></div>
+            }
+        </div>
+    `,
+})
+export class ToolbarFlow extends RootInputs {
+    readonly edgeToolbar = input<{
+        open?: boolean;
+        position?: "label" | "source" | "target";
+        offset?: { x: number; y: number };
+    }>({});
+    readonly nodeIds = input<readonly string[] | undefined>();
+}
+
+/** #28: handles and resize handles (`[flowNodeResizer]`'s defaults), with the given features. */
+@Component({
+    selector: "test-keyboard-flow",
+    imports: [FLOW, FLOW_RESIZE],
+    template: `
+        <div flowRoot ${INPUTS}>
+            <div flowViewport>
+                <div flowEdges>
+                    <svg:g *flowEdgesItem="let edge" [flowEdge]="edge"></svg:g>
+                </div>
+                <div flowNodes>
+                    <div *flowNodesItem="let node" [flowNode]="node">
+                        <div flowHandle type="target" side="top"></div>
+                        <div flowHandle type="source" side="bottom"></div>
+                        <div flowNodeResizer></div>
+                    </div>
+                </div>
+                <svg flowConnectionLine></svg>
+            </div>
+        </div>
+    `,
+})
+export class KeyboardFlow extends RootInputs {}
