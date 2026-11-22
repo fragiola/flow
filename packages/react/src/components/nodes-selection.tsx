@@ -2,7 +2,11 @@ import type { Rect } from "@fragiola/flow";
 import type * as React from "react";
 import { useFlowContext } from "../context";
 import { useFlowValue } from "../hooks/internal";
-import { type DivPrimitiveProps, useRenderElement } from "../utils/use-render";
+import {
+    attributeProps,
+    type DivPrimitiveProps,
+    useRenderElement,
+} from "../utils/use-render";
 
 export interface NodesSelectionState {
     /** the rectangle around the selected nodes, in flow coordinates */
@@ -21,7 +25,9 @@ export interface NodesSelectionProps
  * inside `Flow.Viewport` next to `Flow.Nodes` (it is in flow coordinates): rendered at
  * `selection-rect`, while two or more nodes are selected by a box (or always, with
  * `selection({ rect: "always" })`). A press on it drags the selection (`drag()`), its context
- * menu is the selection's. Give it its look.
+ * menu is the selection's. With `keyboard()` it takes focus, and its keys are a focused selected
+ * node's: the arrows move the selection, the delete keys remove it, Escape clears it. Give it its
+ * look.
  */
 export function NodesSelection(props: NodesSelectionProps) {
     const { model, engine } = useFlowContext("NodesSelection");
@@ -42,7 +48,12 @@ function NodesSelectionElement(props: NodesSelectionProps & { rect: Rect }) {
     );
     return useRenderElement("div", rest, {
         state: { rect, dragging: attributes["data-dragging"] !== undefined },
-        props: { ...attributes, "data-flow-part": "nodes-selection", children },
+        // the engine's record: `data-dragging`, and `tabindex` with `keyboard()` (arrows move it)
+        props: {
+            ...attributeProps(attributes),
+            "data-flow-part": "nodes-selection",
+            children,
+        },
         style: {
             position: "absolute",
             top: 0,
