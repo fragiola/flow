@@ -7,7 +7,7 @@ import { subflows } from "@fragiola/flow/subflows";
 import { fireEvent, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DRAG_HANDLE_ATTRIBUTE, Flow, type RootProps } from "../src/index";
-import { installLayout, part, settle, TestFlow, task } from "./flow";
+import { drag, installLayout, part, settle, TestFlow, task } from "./flow";
 
 const engines = vi.hoisted(
     () =>
@@ -233,6 +233,62 @@ describe("the viewport and gesture options (#25)", () => {
             />,
         );
         expect(order()).toEqual(["e3", "e1", "e2"]);
+    });
+
+    it("keeps the nodes' z-index inside their layer (isolation), so a raised node never covers the connection line", async () => {
+        const { container } = render(<TestFlow defaultNodes={[task("a")]} />);
+        await settle();
+        expect(part(container, "nodes").style.isolation).toBe("isolate");
+    });
+
+    it("raises a node selected by a click, and lowers it when the pane's click clears the selection", async () => {
+        const { container } = render(
+            <TestFlow
+                features={features}
+                defaultNodes={[task("a"), task("b", 0, 200)]}
+            />,
+        );
+        await settle();
+        const z = (id: string) => part(container, "node", id).style.zIndex;
+        expect(z("a")).toBe("0");
+        const root = part(container, "root");
+        drag(part(container, "node", "a"), root, [
+            { clientX: 50, clientY: 20 },
+        ]);
+        expect(z("a")).toBe("10000");
+        expect(z("b")).toBe("0");
+        drag(part(container, "viewport"), root, [
+            { clientX: 600, clientY: 500 },
+        ]);
+        expect(z("a")).toBe("0");
+    });
+
+    it("draws the edges in view with onlyRenderVisible: an edge panned out leaves, and comes back", async () => {
+        const { container } = render(
+            <TestFlow
+                defaultNodes={[task("a"), task("b", 0, 200)]}
+                defaultEdges={[{ id: "ab", source: "a", target: "b" }]}
+                onlyRenderVisible
+            />,
+        );
+        await settle();
+        const edges = () =>
+            container.querySelectorAll('[data-flow-part="edge"]').length;
+        expect(edges()).toBe(1);
+        const root = part(container, "root");
+        const viewport = part(container, "viewport");
+        drag(viewport, root, [
+            { clientX: 700, clientY: 300 },
+            { clientX: 700, clientY: -1500 },
+        ]);
+        await settle();
+        expect(edges()).toBe(0);
+        drag(viewport, root, [
+            { clientX: 700, clientY: 300 },
+            { clientX: 700, clientY: 2100 },
+        ]);
+        await settle();
+        expect(edges()).toBe(1);
     });
 
     it("re-exports the drag handle attribute", () => {

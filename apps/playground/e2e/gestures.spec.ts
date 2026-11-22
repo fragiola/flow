@@ -255,3 +255,47 @@ test("a selected node is drawn above the nodes it overlaps", async ({
     await expect(node(page, "a")).not.toHaveAttribute("data-selected", "");
     expect(await topAt()).toBe("b");
 });
+
+test("the connection line from a selected node is drawn above it (the nodes' layer isolates their z-index)", async ({
+    page,
+}) => {
+    await openFixture(page);
+    const a = await node(page, "a").boundingBox();
+    await page.mouse.click((a?.x ?? 0) + 8, (a?.y ?? 0) + 8);
+    await expect(node(page, "a")).toHaveAttribute("data-selected", "");
+    const from = await center(handle(page, "a", "source"));
+    // a connection held from a's source handle (not released)
+    await mouseDrag(
+        page,
+        from,
+        { x: from.x + 120, y: from.y + 80 },
+        { release: false },
+    );
+    await expect(
+        page.locator('[data-flow-part="connection-path"]'),
+    ).toHaveCount(1);
+    // the line hit-testable along a wide stroke: just above the handle's centre, inside a's box,
+    // the line is what is on top, not the raised node
+    const top = await page.evaluate(({ x, y }) => {
+        const path = document.querySelector<SVGPathElement>(
+            '[data-flow-part="connection-path"]',
+        );
+        const line = path?.closest<SVGSVGElement>(
+            '[data-flow-part="connection-line"]',
+        );
+        if (!path || !line) return null;
+        line.style.pointerEvents = "auto";
+        path.style.pointerEvents = "stroke";
+        path.style.strokeWidth = "40px";
+        path.style.stroke = "transparent";
+        // the line's SVG or its path: either is the line, drawn above the node
+        const hit = document.elementFromPoint(x, y - 8);
+        return hit?.closest('[data-flow-part="connection-line"]')
+            ? "connection-line"
+            : (hit
+                  ?.closest("[data-flow-part]")
+                  ?.getAttribute("data-flow-part") ?? null);
+    }, from);
+    await page.mouse.up();
+    expect(top).toBe("connection-line");
+});

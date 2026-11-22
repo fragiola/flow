@@ -193,6 +193,13 @@ describe("the viewport and gesture options (#25)", () => {
         expect(order()).toEqual(["e3", "e1", "e2"]);
     });
 
+    it("keeps the nodes' z-index inside their layer (isolation), so a raised node never covers the connection line", async () => {
+        const { container } = await render(TestFlow, {
+            defaultNodes: [task("a")],
+        });
+        expect(part(container, "nodes").style.isolation).toBe("isolate");
+    });
+
     it("re-exports the drag handle attribute", () => {
         expect(DRAG_HANDLE_ATTRIBUTE).toBe("data-flow-drag-handle");
     });
