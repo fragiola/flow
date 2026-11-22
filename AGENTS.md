@@ -2384,10 +2384,16 @@ Flow's API studied, none of xyflow's code):
 Decisions of Epic #40 (#38 core, #39 adapters and docs; React Flow v12's SSR, `zIndexMode`, node
 `origin` and `NodeResizeControl` studied as behaviour, none of xyflow's code):
 
-- **`zIndexMode` defaults to `"auto"`**, React Flow's current default. A visible change: a selected
-  edge is now raised (`elevateEdgesOnSelect` defaults to true in `"auto"`) and may cover the nodes
-  it crosses, and an edge between a group's children stands above the group. `"basic"` keeps the
-  order before the Epic (every edge below every node); the adapters' `options` tests cover both.
+- **`zIndexMode` defaults to `"auto"`**, a deliberate choice, not React Flow's default: xyflow
+  defaults to `"basic"`, and its `"basic"` already lifts an edge to the z of an end that is a
+  child or selected (`packages/react/src/store/initialState.ts`, `getElevatedEdgeZIndex`). Here
+  `"basic"` is this library's order before the Epic (every edge below every node, a selected one
+  raised among the edges only, `elevateEdgesOnSelect` off), and `"auto"` adds the sub-flow lift
+  and raises a selected edge above the nodes (`elevateEdgesOnSelect` defaults to true in
+  `"auto"`). A visible change: a selected edge may now cover the nodes it crosses, and an edge
+  between a group's children stands above the group. `limitations.mdx` ("On purpose") says how to
+  get the old order back (`zIndexMode="basic"`, or `elevateEdgesOnSelect={false}`); the adapters'
+  `options` tests cover both modes.
 - **One render level unless needed**: a level per distinct edge value above the lowest shown node
   value, otherwise a single level, which is exactly the DOM before the Epic, so the parts, the
   examples' CSS and the five themes keep working; the `edges-layer` wrappers (with `data-level`)

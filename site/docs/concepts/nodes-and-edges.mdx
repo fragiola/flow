@@ -284,9 +284,13 @@ Whether an edge may stand above nodes is the root's `zIndexMode`:
 
 </Framework>
 
-`"basic"` keeps every edge below every node, as before `"auto"` became the default: with
-`"auto"`, a selected edge is drawn over the nodes it crosses. Turn `elevateEdgesOnSelect` off to
-keep `"auto"`'s sub-flow order without raising the selected edge.
+These are this package's own choices, not React Flow's defaults: React Flow defaults to
+`"basic"`, and its `"basic"` already lifts an edge to the z of an end that is a child or selected.
+Here `"basic"` is the order this package had before `"auto"`: every edge below every node, which
+is what you want when a selected edge must never cover a node. `"auto"` is the default because it
+keeps a sub-flow's edges visible above their group and a selected edge visible above the nodes it
+crosses. Turn `elevateEdgesOnSelect` off to keep `"auto"`'s sub-flow order without raising the
+selected edge ([Limitations](/docs/limitations)).
 
 ### How it is drawn
 
