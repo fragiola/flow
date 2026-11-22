@@ -5,18 +5,10 @@ description: What xyflow has that this package does not, why, and what to do ins
 
 The behaviour reference of this package is [xyflow](https://github.com/xyflow/xyflow) (React
 Flow): its gestures, its edge cases and its tests were studied, and none of its code was copied.
-This page lists, honestly, what it has that this package does not: some on purpose (app policy,
-cosmetics, or a choice of the model), some not yet. Each comes with what to do instead. Found
+This page lists, honestly, what it has that this package does not, all of it on purpose (app
+policy, cosmetics, or a choice of the model), each with what to do instead, and the known gaps
+of the current release. Nothing of React Flow's is left to do: there is no "not yet" list. Found
 something missing from this page? [Open an issue](https://github.com/fragiola/flow/issues).
-
-## Not yet
-
-| xyflow | here | what to do instead |
-| --- | --- | --- |
-| **Edges above nodes** (an edge's `zIndex` over a node's, xyflow's per-level layers). | `zIndex`, `elevateNodesOnSelect` and `elevateEdgesOnSelect` order nodes among nodes and edges among edges; every edge is drawn below every node. | Draw what must sit over the nodes (a highlighted path, a label) in a layer of yours above `Flow.Nodes`, inside `Flow.Viewport`, from `engine.get("edge-path-by", { edgeId })`. |
-| **A node origin per node** (`origin` on a node). | `nodeOrigin` is the root's, for every node on the flow; a child's position stays its top-left corner in its parent. | Compute the corner yourself for the few nodes that need another anchor. |
-| **`NodeResizeControl` with a line variant** (`ResizeLine`), and a direction per handle. | `ResizeHandle` is the only handle part (a side's handle covers its side, give it a thickness), and `direction` is the whole `NodeResizer`'s. | Style a side handle as a line; for a node that resizes one way only, a `NodeResizer` with `direction` and only the handles that make sense. |
-| **Keyboard on the selection rectangle** (`NodesSelection` focusable, arrows moving it). | `Flow.NodesSelection` takes no focus and no keys. | Focus one of the selected nodes (`keyboard()`): the arrows move the whole selection. |
 
 ## On purpose
 
@@ -35,17 +27,27 @@ something missing from this page? [Open an issue](https://github.com/fragiola/fl
 
 ## Other things to know
 
-- **The first render draws no edge.** The engine is created once the root is mounted, and an edge
-  is drawn once both its nodes have a size. On the server and in the first client render, nodes
-  stand at their model position by their top-left corner, whatever the `nodeOrigin`, with no
-  `z-index` of their own, and edges come in the next frame.
+- **Angular has no server render**: its directives write to their elements in the browser, so an
+  Angular flow draws its declared edges in the browser's first render, not in server HTML. React,
+  Vue and Svelte draw them on the server ([Server rendering](/docs/guides/server-rendering)).
+- **Edge labels are not in the server HTML**: a `Flow.EdgeLabel` portals into its layer once
+  mounted, so labels appear after hydration, while the paths are already there.
+- **`fitView` on init runs once, on the sizes known then**: a node's `initialWidth` /
+  `initialHeight` count until it is measured, and the view is not fitted again when the measured
+  sizes differ. Declare sizes close to the rendered ones, or run `fit-view` after `onInit`.
+- **An edge that moves to another render level is remounted** in React, Vue and Svelte (its view
+  state inside the edge's own components is lost; the engine gives it its focus back), and moved
+  in Angular. It happens when it starts or stops standing above some node (selected in
+  `zIndexMode: "auto"`, a `zIndex` change).
 - **A `z-index` of yours on a node is overridden** by its structural one (its `zIndex`, raised by
   10 000 while selected with `elevateNodesOnSelect`): order nodes with `zIndex` or
   `node.set-z-index`.
 - **A node's `extent` rectangle is kept by the gestures**, not by the model: `node.move` from code
-  may place a node outside it (`extent: "parent"` is kept by both). With a `nodeOrigin` other than
-  the top-left corner, `node.set-parent` keeps a node's place as if it were the corner, and
-  `expandParent` grows a parent around its origin.
+  may place a node outside it (`extent: "parent"` is kept by both). With a `nodeOrigin`, or a
+  node's own `origin`, other than the top-left corner, the model's own sub-flow rules count a
+  node's position as its corner: `absolute-position-by`, `expandParent` (a parent grows around its
+  origin), the model's `extent: "parent"` clamp and `node.set-parent` (which keeps a node's place
+  as if it were the corner). The engine's boxes apply the origin.
 - **A keyboard connection's targets are fixed when it starts**: a handle rendered while it waits
   is not offered, and a rule that changes meanwhile is checked again only by the final `edge.add`.
   It does not scroll its target into view, and a pointer press while it waits only cancels it.
@@ -57,8 +59,8 @@ something missing from this page? [Open an issue](https://github.com/fragiola/fl
   installed, pass your own `ResizeHandle` children, each with its `aria-label`.
 - **A toolbar for several nodes (`nodeIds`) shows while every one of them is selected**: for the
   selection, pass the selected nodes' ids; a node's own toolbar still shows beside it.
-- **A reconnect anchor is drawn under its node's handle** (edges come before nodes), so the mouse
-  grabs it beside the handle.
+- **A reconnect anchor is drawn under its node's handle** while its edge is below the nodes (edges
+  come before nodes), so the mouse grabs it beside the handle.
 - **On touch, a finger beside a handle lands on the handle** (Chromium's touch adjustment), so an
   edge's end is grabbed on its stroke near the end: give touch apps a wider
   `reconnection({ radius })`.
