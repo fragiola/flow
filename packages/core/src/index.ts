@@ -1,15 +1,18 @@
 // The public entry of @fragiola/flow, the framework-free core of Flow: the document and its JSON
 // Schema, the model and its commands, the engine that binds a flow to the DOM, the edge path
-// helpers, the part attributes and the feature contract. Each feature is its own entry
+// helpers, the engine-free static geometry (a server render), the part attributes and the feature
+// contract. Each feature is its own entry
 // (`@fragiola/flow/selection`, `/subflows`, `/drag`, `/resize`, `/connection`, `/reconnection`,
 // `/keyboard`, `/minimap`), which this one never imports (`scripts/check-features.ts`).
 
 export {
     DRAG_HANDLE_ATTRIBUTE,
     END_ATTRIBUTE,
+    edgesLayerAttributes,
     type FlowPart,
     flag,
     ID_ATTRIBUTE,
+    LEVEL_ATTRIBUTE,
     type MutablePartAttributes,
     NO_GESTURE_ATTRIBUTE,
     NO_WHEEL_ATTRIBUTE,
@@ -64,6 +67,7 @@ export { isEdge, isNode } from "./document/type-guards";
 export type {
     AnyTypes,
     BuiltInEdgeType,
+    DeclaredHandle,
     EdgeDataOf,
     EdgeFields,
     EdgeFlags,
@@ -106,7 +110,6 @@ export {
     type FlowEngineOptions,
     type PanOnScrollMode,
 } from "./engine/create-flow-engine";
-export type { PathOptions } from "./engine/edge-geometry";
 export {
     type CallbackEventType,
     ENGINE_EVENT_CALLBACKS,
@@ -191,6 +194,7 @@ export {
     bezierPath,
 } from "./geometry/bezier-path";
 export { type EdgeCenter, edgeCenter } from "./geometry/edge-center";
+export type { PathOptions } from "./geometry/edge-geometry";
 export {
     type SimpleBezierPathOptions,
     simpleBezierPath,
@@ -202,6 +206,11 @@ export {
     smoothStepPath,
     stepPath,
 } from "./geometry/smooth-step-path";
+export {
+    type StaticGeometry,
+    type StaticGeometryOptions,
+    staticGeometry,
+} from "./geometry/static-geometry";
 export {
     type StraightPathOptions,
     straightPath,
@@ -220,6 +229,7 @@ export {
     type ViewportForBoundsOptions,
     viewportForBounds,
 } from "./geometry/viewport-for-bounds";
+export type { RenderLayer, ZIndexMode } from "./geometry/z-order";
 export {
     type CommandArgs,
     createFlowModel,
