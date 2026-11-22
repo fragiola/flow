@@ -233,4 +233,52 @@ describe("the minimap", () => {
             unmountAll();
         }
     });
+
+    it("names the tapped minimap in minimap-click, its point through that minimap's box", () => {
+        const flow = mount(json(), { features: [minimap()], sizes });
+        const first = minimapElement(flow.root);
+        // a second minimap at client (0, 0), 100 × 100
+        const second = document.createElement("div");
+        second.setAttribute("data-flow-part", "minimap");
+        second.getBoundingClientRect = () =>
+            ({
+                left: 0,
+                top: 0,
+                width: 100,
+                height: 100,
+                right: 100,
+                bottom: 100,
+                x: 0,
+                y: 0,
+            }) as DOMRect;
+        flow.root.append(second);
+        const events: unknown[] = [];
+        flow.engine.subscribe((event) => {
+            if (event.type === "minimap-click") {
+                events.push({ element: event.element, point: event.point });
+            }
+        });
+        const { viewBox } = flow.engine.get("minimap-view", {
+            width: 100,
+            height: 100,
+        });
+        pointer(second, "pointerdown", { clientX: 50, clientY: 50 });
+        pointer(flow.root, "pointerup", { clientX: 50, clientY: 50 });
+        expect(events).toEqual([
+            {
+                element: second,
+                point: {
+                    x: viewBox.x + viewBox.width / 2,
+                    y: viewBox.y + viewBox.height / 2,
+                },
+            },
+        ]);
+        pointer(first.firstElementChild as Element, "pointerdown", {
+            clientX: 650,
+            clientY: 525,
+        });
+        pointer(flow.root, "pointerup", { clientX: 650, clientY: 525 });
+        expect(events).toHaveLength(2);
+        expect((events[1] as { element: Element }).element).toBe(first);
+    });
 });

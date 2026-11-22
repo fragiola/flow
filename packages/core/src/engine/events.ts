@@ -106,9 +106,11 @@ export type FlowEngineEvent =
     | ({
           /**
            * a tap on a minimap (`minimap()`): `point` is the flow point under it on the minimap
-           * (`minimap-point-to-flow`), not the one behind it in the root
+           * (`minimap-point-to-flow`), not the one behind it in the root; `element` is the
+           * tapped minimap (its `data-flow-part="minimap"` element), as an app may draw several
            */
           readonly type: "minimap-click";
+          readonly element: Element;
       } & FlowPointerInfo)
     | ({
           /** a double click whose two presses were taps on a node */

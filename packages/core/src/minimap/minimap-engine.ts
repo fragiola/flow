@@ -178,8 +178,10 @@ export function minimapEngine(
             },
         },
         pointerdown: (event, target) => {
-            if (target.kind !== "minimap" || !target.element) return undefined;
-            const box = target.element.getBoundingClientRect();
+            const element =
+                target.kind === "minimap" ? target.element : undefined;
+            if (!element) return undefined;
+            const box = element.getBoundingClientRect();
             if (box.width <= 0 || box.height <= 0) return undefined;
             const { inversePan } = effective(host, options);
             // the view box at the press: a drag keeps it, though the view it shows moves
@@ -228,7 +230,8 @@ export function minimapEngine(
                     centre(moving.clientX, moving.clientY);
                 },
                 end: (released) => {
-                    // a tap (within the tap distance): `minimap-click` at the point under it
+                    // a tap (within the tap distance): `minimap-click` at the point under it on
+                    // the pressed minimap, which it names (each minimap keeps only its own taps)
                     const distance = Math.hypot(
                         released.clientX - event.clientX,
                         released.clientY - event.clientY,
@@ -237,6 +240,7 @@ export function minimapEngine(
                     const client = { x: released.clientX, y: released.clientY };
                     host.emit({
                         type: "minimap-click",
+                        element,
                         point: pointOn(box, viewBox, client),
                         client,
                         event: released,
