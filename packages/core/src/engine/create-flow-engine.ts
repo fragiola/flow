@@ -9,11 +9,12 @@ import {
     END_ATTRIBUTE,
     flag,
     ID_ATTRIBUTE,
+    LEVEL_ATTRIBUTE,
     type MutablePartAttributes,
     NO_WHEEL_ATTRIBUTE,
     PART_ATTRIBUTE,
     type PartAttributes,
-    POSITION_ATTRIBUTE,
+    resizeHandleAttributes,
 } from "../attributes/part-attributes";
 import { fail, ok } from "../commands/define";
 import type { CommandResult } from "../commands/types";
@@ -40,12 +41,21 @@ import type {
     FeatureModel,
     FlowFeatures,
 } from "../features/types";
+import { edgeEnds, type PathOptions, pathOf } from "../geometry/edge-geometry";
+import {
+    declaredHandleOf,
+    matchHandle,
+    type NodeLayout,
+    nodeAbsolutePosition,
+    nodeOriginOf,
+    nodeRectOf,
+    nodeSize,
+} from "../geometry/node-layout";
 import {
     boundsOf,
     contains,
     cornerInside,
     intersectionOf,
-    nodeBox,
     overlaps,
     sharesArea,
 } from "../geometry/rect";
@@ -65,6 +75,14 @@ import {
     viewRect,
     zoomAround,
 } from "../geometry/viewport-math";
+import {
+    drawingOrder,
+    edgeStackValue,
+    type Layering,
+    nodeStackValue,
+    renderLayers,
+    type ZIndexMode,
+} from "../geometry/z-order";
 import type { FlowModel } from "../model/create-flow-model";
 import type { HandleType, QueryArgs } from "../state/queries";
 import type {
@@ -77,7 +95,6 @@ import type {
 import { type AutoPanOptions, autoPanOffset, autoPans } from "./auto-pan";
 import { backgroundPattern } from "./background-pattern";
 import { asElement, pressTargetOf, viewOf } from "./dom";
-import { edgeEnds, type PathOptions, pathOf } from "./edge-geometry";
 import { edgeToolbarPosition } from "./edge-toolbar";
 import type { FlowEngineEvent, FlowPointerInfo } from "./events";
 import {
@@ -204,8 +221,17 @@ export interface FlowEngineOptions {
     nodeExtent?: Rect | undefined;
     /** a selected node, and its children with it, is drawn above the others; default true */
     elevateNodesOnSelect?: boolean | undefined;
-    /** a selected edge is drawn above the other edges; default false */
+    /**
+     * a selected edge is drawn above the other edges (in `"auto"`, above the nodes too); default
+     * false in `"basic"`, true in `"auto"`
+     */
     elevateEdgesOnSelect?: boolean | undefined;
+    /**
+     * how nodes and edges stack (`render-layers`): `"basic"` edges always below the nodes, `"auto"`
+     * an edge may stand above nodes (a selected one, one of a child, a higher `zIndex`), `"manual"`
+     * only the `zIndex` values; default `"auto"`
+     */
+    zIndexMode?: ZIndexMode | undefined;
 }
 
 /**
@@ -306,14 +332,6 @@ interface Pinch {
 const ZERO_SIZE: Size = { width: 0, height: 0 };
 
 const TOP_LEFT: XY = { x: 0, y: 0 };
-
-/** What a selected node (with `elevateNodesOnSelect`) or edge (`elevateEdgesOnSelect`) is raised by. */
-const SELECTED_RAISE = 10_000;
-
-/** A `zIndex` as a number (none, or not a finite number: 0). */
-function zOf(value: unknown): number {
-    return finite(value) ? value : 0;
-}
 
 function finite(value: unknown): value is number {
     return typeof value === "number" && Number.isFinite(value);
@@ -443,7 +461,10 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                   : options.fitView;
         this.measurements = new Measurements(
             () => this.current.zoom,
-            () => this.measured(),
+            () => {
+                this.geometryVersion += 1;
+                this.measured();
+            },
             (nodeId) => this.model.get("node-by", { id: nodeId }) !== undefined,
         );
         // a node removed while it was not rendered (culled, hidden) has its kept sizes forgotten
@@ -661,6 +682,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             "visible-nodes": () => this.visibleNodes(),
             "visible-edges": () => this.visibleEdges(),
             "drawn-edges": () => this.drawnEdges(),
+            "render-layers": () => this.layering().layers,
             "node-z-index-by": (p) =>
                 this.nodeZ(String(payloadRecord(p).nodeId)),
             "handles-by": (p) =>
@@ -732,8 +754,10 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             panning: () =>
                 this.pinch !== undefined ||
                 (this.press?.pan === true && this.press.travel > 0),
-            "node-measured": (p) =>
-                this.knownRect(String(payloadRecord(p).nodeId)) !== undefined,
+            "node-measured": (p) => {
+                const node = this.node(String(payloadRecord(p).nodeId));
+                return node !== undefined && this.isMeasured(node);
+            },
         } satisfies {
             [G in Exclude<EngineIsKey, OwnedBy<"engineIs">>]: (
                 payload: unknown,
@@ -1181,54 +1205,56 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         return this.model.get("node-by", { id: nodeId });
     }
 
-    /** A node's size: the document's where it gives one, the measured one otherwise. */
-    private sizeOf(node: FlowNode): Size | undefined {
-        const measured = this.measurements.size(node.id);
-        const usable =
-            measured && (measured.width > 0 || measured.height > 0)
-                ? measured
-                : undefined;
-        const width = node.width ?? usable?.width;
-        const height = node.height ?? usable?.height;
-        return width === undefined || height === undefined
-            ? undefined
-            : { width, height };
-    }
-
     /**
-     * The share of a node's size its position stands at: the engine's `nodeOrigin` for a node on
-     * the flow, the top-left corner for a child (its position is relative to its parent's
-     * top-left corner, so the model's sub-flow rules hold as they are).
+     * A node's size: the document's `width` / `height` where it gives them, the measured one
+     * otherwise, its `initialWidth` / `initialHeight` until it is measured.
      */
-    private originOf(node: FlowNode): XY {
-        if (node.parentId !== undefined && this.node(node.parentId)) {
-            return TOP_LEFT;
-        }
-        return this.options.nodeOrigin ?? TOP_LEFT;
+    private sizeOf(node: FlowNode): Size | undefined {
+        return nodeSize(node, this.measuredSize(node.id));
     }
 
-    /** A node's position in absolute flow coordinates: its parent's top-left corner plus its own. */
-    private absolutePosition(node: FlowNode, seen = new Set<string>()): XY {
-        seen.add(node.id);
-        const parent =
-            node.parentId === undefined || seen.has(node.parentId)
-                ? undefined
-                : this.node(node.parentId);
-        if (!parent) return node.position;
-        const corner = this.boxOf(parent, seen);
+    /** A node's measured size, when it has some (an empty one is not). */
+    private measuredSize(nodeId: string): Size | undefined {
+        const measured = this.measurements.size(nodeId);
+        return measured && (measured.width > 0 || measured.height > 0)
+            ? measured
+            : undefined;
+    }
+
+    /** Whether a node's size is measured or given by the document (`node-measured`; not initial). */
+    private isMeasured(node: FlowNode): boolean {
+        const measured = this.measuredSize(node.id);
+        return (
+            (node.width ?? measured?.width) !== undefined &&
+            (node.height ?? measured?.height) !== undefined
+        );
+    }
+
+    /** What the pure node layout reads of this engine: its nodes, sizes and `nodeOrigin`. */
+    private layoutNow(): NodeLayout {
         return {
-            x: corner.x + node.position.x,
-            y: corner.y + node.position.y,
+            node: (nodeId) => this.node(nodeId),
+            size: (node) => this.sizeOf(node),
+            nodeOrigin: this.options.nodeOrigin,
         };
     }
 
+    /**
+     * The share of a node's size its position stands at: its `origin`, else the engine's
+     * `nodeOrigin`, for a node on the flow; the top-left corner for a child (`nodeOriginOf`).
+     */
+    private originOf(node: FlowNode): XY {
+        return nodeOriginOf(node, this.layoutNow());
+    }
+
+    /** A node's position in absolute flow coordinates: its parent's top-left corner plus its own. */
+    private absolutePosition(node: FlowNode): XY {
+        return nodeAbsolutePosition(node, this.layoutNow());
+    }
+
     /** A node's absolute box (`nodeBox`: its position at its origin), its size zero until known. */
-    private boxOf(node: FlowNode, seen = new Set<string>()): Rect {
-        return nodeBox(
-            this.absolutePosition(node, seen),
-            this.sizeOf(node) ?? ZERO_SIZE,
-            this.originOf(node),
-        );
+    private boxOf(node: FlowNode): Rect {
+        return nodeRectOf(node, this.layoutNow());
     }
 
     /** The top-left corner of a node's parent's box (0, 0 without one). */
@@ -1253,11 +1279,10 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         return {
             id: node.id,
             node,
-            absolutePosition: this.model.get("absolute-position-by", {
-                nodeId,
-            }) ?? { x: rect.x, y: rect.y },
+            // the engine's own layout, as `node-rect-by` (each origin applied)
+            absolutePosition: this.absolutePosition(node),
             rect,
-            measured: this.sizeOf(node) !== undefined,
+            measured: this.isMeasured(node),
             zIndex: this.nodeZ(nodeId),
             handles: this.handlesOf(nodeId),
         };
@@ -1352,51 +1377,77 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         };
     }
 
+    /** A node's stack value by the `zIndexMode` (`nodeStackValue`). */
+    private nodeValue(node: FlowNode): number {
+        return nodeStackValue(node, (id) => this.node(id), this.options);
+    }
+
+    /** An edge's stack value by the `zIndexMode` (`edgeStackValue`). */
+    private edgeValue(edge: FlowEdge): number {
+        return edgeStackValue(edge, (id) => this.node(id), this.options);
+    }
+
     /**
-     * A node's own stacking value: its `zIndex`, raised when it is selected and
-     * `elevateNodesOnSelect` is on.
+     * A node's structural `z-index`: its stack value with a single render level, its rank among
+     * the layers' (negative) otherwise; 0 for an unknown node.
      */
-    private ownZ(node: FlowNode): number {
-        const raised =
-            node.selected === true &&
-            (this.options.elevateNodesOnSelect ?? true);
-        return zOf(node.zIndex) + (raised ? SELECTED_RAISE : 0);
-    }
-
-    /** A node's structural `z-index`: its own, and always above its parent's (0 for none). */
     private nodeZ(nodeId: string): number {
-        // most nodes have no parent: no chain to walk (it is read per node on every pan frame)
-        const first = this.node(nodeId);
-        if (first === undefined) return 0;
-        if (first.parentId === undefined) return this.ownZ(first);
-        const chain: FlowNode[] = [];
-        const seen = new Set<string>();
-        for (
-            let node: FlowNode | undefined = first;
-            node !== undefined && !seen.has(node.id);
-            node =
-                node.parentId === undefined
-                    ? undefined
-                    : this.node(node.parentId)
-        ) {
-            seen.add(node.id);
-            chain.push(node);
-        }
-        let z: number | undefined;
-        for (const node of chain.reverse()) {
-            const own = this.ownZ(node);
-            z = z === undefined ? own : Math.max(own, z + 1);
-        }
-        return z ?? 0;
+        const node = this.node(nodeId);
+        if (node === undefined) return 0;
+        return this.layering().zIndexes?.get(nodeId) ?? this.nodeValue(node);
     }
 
-    /** An edge's stacking value: its `zIndex`, raised when selected with `elevateEdgesOnSelect`. */
-    private edgeZ(edge: FlowEdge): number {
-        const raised =
-            edge.selected === true &&
-            (this.options.elevateEdgesOnSelect ?? false);
-        return zOf(edge.zIndex) + (raised ? SELECTED_RAISE : 0);
+    private layeringCache:
+        | {
+              readonly nodes: readonly FlowNode[];
+              readonly edges: readonly FlowEdge[];
+              readonly options: FlowEngineOptions;
+              readonly revision: number;
+              readonly geometry: number;
+              readonly layering: Layering;
+          }
+        | undefined;
+
+    /** The render layers (`render-layers`), worked out once per change of the flow or the view. */
+    private layering(): Layering {
+        const nodes = this.model.get("all-nodes");
+        const edges = this.model.get("all-edges");
+        const cache = this.layeringCache;
+        if (
+            cache &&
+            cache.nodes === nodes &&
+            cache.edges === edges &&
+            cache.options === this.options &&
+            // the view counts only when it culls the edges (`onlyRenderVisible`)
+            (cache.revision === this.revision ||
+                !(this.options.onlyRenderVisible ?? false)) &&
+            cache.geometry === this.geometryVersion
+        ) {
+            return cache.layering;
+        }
+        const layering = renderLayers(
+            nodes
+                .filter((node) => node.hidden !== true)
+                .map((node) => ({ id: node.id, value: this.nodeValue(node) })),
+            this.drawnEdges().map((edge) => ({
+                id: edge.id,
+                value: this.edgeValue(edge),
+            })),
+            this.options.zIndexMode ?? "auto",
+        );
+        this.layeringCache = {
+            nodes,
+            edges,
+            options: this.options,
+            revision: this.revision,
+            geometry: this.geometryVersion,
+            layering,
+        };
+        return layering;
     }
+
+    /** bumped whenever something is measured (before the adapters hear it, a microtask later) */
+    private geometryVersion = 0;
 
     private boundsOf(
         nodeIds: readonly unknown[] | undefined,
@@ -1477,17 +1528,11 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         type: HandleType,
         handleId: string | undefined,
     ): FlowHandle | undefined {
-        const own = this.measurements.handlesOf(nodeId);
-        const found =
-            handleId === undefined
-                ? (own.find(
-                      (handle) =>
-                          handle.type === type && handle.handleId === undefined,
-                  ) ?? own.find((handle) => handle.type === type))
-                : (own.find(
-                      (handle) =>
-                          handle.type === type && handle.handleId === handleId,
-                  ) ?? own.find((handle) => handle.handleId === handleId));
+        const found = matchHandle(
+            this.measurements.handlesOf(nodeId),
+            type,
+            handleId,
+        );
         return found ? this.placed(found) : undefined;
     }
 
@@ -1496,8 +1541,22 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         if (!edge) return undefined;
         const ends = edgeEnds(edge, {
             rect: (nodeId) => this.knownRect(nodeId),
-            handle: (nodeId, type, handleId) =>
-                this.handleOf(nodeId, type, handleId),
+            // a measured handle, else one the node declares (used until it is measured)
+            handle: (nodeId, type, handleId) => {
+                const measured = this.handleOf(nodeId, type, handleId);
+                if (measured) return measured;
+                const node = this.node(nodeId);
+                const rect = this.knownRect(nodeId);
+                return node && rect
+                    ? declaredHandleOf(node, rect, type, handleId)
+                    : undefined;
+            },
+            side: (nodeId, type) => {
+                const node = this.node(nodeId);
+                return type === "source"
+                    ? node?.sourcePosition
+                    : node?.targetPosition;
+            },
         });
         // the edge's own path options over the engine's
         return ends
@@ -1560,10 +1619,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                               this.node(edge.target)?.hidden !== true &&
                               this.edgePath(edge.id) !== undefined,
                       );
-        return shown
-            .map((edge, i) => ({ edge, i, z: this.edgeZ(edge) }))
-            .sort((a, b) => a.z - b.z || a.i - b.i)
-            .map(({ edge }) => edge);
+        return drawingOrder(shown, (edge) => this.edgeValue(edge));
     }
 
     /**
@@ -1595,7 +1651,9 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         const nodes = this.model
             .get("all-nodes")
             .filter((node) => node.hidden !== true);
+        // a fit on init counts initial sizes as known; `ready` waits for the measured ones
         const all = nodes.every((node) => this.knownRect(node.id));
+        const measured = nodes.every((node) => this.isMeasured(node));
         const fit = this.pendingFit;
         if (fit && nodes.length > 0 && all && this.fitView(fit, false).ok) {
             this.pendingFit = undefined;
@@ -1604,7 +1662,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         const size = this.rootSize();
         if (
             !this.ready &&
-            all &&
+            measured &&
             size.width > 0 &&
             size.height > 0 &&
             (this.pendingFit === undefined || nodes.length === 0)
@@ -1712,6 +1770,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             ["dblclick", (event) => this.doubleClick(event as MouseEvent)],
             ["keydown", (event) => this.keyDown(event as KeyboardEvent)],
             ["focusin", (event) => this.focusIn(event as FocusEvent)],
+            ["focusout", (event) => this.focusOut(event as FocusEvent)],
             ["contextmenu", (event) => this.contextMenu(event as MouseEvent)],
         ];
         for (const [type, listener, options] of listeners) {
@@ -2441,11 +2500,60 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         if (taken) event.preventDefault();
     }
 
+    /** the part that last took focus in the flow (its part name and id), for `refocus` */
+    private lastFocus: { part: string; id: string | undefined } | undefined;
+
     private focusIn(event: FocusEvent): void {
         if (this.destroyed) return;
+        const focused = asElement(event.target);
+        const part = focused?.getAttribute(PART_ATTRIBUTE) ?? null;
+        this.lastFocus =
+            focused && part !== null
+                ? {
+                      part,
+                      id: focused.getAttribute(ID_ATTRIBUTE) ?? undefined,
+                  }
+                : undefined;
         const target = this.target(event.target);
         if (target.kind === "node" || target.kind === "edge")
             this.features.focus(target);
+    }
+
+    /**
+     * Focus left a part: a blur (the part still in the document) forgets it, so a later remount
+     * does not take focus back; a removal (an edge moving to another level's layer) keeps it. The
+     * check waits a microtask, as a removal may tell `focusout` before the part leaves.
+     */
+    private focusOut(event: FocusEvent): void {
+        const left = asElement(event.target);
+        const last = this.lastFocus;
+        if (!left || !last) return;
+        const check = () => {
+            if (this.lastFocus === last && left.isConnected)
+                this.lastFocus = undefined;
+        };
+        const view = viewOf(left);
+        if (view && typeof view.queueMicrotask === "function")
+            view.queueMicrotask(check);
+        else check();
+    }
+
+    /** `adapter.refocus`: a remounted part that had focus, focus lost since, takes it back. */
+    private refocus(element: Element): void {
+        const last = this.lastFocus;
+        if (this.destroyed || !last || !element.isConnected) return;
+        if (
+            element.getAttribute(PART_ATTRIBUTE) !== last.part ||
+            (element.getAttribute(ID_ATTRIBUTE) ?? undefined) !== last.id
+        ) {
+            return;
+        }
+        const owner = element.ownerDocument;
+        const active = owner.activeElement;
+        if (active !== null && active !== owner.body) return;
+        const focusable = element as Partial<HTMLElement>;
+        if (typeof focusable.focus === "function")
+            focusable.focus({ preventScroll: true });
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -2482,8 +2590,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 if (part === "node") {
                     into["data-hidden"] = flag(node?.hidden === true);
                     into["data-measured"] = flag(
-                        nodeId !== undefined &&
-                            this.knownRect(nodeId) !== undefined,
+                        node !== undefined && this.isMeasured(node),
                     );
                 }
                 break;
@@ -2520,7 +2627,20 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 break;
             }
             case "resize-handle":
-                into[POSITION_ATTRIBUTE] = id("position");
+                Object.assign(
+                    into,
+                    resizeHandleAttributes(id("position"), {
+                        direction: id("direction"),
+                        variant: id("variant"),
+                    }),
+                );
+                break;
+            case "edges-layer":
+                into[LEVEL_ATTRIBUTE] =
+                    typeof payload.level === "number" &&
+                    Number.isFinite(payload.level)
+                        ? String(payload.level)
+                        : undefined;
                 break;
             case "reconnect-anchor":
                 into[ID_ATTRIBUTE] = id("edgeId");
@@ -2608,6 +2728,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 };
             },
             getSnapshot: () => this.revision,
+            refocus: (element) => this.refocus(element),
         } satisfies FlowEngineAdapter);
     }
 }

@@ -40,6 +40,10 @@ export class FlowViewportDirective {
             left: 0,
             width: "100%",
             height: "100%",
+            // a stacking context of its own before the engine writes its transform (the
+            // server's HTML): with several render levels the nodes and edge layers have
+            // negative z-indexes
+            isolation: "isolate",
         }));
         // the engine writes its transform on it
         effect((onCleanup) => {

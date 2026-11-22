@@ -255,7 +255,9 @@ changed `features` prop warns and is ignored.
   middleware; `defaultNodes`, `features` and `createId` are then unused.
 
 The engine is created in the root's layout effect (Vue: its `onMounted`; Svelte: an `$effect`; Angular: after its first render): the first render, and a
-server render, have no engine (nodes at their model position, no edges drawn).
+server render, have no engine. They draw the document's static geometry instead: nodes at their
+place (origin applied), and the edges whose nodes declare their sizes and handles
+([Server rendering](/docs/guides/server-rendering)).
 
 ## Props
 
@@ -301,7 +303,8 @@ through `engine.adapter.setOptions`).
 | `nodeOrigin` | `XY` | `{ x: 0, y: 0 }` | the point of a node's box its position stands at, as shares of its size (for the nodes on the flow) |
 | `nodeExtent` | `Rect` | none | the flow rectangle every node's box stays inside when dragged, moved by keys or resized |
 | `elevateNodesOnSelect` | `boolean` | `true` | a selected node, and its children, is drawn above the others |
-| `elevateEdgesOnSelect` | `boolean` | `false` | a selected edge is drawn above the other edges |
+| `elevateEdgesOnSelect` | `boolean` | `true` with `zIndexMode="auto"`, `false` with `"basic"` | a selected edge is drawn above the other edges (in `"auto"`, above the nodes too) |
+| `zIndexMode` | `ZIndexMode` | `"auto"` | how nodes and edges stack ([z-order](/docs/concepts/nodes-and-edges#z-order)): `"basic"` edges always below the nodes, `"auto"` an edge of a child or a selected one may stand above nodes, `"manual"` only the `zIndex` values count |
 | `paneClickDistance` | `number` | `3` | how far, in pixels, a press on the pane may move and still be a click (`onPaneClick`, clearing the selection) |
 | `nodeClickDistance` | `number` | `3` | how far a press on a node, an edge or a handle may move and still be a click (`onNodeClick`, selecting) |
 | `preventScrolling` | `boolean` | `true` | the wheel over the flow never scrolls the page, even with `zoomOnScroll` and `panOnScroll` off |

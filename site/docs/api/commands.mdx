@@ -27,6 +27,12 @@ Adds a node at the end of the drawing order: its type, position and data, option
 | `data` | `object` | yes | the app's data, a JSON object typed by the node or edge type |
 | `width` | `number` | no | its width, when the document gives one |
 | `height` | `number` | no | its height, when the document gives one |
+| `initialWidth` | `number` | no | its width until it is measured; width wins |
+| `initialHeight` | `number` | no | its height until it is measured; height wins |
+| `handles` | `object[]` | no | its handles, declared for its edges to be drawn before it is measured |
+| `sourcePosition` | `"top" \| "right" \| "bottom" \| "left"` | no | the side its edges leave by when no handle gives one; default bottom |
+| `targetPosition` | `"top" \| "right" \| "bottom" \| "left"` | no | the side its edges enter by when no handle gives one; default top |
+| `origin` | `object` | no | the point of its box its position stands at, as shares of its size, over the engine's nodeOrigin |
 | `zIndex` | `integer` | no | its place in the stacking order of its layer (nodes among nodes, edges among edges): a greater one is drawn above; default 0 |
 | `draggable` | `boolean` | no | it may be moved (`node.move`); default true |
 | `selectable` | `boolean` | no | it may be selected (`selection.set`); default true |

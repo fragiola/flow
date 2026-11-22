@@ -1,10 +1,11 @@
 // The path of an edge (`[flowEdgePath]`, and the one `[flowEdge]` draws when the app writes none):
-// its `d` from the engine (`edge-path-by`, D9), unfilled, on an SVG `<path>`.
+// its `d` from the engine (`edge-path-by`, D9), or the static geometry's before the engine exists,
+// unfilled, on an SVG `<path>`.
 import { computed, type Signal } from "@angular/core";
 import type { EdgePath } from "@fragiola/flow";
 import type { FlowContext } from "../context";
 import { bindAttributes, bindBaseAttributes } from "../utils/helpers";
-import { edgePathOf } from "./inject-edge";
+import { edgePathOf, staticEdgeAttributes } from "./inject-edge";
 import { flowValue } from "./internal";
 
 export interface EdgePathState {
@@ -24,9 +25,11 @@ export function bindEdgePath(
     const path = edgePathOf(context, edgeId);
     const attributes = flowValue(context, () => {
         const id = edgeId();
-        return id === undefined
-            ? undefined
-            : context.engine()?.adapter.attributes("edge-path", { edgeId: id });
+        if (id === undefined) return undefined;
+        const engine = context.engine();
+        return engine
+            ? engine.adapter.attributes("edge-path", { edgeId: id })
+            : staticEdgeAttributes(context, "edge-path", id);
     });
     bindAttributes(element, () => attributes() ?? {});
     // the app's own `d` (an app type drawn from `state.path`'s ends) and `fill` win

@@ -1,4 +1,8 @@
-import { partAttributes } from "@fragiola/flow";
+import {
+    type ResizeHandleDirection,
+    type ResizeHandleVariant,
+    resizeHandleAttributes,
+} from "@fragiola/flow";
 import type * as React from "react";
 import { useFlowContext, usePartNodeId } from "../context";
 import { useFlowValue } from "../hooks/internal";
@@ -34,6 +38,10 @@ export const RESIZE_POSITIONS: readonly ResizePosition[] = Object.freeze([
 export interface ResizeHandleState {
     readonly nodeId: string;
     readonly position: ResizePosition;
+    /** its own direction, over its resizer's (`data-direction`); none: the resizer's */
+    readonly direction: ResizeHandleDirection | undefined;
+    /** how it is drawn (`data-variant`): a corner is always a `handle` */
+    readonly variant: ResizeHandleVariant;
 }
 
 export interface ResizeHandleProps
@@ -42,6 +50,16 @@ export interface ResizeHandleProps
     position: ResizePosition;
     /** its node; default the enclosing `Flow.Node`'s */
     nodeId?: string | undefined;
+    /**
+     * the sides it moves, over its resizer's `direction` (`data-direction`): `"horizontal"` only
+     * the width (and x), `"vertical"` only the height (and y); default the resizer's
+     */
+    direction?: ResizeHandleDirection | undefined;
+    /**
+     * how it is drawn (`data-variant`, for your styles): `"handle"` (default) or `"line"`, a
+     * side's whole length; a corner's `"line"` is ignored
+     */
+    variant?: ResizeHandleVariant | undefined;
     children?: React.ReactNode;
 }
 
@@ -95,20 +113,41 @@ const PLACE: Record<ResizePosition, React.CSSProperties> = {
  * A grab area of a `NodeResizer` (`data-flow-part="resize-handle"`, `data-position`): a press on
  * it resizes its node from that corner or side (`resize()`); with `keyboard()` too it takes focus
  * and the arrows move that corner or side. Placed on its corner (centred) or
- * along its side; give it its size (a side's thickness) and look.
+ * along its side; give it its size (a side's thickness) and look. Its `direction` overrides its
+ * resizer's; `variant="line"` marks a side's handle as a line for your styles.
  */
 export function ResizeHandle(props: ResizeHandleProps) {
-    const { position, nodeId: nodeIdProp, children, ...rest } = props;
+    const {
+        position,
+        nodeId: nodeIdProp,
+        direction,
+        variant,
+        children,
+        ...rest
+    } = props;
     const nodeId = usePartNodeId("ResizeHandle", nodeIdProp);
     const { model, engine } = useFlowContext("ResizeHandle");
-    // the engine's record: `data-position`, and `tabindex` with `keyboard()` (arrows resize)
+    // the engine's record: `data-position`, `data-variant`, `data-direction`, and `tabindex` with
+    // `keyboard()` (arrows resize)
     const attributes = useFlowValue(model, engine, () =>
         engine
-            ? engine.adapter.attributes("resize-handle", { nodeId, position })
-            : { ...partAttributes("resize-handle"), "data-position": position },
+            ? engine.adapter.attributes("resize-handle", {
+                  nodeId,
+                  position,
+                  direction,
+                  variant,
+              })
+            : resizeHandleAttributes(position, { direction, variant }),
     );
     return useRenderElement("div", rest, {
-        state: { nodeId, position },
+        state: {
+            nodeId,
+            position,
+            direction: attributes["data-direction"] as
+                | ResizeHandleDirection
+                | undefined,
+            variant: attributes["data-variant"] as ResizeHandleVariant,
+        },
         props: { ...attributeProps(attributes), children },
         style: {
             position: "absolute",

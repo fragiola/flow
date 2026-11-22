@@ -22,7 +22,9 @@ export interface NodesSelectionState {
  * the app's element: `<div flowNodesSelection>` inside `[flowViewport]`, after `[flowNodes]` (it
  * is in flow coordinates). It is in the document only at `selection-rect`: while two or more nodes
  * are selected by a box (or always, with `selection({ rect: "always" })`). A press on it drags the
- * selection (`drag()`), its context menu is the selection's. Give it its look.
+ * selection (`drag()`), its context menu is the selection's. With `keyboard()` it takes focus
+ * (`tabindex`), and its keys are a focused selected node's: the arrows move the selection, the
+ * delete keys remove it, Escape clears it. Give it its look.
  */
 @Directive({ selector: "[flowNodesSelection]", exportAs: "flowNodesSelection" })
 export class FlowNodesSelectionDirective {

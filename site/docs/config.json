@@ -104,6 +104,10 @@
                     "path": "guides/resizing"
                 },
                 {
+                    "label": "Server rendering",
+                    "path": "guides/server-rendering"
+                },
+                {
                     "label": "Minimap and controls",
                     "path": "guides/minimap-and-controls"
                 },

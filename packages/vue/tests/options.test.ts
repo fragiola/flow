@@ -223,7 +223,7 @@ describe("the viewport and gesture options (#25)", () => {
         expect(z("b")).toBe("0");
     });
 
-    it("draws the edges in the core's order (drawn-edges: by zIndex, a selected one raised with elevateEdgesOnSelect)", async () => {
+    it("draws the edges in the core's order (drawn-edges: by zIndex, a selected one raised with elevateEdgesOnSelect, in the basic zIndexMode)", async () => {
         const elevate = shallowRef<boolean | undefined>(undefined);
         const nodes = [task("a"), task("b", 0, 200), task("c", 200, 200)];
         const edges = [
@@ -236,6 +236,7 @@ describe("the viewport and gesture options (#25)", () => {
                 features,
                 defaultNodes: nodes,
                 defaultEdges: edges,
+                zIndexMode: "basic",
                 elevateEdgesOnSelect: elevate.value,
             }),
         );
@@ -247,6 +248,58 @@ describe("the viewport and gesture options (#25)", () => {
         elevate.value = true;
         await settle();
         expect(order()).toEqual(["e3", "e1", "e2"]);
+        expect(
+            container.querySelector('[data-flow-part="edges-layer"]'),
+        ).toBeNull();
+    });
+
+    it("raises a selected edge above the nodes in the default auto zIndexMode (its own render level)", async () => {
+        const nodes = [task("a"), task("b", 0, 200), task("c", 200, 200)];
+        const edges = [
+            { id: "e1", source: "a", target: "b" },
+            { id: "e2", source: "a", target: "c", selected: true },
+            { id: "e3", source: "b", target: "c" },
+        ];
+        const { container } = await render(() =>
+            h(TestFlow, {
+                features,
+                defaultNodes: nodes,
+                defaultEdges: edges,
+            }),
+        );
+        const layers = [
+            ...container.querySelectorAll<HTMLElement>(
+                '[data-flow-part="edges-layer"]',
+            ),
+        ];
+        const idsIn = (element: Element) =>
+            [...element.querySelectorAll('[data-flow-part="edge"]')].map(
+                (edge) => edge.getAttribute("data-flow-id"),
+            );
+        expect(layers.map((layer) => layer.dataset.level)).toEqual(["0", "1"]);
+        expect(layers.map(idsIn)).toEqual([["e1", "e3"], ["e2"]]);
+        // the upper level stands above the nodes, both below what follows the layers
+        const [lower, upper] = layers.map((layer) =>
+            Number(layer.style.zIndex),
+        );
+        const node = Number(part(container, "node", "a").style.zIndex);
+        expect(lower).toBeLessThan(node);
+        expect(upper).toBeGreaterThan(node);
+        expect(upper).toBeLessThan(0);
+        expect(part(container, "nodes").style.isolation).toBe("");
+    });
+
+    it("forwards zIndexMode to the engine, and a change to setOptions", async () => {
+        const mode = shallowRef<"basic" | "auto" | "manual">("basic");
+        await render(() =>
+            h(TestFlow, { defaultNodes: [task("a")], zIndexMode: mode.value }),
+        );
+        expect(last().options.zIndexMode).toBe("basic");
+        mode.value = "manual";
+        await settle();
+        expect(last().setOptions).toHaveBeenLastCalledWith({
+            zIndexMode: "manual",
+        });
     });
 
     it("takes a number's text for duration and pan-on-scroll-speed", async () => {

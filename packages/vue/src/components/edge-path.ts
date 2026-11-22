@@ -1,6 +1,6 @@
 import type { EdgePath as EdgePathValue } from "@fragiola/flow";
 import { useFlowValue } from "../composables/internal";
-import { useEdgePath } from "../composables/use-edge";
+import { edgeAttributes, useEdgePath } from "../composables/use-edge";
 import { useEdgeId, useFlowContext } from "../context";
 import {
     definePrimitive,
@@ -26,7 +26,7 @@ export interface EdgePathSlots extends RenderSlot<EdgePathState> {}
 
 /**
  * An edge's path (`data-flow-part="edge-path"`): an SVG `<path>` whose `d` is the engine's
- * (`edge-path-by`, D9), unfilled. A `d` of your own draws an app type (from `state.path`'s ends).
+ * (`edge-path-by`, D9; before the engine exists, the static geometry's), unfilled. A `d` of your own draws an app type (from `state.path`'s ends).
  * Several may share an edge: a wide transparent one is a bigger press target.
  */
 export const EdgePath: FlowComponent<EdgePathProps, EdgePathSlots> =
@@ -38,9 +38,7 @@ export const EdgePath: FlowComponent<EdgePathProps, EdgePathSlots> =
             const edgeId = useEdgeId("EdgePath", () => props.edgeId);
             const path = useEdgePath(context, edgeId);
             const attributes = useFlowValue(context, () =>
-                context.engine.value?.adapter.attributes("edge-path", {
-                    edgeId: edgeId(),
-                }),
+                edgeAttributes(context, "edge-path", edgeId()),
             );
             return () => {
                 const current = path.value;

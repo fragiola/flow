@@ -15,10 +15,12 @@ handles, and is drawn as a path of its type. The viewport is not in the document
 const node: FlowNodeInput<Types> = {
     id: "fetch",                    // optional on input: generated when missing
     type: "task",                   // a node type of your registry
-    position: { x: 120, y: 80 },    // its top-left corner (the root's nodeOrigin), in flow coordinates
+    position: { x: 120, y: 80 },    // its top-left corner (its origin, else the root's nodeOrigin), in flow coordinates
     data: { title: "Fetch orders", done: false },
-    width: 180,                     // optional: the size the document gives
+    width: 180,                     // optional: a fixed size, over the measured one
     height: 64,
+    // initialWidth, initialHeight: a size until it is measured; handles, sourcePosition,
+    // targetPosition: where its edges end before then; origin: its own anchor (below)
     zIndex: 1,                      // optional: drawn above the nodes with less (default 0)
     draggable: true,                // flags, each with its default
     selectable: true,
@@ -54,8 +56,111 @@ const edge: FlowEdgeInput<Types> = {
 
 An edge without a handle uses its node's first handle of that type (a source handle at its
 source, a target handle at its target), or, when the node has none, leaves the source by its
-bottom and enters the target by its top. An edge of a type of yours gets the bezier path, and its
+bottom and enters the target by its top (a node's `sourcePosition` and `targetPosition` change
+those sides). An edge of a type of yours gets the bezier path, and its
 ends to draw your own ([Custom edges](/docs/guides/custom-edges)).
+
+## Sizes and handles before measuring
+
+The engine measures what you render, so by default a node's edges are drawn once it is on screen
+and measured. A node can declare enough for its edges to be drawn before that: on the server and
+in the first client render ([Server rendering](/docs/guides/server-rendering)), and in `fitView`
+on init.
+
+| field | what it gives |
+| --- | --- |
+| `width`, `height` | a fixed size: it wins over the measured one, always |
+| `initialWidth`, `initialHeight` | a size until the node is measured; then the measured one |
+| `handles` | `DeclaredHandle[]`: `{ id?, type, position, x, y, width?, height? }`, each handle's box relative to the node's top-left corner; an edge ends at the box's centre, the point the engine measures for a rendered handle; a measured handle of the same type and id always wins |
+| `sourcePosition`, `targetPosition` | the side an edge leaves or enters by when no handle (rendered or declared) gives one; default `"bottom"` and `"top"` |
+
+```ts
+const nodes: FlowNodeInput<Types>[] = [
+    {
+        id: "fetch",
+        type: "task",
+        position: { x: 0, y: 0 },
+        data: { title: "Fetch orders", done: false },
+        initialWidth: 180,
+        initialHeight: 64,
+        handles: [{ type: "source", position: "right", x: 176, y: 28, width: 8, height: 8 }],
+    },
+    {
+        id: "parse",
+        type: "task",
+        position: { x: 260, y: 0 },
+        data: { title: "Parse", done: false },
+        initialWidth: 180,
+        initialHeight: 64,
+        targetPosition: "left", // no handle declared: the edge enters by the left side's middle
+    },
+];
+```
+
+Declare what you render: a handle at `x: 176, width: 8` on a 180-wide node is centred on its
+right edge, where a `Flow.Handle` with `side="right"` and an 8 px box sits. When the measured
+geometry equals the declared one, nothing moves when the engine takes over.
+
+## A node's own origin
+
+A node's `position` is its box's top-left corner, or the point the root's `nodeOrigin` names, as
+shares of its size. A node's own `origin` overrides `nodeOrigin` for that node, everywhere the
+engine computes a box (its edges and handles, bounds, `fit-view`, the minimap, toolbars, the
+selection box, drags and resizes):
+
+```ts
+const nodes: FlowNodeInput<Types>[] = [
+    // stands on its top-left corner, as every node by default
+    { id: "start", type: "task", position: { x: 0, y: 0 }, data: { title: "Start", done: false } },
+    // stands on its centre: a circle a layout placed by its centre
+    { id: "hub", type: "task", position: { x: 300, y: 40 }, origin: { x: 0.5, y: 0.5 }, data: { title: "Hub", done: false } },
+];
+```
+
+<Framework name="react">
+
+```tsx
+<Flow.Root defaultNodes={nodes} nodeOrigin={{ x: 0, y: 0 }} className="h-96">
+    …
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Root :default-nodes="nodes" :node-origin="{ x: 0, y: 0 }" class="h-96">
+    …
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Root defaultNodes={nodes} nodeOrigin={{ x: 0, y: 0 }} class="h-96">
+    …
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowRoot [defaultNodes]="nodes" [nodeOrigin]="{ x: 0, y: 0 }" class="h-96">
+    …
+</div>
+```
+
+</Framework>
+
+As with `nodeOrigin`, a child of a sub-flow keeps its top-left corner in its parent: its own
+`origin` does not move it, so the model's sub-flow rules hold as they are. A parent's `origin`
+moves its box, and its children with it. The model's own sub-flow rules count the position as the
+corner ([Limitations](/docs/limitations)).
 
 ## Where a node may go
 
@@ -119,23 +224,30 @@ const nodes: FlowNodeInput<Types>[] = [
 The model itself keeps only `"parent"` (with the sizes the document gives): a rectangle is kept by
 the gestures, so `node.move` from your code may place a node outside it.
 
-## Which is drawn above
+## Z-order
 
 Nodes are drawn in the order of their `zIndex` (default 0), then of the document; a child is
 always above its parent. A selected node rises above the others, its children with it, while the
-root's `elevateNodesOnSelect` is on (the default). Edges are ordered among themselves the same way,
-and a selected edge rises above the other edges with `elevateEdgesOnSelect` (off by default).
-Change an order from code with two commands, `null` putting the default back:
+root's `elevateNodesOnSelect` is on (the default). Edges are ordered by their `zIndex` the same
+way. Change an order from code with two commands, `null` putting the default back:
 
 ```ts
 model.run("node.set-z-index", { nodeId: "note", zIndex: 10 });
 model.run("edge.set-z-index", { edgeId: "fetch-parse", zIndex: null });
 ```
 
+Whether an edge may stand above nodes is the root's `zIndexMode`:
+
+| `zIndexMode` | nodes | edges |
+| --- | --- | --- |
+| `"basic"` | by `zIndex`, a selected one raised (`elevateNodesOnSelect`), a child above its parent | by `zIndex`, a selected one raised among the edges (`elevateEdgesOnSelect`, off by default); every edge below every node |
+| `"auto"` (the default) | as in `"basic"` | as high as its `zIndex`, and at least as high as its ends when one of them is a child (an edge between a group's children stands above the group); a selected one is raised above the nodes (`elevateEdgesOnSelect` defaults to true here) |
+| `"manual"` | only their `zIndex` | only their `zIndex`: one above a node's is drawn above it |
+
 <Framework name="react">
 
 ```tsx
-<Flow.Root defaultNodes={nodes} defaultEdges={edges} elevateNodesOnSelect={false} elevateEdgesOnSelect>
+<Flow.Root defaultNodes={nodes} defaultEdges={edges} zIndexMode="basic" elevateNodesOnSelect={false} elevateEdgesOnSelect>
     …
 </Flow.Root>
 ```
@@ -145,7 +257,7 @@ model.run("edge.set-z-index", { edgeId: "fetch-parse", zIndex: null });
 <Framework name="vue">
 
 ```vue
-<Flow.Root :default-nodes="nodes" :default-edges="edges" :elevate-nodes-on-select="false" elevate-edges-on-select>
+<Flow.Root :default-nodes="nodes" :default-edges="edges" z-index-mode="basic" :elevate-nodes-on-select="false" elevate-edges-on-select>
     …
 </Flow.Root>
 ```
@@ -155,7 +267,7 @@ model.run("edge.set-z-index", { edgeId: "fetch-parse", zIndex: null });
 <Framework name="svelte">
 
 ```svelte
-<Flow.Root defaultNodes={nodes} defaultEdges={edges} elevateNodesOnSelect={false} elevateEdgesOnSelect>
+<Flow.Root defaultNodes={nodes} defaultEdges={edges} zIndexMode="basic" elevateNodesOnSelect={false} elevateEdgesOnSelect>
     …
 </Flow.Root>
 ```
@@ -165,17 +277,46 @@ model.run("edge.set-z-index", { edgeId: "fetch-parse", zIndex: null });
 <Framework name="angular">
 
 ```html
-<div flowRoot [defaultNodes]="nodes" [defaultEdges]="edges" [elevateNodesOnSelect]="false" elevateEdgesOnSelect>
+<div flowRoot [defaultNodes]="nodes" [defaultEdges]="edges" zIndexMode="basic" [elevateNodesOnSelect]="false" elevateEdgesOnSelect>
     …
 </div>
 ```
 
 </Framework>
 
-The order holds within each layer: edges are always drawn below every node, whatever their
-`zIndex` ([Limitations](/docs/limitations)). The adapters put a node's order in its structural
-`z-index` (a selected node's is raised by 10 000), so a `z-index` of yours on a node is
-overridden; the first render, before the engine is attached, has none.
+These are this package's own choices, not React Flow's defaults: React Flow defaults to
+`"basic"`, and its `"basic"` already lifts an edge to the z of an end that is a child or selected.
+Here `"basic"` is the order this package had before `"auto"`: every edge below every node, which
+is what you want when a selected edge must never cover a node. `"auto"` is the default because it
+keeps a sub-flow's edges visible above their group and a selected edge visible above the nodes it
+crosses. Turn `elevateEdgesOnSelect` off to keep `"auto"`'s sub-flow order without raising the
+selected edge ([Limitations](/docs/limitations)).
+
+### How it is drawn
+
+The engine splits the flow into ordered levels (`engine.get("render-layers")`): one, the edges
+below the nodes, unless an edge stands above some node. With one level the DOM is exactly the
+usual one: an edges SVG in `Flow.Edges`, then the nodes in `Flow.Nodes`. With several,
+`Flow.Edges` holds one wrapper per level, `data-flow-part="edges-layer"` with `data-level` (0 the
+lowest) and the level's `z-index`, each with its SVG (`data-flow-part="edges"`) and its edges'
+labels; the nodes stay in their one `nodes` layer, which drops its `isolation` then, and their
+z-indexes interleave with the levels' in the viewport. A node never changes wrapper, so it keeps
+its state, focus and measurement; an edge that changes level is remounted (in Angular, moved) and
+gets its focus back.
+
+```css title="flow.css"
+/* the wrappers only appear while an edge stands above a node */
+[data-flow-part="edges-layer"][data-level="1"] [data-flow-part="edge-path"] {
+    stroke-width: 2;
+}
+```
+
+For the layering to work, your CSS must not make `Flow.Nodes` or `Flow.Edges` a stacking context:
+no `opacity` below 1, `transform`, `filter`, `isolation` or `z-index` on them (style a wrapper of
+yours around `Flow.Viewport`, or the nodes themselves, instead). The adapters put a node's order in
+its structural `z-index` (a selected node's is raised by 10 000; a negative rank while there are
+several levels), so a `z-index` of yours on a node is overridden; the first render takes the same
+value from the document's static geometry.
 
 ## The rules the model keeps
 

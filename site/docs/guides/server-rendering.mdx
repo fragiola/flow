@@ -1,0 +1,300 @@
+---
+title: Server rendering
+description: Declare node sizes and handles so the edges are in the server HTML and the first client render, with no hydration mismatch and no jump when the engine measures.
+---
+
+The engine measures what you render: a node's size, each handle's centre. It exists only in the
+browser, once the root is mounted. Before that (on the server, and in the first client render)
+the adapters draw the flow from the document alone, with `staticGeometry`: every node at its
+place, and every edge whose two nodes have a size the document gives, ending at the handles the
+document declares. Declare them, and the edges are in the server HTML (React, Vue, Svelte) and in
+the browser's first paint (all four), before anything is measured.
+
+What stays yours: the server setup of your framework (Next.js, Nuxt, SvelteKit, your own
+`renderToString`), and keeping the declared sizes and handles equal to what you render.
+
+<Example id="server-rendering" />
+
+## Declare sizes and handles
+
+A node's size, for the static geometry, is its `width` / `height` (fixed: they win over the
+measured size, always) or else its `initialWidth` / `initialHeight` (used only until the node is
+measured). A node with neither has no size before it is measured, and its edges wait.
+
+An edge ends at its node's declared `handles`: each one a box `{ type, position, x, y, width?,
+height?, id? }` relative to the node's top-left corner, its point the box's centre (the point the
+engine measures for a rendered `Flow.Handle`). A node without declared handles is entered and left
+by the middle of a side: `targetPosition` (default `"top"`) and `sourcePosition` (default
+`"bottom"`).
+
+```ts title="nodes.ts"
+// a 160 × 48 card, with 10 px handles centred on its top and bottom sides
+const card = (id: string, x: number, y: number, label: string): FlowNodeInput<Types> => ({
+    id,
+    type: "step",
+    position: { x, y },
+    data: { label },
+    width: 160,
+    height: 48,
+    handles: [
+        { type: "target", position: "top", x: 75, y: -5, width: 10, height: 10 },
+        { type: "source", position: "bottom", x: 75, y: 43, width: 10, height: 10 },
+    ],
+});
+
+const nodes = [
+    card("start", 0, 0, "Start"),
+    card("fetch", -160, 140, "Fetch data"),
+    card("save", 0, 280, "Save"),
+];
+
+const edges: FlowEdgeInput<Types>[] = [
+    { id: "start-fetch", source: "start", target: "fetch" },
+    { id: "fetch-save", source: "fetch", target: "save" },
+];
+```
+
+Render what you declared: the node gets `width` and `height` as its structural style, and a
+`Flow.Handle` sits centred on the middle of its side, so a 10 px handle on the top of a 160-wide
+node has its box at `x: 75, y: -5`.
+
+<Framework name="react">
+
+```tsx title="flow.tsx"
+<Flow.Root<Types> defaultNodes={nodes} defaultEdges={edges} className="h-[480px] w-full">
+    <Flow.Viewport>
+        <Flow.Edges<Types>>
+            {(edge) => (
+                <Flow.Edge<Types> edge={edge}>
+                    <Flow.EdgePath className="stroke-slate-400 stroke-2" />
+                </Flow.Edge>
+            )}
+        </Flow.Edges>
+        <Flow.Nodes<Types>>
+            {(node) => (
+                <Flow.Node<Types> node={node} className="rounded-lg border bg-white p-3 text-center">
+                    {node.data.label}
+                    <Flow.Handle type="target" side="top" className="size-2.5 rounded-full border bg-white" />
+                    <Flow.Handle type="source" side="bottom" className="size-2.5 rounded-full border bg-white" />
+                </Flow.Node>
+            )}
+        </Flow.Nodes>
+    </Flow.Viewport>
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="flow.vue"
+<template>
+    <Flow.Root :default-nodes="nodes" :default-edges="edges" class="h-[480px] w-full">
+        <Flow.Viewport>
+            <Flow.Edges v-slot="{ edge }">
+                <Flow.Edge :edge="edge">
+                    <Flow.EdgePath class="stroke-slate-400 stroke-2" />
+                </Flow.Edge>
+            </Flow.Edges>
+            <Flow.Nodes v-slot="{ node }">
+                <Flow.Node :node="node" class="rounded-lg border bg-white p-3 text-center">
+                    {{ node.data.label }}
+                    <Flow.Handle type="target" side="top" class="size-2.5 rounded-full border bg-white" />
+                    <Flow.Handle type="source" side="bottom" class="size-2.5 rounded-full border bg-white" />
+                </Flow.Node>
+            </Flow.Nodes>
+        </Flow.Viewport>
+    </Flow.Root>
+</template>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="flow.svelte"
+<Flow.Root defaultNodes={nodes} defaultEdges={edges} class="h-[480px] w-full">
+    <Flow.Viewport>
+        <Flow.Edges>
+            {#snippet children(edge)}
+                <Flow.Edge {edge}>
+                    <Flow.EdgePath class="stroke-slate-400 stroke-2" />
+                </Flow.Edge>
+            {/snippet}
+        </Flow.Edges>
+        <Flow.Nodes>
+            {#snippet children(node)}
+                <Flow.Node {node} class="rounded-lg border bg-white p-3 text-center">
+                    {node.data.label}
+                    <Flow.Handle type="target" side="top" class="size-2.5 rounded-full border bg-white" />
+                    <Flow.Handle type="source" side="bottom" class="size-2.5 rounded-full border bg-white" />
+                </Flow.Node>
+            {/snippet}
+        </Flow.Nodes>
+    </Flow.Viewport>
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowRoot [model]="model" class="h-[480px] w-full">
+    <div flowViewport>
+        <div flowEdges>
+            <ng-template [flowEdgesItem]="model" let-edge>
+                <svg:g [flowEdge]="edge">
+                    <svg:path flowEdgePath class="stroke-slate-400 stroke-2" />
+                </svg:g>
+            </ng-template>
+        </div>
+        <div flowNodes>
+            <ng-template [flowNodesItem]="model" let-node>
+                <div [flowNode]="node" class="rounded-lg border bg-white p-3 text-center">
+                    {{ node.data.label }}
+                    <div flowHandle type="target" side="top" class="size-2.5 rounded-full border bg-white"></div>
+                    <div flowHandle type="source" side="bottom" class="size-2.5 rounded-full border bg-white"></div>
+                </div>
+            </ng-template>
+        </div>
+    </div>
+</div>
+```
+
+</Framework>
+
+A node whose content decides its size can take `initialWidth` / `initialHeight` instead of
+`width` / `height`: a close guess draws its edges at once, and the measured size replaces it.
+
+## Render it on the server
+
+Nothing else is needed: render the flow with your framework's server renderer, and hydrate it.
+The HTML holds the root, the viewport, each node at its place and each edge's `path` with its `d`.
+
+<Framework name="react">
+
+```tsx title="server.tsx"
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
+
+// on the server
+const html = renderToString(<App />);
+
+// in the browser, over that HTML
+hydrateRoot(document.getElementById("app")!, <App />);
+```
+
+In a framework with server components (Next.js), the flow is a client component (`"use client"`):
+it is still rendered to HTML on the server, edges included.
+
+</Framework>
+
+<Framework name="vue">
+
+```ts title="server.ts"
+import { createSSRApp } from "vue";
+import { renderToString } from "vue/server-renderer";
+import App from "./app.vue";
+
+// on the server
+const html = await renderToString(createSSRApp(App));
+
+// in the browser, over that HTML: createSSRApp hydrates
+createSSRApp(App).mount("#app");
+```
+
+Nuxt does both for you.
+
+</Framework>
+
+<Framework name="svelte">
+
+```ts title="server.ts"
+import { hydrate } from "svelte";
+import { render } from "svelte/server";
+import App from "./app.svelte";
+
+// on the server
+const { body } = render(App);
+
+// in the browser, over that HTML
+hydrate(App, { target: document.getElementById("app")! });
+```
+
+SvelteKit does both for you.
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="main.ts"
+import { bootstrapApplication } from "@angular/platform-browser";
+import { App } from "./app";
+
+// a browser bootstrap: the first render draws the declared edges, then flowRoot makes its engine
+bootstrapApplication(App);
+```
+
+`@fragiola/flow-angular` has no server render: its directives write to their elements in the
+browser. The static geometry still draws the declared edges in the browser's first render, before
+`flowRoot` creates its engine (after that render), so they are there on the first paint.
+
+</Framework>
+
+## No hydration mismatch, no jump
+
+The server's HTML, the first client render and the engine before it measures run the very same
+pure functions of the same inputs (the document and the root's `nodeOrigin`, `pathOptions`,
+`zIndexMode`, `elevateNodesOnSelect`, `elevateEdgesOnSelect`): the client renders exactly what
+the server sent, so hydration reports no mismatch. Then the engine measures. When the measured
+sizes and handle centres equal the declared ones, no path and no node moves; when they differ, the
+measured ones win and the edges follow them.
+
+The server HTML is drawn at the identity viewport (`{ x: 0, y: 0, zoom: 1 }`): only the engine
+writes the viewport's transform, and the engine is attached after mount. `defaultViewport` and
+`fitView` apply then, so they pan and zoom the whole flow once the page is interactive. For a
+server-rendered flow without a jump, keep the identity viewport and place the nodes where they
+should be seen at zoom 1 (as the example above does), or accept that move.
+
+- **Measured handles win**: a declared handle is used only until a handle of that node, type and
+  id is rendered and measured. Declare the handles you render, at the place you render them.
+- **Fixed sizes stay**: `width` / `height` are the node's size before and after measurement;
+  `initialWidth` / `initialHeight` give way to the measured size.
+- **Origins and layers too**: a node's `origin` (or the root's `nodeOrigin`) places it on the
+  server as in the browser, and an edge that stands above nodes (`zIndexMode`) is in its own
+  `edges-layer` from the server on ([Z-order](/docs/concepts/nodes-and-edges#z-order)). The
+  viewport is its own stacking context from the server on too (`isolation: isolate`), so those
+  layers stack inside it before the engine as after.
+- **Edge labels come after mount**: a `Flow.EdgeLabel` portals into its layer, so labels are not
+  in the server HTML; the paths are.
+- **`fitView` moves the flow after mount**: the server draws the identity viewport, and `fitView`
+  runs once the engine is attached, counting the declared sizes; it fits once, and is not run
+  again when the measured sizes differ. Leave it out (and `defaultViewport` at the identity) for a
+  flow that does not move on hydration.
+
+## Draw a flow yourself
+
+`staticGeometry(flow, options?)`, from the core (and every adapter's main entry), is the geometry
+the adapters render before the engine: node rects (absolute, origin applied), node z-indexes, edge
+paths, the drawing order and the render layers, as frozen plain data. It needs no DOM and no
+engine, so an app can use it for what it renders itself: an SVG thumbnail, an image on the server,
+a static preview in a list.
+
+```ts title="thumbnail.ts"
+import { staticGeometry } from "@fragiola/flow";
+
+export function thumbnail(flow: { nodes: FlowNode[]; edges: FlowEdge[] }): string {
+    const geometry = staticGeometry(flow);
+    const boxes = Object.values(geometry.nodeRects).map(
+        (rect) => `<rect x="${rect.x}" y="${rect.y}" width="${rect.width}" height="${rect.height}" rx="6" />`,
+    );
+    const paths = geometry.drawnEdges.map(
+        (edgeId) => `<path d="${geometry.edgePaths[edgeId]?.path}" fill="none" stroke="currentColor" />`,
+    );
+    return `<svg xmlns="http://www.w3.org/2000/svg">${paths.join("")}${boxes.join("")}</svg>`;
+}
+```
+
+Give it the root's options (`nodeOrigin`, `pathOptions`, `zIndexMode`, …) when the picture must
+match the flow on screen. Its fields: [Static geometry](/docs/api/engine#static-geometry).

@@ -7,6 +7,7 @@ import type {
     FlowFeatures,
     FlowModel,
     FlowTypes,
+    StaticGeometry,
 } from "@fragiola/flow";
 import * as React from "react";
 
@@ -25,6 +26,11 @@ export interface FlowContextValue {
     readonly publicEngine: AnyFlowEngine;
     /** the root's element, once mounted: what renders outside the zoom portals into it */
     readonly rootElement: HTMLElement | null;
+    /**
+     * the flow's geometry from its document while there is no engine (the server render and the
+     * first client render: `staticGeometry` with the root's options), null once the engine exists
+     */
+    readonly staticGeometry: StaticGeometry | null;
 }
 
 export const FlowContext = React.createContext<FlowContextValue | null>(null);
@@ -43,7 +49,10 @@ export interface EdgeContextValue {
 
 export const EdgeContext = React.createContext<EdgeContextValue | null>(null);
 
-/** The HTML layer of `Flow.Edges` that edge labels portal into (null until mounted). */
+/**
+ * The HTML layer edge labels portal into (null until mounted): the `Flow.Edges` element with one
+ * render level, its level's `edges-layer` wrapper with several.
+ */
 export const EdgeLabelLayerContext = React.createContext<HTMLElement | null>(
     null,
 );

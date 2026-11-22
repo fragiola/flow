@@ -1,14 +1,14 @@
-// An edge as the engine draws it (D9): its ends at its handles' centres (or, for a node with no
-// handle registered for that end, the middle of its default side: a source leaves by the bottom,
-// a target enters by the top), and its path by its type.
+// An edge as it is drawn (D9), with or without an engine: its ends at its handles' centres (or,
+// for a node with no handle for that end, the middle of its default side: its `sourcePosition` /
+// `targetPosition`, else a source leaves by the bottom and a target enters by the top), and its
+// path by its type. Pure: no DOM and nothing of the engine (the server render calls it too).
 import type { FlowEdge, XY } from "../document/types";
-import { bezierPath } from "../geometry/bezier-path";
-import { simpleBezierPath } from "../geometry/simple-bezier-path";
-import { smoothStepPath, stepPath } from "../geometry/smooth-step-path";
-import { straightPath } from "../geometry/straight-path";
-import type { EdgePath, HandleSide, PathEnds, Rect } from "../geometry/types";
 import type { HandleType } from "../state/queries";
-import type { FlowHandle } from "./adapter";
+import { bezierPath } from "./bezier-path";
+import { simpleBezierPath } from "./simple-bezier-path";
+import { smoothStepPath, stepPath } from "./smooth-step-path";
+import { straightPath } from "./straight-path";
+import type { EdgePath, HandleSide, PathEnds, Rect } from "./types";
 
 /** The shape options of the built-in paths (the engine's `pathOptions`). */
 export interface PathOptions {
@@ -26,7 +26,15 @@ export interface PathOptions {
     readonly centerY?: number | undefined;
 }
 
-/** What the edge geometry reads of the engine. */
+/** A handle as the edge geometry reads it: its side and, once placed, its absolute centre. */
+export interface EdgeEndHandle {
+    /** the side of its node it sits on */
+    readonly side: HandleSide;
+    /** its centre in absolute flow coordinates (none: the middle of its side is used) */
+    readonly center: XY | undefined;
+}
+
+/** What the edge geometry reads: the engine's measured flow, or a document's declared one. */
 export interface EdgeLookup {
     /** a node's absolute box, when its size is known */
     rect(nodeId: string): Rect | undefined;
@@ -35,7 +43,9 @@ export interface EdgeLookup {
         nodeId: string,
         type: HandleType,
         handleId: string | undefined,
-    ): FlowHandle | undefined;
+    ): EdgeEndHandle | undefined;
+    /** the side an end at a node with no handle for it takes (its `sourcePosition` / `targetPosition`) */
+    side(nodeId: string, type: HandleType): HandleSide | undefined;
 }
 
 /** The middle of a rectangle's side. */
@@ -57,13 +67,15 @@ function endOf(
     nodeId: string,
     type: HandleType,
     handleId: string | undefined,
-    fallback: HandleSide,
 ): { point: XY; side: HandleSide } | undefined {
     const rect = lookup.rect(nodeId);
     if (!rect) return undefined;
     const handle = lookup.handle(nodeId, type, handleId);
     if (handle?.center) return { point: handle.center, side: handle.side };
-    const side = handle?.side ?? fallback;
+    const side =
+        handle?.side ??
+        lookup.side(nodeId, type) ??
+        (type === "source" ? "bottom" : "top");
     return { point: sidePoint(rect, side), side };
 }
 
@@ -72,20 +84,8 @@ export function edgeEnds(
     edge: FlowEdge,
     lookup: EdgeLookup,
 ): PathEnds | undefined {
-    const source = endOf(
-        lookup,
-        edge.source,
-        "source",
-        edge.sourceHandle,
-        "bottom",
-    );
-    const target = endOf(
-        lookup,
-        edge.target,
-        "target",
-        edge.targetHandle,
-        "top",
-    );
+    const source = endOf(lookup, edge.source, "source", edge.sourceHandle);
+    const target = endOf(lookup, edge.target, "target", edge.targetHandle);
     return source && target
         ? {
               source: source.point,

@@ -23,13 +23,16 @@
 <!--
     @component
     An edge's path (`data-flow-part="edge-path"`): an SVG `<path>` whose `d` is the engine's
-    (`edge-path-by`, D9), unfilled. A `d` of your own draws an app type (from `state.path`'s ends).
+    (`edge-path-by`, D9; before the engine, the static geometry's), unfilled. A `d` of your own draws an app type (from `state.path`'s ends).
     Several may share an edge: a wide transparent one is a bigger press target.
 -->
 <script lang="ts">
     import { useEdgeId, useFlowContext } from "../context.js";
     import { flowValue } from "../runes/internal.svelte.js";
-    import { edgePathValue } from "../runes/use-edge.svelte.js";
+    import {
+        edgePathValue,
+        staticAttributes,
+    } from "../runes/use-edge.svelte.js";
     import {
         elementProps,
         refProps,
@@ -48,9 +51,18 @@
     const edgeIdOf = useEdgeId("EdgePath", () => edgeIdProp);
     const context = useFlowContext("EdgePath");
     const path = edgePathValue(context, edgeIdOf);
-    const attributes = flowValue(context, () =>
-        context.engine?.adapter.attributes("edge-path", { edgeId: edgeIdOf() }),
-    );
+    // the engine's attributes, or before it (the server, the first render) the document's
+    const attributes = flowValue(context, () => {
+        const edgeId = edgeIdOf();
+        const { engine, model } = context;
+        return engine
+            ? engine.adapter.attributes("edge-path", { edgeId })
+            : staticAttributes(
+                  "edge-path",
+                  edgeId,
+                  model.get("edge-by", { id: edgeId }),
+              );
+    });
     const refs = refProps((element) => {
         ref = element as SVGPathElement | null;
     });

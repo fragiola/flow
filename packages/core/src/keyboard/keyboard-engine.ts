@@ -12,7 +12,9 @@
 // With `connection()`, handles take focus too (`tabindex` in their attributes) and Enter or Space
 // on one starts a keyboard connection (Tab, Shift + Tab or the arrows walk the targets the model
 // accepts, nearest first; Enter or Space connect; Escape cancels); with `resize()`, resize handles
-// take focus and the arrows move their sides. Both are reached through the host's keyboard links,
+// take focus and the arrows move their sides (#40: a handle's own direction over its resizer's).
+// The selection's rectangle (`nodes-selection`) takes focus as well, and its keys are a focused
+// selected node's: the arrows move the selection, the delete keys remove it, Escape clears it. Both are reached through the host's keyboard links,
 // never by importing those features.
 import type { BatchEntry } from "../commands/types";
 import type { FlowEdge, FlowNode, XY } from "../document/types";
@@ -424,10 +426,15 @@ export function keyboardEngine(
                 const distance = event.shiftKey
                     ? options.fastStep
                     : options.step;
-                return links.resize.step(target.nodeId, target.position, {
-                    x: direction.x * distance,
-                    y: direction.y * distance,
-                });
+                return links.resize.step(
+                    target.nodeId,
+                    target.position,
+                    {
+                        x: direction.x * distance,
+                        y: direction.y * distance,
+                    },
+                    target.direction,
+                );
             }
             if (direction) {
                 if (event.altKey || event.ctrlKey || event.metaKey)
@@ -489,7 +496,12 @@ export function keyboardEngine(
                 ) {
                     into.tabindex = "0";
                 }
-            } else if (part === "resize-handle" && links.resize !== undefined) {
+            } else if (
+                (part === "resize-handle" && links.resize !== undefined) ||
+                part === "nodes-selection"
+            ) {
+                // the selection's rectangle takes focus too: the arrows move the selection, the
+                // delete keys remove it, Escape clears it (a focused selected node's keys)
                 into.tabindex = "0";
             }
         },

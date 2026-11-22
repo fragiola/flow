@@ -98,6 +98,130 @@ export class Resizable {
 
 </Framework>
 
+## Its own direction, and a line
+
+A handle's `direction` (`"horizontal"`, `"vertical"`) overrides its resizer's for that handle: a
+press or an arrow key on it moves only the width (and x), or only the height (and y). It carries
+`data-direction`, read when the press or the key starts. Without it, the handle follows its
+`NodeResizer`'s `direction`, as before.
+
+`variant="line"` marks a side's handle as a line: `data-variant="line"`, for your styles (a thin
+bar along the whole side, a resize cursor). The structural style is the same as a handle's; the
+look is yours. A corner is always `data-variant="handle"`: its `"line"` is ignored.
+
+Here a card grows freely from its corner, while its right and bottom sides are thin lines that each
+move one dimension:
+
+<Framework name="react">
+
+```tsx
+import { NodeResizer, ResizeHandle } from "@fragiola/flow-react/resize";
+
+<NodeResizer>
+    <ResizeHandle position="bottom-right" aria-label="Resize card" className="size-2.5 bg-palette-ring" />
+    <ResizeHandle
+        position="right"
+        variant="line"
+        direction="horizontal"
+        aria-label="Resize card: width"
+        className="w-px cursor-ew-resize bg-palette-ring data-[variant=line]:w-0.5"
+    />
+    <ResizeHandle
+        position="bottom"
+        variant="line"
+        direction="vertical"
+        aria-label="Resize card: height"
+        className="h-px cursor-ns-resize bg-palette-ring data-[variant=line]:h-0.5"
+    />
+</NodeResizer>;
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import { NodeResizer, ResizeHandle } from "@fragiola/flow-vue/resize";
+</script>
+
+<template>
+    <NodeResizer>
+        <ResizeHandle position="bottom-right" aria-label="Resize card" class="size-2.5 bg-palette-ring" />
+        <ResizeHandle
+            position="right"
+            variant="line"
+            direction="horizontal"
+            aria-label="Resize card: width"
+            class="w-px cursor-ew-resize bg-palette-ring data-[variant=line]:w-0.5"
+        />
+        <ResizeHandle
+            position="bottom"
+            variant="line"
+            direction="vertical"
+            aria-label="Resize card: height"
+            class="h-px cursor-ns-resize bg-palette-ring data-[variant=line]:h-0.5"
+        />
+    </NodeResizer>
+</template>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<script lang="ts">
+    import { NodeResizer, ResizeHandle } from "@fragiola/flow-svelte/resize";
+</script>
+
+<NodeResizer>
+    <ResizeHandle position="bottom-right" aria-label="Resize card" class="size-2.5 bg-palette-ring" />
+    <ResizeHandle
+        position="right"
+        variant="line"
+        direction="horizontal"
+        aria-label="Resize card: width"
+        class="w-px cursor-ew-resize bg-palette-ring data-[variant=line]:w-0.5"
+    />
+    <ResizeHandle
+        position="bottom"
+        variant="line"
+        direction="vertical"
+        aria-label="Resize card: height"
+        class="h-px cursor-ns-resize bg-palette-ring data-[variant=line]:h-0.5"
+    />
+</NodeResizer>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowNodeResizer>
+    <div flowResizeHandle position="bottom-right" aria-label="Resize card" class="size-2.5 bg-palette-ring"></div>
+    <div
+        flowResizeHandle
+        position="right"
+        variant="line"
+        direction="horizontal"
+        aria-label="Resize card: width"
+        class="w-px cursor-ew-resize bg-palette-ring data-[variant=line]:w-0.5"
+    ></div>
+    <div
+        flowResizeHandle
+        position="bottom"
+        variant="line"
+        direction="vertical"
+        aria-label="Resize card: height"
+        class="h-px cursor-ns-resize bg-palette-ring data-[variant=line]:h-0.5"
+    ></div>
+</div>
+```
+
+</Framework>
+
 ## Props
 
 `ResizeHandleProps` extends the [common primitive props](/docs/api/primitives/root#common-props) and
@@ -107,6 +231,8 @@ every `div` attribute.
 | --- | --- | --- | --- |
 | `position` | `ResizePosition` | required | the corner or side it moves |
 | `nodeId` | `string` | the enclosing `Flow.Node`'s | the node its state names (the node a press resizes is the one it is rendered in) |
+| `direction` | `ResizeHandleDirection` | its resizer's | the sides it moves, over its resizer's `direction`: `"horizontal"` only the width (and x), `"vertical"` only the height (and y) (`data-direction`) |
+| `variant` | `ResizeHandleVariant` | `"handle"` | how it is drawn, for your styles (`data-variant`): `"handle"` or `"line"`, a side's whole length; a corner's `"line"` is ignored |
 | `children` | `ReactNode` | none | its content |
 
 ## State
@@ -117,6 +243,8 @@ every `div` attribute.
 | --- | --- | --- |
 | `nodeId` | `string` | its node |
 | `position` | `ResizePosition` | its corner or side |
+| `direction` | `ResizeHandleDirection \| undefined` | its own direction; none: its resizer's |
+| `variant` | `ResizeHandleVariant` | how it is drawn: a corner is always `"handle"` |
 
 ## Data attributes
 
@@ -124,6 +252,9 @@ every `div` attribute.
 | --- | --- |
 | `data-flow-part` | `"resize-handle"` |
 | `data-position` | its `ResizePosition` |
+| `data-variant` | `"handle"` or `"line"` (a side's only) |
+| `data-direction` | its own `direction`, when it has one |
+| `tabindex` | `"0"` with `keyboard()` installed |
 
 ## Structural style
 

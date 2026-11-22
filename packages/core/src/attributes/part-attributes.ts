@@ -15,8 +15,20 @@ export const ID_ATTRIBUTE = "data-flow-id";
 /** The attribute a resize handle carries: which corner or side of its node it moves. */
 export const POSITION_ATTRIBUTE = "data-position";
 
+/**
+ * The attribute a resize handle given its own direction carries (`horizontal`, `vertical`): the
+ * sides it moves, over its resizer's `direction`, read when a press or a key on it starts.
+ */
+export const DIRECTION_ATTRIBUTE = "data-direction";
+
+/** The attribute a resize handle carries: how it is drawn (`handle`, `line`), for the app's styles. */
+export const VARIANT_ATTRIBUTE = "data-variant";
+
 /** The attribute a reconnect anchor carries: which end of its edge it moves (`source`, `target`). */
 export const END_ATTRIBUTE = "data-end";
+
+/** The attribute an edges layer carries: its render level (`render-layers`), 0 the lowest. */
+export const LEVEL_ATTRIBUTE = "data-level";
 
 /** A subtree inside a node that starts no gesture when pressed (a slider, a text field). */
 export const NO_GESTURE_ATTRIBUTE = "data-flow-no-gesture";
@@ -37,6 +49,7 @@ export type FlowPart =
     | "nodes"
     | "node"
     | "edges"
+    | "edges-layer"
     | "edge"
     | "edge-path"
     | "edge-label"
@@ -71,4 +84,58 @@ export function partAttributes(part: string, id?: string): PartAttributes {
     return id === undefined
         ? { [PART_ATTRIBUTE]: part }
         : { [PART_ATTRIBUTE]: part, [ID_ATTRIBUTE]: id };
+}
+
+/**
+ * The attributes of one render level's edges layer (`edges-layer`, with several levels): its part
+ * and its `data-level`. Static: the same with or without an engine.
+ */
+export function edgesLayerAttributes(level: number): PartAttributes {
+    return {
+        [PART_ATTRIBUTE]: "edges-layer",
+        [LEVEL_ATTRIBUTE]: String(level),
+    };
+}
+
+/** The sides a resize handle moves, over its resizer's direction. */
+export type ResizeHandleDirection = "horizontal" | "vertical";
+
+/**
+ * How a resize handle is drawn: `handle` (a grab area on its corner or side) or `line` (a side's
+ * whole length, a marker the app styles thin); a corner is always a `handle`.
+ */
+export type ResizeHandleVariant = "handle" | "line";
+
+/** What a resize handle's attributes are made of (`resizeHandleAttributes`). */
+export interface ResizeHandleAttributeOptions {
+    /** the sides it moves, over its resizer's; anything else: the resizer's */
+    readonly direction?: string | undefined;
+    /** how it is drawn; default `handle`, and a corner's `line` is ignored */
+    readonly variant?: string | undefined;
+}
+
+const SIDES = new Set(["top", "right", "bottom", "left"]);
+
+/**
+ * The static attributes of a resize handle (the engine's record adds its state): its part,
+ * `data-position`, `data-variant` (`line` only on a side, else `handle`) and `data-direction` when
+ * it has a valid one of its own.
+ */
+export function resizeHandleAttributes(
+    position: string | undefined,
+    options: ResizeHandleAttributeOptions = {},
+): PartAttributes {
+    const { direction, variant } = options;
+    return {
+        [PART_ATTRIBUTE]: "resize-handle",
+        [POSITION_ATTRIBUTE]: position,
+        [VARIANT_ATTRIBUTE]:
+            variant === "line" && position !== undefined && SIDES.has(position)
+                ? "line"
+                : "handle",
+        [DIRECTION_ATTRIBUTE]:
+            direction === "horizontal" || direction === "vertical"
+                ? direction
+                : undefined,
+    };
 }

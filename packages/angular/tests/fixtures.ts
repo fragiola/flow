@@ -70,6 +70,7 @@ export abstract class RootInputs {
         input<FlowEngineOptions["elevateNodesOnSelect"]>();
     readonly elevateEdgesOnSelect =
         input<FlowEngineOptions["elevateEdgesOnSelect"]>();
+    readonly zIndexMode = input<FlowEngineOptions["zIndexMode"]>();
     readonly onNodesChange = input<(nodes: readonly FlowNode[]) => void>();
     readonly onEdgesChange = input<(edges: readonly FlowEdge[]) => void>();
     readonly onViewportChange = input<(viewport: Viewport) => void>();
@@ -102,6 +103,7 @@ const INPUTS = `
     [nodeExtent]="nodeExtent()"
     [elevateNodesOnSelect]="elevateNodesOnSelect()"
     [elevateEdgesOnSelect]="elevateEdgesOnSelect()"
+    [zIndexMode]="zIndexMode()"
 `;
 
 /**

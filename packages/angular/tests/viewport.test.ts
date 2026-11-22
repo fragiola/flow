@@ -25,6 +25,8 @@ describe("the viewport", () => {
             "translate(10px, 20px) scale(1.5)",
         );
         expect(viewport.style.transformOrigin).toBe("0 0");
+        // its own stacking context, transform or not: the render levels' negative z-indexes
+        expect(viewport.style.isolation).toBe("isolate");
     });
 
     it("pans by a drag on the pane and zooms by the wheel without rendering the nodes or the edges again", async () => {

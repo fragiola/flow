@@ -233,6 +233,41 @@ export function pair(): {
     };
 }
 
+/**
+ * {@link pair} with each node's handles declared where the test layout measures them (a 10 × 10
+ * box centred on its side), so the static geometry equals the measured one.
+ */
+export function declaredPair(): {
+    nodes: FlowNodeInput[];
+    edges: FlowEdgeInput[];
+} {
+    const handles = [
+        {
+            type: "target",
+            position: "top",
+            x: 45,
+            y: -5,
+            width: 10,
+            height: 10,
+        },
+        {
+            type: "source",
+            position: "bottom",
+            x: 45,
+            y: 35,
+            width: 10,
+            height: 10,
+        },
+    ];
+    return {
+        nodes: [
+            task("a", 0, 0, { handles } as Partial<FlowNodeInput>),
+            task("b", 0, 200, { handles } as Partial<FlowNodeInput>),
+        ],
+        edges: [{ id: "ab", source: "a", target: "b" }],
+    };
+}
+
 /** The element of a part (and an id). */
 export function part(
     container: ParentNode,

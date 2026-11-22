@@ -28,6 +28,7 @@ describe("createFlowEngine", () => {
             "detachRoot",
             "getSnapshot",
             "model",
+            "refocus",
             "registerHandle",
             "registerNode",
             "setOptions",

@@ -3,7 +3,11 @@
 // re-renders from. An app never needs it: it uses `run`, `can`, `check`, `get`, `is` and
 // `subscribe`. The adapter renders and attaches; the engine listens to the root's events itself
 // (Pointer Events with capture, the wheel, keys, focus) and decides.
-import type { PartAttributes } from "../attributes/part-attributes";
+import type {
+    PartAttributes,
+    ResizeHandleDirection,
+    ResizeHandleVariant,
+} from "../attributes/part-attributes";
 import type { XY } from "../document/types";
 import type { HandleSide, Rect } from "../geometry/types";
 import type { FlowModel } from "../model/create-flow-model";
@@ -76,6 +80,8 @@ export interface PressTarget {
     readonly handle?: FlowHandle | undefined;
     /** a resize handle's corner or side (`data-position`: `top-left`, `top`, …) */
     readonly position?: string | undefined;
+    /** a resize handle's own direction (`data-direction`), over its resizer's */
+    readonly direction?: ResizeHandleDirection | undefined;
     /** a reconnect anchor's end of its edge (`data-end`) */
     readonly end?: "source" | "target" | undefined;
     /**
@@ -103,9 +109,20 @@ export interface PartPayloadMap {
     "edge-label": { edgeId: string };
     "reconnect-anchor": { edgeId: string; end: "source" | "target" };
     handle: HandleRegistration;
-    "resize-handle": { nodeId: string; position: string };
+    /**
+     * a resize handle: its corner or side, its own direction over its resizer's (#40,
+     * `data-direction`), how it is drawn (#40, `data-variant`: `line` on a side only)
+     */
+    "resize-handle": {
+        nodeId: string;
+        position: string;
+        direction?: ResizeHandleDirection | undefined;
+        variant?: ResizeHandleVariant | undefined;
+    };
     resizer: { nodeId: string };
     "minimap-node": { nodeId: string };
+    /** one render level's edges layer (`render-layers`) */
+    "edges-layer": { level: number };
     /** a node's toolbar (`nodeId`), several nodes' (neither: no id) or an edge's (`edgeId`) */
     toolbar: { nodeId?: string | undefined; edgeId?: string | undefined };
 }
@@ -155,6 +172,13 @@ export interface FlowEngineAdapter {
             ? [payload: PartPayloadMap[P]]
             : [payload?: Readonly<Record<string, unknown>>]
     ): PartAttributes;
+    /**
+     * gives focus back to a part that was remounted (an edge moved to another render level's
+     * layer): when `element` is the part (`data-flow-part` and `data-flow-id`) that last had focus
+     * in the flow and focus was lost (its document's active element is its body, or none), it is
+     * focused again, without scrolling
+     */
+    refocus(element: Element): void;
     /** calls `listener` when the view changed (not the model: adapters subscribe to it); returns its remover */
     subscribe(listener: (change: ViewChange) => void): () => void;
     /** a number that changes whenever the view changes */

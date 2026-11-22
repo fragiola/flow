@@ -2,6 +2,7 @@
 // a popup's own, never the global ones), and what a press, a key or the wheel hit, read from the
 // part attributes (D11).
 import {
+    DIRECTION_ATTRIBUTE,
     DRAG_HANDLE_ATTRIBUTE,
     END_ATTRIBUTE,
     ID_ATTRIBUTE,
@@ -45,6 +46,7 @@ const PANE_PARTS = new Set([
     "background",
     "nodes",
     "edges",
+    "edges-layer",
 ]);
 
 const EDGE_PARTS = new Set(["edge", "edge-path", "edge-label"]);
@@ -79,6 +81,13 @@ function outsideDragHandle(element: Element, node: Element): boolean {
     const pressed = element.closest(`[${DRAG_HANDLE_ATTRIBUTE}]`);
     if (pressed && node.contains(pressed) && own(pressed)) return false;
     return [...node.querySelectorAll(`[${DRAG_HANDLE_ATTRIBUTE}]`)].some(own);
+}
+
+/** A resize handle's own direction, when its `data-direction` names one. */
+function directionOf(
+    value: string | null,
+): "horizontal" | "vertical" | undefined {
+    return value === "horizontal" || value === "vertical" ? value : undefined;
 }
 
 /** What `target` (an event's) is in the flow under `root`. */
@@ -120,6 +129,7 @@ export function pressTargetOf(
             element: part,
             nodeId: nodeIdAround(part, root),
             position: part.getAttribute(POSITION_ATTRIBUTE) ?? undefined,
+            direction: directionOf(part.getAttribute(DIRECTION_ATTRIBUTE)),
         };
     }
     if (name === "reconnect-anchor") {

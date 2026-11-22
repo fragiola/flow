@@ -86,6 +86,11 @@ for a finger.
 Sides are physical, not logical: a diagram's right stays right in a right-to-left page, so
 `side` never flips with the text direction.
 
+The engine measures each handle's centre once it is rendered. Until then, a node may declare its
+handles in the document (`handles`: `{ id?, type, position, x, y, width?, height? }`), so its
+edges are drawn on the server and in the first render; a measured handle always wins
+([Sizes and handles before measuring](/docs/concepts/nodes-and-edges#sizes-and-handles-before-measuring)).
+
 ## A connection
 
 With `connection()` installed, dragging from a handle draws a connection. `Flow.ConnectionLine`,

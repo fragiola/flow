@@ -36,7 +36,11 @@ import {
     type FlowNodeInput,
     type FlowTypes,
     partAttributes,
+    type RenderLayer,
+    type StaticGeometry,
+    staticGeometry,
     type Viewport,
+    type ZIndexMode,
 } from "@fragiola/flow";
 import {
     type AnyFlowEngine,
@@ -96,6 +100,7 @@ export type RootEngineProps = Pick<
     | "nodeExtent"
     | "elevateNodesOnSelect"
     | "elevateEdgesOnSelect"
+    | "zIndexMode"
     | "paneClickDistance"
     | "nodeClickDistance"
     | "preventScrolling"
@@ -129,6 +134,29 @@ function notInitialized(): Error {
 }
 
 const DEFAULT_VIEWPORT: Viewport = Object.freeze({ x: 0, y: 0, zoom: 1 });
+
+/** Two lists of render layers that draw the same (`render-layers` builds new ones as the flow changes). */
+function sameLayers(
+    a: readonly RenderLayer[],
+    b: readonly RenderLayer[],
+): boolean {
+    const sameIds = (x: readonly string[], y: readonly string[]) =>
+        x.length === y.length && x.every((id, i) => id === y[i]);
+    return (
+        a === b ||
+        (a.length === b.length &&
+            a.every((layer, i) => {
+                const other = b[i];
+                return (
+                    other !== undefined &&
+                    layer.level === other.level &&
+                    layer.zIndex === other.zIndex &&
+                    sameIds(layer.nodeIds, other.nodeIds) &&
+                    sameIds(layer.edgeIds, other.edgeIds)
+                );
+            }))
+    );
+}
 
 /** A list of features by their names, in order: an equal new list (`[features]="[drag()]"`) is the same. */
 function featureNames(features: FlowFeatures | undefined): string {
@@ -295,6 +323,8 @@ export class FlowRootDirective<
     readonly elevateEdgesOnSelect = input(undefined, {
         transform: optionalBoolean,
     });
+    /** how nodes and edges stack (`"basic"`, `"auto"`: the default, `"manual"`) */
+    readonly zIndexMode = input<ZIndexMode | undefined>(undefined);
     readonly paneClickDistance = input(undefined, {
         transform: optionalNumber,
     });
@@ -462,6 +492,62 @@ export class FlowRootDirective<
         });
     }
 
+    /** the static geometry last computed, and what it was computed from */
+    private staticFrom:
+        | {
+              nodes: unknown;
+              edges: unknown;
+              options: string;
+              geometry: StaticGeometry;
+          }
+        | undefined;
+
+    /**
+     * The flow's geometry from its document while there is no engine (the first render): one
+     * object per document and options (every part reads the same), `null` once the engine exists.
+     */
+    private readonly geometry = computed((): StaticGeometry | null => {
+        if (this.current()) return null;
+        this.revision();
+        const model = this.erased();
+        const props = this.engineProps();
+        const options = {
+            nodeOrigin: props.nodeOrigin,
+            pathOptions: props.pathOptions,
+            zIndexMode: props.zIndexMode,
+            elevateNodesOnSelect: props.elevateNodesOnSelect,
+            elevateEdgesOnSelect: props.elevateEdgesOnSelect,
+        };
+        return untracked(() => {
+            const nodes = model.get("all-nodes");
+            const edges = model.get("all-edges");
+            const key = JSON.stringify(options);
+            const last = this.staticFrom;
+            if (
+                last?.nodes === nodes &&
+                last.edges === edges &&
+                last.options === key
+            ) {
+                return last.geometry;
+            }
+            const geometry = staticGeometry({ nodes, edges }, options);
+            this.staticFrom = { nodes, edges, options: key, geometry };
+            return geometry;
+        });
+    });
+
+    /** the levels the flow is drawn in: the engine's, else the static geometry's */
+    private readonly layers = computed(
+        (): readonly RenderLayer[] => {
+            this.revision();
+            const live = this.current();
+            return live
+                ? live.get("render-layers")
+                : (this.geometry()?.layers ?? []);
+        },
+        { equal: sameLayers },
+    );
+
     /** @internal what the parts inject */
     readonly context: FlowContext = {
         model: this.erased,
@@ -469,6 +555,8 @@ export class FlowRootDirective<
         publicEngine: this.facade.engine as unknown as AnyFlowEngine,
         rootElement: this.host,
         revision: this.revision.asReadonly(),
+        geometry: this.geometry,
+        layers: this.layers,
     };
 
     private readonly attributes = flowValue(this.context, () => {
@@ -515,6 +603,7 @@ export class FlowRootDirective<
             nodeExtent: this.nodeExtent(),
             elevateNodesOnSelect: this.elevateNodesOnSelect(),
             elevateEdgesOnSelect: this.elevateEdgesOnSelect(),
+            zIndexMode: this.zIndexMode(),
             paneClickDistance: this.paneClickDistance(),
             nodeClickDistance: this.nodeClickDistance(),
             preventScrolling: this.preventScrolling(),

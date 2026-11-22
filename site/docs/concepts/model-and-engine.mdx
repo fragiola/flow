@@ -153,8 +153,10 @@ controlled viewport.
 
 The root creates its engine once it is mounted (React: in a layout effect; Vue: in its
 `onMounted`; Svelte: in an `$effect`; Angular: after its first render), and destroys it when it unmounts. Before that (the
-first render, a server render) there is no engine: nodes render at their model position, edges
-wait for their nodes' sizes. The `engine` `useFlow()` returns is there from the first render (Vue: from
+first render, a server render) there is no engine: nodes and edges render from the document's
+static geometry (`staticGeometry`, the same functions the engine runs before it measures), so the
+edges of nodes that declare their sizes and handles are already drawn
+([Server rendering](/docs/guides/server-rendering)); the others wait for their nodes' sizes. The `engine` `useFlow()` returns is there from the first render (Vue: from
 `setup`; Svelte: from the component's script; Angular: from `injectFlow()`) all the same: before the mount, an action is refused and a read is empty.
 
 The engine never touches the global `document` or `window`: it uses its root element's owner

@@ -613,6 +613,7 @@ const PAGES_IN_EVERY_FRAMEWORK = [
     "guides/persistence",
     "guides/resizing",
     "guides/selection",
+    "guides/server-rendering",
     "guides/styling-css",
     "guides/styling-tailwind",
     "guides/sub-flows",
@@ -1502,7 +1503,7 @@ describe("the core reference", () => {
             expectRows("path-helpers", "geometry/straight-path.ts", [
                 "StraightPathOptions",
             ]) +
-            expectRows("path-helpers", "engine/edge-geometry.ts", [
+            expectRows("path-helpers", "geometry/edge-geometry.ts", [
                 "PathOptions",
             ]);
         expect(checked).toBeGreaterThan(15);

@@ -12,6 +12,7 @@ import type {
 } from "../document/types";
 import type { EdgePath, HandleSide, Rect, Viewport } from "../geometry/types";
 import type { FitPadding } from "../geometry/viewport-for-bounds";
+import type { RenderLayer } from "../geometry/z-order";
 import type { NoPayload } from "../state/queries";
 import type { FlowHandle } from "./adapter";
 import type {
@@ -288,11 +289,11 @@ export interface InternalNode<T extends FlowTypes = AnyTypes> {
     readonly id: string;
     /** the document's node */
     readonly node: FlowNode<T>;
-    /** its position in absolute flow coordinates (its parents' added; `absolute-position-by`) */
+    /** its position in absolute flow coordinates: its parent's box's top-left corner plus its own (each origin applied) */
     readonly absolutePosition: XY;
     /** its box in absolute flow coordinates, `nodeOrigin` applied, size 0 until known (`node-rect-by`) */
     readonly rect: Rect;
-    /** its size is known: measured, or given by the document (`node-measured`) */
+    /** its size is measured, or given by the document (`node-measured`; an initial size is not) */
     readonly measured: boolean;
     /** its structural `z-index` (`node-z-index-by`) */
     readonly zIndex: number;
@@ -350,14 +351,22 @@ export interface EngineGetMap<T extends FlowTypes = AnyTypes> {
     /** the edges whose ends' box is in view */
     "visible-edges": { payload: NoPayload; result: readonly FlowEdge<T>[] };
     /**
-     * the edges to draw, in drawing order: those shown whose nodes are measured (with
-     * `onlyRenderVisible`, those in view), by `zIndex` (a selected one raised with
-     * `elevateEdgesOnSelect`), the document's order among equals
+     * the edges to draw, in drawing order: those shown whose nodes have a size (with
+     * `onlyRenderVisible`, those in view), by their stack value (`zIndexMode`: `zIndex`, a selected
+     * one raised with `elevateEdgesOnSelect`, in `"auto"` at least its ends' when one is a child),
+     * the document's order among equals
      */
     "drawn-edges": { payload: NoPayload; result: readonly FlowEdge<T>[] };
     /**
-     * a node's structural `z-index` among the nodes: its `zIndex` (a selected one raised with
-     * `elevateNodesOnSelect`), always above its parent's
+     * the levels to draw, lowest first: one (today's DOM, the edges below the nodes) unless an
+     * edge's stack value (`zIndexMode`) is above the lowest shown node's; then each level's edges
+     * go in their own layer at its `zIndex`, between the nodes below and above them
+     */
+    "render-layers": { payload: NoPayload; result: readonly RenderLayer[] };
+    /**
+     * a node's structural `z-index`: its stack value (`zIndexMode`: its `zIndex`, a selected one
+     * raised with `elevateNodesOnSelect`, always above its parent's) with one render level; with
+     * several, its rank among the layers (negative), below what the app draws after them
      */
     "node-z-index-by": { payload: { nodeId: string }; result: number };
     /** a node on screen: its node, absolute place and box, size known, z-index and handles */
@@ -437,7 +446,7 @@ export interface EngineIsMap {
     ready: NoPayload;
     /** the viewport is being panned by a drag or a pinch */
     panning: NoPayload;
-    /** a node's size is known (measured, or given by the document) */
+    /** a node's size is measured, or given by the document (`width` and `height`; an initial one is not) */
     "node-measured": { nodeId: string };
     /** a box selection is being drawn (`selection()`) */
     "box-selecting": NoPayload;

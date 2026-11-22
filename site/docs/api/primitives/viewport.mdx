@@ -10,6 +10,11 @@ zooms with the flow: `Flow.Edges` first, then `Flow.Nodes` (drawn on top), then
 
 The engine writes its `transform` and `transform-origin` directly (`engine.adapter.attachViewport`):
 the framework never renders a transform on it, so a pan or a zoom re-renders nothing inside it.
+Before the engine is attached (on the server, and in the first client render) it has none, so the
+flow is drawn at the identity viewport (`{ x: 0, y: 0, zoom: 1 }`); `defaultViewport` and
+`fitView` apply once the engine is attached, after mount. It is its own stacking context
+(`isolation: isolate`) from the server on, so the edge levels and the nodes stack inside it
+([Z-order](/docs/concepts/nodes-and-edges#z-order)).
 
 <Framework name="react">
 

@@ -62,7 +62,7 @@ interface NodeView {
     attributes: PartAttributes;
     x: number;
     y: number;
-    /** its structural `z-index` (`node-z-index-by`); none without an engine */
+    /** its structural `z-index` (`node-z-index-by`, or the static geometry's) */
     zIndex: number | undefined;
     focusable: boolean;
 }
@@ -102,17 +102,18 @@ export function bindNode<T extends FlowTypes>(
         if (!current) return undefined;
         const id = current.id;
         const engine = context.engine();
-        const model = context.model();
         if (!engine) {
-            const at = model.get("absolute-position-by", { nodeId: id });
+            // the first render: the static geometry's place (the node's origin applied) and stack
+            const geometry = context.geometry();
+            const rect = geometry?.nodeRects[id];
             return {
                 attributes: {
                     ...partAttributes("node", id),
                     "data-selected": flag(current.selected === true),
                 },
-                x: at?.x ?? current.position.x,
-                y: at?.y ?? current.position.y,
-                zIndex: undefined,
+                x: rect?.x ?? current.position.x,
+                y: rect?.y ?? current.position.y,
+                zIndex: geometry?.nodeZIndexes[id],
                 focusable: false,
             };
         }

@@ -4,6 +4,7 @@ import {
     type EdgePath,
     type FlowEdge,
     type FlowTypes,
+    flag,
     type PartAttributes,
     partAttributes,
 } from "@fragiola/flow";
@@ -103,8 +104,8 @@ export function bindEdge<T extends FlowTypes>(
                       focusable: engine.is("edge-focusable", { edgeId }),
                   }
                 : {
-                      attributes: partAttributes("edge", edgeId),
-                      path: undefined,
+                      attributes: staticEdgeAttributes(context, "edge", edgeId),
+                      path: context.geometry()?.edgePaths[edgeId],
                       reconnecting: false,
                       focusable: false,
                   };
@@ -145,7 +146,25 @@ export function bindEdge<T extends FlowTypes>(
     return { state };
 }
 
-/** @internal an edge's path, as a signal that changes when it does */
+/**
+ * @internal an edge part's attributes before the engine exists (the first render): the engine's
+ * own for an edge, from the model (`data-selected`, `data-animated`), so nothing changes when it
+ * comes
+ */
+export function staticEdgeAttributes(
+    context: FlowContext,
+    part: "edge" | "edge-path" | "edge-label",
+    edgeId: string,
+): PartAttributes {
+    const edge = context.model().get("edge-by", { id: edgeId });
+    return {
+        ...partAttributes(part, edgeId),
+        "data-selected": flag(edge?.selected === true),
+        "data-animated": flag(edge?.animated === true),
+    };
+}
+
+/** @internal an edge's path, as a signal that changes when it does (the static one before the engine) */
 export function edgePathOf(
     context: FlowContext,
     edgeId: () => string | undefined,
@@ -154,9 +173,11 @@ export function edgePathOf(
         context,
         () => {
             const id = edgeId();
-            return id === undefined
-                ? undefined
-                : context.engine()?.get("edge-path-by", { edgeId: id });
+            if (id === undefined) return undefined;
+            const engine = context.engine();
+            return engine
+                ? engine.get("edge-path-by", { edgeId: id })
+                : context.geometry()?.edgePaths[id];
         },
         sameEdgePath,
     );

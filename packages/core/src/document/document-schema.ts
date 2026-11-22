@@ -149,6 +149,57 @@ export const edgePathOptionsSchema = {
     additionalProperties: false,
 } as const;
 
+/** A side of a node: a handle's, or the side an edge leaves or enters by. */
+export const handleSideSchema = {
+    enum: ["top", "right", "bottom", "left"],
+    description: "a side of the node: top, right, bottom or left",
+} as const;
+
+/** A handle a node declares, for its edges to be drawn before it is measured. */
+export const declaredHandleSchema = {
+    type: "object",
+    description:
+        "a handle the node declares, used until a handle of that type and id is measured",
+    properties: {
+        id: {
+            type: "string",
+            minLength: 1,
+            description:
+                "its id among the node's handles of its type; none: the default handle",
+        },
+        type: {
+            enum: ["source", "target"],
+            description: "edges start (source) or end (target) at it",
+        },
+        position: {
+            ...handleSideSchema,
+            description: "the side of the node it sits on",
+        },
+        x: {
+            type: "number",
+            description:
+                "its box's left edge, relative to the node box's left edge",
+        },
+        y: {
+            type: "number",
+            description:
+                "its box's top edge, relative to the node box's top edge",
+        },
+        width: {
+            type: "number",
+            minimum: 0,
+            description: "its box's width; default 0",
+        },
+        height: {
+            type: "number",
+            minimum: 0,
+            description: "its box's height; default 0",
+        },
+    },
+    required: ["type", "position", "x", "y"],
+    additionalProperties: false,
+} as const;
+
 const selected = {
     type: "boolean",
     description: "it is selected (requires the selection feature)",
@@ -184,6 +235,37 @@ export const nodeSchema = {
             type: "number",
             minimum: 0,
             description: "its height, when the document gives one",
+        },
+        initialWidth: {
+            type: "number",
+            minimum: 0,
+            description: "its width until it is measured; width wins",
+        },
+        initialHeight: {
+            type: "number",
+            minimum: 0,
+            description: "its height until it is measured; height wins",
+        },
+        handles: {
+            type: "array",
+            items: declaredHandleSchema,
+            description:
+                "its handles, declared for its edges to be drawn before it is measured",
+        },
+        sourcePosition: {
+            ...handleSideSchema,
+            description:
+                "the side its edges leave by when no handle gives one; default bottom",
+        },
+        targetPosition: {
+            ...handleSideSchema,
+            description:
+                "the side its edges enter by when no handle gives one; default top",
+        },
+        origin: {
+            ...xySchema,
+            description:
+                "the point of its box its position stands at, as shares of its size, over the engine's nodeOrigin",
         },
         zIndex: zIndexSchema,
         ...nodeFlagProperties,

@@ -1,9 +1,11 @@
 // #36: the parts' new inputs (the minimap's inversePan, zoomStep and minimapClick, the resizer's
 // direction, the fit-view button's framing, the edge toolbar's point and alignment), the
 // rectangle around a box selection (`[flowNodesSelection]`) and the root's selection-drag
-// outputs: React's `tests/part-options.test.tsx`.
+// outputs: React's `tests/part-options.test.tsx`; #40: the rectangle's keyboard and
+// `[flowResizeHandle]`'s direction and variant.
 import { Component, input } from "@angular/core";
 import { drag as dragFeature } from "@fragiola/flow/drag";
+import { keyboard } from "@fragiola/flow/keyboard";
 import { minimap } from "@fragiola/flow/minimap";
 import { resize } from "@fragiola/flow/resize";
 import { selection } from "@fragiola/flow/selection";
@@ -20,6 +22,7 @@ import { ToolbarFlow } from "./fixtures";
 import {
     drag,
     installLayout,
+    key,
     pair,
     part,
     pointer,
@@ -336,5 +339,106 @@ describe("[flowNodesSelection]", () => {
         expect(part(container, "nodes-selection").style.transform).toBe(
             "translate(30px, 20px)",
         );
+    });
+});
+
+/** Two selected nodes, their rectangle always shown, with keyboard(). */
+@Component({
+    selector: "test-nodes-selection-keyboard",
+    imports: [FLOW],
+    template: `
+        <div flowRoot [features]="features" [defaultNodes]="nodes" [defaultViewport]="{ x: 0, y: 0, zoom: 1 }">
+            <div flowViewport>
+                <div flowNodes>
+                    <div *flowNodesItem="let node" [flowNode]="node"></div>
+                </div>
+                <div flowNodesSelection></div>
+            </div>
+        </div>
+    `,
+})
+class NodesSelectionKeyboard {
+    readonly features = [selection({ rect: "always" }), keyboard({ step: 5 })];
+    readonly nodes: FlowNode[] = [
+        task("a", 0, 0, { selected: true }),
+        task("b", 200, 100, { selected: true }),
+    ];
+}
+
+describe("[flowNodesSelection] with keyboard()", () => {
+    it("takes focus, and the arrows on it move the selection", async () => {
+        const { container } = await render(NodesSelectionKeyboard);
+        const rect = part(container, "nodes-selection");
+        expect(rect.getAttribute("tabindex")).toBe("0");
+        rect.focus();
+        expect(document.activeElement).toBe(rect);
+        await key(rect, "ArrowRight");
+        await settle();
+        expect(part(container, "node", "a").style.transform).toBe(
+            "translate(5px, 0px)",
+        );
+        expect(part(container, "node", "b").style.transform).toBe(
+            "translate(205px, 100px)",
+        );
+    });
+});
+
+/** A node with a vertical resizer and the app's handles, their direction and variant bound. */
+@Component({
+    selector: "test-resize-handle-look",
+    imports: [FLOW, FLOW_RESIZE],
+    template: `
+        <div flowRoot [features]="features" [defaultNodes]="nodes" [defaultViewport]="{ x: 0, y: 0, zoom: 1 }">
+            <div flowViewport>
+                <div flowNodes>
+                    <div *flowNodesItem="let node" [flowNode]="node">
+                        <div flowNodeResizer direction="vertical">
+                            <div flowResizeHandle position="right" variant="line"></div>
+                            <div flowResizeHandle position="top-left" variant="line"></div>
+                            <div flowResizeHandle position="bottom-right" [direction]="cornerDirection()"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `,
+})
+class ResizeHandleLook {
+    readonly cornerDirection = input<"horizontal" | "vertical" | undefined>(
+        "horizontal",
+    );
+    readonly features = [resize()];
+    readonly nodes: FlowNode[] = [task("a")];
+}
+
+describe("[flowResizeHandle] direction and variant", () => {
+    it("gives data-direction and data-variant, a corner's line ignored", async () => {
+        const { container } = await render(ResizeHandleLook);
+        const at = (position: string) =>
+            container.querySelector(
+                `[data-position="${position}"]`,
+            ) as HTMLElement;
+        expect(at("right").getAttribute("data-variant")).toBe("line");
+        expect(at("right").hasAttribute("data-direction")).toBe(false);
+        expect(at("top-left").getAttribute("data-variant")).toBe("handle");
+        expect(at("bottom-right").getAttribute("data-variant")).toBe("handle");
+        expect(at("bottom-right").getAttribute("data-direction")).toBe(
+            "horizontal",
+        );
+    });
+
+    it("moves only its own direction's sides, over the resizer's", async () => {
+        const { container } = await render(ResizeHandleLook);
+        const corner = container.querySelector(
+            '[data-position="bottom-right"]',
+        ) as HTMLElement;
+        await drag(corner, part(container, "root"), [
+            { clientX: 100, clientY: 40 },
+            { clientX: 130, clientY: 70 },
+        ]);
+        await settle();
+        const node = part(container, "node", "a");
+        expect(node.style.width).toBe("130px");
+        expect(node.style.height).toBe("40px");
     });
 });

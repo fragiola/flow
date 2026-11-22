@@ -1,18 +1,22 @@
 // #36: the parts' new props (the minimap's inversePan, zoomStep and its `click` event, the
 // resizer's direction, the fit-view button's framing, the edge toolbar's point and alignment), the
 // rectangle around a box selection (`Flow.NodesSelection`) and the root's selection-drag events:
-// React's `tests/part-options.test.tsx`.
+// React's `tests/part-options.test.tsx`; #40: the rectangle's keyboard and `ResizeHandle`'s
+// direction and variant.
 import { drag as dragFeature } from "@fragiola/flow/drag";
+import { keyboard } from "@fragiola/flow/keyboard";
 import { selection } from "@fragiola/flow/selection";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { h, shallowRef } from "vue";
+import { createSSRApp, h, shallowRef } from "vue";
+import { renderToString } from "vue/server-renderer";
 import { createFlowRef, Flow, type FlowEdge, type XY } from "../src/index";
 import { MiniMap, minimap } from "../src/minimap/index";
-import { NodeResizer, resize } from "../src/resize/index";
+import { NodeResizer, ResizeHandle, resize } from "../src/resize/index";
 import {
     click,
     drag,
     installLayout,
+    key,
     pair,
     part,
     pointer,
@@ -310,5 +314,112 @@ describe("Flow.NodesSelection", () => {
         expect(part(container, "nodes-selection").style.transform).toBe(
             "translate(30px, 20px)",
         );
+    });
+});
+
+describe("Flow.NodesSelection with keyboard()", () => {
+    it("takes focus, and the arrows on it move the selection", async () => {
+        const { container } = await render(() =>
+            h(
+                Flow.Root,
+                {
+                    features: [
+                        selection({ rect: "always" }),
+                        keyboard({ step: 5 }),
+                    ],
+                    defaultNodes: [
+                        task("a", 0, 0, { selected: true }),
+                        task("b", 200, 100, { selected: true }),
+                    ],
+                    defaultViewport: { x: 0, y: 0, zoom: 1 },
+                },
+                () =>
+                    h(Flow.Viewport, null, () => [
+                        h(Flow.Nodes, null, {
+                            default: ({ node }: { node: unknown }) => [
+                                h(Flow.Node, { node } as never),
+                            ],
+                        }),
+                        h(Flow.NodesSelection),
+                    ]),
+            ),
+        );
+        const rect = part(container, "nodes-selection");
+        expect(rect.getAttribute("tabindex")).toBe("0");
+        rect.focus();
+        expect(document.activeElement).toBe(rect);
+        await key(rect, "ArrowRight");
+        expect(part(container, "node", "a").style.transform).toBe(
+            "translate(5px, 0px)",
+        );
+        expect(part(container, "node", "b").style.transform).toBe(
+            "translate(205px, 100px)",
+        );
+    });
+});
+
+describe("ResizeHandle direction and variant", () => {
+    const flow = (resizer: Record<string, unknown>, handles: () => unknown) =>
+        h(
+            Flow.Root,
+            {
+                features: [resize()],
+                defaultNodes: [task("a")],
+                defaultViewport: { x: 0, y: 0, zoom: 1 },
+            },
+            () =>
+                h(Flow.Viewport, null, () =>
+                    h(Flow.Nodes, null, {
+                        default: ({ node }: { node: unknown }) => [
+                            h(Flow.Node, { node } as never, () =>
+                                h(NodeResizer, resizer, handles as never),
+                            ),
+                        ],
+                    }),
+                ),
+        );
+    const three = () => [
+        h(ResizeHandle, { position: "right", variant: "line" }),
+        h(ResizeHandle, { position: "top-left", variant: "line" }),
+        h(ResizeHandle, { position: "bottom", direction: "vertical" }),
+    ];
+
+    it("gives data-direction and data-variant, a corner's line ignored, with or without an engine", async () => {
+        const { container } = await render(() => flow({}, three));
+        const at = (position: string) =>
+            container.querySelector(
+                `[data-position="${position}"]`,
+            ) as HTMLElement;
+        expect(at("right").getAttribute("data-variant")).toBe("line");
+        expect(at("right").hasAttribute("data-direction")).toBe(false);
+        expect(at("top-left").getAttribute("data-variant")).toBe("handle");
+        expect(at("bottom").getAttribute("data-variant")).toBe("handle");
+        expect(at("bottom").getAttribute("data-direction")).toBe("vertical");
+        // before the engine (a server render): the same static record
+        const html = await renderToString(
+            createSSRApp({ render: () => flow({}, three) }),
+        );
+        expect(html).toContain('data-position="right" data-variant="line"');
+        expect(html).toContain(
+            'data-position="bottom" data-variant="handle" data-direction="vertical"',
+        );
+    });
+
+    it("moves only its own direction's sides, over the resizer's", async () => {
+        const { container } = await render(() =>
+            flow({ direction: "vertical" }, () =>
+                h(ResizeHandle, {
+                    position: "bottom-right",
+                    direction: "horizontal",
+                }),
+            ),
+        );
+        await drag(part(container, "resize-handle"), part(container, "root"), [
+            { clientX: 100, clientY: 40 },
+            { clientX: 130, clientY: 70 },
+        ]);
+        const node = part(container, "node", "a");
+        expect(node.style.width).toBe("130px");
+        expect(node.style.height).toBe("40px");
     });
 });

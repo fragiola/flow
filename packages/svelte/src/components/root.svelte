@@ -19,6 +19,8 @@
         type FlowNodeInput,
         type FlowTypes,
         partAttributes,
+        type StaticGeometry,
+        staticGeometry,
         type Viewport,
     } from "@fragiola/flow";
     import type { Snippet } from "svelte";
@@ -63,6 +65,7 @@
         | "nodeExtent"
         | "elevateNodesOnSelect"
         | "elevateEdgesOnSelect"
+        | "zIndexMode"
         | "paneClickDistance"
         | "nodeClickDistance"
         | "preventScrolling"
@@ -244,6 +247,7 @@
         nodeExtent,
         elevateNodesOnSelect,
         elevateEdgesOnSelect,
+        zIndexMode,
         paneClickDistance,
         nodeClickDistance,
         preventScrolling,
@@ -320,6 +324,7 @@
         nodeExtent: plain(nodeExtent),
         elevateNodesOnSelect,
         elevateEdgesOnSelect,
+        zIndexMode,
         paneClickDistance,
         nodeClickDistance,
         preventScrolling,
@@ -557,6 +562,49 @@
         return () => setFlowRef(held, null);
     });
 
+    // the geometry before the engine (the server render and the first client render): the pure
+    // function the engine falls back to, over the model's document and the options the engine
+    // gets, so the server's output, the first client render and the engine agree (no hydration
+    // mismatch, no jump). Computed again only for another document or other options
+    let lastGeometry:
+        | {
+              nodes: unknown;
+              edges: unknown;
+              options: string;
+              geometry: StaticGeometry;
+          }
+        | undefined;
+    const geometry = $derived.by((): StaticGeometry | null => {
+        revision;
+        if (engine) {
+            lastGeometry = undefined;
+            return null;
+        }
+        const current = model;
+        const flow = {
+            nodes: current.get("all-nodes"),
+            edges: current.get("all-edges"),
+        };
+        const options = {
+            nodeOrigin: plain(nodeOrigin),
+            pathOptions: plain(pathOptions),
+            zIndexMode,
+            elevateNodesOnSelect,
+            elevateEdgesOnSelect,
+        };
+        const key = JSON.stringify(options);
+        if (
+            lastGeometry?.nodes === flow.nodes &&
+            lastGeometry.edges === flow.edges &&
+            lastGeometry.options === key
+        ) {
+            return lastGeometry.geometry;
+        }
+        const made = staticGeometry(flow, options);
+        lastGeometry = { ...flow, options: key, geometry: made };
+        return made;
+    });
+
     const context: FlowContextValue = {
         get model() {
             return model;
@@ -570,6 +618,9 @@
         },
         get revision() {
             return revision;
+        },
+        get geometry() {
+            return geometry;
         },
     };
     setFlowContext(context);

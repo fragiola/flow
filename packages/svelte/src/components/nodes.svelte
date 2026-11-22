@@ -18,14 +18,16 @@
         children: Snippet<[FlowNode<T>]>;
     }
 
-    // its own stacking context: the nodes' z-index (a selected one raised) orders them among
-    // themselves, never above what follows the layer (the connection line)
+    // its own stacking context with one render level: the nodes' z-index (a selected one raised)
+    // orders them among themselves, never above what follows the layer (the connection line).
+    // With several, none: the nodes' (negative) z-indexes interleave with the edges' level wrappers
     const NODES_STYLE = {
         position: "absolute",
         top: "0",
         left: "0",
         isolation: "isolate",
     };
+    const LAYERED_NODES_STYLE = { position: "absolute", top: "0", left: "0" };
 </script>
 
 <!--
@@ -63,6 +65,15 @@
                 : model.get("all-nodes").filter((node) => node.hidden !== true)
         ) as readonly FlowNode<T>[];
     });
+    // several render levels (an edge above some node): the engine's, or the static geometry's
+    const layered = flowValue(context, () => {
+        const { engine, geometry } = context;
+        return (
+            (engine
+                ? engine.get("render-layers").length
+                : (geometry?.layers.length ?? 1)) > 1
+        );
+    });
     const refs = refProps((element) => {
         ref = element as HTMLDivElement | null;
     });
@@ -75,7 +86,7 @@
             style,
             state: partState,
             own,
-            structural: NODES_STYLE,
+            structural: layered.current ? LAYERED_NODES_STYLE : NODES_STYLE,
         }),
     );
 </script>

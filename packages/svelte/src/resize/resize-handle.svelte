@@ -1,4 +1,8 @@
 <script module lang="ts">
+    import type {
+        ResizeHandleDirection,
+        ResizeHandleVariant,
+    } from "@fragiola/flow";
     import type { Snippet } from "svelte";
     import type { DivPrimitiveProps } from "../utils/render.js";
 
@@ -28,6 +32,10 @@
     export interface ResizeHandleState {
         readonly nodeId: string;
         readonly position: ResizePosition;
+        /** its own direction, over its resizer's (`data-direction`); none: the resizer's */
+        readonly direction: ResizeHandleDirection | undefined;
+        /** how it is drawn (`data-variant`): a corner is always a `handle` */
+        readonly variant: ResizeHandleVariant;
     }
 
     export interface ResizeHandleProps
@@ -36,6 +44,16 @@
         position: ResizePosition;
         /** its node; default the enclosing `Flow.Node`'s */
         nodeId?: string | undefined;
+        /**
+         * the sides it moves, over its resizer's `direction` (`data-direction`): `"horizontal"`
+         * only the width (and x), `"vertical"` only the height (and y); default the resizer's
+         */
+        direction?: ResizeHandleDirection | undefined;
+        /**
+         * how it is drawn (`data-variant`, for your styles): `"handle"` (default) or `"line"`, a
+         * side's whole length; a corner's `"line"` is ignored
+         */
+        variant?: ResizeHandleVariant | undefined;
         children?: Snippet<[{ state: ResizeHandleState }]> | undefined;
     }
 
@@ -96,10 +114,11 @@
     A grab area of a `NodeResizer` (`data-flow-part="resize-handle"`, `data-position`): a press on
     it resizes its node from that corner or side (`resize()`); with `keyboard()` too it takes focus
     and the arrows move that corner or side. Placed on its corner (centred) or along its side; give
-    it its size (a side's thickness) and look.
+    it its size (a side's thickness) and look. Its `direction` overrides its resizer's;
+    `variant="line"` marks a side's handle as a line for your styles.
 -->
 <script lang="ts">
-    import { partAttributes } from "@fragiola/flow";
+    import { resizeHandleAttributes } from "@fragiola/flow";
     import { useFlowContext, usePartNodeId } from "../context.js";
     import { flowValue } from "../runes/internal.svelte.js";
     import {
@@ -111,6 +130,8 @@
     let {
         position,
         nodeId: nodeIdProp,
+        direction,
+        variant,
         children,
         render,
         class: className,
@@ -121,19 +142,29 @@
 
     const nodeIdOf = usePartNodeId("ResizeHandle", () => nodeIdProp);
     const context = useFlowContext("ResizeHandle");
-    // the engine's record: `data-position`, and `tabindex` with `keyboard()` (arrows resize)
+    // the engine's record: `data-position`, `data-variant`, `data-direction`, and `tabindex`
+    // with `keyboard()` (arrows resize)
     const attributes = flowValue(context, () =>
         context.engine
             ? context.engine.adapter.attributes("resize-handle", {
                   nodeId: nodeIdOf(),
                   position,
+                  direction,
+                  variant,
               })
-            : { ...partAttributes("resize-handle"), "data-position": position },
+            : resizeHandleAttributes(position, { direction, variant }),
     );
     const refs = refProps((element) => {
         ref = element as HTMLDivElement | null;
     });
-    const partState = $derived<ResizeHandleState>({ nodeId: nodeIdOf(), position });
+    const partState = $derived<ResizeHandleState>({
+        nodeId: nodeIdOf(),
+        position,
+        direction: attributes.current["data-direction"] as
+            | ResizeHandleDirection
+            | undefined,
+        variant: attributes.current["data-variant"] as ResizeHandleVariant,
+    });
     const attrs: RenderedProps<HTMLDivElement> = $derived(
         elementProps({
             rest,

@@ -212,7 +212,13 @@ What differs from React, part by part:
 - **`flowMiniMap`** and **`flowNodeResizer`** come from `@fragiola/flow-angular/minimap` and
   `@fragiola/flow-angular/resize`, with `flowMiniMapNode`, `flowMiniMapMask`, `flowResizeHandle`
   and `RESIZE_POSITIONS`.
-- No server render nor hydration: the directives write to their elements in the browser.
+- No server render nor hydration: the directives write to their elements in the browser. The
+  first browser render, before the engine, draws the document's static geometry: the edges of
+  nodes that declare their sizes and handles are there on the first paint
+  ([Server rendering](/docs/guides/server-rendering)).
+- **`flowEdges`** with several render levels (an edge above some node, `zIndexMode`) holds one
+  `edges-layer` per level, and an edge that changes level is moved there (its view kept), not
+  recreated.
 
 The state of each part is typed by its exports: `RootState`, `RootEngineProps` (the engine
 options the root takes), `ViewportMoveEvent`; `ViewportState`; `BackgroundState`; `NodesState`,

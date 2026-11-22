@@ -18,9 +18,12 @@ import {
     type FlowNodeInput,
     type FlowTypes,
     partAttributes,
+    type StaticGeometry,
+    staticGeometry,
     type Viewport,
 } from "@fragiola/flow";
 import {
+    computed,
     defineComponent,
     h,
     onBeforeUnmount,
@@ -105,6 +108,7 @@ export type RootEngineProps = Omit<
         | "preventScrolling"
         | "nodesFocusable"
         | "edgesFocusable"
+        | "zIndexMode"
     >,
     "panOnScrollSpeed" | "paneClickDistance" | "nodeClickDistance"
 > & {
@@ -238,6 +242,7 @@ const ENGINE_PROPS = [
     "preventScrolling",
     "nodesFocusable",
     "edgesFocusable",
+    "zIndexMode",
 ] as const satisfies readonly (keyof RootEngineProps)[];
 
 /** The engine props whose attribute's text is its number (`pane-click-distance="5"`). */
@@ -619,12 +624,52 @@ const RootFlow = definePrimitive<AnyRootProps, RootSlots, RootEmits<AnyTypes>>(
             );
         });
 
+        // the geometry the parts draw from while there is no engine (the server, the first client
+        // render): once per document and options, shared by every part
+        let lastGeometry:
+            | {
+                  nodes: readonly FlowNode[];
+                  edges: readonly FlowEdge[];
+                  key: string;
+                  value: StaticGeometry;
+              }
+            | undefined;
+        const geometry = computed<StaticGeometry | null>(() => {
+            revision.value;
+            if (engine.value) {
+                lastGeometry = undefined;
+                return null;
+            }
+            const options = {
+                nodeOrigin: plain(props.nodeOrigin),
+                pathOptions: plain(props.pathOptions),
+                zIndexMode: props.zIndexMode,
+                elevateNodesOnSelect: props.elevateNodesOnSelect,
+                elevateEdgesOnSelect: props.elevateEdgesOnSelect,
+            };
+            const nodes = model.get("all-nodes");
+            const edges = model.get("all-edges");
+            const key = optionsKey(options);
+            if (
+                lastGeometry &&
+                lastGeometry.nodes === nodes &&
+                lastGeometry.edges === edges &&
+                lastGeometry.key === key
+            ) {
+                return lastGeometry.value;
+            }
+            const value = staticGeometry({ nodes, edges }, options);
+            lastGeometry = { nodes, edges, key, value };
+            return value;
+        });
+
         const context: FlowContextValue = {
             model,
             engine,
             publicEngine: facade.engine as unknown as AnyFlowEngine,
             rootElement,
             revision,
+            geometry,
         };
         provide(FlowKey, context);
 

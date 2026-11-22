@@ -372,8 +372,59 @@ the rectangle is held.
 
 </Framework>
 
-The rectangle takes no focus and no keys: from the keyboard, move the selected nodes with the
-arrows on one of them (`keyboard()`). See [`NodesSelection`](/docs/api/primitives/nodes-selection).
+With `keyboard()` installed, the rectangle takes focus (`tabindex="0"`, from the engine), and its
+keys are a focused selected node's: the arrows move the whole selection by the keyboard's `step`
+(Shift: `fastStep`), within the extent and the snap a node's arrows keep; a delete key (`deleteKeys`)
+removes the selection (after `beforeDelete`, told as `remove`); Escape clears the selection. Enter
+and Space do nothing on it. Name it, since it has no text of its own:
+
+<Framework name="react">
+
+```tsx
+<Flow.NodesSelection
+    aria-label="Selected nodes"
+    className="rounded border border-blue-500 bg-blue-500/5 focus-visible:outline-2"
+/>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.NodesSelection
+    aria-label="Selected nodes"
+    class="rounded border border-blue-500 bg-blue-500/5 focus-visible:outline-2"
+/>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.NodesSelection
+    aria-label="Selected nodes"
+    class="rounded border border-blue-500 bg-blue-500/5 focus-visible:outline-2"
+/>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div
+    flowNodesSelection
+    aria-label="Selected nodes"
+    class="rounded border border-blue-500 bg-blue-500/5 focus-visible:outline-2"
+></div>
+```
+
+</Framework>
+
+See [`NodesSelection`](/docs/api/primitives/nodes-selection) and
+[Keyboard and accessibility](/docs/guides/keyboard#the-selection-rectangle).
 
 ## A toolbar for the selection
 

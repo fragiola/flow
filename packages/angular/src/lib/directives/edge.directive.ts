@@ -1,4 +1,12 @@
-import { computed, Directive, inject, input, type Signal } from "@angular/core";
+import {
+    afterRenderEffect,
+    computed,
+    Directive,
+    inject,
+    input,
+    type Signal,
+    untracked,
+} from "@angular/core";
 import type { AnyTypes, FlowEdge, FlowTypes } from "@fragiola/flow";
 import { type EdgeContext, FLOW_EDGE, injectFlowContext } from "../context";
 import { bindEdgePath } from "../inject/bind-edge-path";
@@ -49,6 +57,11 @@ export class FlowEdgeDirective<T extends FlowTypes = AnyTypes> {
         const flow = injectFlowContext("[flowEdge]");
         const host = injectHost<SVGElement>();
         this.state = bindEdge<T>(flow, host, this.edge).state;
+        // a new edge element (another level's SVG, another template) that had focus takes it back
+        afterRenderEffect(() => {
+            const engine = flow.engine();
+            if (engine) untracked(() => engine.adapter.refocus(host));
+        });
         // React's default child: an edge path
         defaultContent(host, (document) => {
             const path = document.createElementNS(SVG, "path");

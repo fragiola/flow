@@ -2,13 +2,68 @@
 // The part attributes (D11): `data-flow-part` and `data-flow-id` on every part, boolean state
 // attributes present as "" or absent, from one core helper every adapter spreads.
 import { afterEach, describe, expect, it } from "vitest";
-import { flag, partAttributes } from "../../src/attributes/part-attributes";
+import {
+    edgesLayerAttributes,
+    flag,
+    partAttributes,
+    resizeHandleAttributes,
+} from "../../src/attributes/part-attributes";
 import { selection } from "../../src/selection/selection";
 import { flowOf, mount, unmountAll } from "../engine/harness";
 
 afterEach(unmountAll);
 
 describe("part attributes", () => {
+    it("give an edges layer its level, with or without an engine", () => {
+        const static_ = edgesLayerAttributes(1);
+        expect(static_).toEqual({
+            "data-flow-part": "edges-layer",
+            "data-level": "1",
+        });
+        const { engine } = mount(flowOf({}));
+        expect(engine.adapter.attributes("edges-layer", { level: 1 })).toEqual(
+            static_,
+        );
+    });
+
+    it("give a resize handle its position, variant and own direction, with or without an engine", () => {
+        expect(resizeHandleAttributes("top")).toEqual({
+            "data-flow-part": "resize-handle",
+            "data-position": "top",
+            "data-variant": "handle",
+            "data-direction": undefined,
+        });
+        const line = resizeHandleAttributes("left", {
+            variant: "line",
+            direction: "horizontal",
+        });
+        expect(line).toEqual({
+            "data-flow-part": "resize-handle",
+            "data-position": "left",
+            "data-variant": "line",
+            "data-direction": "horizontal",
+        });
+        // a corner is never a line; an unknown direction is none
+        expect(
+            resizeHandleAttributes("top-left", {
+                variant: "line",
+                direction: "diagonal",
+            }),
+        ).toMatchObject({
+            "data-variant": "handle",
+            "data-direction": undefined,
+        });
+        const { engine } = mount(flowOf({ a: [0, 0] }));
+        expect(
+            engine.adapter.attributes("resize-handle", {
+                nodeId: "a",
+                position: "left",
+                variant: "line",
+                direction: "horizontal",
+            }),
+        ).toEqual(line);
+    });
+
     it("give a part its name and id without an engine", () => {
         expect(partAttributes("viewport")).toEqual({
             "data-flow-part": "viewport",
@@ -72,6 +127,8 @@ describe("part attributes", () => {
         ).toEqual({
             "data-flow-part": "resize-handle",
             "data-position": "top-left",
+            "data-variant": "handle",
+            "data-direction": undefined,
         });
         expect(attributes("minimap-node", { nodeId: "a" })).toEqual({
             "data-flow-part": "minimap-node",

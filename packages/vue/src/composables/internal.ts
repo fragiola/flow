@@ -1,4 +1,5 @@
 // The composables and helpers only the primitives call.
+import type { FlowEdge, RenderLayer } from "@fragiola/flow";
 import { type ComputedRef, computed } from "vue";
 import type { FlowContextValue } from "../context";
 import { shallowEqual } from "../utils/shallow-equal";
@@ -51,4 +52,60 @@ export function useFlowValue<S>(
         last = { value };
         return value;
     });
+}
+
+/** @internal one render level as the parts draw it: its edges, in drawing order */
+export interface DrawnLayer {
+    readonly level: number;
+    readonly zIndex: number | undefined;
+    readonly edges: readonly FlowEdge[];
+}
+
+function sameLayers(
+    a: readonly DrawnLayer[],
+    b: readonly DrawnLayer[],
+): boolean {
+    return (
+        a.length === b.length &&
+        a.every((layer, i) => {
+            const other = b[i];
+            return (
+                other !== undefined &&
+                layer.level === other.level &&
+                layer.zIndex === other.zIndex &&
+                sameValue(layer.edges, other.edges)
+            );
+        })
+    );
+}
+
+/**
+ * @internal the render levels (`render-layers`) with their edges: the engine's, or before it
+ * exists the static geometry's (a server render, the first client render)
+ */
+export function useDrawnLayers(
+    context: FlowContextValue,
+): ComputedRef<readonly DrawnLayer[]> {
+    return useFlowValue(
+        context,
+        () => {
+            const engine = context.engine.value;
+            const layers: readonly RenderLayer[] = engine
+                ? engine.get("render-layers")
+                : (context.geometry.value?.layers ?? []);
+            const edges = engine
+                ? engine.get("drawn-edges")
+                : context.model.get("all-edges");
+            const byId = new Map(edges.map((edge) => [edge.id, edge]));
+            return layers.map((layer) => ({
+                level: layer.level,
+                zIndex: layer.zIndex,
+                edges: layer.edgeIds.flatMap((id) => {
+                    const edge = byId.get(id);
+                    return edge ? [edge] : [];
+                }),
+            }));
+        },
+        sameLayers,
+    );
 }

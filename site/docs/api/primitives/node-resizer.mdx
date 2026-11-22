@@ -205,7 +205,8 @@ make sense, the two sides:
 </Framework>
 
 The direction is the resizer's, sent with its limits (`engine.adapter.setPartOptions("resizer",
-nodeId, { direction })`); a `ResizeHandle` takes none of its own.
+nodeId, { direction })`). A `ResizeHandle`'s own `direction` wins over it for that handle (see
+[Its own direction, and a line](/docs/api/primitives/resize-handle#its-own-direction-and-a-line)).
 
 A resize snaps to a grid only with `resize({ snap })`: the sides the pointer moves land on it, so
 sizes and positions do. The drag feature's `snapGrid` is the drag's alone and does not apply to a

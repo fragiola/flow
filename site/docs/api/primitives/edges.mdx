@@ -6,11 +6,21 @@ description: Flow.Edges is the SVG layer of the edges, calling your children fun
 `Flow.Edges` goes inside `Flow.Viewport`, before `Flow.Nodes` so the nodes are drawn on top. It
 renders a `div` holding an SVG where its children function draws each edge (usually a
 `Flow.Edge`), and is the HTML layer `Flow.EdgeLabel`s are portalled into. An edge is drawn once
-both its nodes have a size (`edge-path-by` is defined): on the first paint, edges wait for their
-nodes' measurements. Hidden edges, and edges of hidden nodes, are left out; with
-`onlyRenderVisible`, only those in view (`visible-edges`). They are drawn in the engine's order
-(`drawn-edges`): by `zIndex`, a selected edge last with `elevateEdgesOnSelect`, then in the
-document's order; every edge stays below every node.
+both its nodes have a size (`edge-path-by` is defined). Before the engine exists (a server render,
+the first client render) it draws the document's [static geometry](/docs/guides/server-rendering):
+the edges whose nodes declare a size (`width` / `height` or `initialWidth` / `initialHeight`), at
+their declared `handles`; the others wait for their nodes' measurements. Hidden edges, and edges
+of hidden nodes, are left out; with `onlyRenderVisible`, only those in view (`visible-edges`). They
+are drawn in the engine's order (`drawn-edges`): by their stack value (`zIndex`, a selected edge
+raised with `elevateEdgesOnSelect`, an edge of a child at least as high as its ends with
+`zIndexMode: "auto"`), then in the document's order.
+
+With one render level (`render-layers`) every edge stays below every node, in one SVG: the DOM
+below. When an edge stands above some node (a selected edge in `"auto"`, an edge between a group's
+children, a `zIndex` above a node's), each level gets a wrapper of its own inside the `div`,
+`data-flow-part="edges-layer"` with `data-level` and the level's `z-index`, holding that level's
+SVG (`data-flow-part="edges"`) and its edges' labels. An edge that moves to another level is
+remounted (in Angular, moved) and gets its focus back ([z-order](/docs/concepts/nodes-and-edges#z-order)).
 
 <Framework name="react">
 
@@ -106,9 +116,12 @@ every `div` attribute but `children`.
 
 | attribute | value |
 | --- | --- |
-| `data-flow-part` | `"edges"`, on the `div` and on its `svg` |
+| `data-flow-part` | `"edges"`, on the `div` and on its `svg` (each level's `svg` with several); `"edges-layer"` on each level's wrapper |
+| `data-level` | on an `edges-layer`: its render level, 0 the lowest |
 
 ## Structural style
 
 The `div` and the `svg` are absolute, `100%` of the viewport, `overflow: visible` and
-`pointer-events: none`.
+`pointer-events: none`; so is each `edges-layer`, with its level's `z-index`. The `div` makes no
+stacking context, so the levels interleave with the nodes: do not give it (nor `Flow.Nodes`) an
+`opacity`, a `transform`, a `filter`, an `isolation` or a `z-index`.
