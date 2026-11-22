@@ -24,13 +24,21 @@ export interface NodesProps<T extends FlowTypes = AnyTypes>
     children: (node: FlowNode<T>) => React.ReactNode;
 }
 
-// its own stacking context: the nodes' z-index (a selected one raised) orders them among
-// themselves, never above what follows the layer (the connection line)
+// with one render level, its own stacking context: the nodes' z-index (a selected one raised)
+// orders them among themselves, never above what follows the layer (the connection line)
 const NODES_STYLE: React.CSSProperties = {
     position: "absolute",
     top: 0,
     left: 0,
     isolation: "isolate",
+};
+
+// with several render levels, none: the nodes' (negative) z-indexes interleave with the edge
+// levels' wrappers in the viewport's stacking context
+const LAYERED_NODES_STYLE: React.CSSProperties = {
+    position: "absolute",
+    top: 0,
+    left: 0,
 };
 
 interface NodeSlotProps {
@@ -47,15 +55,26 @@ const NodeSlot = React.memo(function NodeSlot({ node, render }: NodeSlotProps) {
 /**
  * The layer of the nodes (`data-flow-part="nodes"`), inside `Flow.Viewport`: calls `children` for
  * each node that is not hidden (with `onlyRenderVisible`, each one in view, `visible-nodes`), in
- * drawing order, keyed by its id (a node keeps its element when it moves). You render each node.
+ * drawing order, keyed by its id (a node keeps its element when it moves, and never leaves this
+ * layer: with several render levels its `z-index` places it among the edge levels). You render each
+ * node.
  */
 export function Nodes<T extends FlowTypes = AnyTypes>(props: NodesProps<T>) {
     const { children, ...rest } = props;
-    const { model, engine } = useFlowContext("Nodes");
+    const { model, engine, staticGeometry } = useFlowContext("Nodes");
     const list = useFlowValue(model, engine, () =>
         engine?.adapter.settings.onlyRenderVisible
             ? engine.get("visible-nodes")
             : model.get("all-nodes").filter((node) => node.hidden !== true),
+    );
+    const layered = useFlowValue(
+        model,
+        engine,
+        () =>
+            (engine
+                ? engine.get("render-layers")
+                : (staticGeometry?.layers ?? [])
+            ).length > 1,
     );
     const render = children as unknown as (node: FlowNode) => React.ReactNode;
     return useRenderElement("div", rest, {
@@ -66,6 +85,6 @@ export function Nodes<T extends FlowTypes = AnyTypes>(props: NodesProps<T>) {
                 <NodeSlot key={node.id} node={node} render={render} />
             )),
         },
-        style: NODES_STYLE,
+        style: layered ? LAYERED_NODES_STYLE : NODES_STYLE,
     });
 }
