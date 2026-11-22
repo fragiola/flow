@@ -91,7 +91,7 @@ export function useEdgeLabelLayer(): EdgeLabelLayerValue | undefined {
  * The node of `nodeId`, or the enclosing `Flow.Node`'s, read when called (`nodeId` is a getter of
  * the part's prop, so a new prop is followed).
  */
-export function useNodeId(
+export function usePartNodeId(
     part: string,
     nodeId: () => string | undefined,
 ): () => string {

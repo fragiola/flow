@@ -100,7 +100,7 @@
 -->
 <script lang="ts">
     import { partAttributes } from "@fragiola/flow";
-    import { useFlowContext, useNodeId } from "../context.js";
+    import { useFlowContext, usePartNodeId } from "../context.js";
     import { flowValue } from "../runes/internal.svelte.js";
     import {
         elementProps,
@@ -119,7 +119,7 @@
         ...rest
     }: ResizeHandleProps = $props();
 
-    const nodeIdOf = useNodeId("ResizeHandle", () => nodeIdProp);
+    const nodeIdOf = usePartNodeId("ResizeHandle", () => nodeIdProp);
     const context = useFlowContext("ResizeHandle");
     // the engine's record: `data-position`, and `tabindex` with `keyboard()` (arrows resize)
     const attributes = flowValue(context, () =>
