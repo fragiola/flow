@@ -3,10 +3,12 @@
 // within `radius`, valid when `model.can("edge.add", …)`, and a drop there adds the edge. With
 // `clickToConnect`, a tap on a connectable handle starts the same connection without a press: the
 // engine moves it with the pointer, and the next press's release is its drop (a tap on another
-// handle connects; elsewhere it is cancelled, as Escape does).
+// handle connects; elsewhere it is cancelled, as Escape does). With `keyboard()`, a focused handle
+// starts a keyboard connection (its keys are the keyboard's; the session's `keyboard`).
 import { connectSessionOf } from "../connect-session/connect-session";
 import type { FlowHandle, PressTarget } from "../engine/adapter";
 import { TAP_TOLERANCE } from "../engine/tap";
+import { keyboardLinks } from "../features/keyboard-links";
 import type { FeatureEngine, FeatureEngineHost } from "../features/types";
 import type { ConnectionOptions } from "./connection";
 
@@ -29,6 +31,14 @@ export function connectionEngine(
             host.model.is("node-connectable", { nodeId: handle.nodeId })
             ? handle
             : undefined;
+    };
+
+    // with keyboard(): Enter on a focused handle draws a connection from it
+    keyboardLinks(host).connect = {
+        start: (from) =>
+            startable({ kind: "handle", element: undefined, handle: from })
+                ? session.keyboard(from)
+                : undefined,
     };
 
     return {

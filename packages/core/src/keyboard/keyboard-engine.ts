@@ -7,9 +7,22 @@
 // - the delete keys (`deleteKeys`: Delete and Backspace by default) remove the selection
 //   (`selection.remove`), or without `selection()` the focused node or edge;
 // - Escape clears the selection (a gesture under way is cancelled by the engine first).
+// With `connection()`, handles take focus too (`tabindex` in their attributes) and Enter or Space
+// on one starts a keyboard connection (Tab, Shift + Tab or the arrows walk the targets the model
+// accepts, nearest first; Enter or Space connect; Escape cancels); with `resize()`, resize handles
+// take focus and the arrows move their sides. Both are reached through the host's keyboard links,
+// never by importing those features.
 import type { FlowEdge, FlowNode, XY } from "../document/types";
 import { movedRoots, runMoves } from "../engine/node-moves";
-import type { FeatureEngine, FeatureEngineHost } from "../features/types";
+import {
+    type KeyboardConnection,
+    keyboardLinks,
+} from "../features/keyboard-links";
+import type {
+    FeatureEngine,
+    FeatureEngineHost,
+    FeatureGesture,
+} from "../features/types";
 import { centeredOn, viewRect } from "../geometry/viewport-math";
 import type { KeyboardOptions } from "./keyboard";
 
@@ -20,12 +33,62 @@ const ARROWS: Readonly<Record<string, XY>> = {
     ArrowRight: { x: 1, y: 0 },
 };
 
+/** The keys that walk a keyboard connection's targets: the next one, or the previous one. */
+const TARGET_STEPS: Readonly<Record<string, 1 | -1>> = {
+    ArrowRight: 1,
+    ArrowDown: 1,
+    ArrowLeft: -1,
+    ArrowUp: -1,
+};
+
+/** Enter or Space, without a modifier (Shift aside). */
+function activates(event: KeyboardEvent): boolean {
+    return (
+        (event.key === "Enter" || event.key === " ") &&
+        !event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey
+    );
+}
+
+/**
+ * The gesture of a keyboard connection, given to the engine (it goes on without a press): Tab and
+ * Shift + Tab or the arrows walk its targets, Enter or Space connect, Escape (the engine's)
+ * cancels, as a press anywhere does.
+ */
+function connectionGesture(connection: KeyboardConnection): FeatureGesture {
+    return {
+        move: () => {},
+        end: () => connection.cancel(),
+        cancel: () => connection.cancel(),
+        active: () => connection.open(),
+        keydown: (event) => {
+            if (event.altKey || event.ctrlKey || event.metaKey) return false;
+            if (event.key === "Tab") {
+                connection.next(event.shiftKey ? -1 : 1);
+                return true;
+            }
+            const step = TARGET_STEPS[event.key];
+            if (step !== undefined) {
+                connection.next(step);
+                return true;
+            }
+            if (activates(event)) {
+                connection.connect();
+                return true;
+            }
+            return false;
+        },
+    };
+}
+
 /** The engine side of `keyboard()`. */
 export function keyboardEngine(
     host: FeatureEngineHost,
     options: KeyboardOptions,
 ): FeatureEngine {
     const { model } = host;
+    const links = keyboardLinks(host);
 
     const move = (
         direction: XY,
@@ -126,6 +189,16 @@ export function keyboardEngine(
         },
         keydown: (event, target) => {
             if (!host.interactive()) return false;
+            // Enter or Space on a focused handle starts a keyboard connection (`connection()`)
+            if (
+                target.kind === "handle" &&
+                target.handle !== undefined &&
+                links.connect !== undefined &&
+                activates(event)
+            ) {
+                const connection = links.connect.start(target.handle);
+                return connection ? connectionGesture(connection) : false;
+            }
             const nodeId = target.kind === "node" ? target.nodeId : undefined;
             const edgeId = target.kind === "edge" ? target.edgeId : undefined;
             const onEntity = nodeId !== undefined || edgeId !== undefined;
@@ -170,6 +243,22 @@ export function keyboardEngine(
                 return any && model.run("selection.clear", {}).ok;
             }
             return false;
+        },
+        attributes: (part, payload, into) => {
+            // a handle takes focus only with `connection()` too, a resize handle with `resize()`:
+            // an app without them keeps its tab order
+            if (part === "handle" && links.connect !== undefined) {
+                const nodeId = payload.nodeId;
+                if (
+                    payload.connectable !== false &&
+                    typeof nodeId === "string" &&
+                    model.is("node-connectable", { nodeId })
+                ) {
+                    into.tabindex = "0";
+                }
+            } else if (part === "resize-handle" && links.resize !== undefined) {
+                into.tabindex = "0";
+            }
         },
         focus: (target) => {
             if (target.kind !== "node" || target.nodeId === undefined) return;

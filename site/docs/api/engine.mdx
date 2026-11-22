@@ -360,13 +360,14 @@ viewport from it.
 | `"drag-start"` | `nodeIds` | a drag of these nodes started (`drag()`) |
 | `"nodes-move"` | `nodeIds`, `source` | nodes were dropped after a drag, or moved by the arrows; `source` is a `MoveSource`, `"pointer"` or `"keyboard"` |
 | `"drag-cancel"` | `nodeIds` | a drag was cancelled: its nodes went back |
-| `"connect-start"` | `nodeId`, `handleId`, `handleType` | a connection started from a handle (`connection()`) |
-| `"connect"` | `edgeId`, `source`, `target` | a connection was dropped on a handle: an edge was added |
-| `"connect-cancel"` | `refused` | a connection ended without an edge; `refused`: on a handle `model.can("edge.add")` refused |
+| `"connect-start"` | `nodeId`, `handleId`, `handleType`, `input` | a connection started from a handle (`connection()`); `input` (a `MoveSource`): `"pointer"` (a drag or a tap) or `"keyboard"` (Enter on a focused handle, with `keyboard()`) |
+| `"connect-target"` | `nodeId`, `handleId`, `handleType`, `index`, `count` | a keyboard connection points at another target: the `index`-th of the `count` handles the model accepts, nearest first (`index` -1 and no handle when it accepts none), for your live region |
+| `"connect"` | `edgeId`, `source`, `target`, `input` | a connection was dropped on a handle (or Enter chose it): an edge was added |
+| `"connect-cancel"` | `refused`, `input` | a connection ended without an edge; `refused`: on a handle `model.can("edge.add")` refused |
 | `"reconnect-start"` | `edgeId`, `end` | an edge's end was grabbed (`reconnection()`) |
 | `"reconnect"` | `edgeId`, `source`, `target` | an edge was reconnected |
 | `"reconnect-cancel"` | `edgeId`, `refused` | a reconnection ended with the edge as it was |
-| `"resize"` | `nodeId`, `width`, `height` | a node was resized (`resize()`) |
+| `"resize"` | `nodeId`, `width`, `height`, `source` | a node was resized (`resize()`): by a drag (`source: "pointer"`), or by the arrows on a focused resize handle (`"keyboard"`, with `keyboard()`) |
 | `"box-select"` | `nodeIds`, `edgeIds` | a box selection ended with these selected (`selection()`) |
 | `"remove"` | `nodeIds`, `edgeIds` | a delete key (`deleteKeys`: Delete or Backspace by default) removed these (`keyboard()`) |
 

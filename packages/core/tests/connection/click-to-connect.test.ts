@@ -92,8 +92,15 @@ describe("click-to-connect", () => {
                 nodeId: "a",
                 handleId: "out",
                 handleType: "source",
+                input: "pointer",
             },
-            { type: "connect", edgeId: "edge-1", source: "a", target: "b" },
+            {
+                type: "connect",
+                edgeId: "edge-1",
+                source: "a",
+                target: "b",
+                input: "pointer",
+            },
         ]);
         // the tap that connects selects nothing
         expect(model.get("selected-nodes")).toEqual([]);
@@ -125,6 +132,7 @@ describe("click-to-connect", () => {
         expect(flow.events.at(-1)).toEqual({
             type: "connect-cancel",
             refused: true,
+            input: "pointer",
         });
     });
 
@@ -137,6 +145,7 @@ describe("click-to-connect", () => {
         expect(flow.events.at(-1)).toEqual({
             type: "connect-cancel",
             refused: false,
+            input: "pointer",
         });
         // the tap went to the connection: the selection stays
         expect(flow.model.get("selected-nodes").map((n) => n.id)).toEqual([
@@ -215,6 +224,7 @@ describe("click-to-connect", () => {
         expect(flow.events.at(-1)).toEqual({
             type: "connect-cancel",
             refused: false,
+            input: "pointer",
         });
         tap(flow.handle("a", "source", "out"), at(100, 25));
         flow.engine.run("set-interactive", { interactive: false });

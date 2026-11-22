@@ -304,6 +304,7 @@ export function resizeEngine(
                     nodeId: start.nodeId,
                     width: last.rect.width,
                     height: last.rect.height,
+                    source: "pointer",
                 });
             },
             cancel: () => {

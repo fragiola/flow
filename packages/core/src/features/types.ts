@@ -72,6 +72,12 @@ export interface FeatureGesture {
      */
     active?(): boolean;
     /**
+     * a key while the gesture goes on without a press (one a tap or a key started): `true` takes
+     * it (its default is prevented, no feature sees it); the gesture is over once `active()`
+     * answers false (a key connected it)
+     */
+    keydown?(event: KeyboardEvent): boolean;
+    /**
      * the gesture follows the pointer in the flow (a drag, a connection, a box, a resize): while it
      * is active and its pointer nears the root's edge, the engine pans the viewport every frame
      * (the `autoPan` option) and calls `move` again with the pointer's last event, so `move` must
@@ -206,8 +212,16 @@ export interface FeatureEngine {
     ): boolean | FeatureGesture | undefined;
     /** the wheel in the flow: `true` takes it (the minimap zooms) */
     wheel?(event: WheelEvent, target: PressTarget): boolean | undefined;
-    /** a key in the flow: `true` takes it (its default is prevented) */
-    keydown?(event: KeyboardEvent, target: PressTarget): boolean | undefined;
+    /**
+     * a key in the flow: `true` takes it (its default is prevented); a gesture takes it and goes
+     * on without a press (a keyboard connection), as a tap's does: the engine gives it the next
+     * keys first (`FeatureGesture.keydown`), and Escape, `cancel-gesture`, a press and a detach
+     * end it
+     */
+    keydown?(
+        event: KeyboardEvent,
+        target: PressTarget,
+    ): boolean | FeatureGesture | undefined;
     /** DOM focus entered a part of the flow (a node, an edge) */
     focus?(target: PressTarget): void;
     /** adds its state attributes to a part's record (`data-dragging` on a dragged node) */

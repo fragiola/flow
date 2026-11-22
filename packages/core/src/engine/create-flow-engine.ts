@@ -2021,9 +2021,29 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             event.preventDefault();
             return;
         }
+        // a gesture going on without a press (a keyboard connection) takes the keys first
+        const following = this.following;
+        if (following?.keydown) {
+            const taken = following.keydown(event);
+            if (
+                this.following === following &&
+                following.active?.() === false
+            ) {
+                this.following = undefined;
+            }
+            if (taken) {
+                event.preventDefault();
+                return;
+            }
+        }
         const target = this.target(event.target);
         if (target.kind === "other") return;
-        if (this.features.keydown(event, target)) event.preventDefault();
+        const taken = this.features.keydown(event, target);
+        if (typeof taken === "object") {
+            this.cancelFollowing();
+            this.following = taken;
+        }
+        if (taken) event.preventDefault();
     }
 
     private focusIn(event: FocusEvent): void {
