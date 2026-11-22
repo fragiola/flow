@@ -15,17 +15,23 @@ export function useControlButton(
     part: string,
     action: EngineActionKey,
     disabledProp: () => boolean | null | undefined,
+    duration: () => number | undefined = () => undefined,
 ): {
     readonly state: ControlButtonState;
     readonly props: Record<string, unknown>;
 } {
     const context = useFlowContext(part);
+    // its `duration` when given (an absent one is the engine's default)
+    const payload = () => {
+        const value = duration();
+        return value === undefined ? {} : { duration: value };
+    };
     const allowed = flowValue(context, () =>
-        context.engine ? context.engine.can(action, {} as never) : false,
+        context.engine ? context.engine.can(action, payload() as never) : false,
     );
     const disabled = $derived(disabledProp() === true || !allowed.current);
     const onclick = () => {
-        context.engine?.run(action, {} as never);
+        context.engine?.run(action, payload() as never);
     };
     return {
         get state() {

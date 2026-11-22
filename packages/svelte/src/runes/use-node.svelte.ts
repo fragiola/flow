@@ -55,6 +55,8 @@ interface NodeView {
     attributes: PartAttributes;
     x: number;
     y: number;
+    /** its structural `z-index` (`node-z-index-by`); none without an engine */
+    zIndex: number | undefined;
     focusable: boolean;
 }
 
@@ -81,6 +83,7 @@ export function useNode<T extends FlowTypes = AnyTypes>(
                 },
                 x: at?.x ?? value.position.x,
                 y: at?.y ?? value.position.y,
+                zIndex: undefined,
                 focusable: false,
             };
         }
@@ -89,6 +92,7 @@ export function useNode<T extends FlowTypes = AnyTypes>(
             attributes: engine.adapter.attributes("node", { nodeId }),
             x: rect?.x ?? value.position.x,
             y: rect?.y ?? value.position.y,
+            zIndex: engine.get("node-z-index-by", { nodeId }),
             focusable: engine.is("node-focusable", { nodeId }),
         };
     });
@@ -120,12 +124,12 @@ export function useNode<T extends FlowTypes = AnyTypes>(
         };
     });
     const props = $derived.by((): NodeElementProps => {
-        const { attributes, x, y, focusable } = view.current;
+        const { attributes, x, y, zIndex, focusable } = view.current;
         const value = current();
         return {
             ...(attributes as DataAttributes),
             tabindex: focusable ? 0 : undefined,
-            style: styleString(nodeStyle(x, y, value)) ?? "",
+            style: styleString(nodeStyle(x, y, zIndex, value)) ?? "",
             [key]: attachment,
         };
     });
@@ -139,10 +143,11 @@ export function useNode<T extends FlowTypes = AnyTypes>(
     };
 }
 
-/** A node's structural style: absolute, at its position, with the document's size. */
+/** A node's structural style: absolute, at its position, its `z-index`, with the document's size. */
 function nodeStyle(
     x: number,
     y: number,
+    zIndex: number | undefined,
     node: { width?: number | undefined; height?: number | undefined },
 ): Record<string, string> {
     return {
@@ -150,6 +155,7 @@ function nodeStyle(
         top: "0",
         left: "0",
         transform: `translate(${px(x)}, ${px(y)})`,
+        ...(zIndex === undefined ? {} : { "z-index": String(zIndex) }),
         ...(node.width === undefined ? {} : { width: px(node.width) }),
         ...(node.height === undefined ? {} : { height: px(node.height) }),
     };

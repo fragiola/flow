@@ -736,6 +736,15 @@ Decisions of the Svelte adapter (#12):
   entity again (`{@render}` follows the snippet's identity): Vue's #11 bug cannot happen.
 - **Callback props are lowercase** (`onnodeschange`, `onedgeschange`, `onviewportchange`), as
   Svelte's DOM event props and xyflow's Svelte package.
+- **The viewport and gesture options (#25)** are React's root props under React's names
+  (`autoPan`, `panOnDrag={[1, 2]}`, `panActivationKey`, `panOnScrollMode`, `panOnScrollSpeed`,
+  `zoomActivationKey`, `easing`, `nodeOrigin`, `nodeExtent`, `elevateNodesOnSelect`,
+  `elevateEdgesOnSelect`), sent as React's (`null` is not `undefined`, a function by identity);
+  the object-valued ones (`panOnDrag`, `autoPan`, `nodeOrigin`, `nodeExtent`) go through `plain`
+  (a `$state` parent's proxy never reaches the engine; `panOnDrag` did not before #25).
+  `ZoomIn`, `ZoomOut`, `FitView` take `duration`. The node's `z-index` is in its structural style
+  string (`useNode`'s `props.style`, `elementProps`' `structural`), so a consumer's `style`
+  (`z-index` included) never replaces it (tested). The node origin and `drawn-edges` are React's.
 - **`ref` has no fallback** (`ref = $bindable()`): Svelte refuses `bind:ref={undefined}` on a prop
   with a fallback, and `let el = $state()` is the common app code.
 - **Biome does not read `.svelte` files** (not in its `includes`); `svelte-check

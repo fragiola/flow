@@ -5,6 +5,8 @@
 
     export interface ZoomOutProps
         extends Omit<ButtonPrimitiveProps<ControlButtonState>, "children"> {
+        /** how long its viewport change animates, in milliseconds (the root's `easing`); default 0: at once */
+        duration?: number | undefined;
         /** its content (an icon, a label) */
         children?: Snippet<[{ state: ControlButtonState }]> | undefined;
     }
@@ -26,6 +28,7 @@
     let {
         children,
         disabled,
+        duration,
         render,
         class: className,
         style,
@@ -33,7 +36,12 @@
         ...rest
     }: ZoomOutProps = $props();
 
-    const button = useControlButton("ZoomOut", "zoom-out", () => disabled);
+    const button = useControlButton(
+        "ZoomOut",
+        "zoom-out",
+        () => disabled,
+        () => duration,
+    );
     const refs = refProps((element) => {
         ref = element as HTMLButtonElement | null;
     });
