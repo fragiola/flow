@@ -1,7 +1,12 @@
 import { partAttributes } from "@fragiola/flow";
 import type * as React from "react";
-import { useNodeId } from "../context";
-import { type DivPrimitiveProps, useRenderElement } from "../utils/use-render";
+import { useFlowContext, useNodeId } from "../context";
+import { useFlowValue } from "../hooks/internal";
+import {
+    attributeProps,
+    type DivPrimitiveProps,
+    useRenderElement,
+} from "../utils/use-render";
 
 /** A corner or a side of a node a `ResizeHandle` moves. */
 export type ResizePosition =
@@ -88,19 +93,23 @@ const PLACE: Record<ResizePosition, React.CSSProperties> = {
 
 /**
  * A grab area of a `NodeResizer` (`data-flow-part="resize-handle"`, `data-position`): a press on
- * it resizes its node from that corner or side (`resize()`). Placed on its corner (centred) or
+ * it resizes its node from that corner or side (`resize()`); with `keyboard()` too it takes focus
+ * and the arrows move that corner or side. Placed on its corner (centred) or
  * along its side; give it its size (a side's thickness) and look.
  */
 export function ResizeHandle(props: ResizeHandleProps) {
     const { position, nodeId: nodeIdProp, children, ...rest } = props;
     const nodeId = useNodeId("ResizeHandle", nodeIdProp);
+    const { model, engine } = useFlowContext("ResizeHandle");
+    // the engine's record: `data-position`, and `tabindex` with `keyboard()` (arrows resize)
+    const attributes = useFlowValue(model, engine, () =>
+        engine
+            ? engine.adapter.attributes("resize-handle", { nodeId, position })
+            : { ...partAttributes("resize-handle"), "data-position": position },
+    );
     return useRenderElement("div", rest, {
         state: { nodeId, position },
-        props: {
-            ...partAttributes("resize-handle"),
-            "data-position": position,
-            children,
-        },
+        props: { ...attributeProps(attributes), children },
         style: {
             position: "absolute",
             pointerEvents: "auto",

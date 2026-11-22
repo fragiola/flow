@@ -7,7 +7,7 @@ import {
 } from "@fragiola/flow";
 import * as React from "react";
 import { useFlowContext, useNodeId } from "../context";
-import type { DataAttributes } from "../utils/use-render";
+import { type AttributeProps, attributeProps } from "../utils/use-render";
 import { useFlowValue } from "./internal";
 
 export interface UseHandleOptions {
@@ -42,8 +42,11 @@ export interface HandleState {
 
 export interface UseHandleResult {
     state: HandleState;
-    /** what goes on the handle's element: its attributes and the ref that registers it (D8) */
-    props: { ref: React.RefCallback<Element> } & DataAttributes;
+    /**
+     * what goes on the handle's element: its attributes (`tabIndex` with `keyboard()` and
+     * `connection()`) and the ref that registers it (D8)
+     */
+    props: { ref: React.RefCallback<Element> } & AttributeProps;
 }
 
 /**
@@ -87,6 +90,6 @@ export function useHandle(options: UseHandleOptions): UseHandleResult {
             invalid: attributes["data-invalid"] !== undefined,
             attributes,
         },
-        props: { ...(attributes as DataAttributes), ref },
+        props: { ...attributeProps(attributes), ref },
     };
 }

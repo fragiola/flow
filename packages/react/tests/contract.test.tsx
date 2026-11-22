@@ -63,6 +63,10 @@ function flowWith(slot: string, p: Props): React.ReactNode {
                                 end="target"
                                 {...(at("reconnect-anchor") as object)}
                             />
+                            <Flow.EdgeToolbar
+                                open
+                                {...(at("edge-toolbar") as object)}
+                            />
                         </Flow.Edge>
                     )}
                 </Flow.Edges>
@@ -199,6 +203,13 @@ const CASES: Case[] = [
     simple("toolbar", "div", div, {
         structural: ["position", "static", "absolute"],
     }),
+    {
+        ...simple("toolbar", "div", div, {
+            structural: ["position", "static", "absolute"],
+        }),
+        // the edge's toolbar: the same part
+        flow: (p) => flowWith("edge-toolbar", p),
+    },
     simple("minimap", "svg", () => <svg />),
     simple("minimap-node", "rect", () => <rect />),
     simple("minimap-mask", "path", () => <path />),
