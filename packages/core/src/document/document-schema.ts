@@ -72,6 +72,11 @@ export const nodeFlagProperties = {
             "it may be removed (`node.remove`, `selection.remove`); default true",
     },
     hidden: { type: "boolean", description: "it is not shown; default false" },
+    focusable: {
+        type: "boolean",
+        description:
+            "it takes DOM focus (with the keyboard feature); default true",
+    },
 } as const;
 
 /** An edge's flags, each optional (an absent flag is its default). */
@@ -87,9 +92,14 @@ export const edgeFlagProperties = {
     },
     hidden: { type: "boolean", description: "it is not shown; default false" },
     reconnectable: {
+        anyOf: [{ type: "boolean" }, { const: "source" }, { const: "target" }],
+        description:
+            'its ends may be moved to other nodes or handles (`edge.reconnect`): both (true), none (false), or only its "source" or its "target" end; default true',
+    },
+    focusable: {
         type: "boolean",
         description:
-            "its ends may be moved to other nodes (`edge.reconnect`); default true",
+            "it takes DOM focus (with the keyboard feature); default true",
     },
 } as const;
 

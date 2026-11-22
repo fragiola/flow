@@ -256,7 +256,7 @@ export const nodeSetData = defineCommand({
 export const nodeSetFlags = defineCommand({
     name: "node.set-flags",
     description:
-        "Sets some of a node's flags (draggable, selectable, connectable, deletable, hidden); the others stay. A node made unselectable is deselected.",
+        "Sets some of a node's flags (draggable, selectable, connectable, deletable, hidden, focusable); the others stay. A node made unselectable is deselected.",
     payloadSchema: {
         type: "object",
         properties: { nodeId, ...nodeFlagProperties },

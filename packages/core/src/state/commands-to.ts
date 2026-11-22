@@ -8,7 +8,7 @@
 // node's type, a removed data key, a size given back to measurement) replaces the entity: removed
 // and added again with the same id, its edges with it. The drawing order is not synced.
 import type { BatchEntry } from "../commands/types";
-import { edgeFlag, nodeFlag } from "../document/flags";
+import { edgeFlag, nodeFlag, reconnectableEnd } from "../document/flags";
 import type {
     EdgeFlags,
     FlowEdge,
@@ -32,14 +32,27 @@ const NODE_FLAGS = [
     "connectable",
     "deletable",
     "hidden",
+    "focusable",
 ] as const satisfies readonly (keyof NodeFlags)[];
 
 const EDGE_FLAGS = [
     "selectable",
     "deletable",
     "hidden",
-    "reconnectable",
+    "focusable",
 ] as const satisfies readonly (keyof EdgeFlags)[];
+
+/** Whether `edge.reconnect` may move an edge's ends where `next` puts them. */
+function reconnects(edge: FlowEdge, next: FlowEdgeInput): boolean {
+    const sourceMoves =
+        next.source !== edge.source || next.sourceHandle !== edge.sourceHandle;
+    const targetMoves =
+        next.target !== edge.target || next.targetHandle !== edge.targetHandle;
+    return (
+        (!sourceMoves || reconnectableEnd(edge, "source")) &&
+        (!targetMoves || reconnectableEnd(edge, "target"))
+    );
+}
 
 type Json = Readonly<Record<string, unknown>>;
 
@@ -108,14 +121,30 @@ export function commandsTo(
     reader: FlowReader,
     target: CommandsToPayload,
     installed: ReadonlySet<string>,
+    defaultEdge?: Readonly<Record<string, unknown>> | undefined,
 ): BatchEntry[] {
     const nodesWanted = target.nodes;
-    const edgesWanted = target.edges;
+    // the wanted edges as `edge.add` would store them (`defaultEdgeOptions` under what they give),
+    // so an edge the defaults filled in is not synced back forever
+    const edgesWanted =
+        defaultEdge === undefined || target.edges === undefined
+            ? target.edges
+            : target.edges.map(
+                  (edge) =>
+                      ({
+                          ...defaultEdge,
+                          ...Object.fromEntries(
+                              Object.entries(edge).filter(
+                                  ([, value]) => value !== undefined,
+                              ),
+                          ),
+                      }) as FlowEdgeInput,
+              );
     const currentNodes = reader.nodes();
     const currentEdges = reader.edges();
     if (
         (nodesWanted === undefined || nodesWanted === currentNodes) &&
-        (edgesWanted === undefined || edgesWanted === currentEdges)
+        (target.edges === undefined || target.edges === currentEdges)
     ) {
         return [];
     }
@@ -220,8 +249,7 @@ export function commandsTo(
             (next.type ?? "bezier") !== (edge.type ?? "bezier") ||
             dataPatch(edge.data as Json, next.data as Json) === undefined ||
             (moved &&
-                (!installed.has("edge.reconnect") ||
-                    !edgeFlag(edge, "reconnectable")));
+                (!installed.has("edge.reconnect") || !reconnects(edge, next)));
         if (touchesGone(edge)) {
             // removed with its node: added again as it is wanted (an edge the app does not
             // control goes with a removed node, and comes back with a replaced one)
@@ -408,11 +436,15 @@ export function commandsTo(
         push("node.set-flags", { nodeId, connectable: false });
     for (const [edge, next] of updatedEdges) {
         const edgeId = edge.id;
-        const flags: Record<string, boolean> = {};
+        const flags: Record<string, boolean | string> = {};
         for (const flag of EDGE_FLAGS) {
             const value = edgeFlag(next, flag);
             if (value !== edgeFlag(edge, flag)) flags[flag] = value;
         }
+        // `reconnectable` is a flag or an end's name
+        const reconnectable = next.reconnectable ?? true;
+        if (reconnectable !== (edge.reconnectable ?? true))
+            flags.reconnectable = reconnectable;
         if (Object.keys(flags).length > 0)
             push("edge.set-flags", { edgeId, ...flags });
         if (next.zIndex !== edge.zIndex)

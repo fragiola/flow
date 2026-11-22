@@ -116,7 +116,7 @@ export const edgeSetData = defineCommand({
 export const edgeSetFlags = defineCommand({
     name: "edge.set-flags",
     description:
-        "Sets some of an edge's flags (selectable, deletable, hidden, reconnectable); the others stay. An edge made unselectable is deselected.",
+        "Sets some of an edge's flags (selectable, deletable, hidden, reconnectable, focusable); the others stay. An edge made unselectable is deselected.",
     payloadSchema: {
         type: "object",
         properties: { edgeId, ...edgeFlagProperties },

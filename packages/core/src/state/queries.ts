@@ -144,8 +144,14 @@ export interface ModelIsMap {
     "edge-deletable": { edgeId: string };
     /** an edge is hidden (`hidden`, default false) */
     "edge-hidden": { edgeId: string };
-    /** an edge's ends may be moved (`reconnectable`, default true) */
-    "edge-reconnectable": { edgeId: string };
+    /**
+     * an edge's ends may be moved (`reconnectable`, default true): one of them at least, or the
+     * `end` given (`reconnectable: "source"` moves the source end only)
+     */
+    "edge-reconnectable": {
+        edgeId: string;
+        end?: "source" | "target" | undefined;
+    };
     /** a node is selected (`selection()`) */
     "node-selected": { nodeId: string };
     /** an edge is selected (`selection()`) */
