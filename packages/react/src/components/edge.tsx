@@ -1,6 +1,6 @@
 import type { AnyTypes, FlowEdge, FlowTypes } from "@fragiola/flow";
 import * as React from "react";
-import { EdgeContext } from "../context";
+import { EdgeContext, useFlowContext } from "../context";
 import { type EdgeState, useEdge } from "../hooks/use-edge";
 import { type SvgPrimitiveProps, useRenderElement } from "../utils/use-render";
 import { EdgePath } from "./edge-path";
@@ -23,9 +23,19 @@ const EDGE_STYLE: React.CSSProperties = { pointerEvents: "visibleStroke" };
 export function Edge<T extends FlowTypes = AnyTypes>(props: EdgeProps<T>) {
     const { edge, children, ...rest } = props;
     const { state, props: own } = useEdge<T>(edge);
+    const { engine } = useFlowContext("Edge");
     const context = React.useMemo(() => ({ edgeId: edge.id }), [edge.id]);
+    // an edge that moved to another render level's SVG is a new element: the one that had focus
+    // takes it back (`adapter.refocus` does nothing otherwise)
+    const ref = React.useCallback(
+        (element: Element | null) => {
+            if (engine && element) engine.adapter.refocus(element);
+        },
+        [engine],
+    );
     const element = useRenderElement("g", rest, {
         state,
+        ref,
         props: { ...own, children: children ?? <EdgePath /> },
         style: EDGE_STYLE,
     });
