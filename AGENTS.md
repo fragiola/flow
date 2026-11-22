@@ -882,6 +882,19 @@ Decisions of the Angular adapter (#15):
   part writing its DOM from its own subscription (a control button's click wrote `disabled`
   directly, #16's first fix); refused: one place, and the direct write could leave a button
   disabled when the app's `(click)` undid the limit in the same task (#16's review).
+- **The viewport and gesture options (#25)** are React's root props as inputs of `flowRoot`
+  under React's names (`[autoPan]`, `[panOnDrag]="[1, 2]"`, `panActivationKey`,
+  `panOnScrollMode`, `panOnScrollSpeed`, `zoomActivationKey`, `[easing]`, `[nodeOrigin]`,
+  `[nodeExtent]`, `elevateNodesOnSelect`, `elevateEdgesOnSelect`), sent as React's (`null` is not
+  `undefined`, a function by identity). Transforms: `panOnDrag` keeps a list of mouse buttons
+  (a bare attribute or a boolean as before; before #25 `optionalBoolean` turned a list into
+  `true`), `autoPan` keeps an options object, `panOnScrollSpeed` takes its attribute's text as a
+  number, `elevateNodesOnSelect` / `elevateEdgesOnSelect` a bare attribute; the keys and
+  `panOnScrollMode` are plain strings (`[panActivationKey]="null"` for none). `flowZoomIn`,
+  `flowZoomOut`, `flowFitView` take `duration` (`duration="300"` or `[duration]="300"`). The
+  node's `z-index` is a key of its `bindStructuralStyle` (it wins over the app's `[style]`,
+  tested); the node origin and `drawn-edges` (the order `SlotViews` places the edges' elements in)
+  are React's.
 - **Known limits:** no server render nor hydration (the sibling Angular adapters do not support it
   either; `[flowEdges]` adds its SVG in its constructor); jsdom lays nothing out, so the tests stub
   the layout (`tests/flow.ts`, React's); a part that leaves the document while hidden must not be

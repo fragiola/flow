@@ -54,7 +54,7 @@ const LAYER_STYLE: StructuralStyle = {
  * The layer of the edges (`data-flow-part="edges"`), on the app's element inside `[flowViewport]`,
  * before `[flowNodes]`: `<div flowEdges>`. It holds an SVG of its own (`data-flow-part="edges"`
  * too) where its `<ng-template flowEdgesItem let-edge>` draws each edge, once both its nodes have
- * a size (`edge-path-by`), and it is the HTML layer edge labels go to. It lets presses through to
+ * a size, in the engine's drawing order (`drawn-edges`: by `zIndex`), and it is the HTML layer edge labels go to. It lets presses through to
  * the pane; the edges' own parts take them.
  */
 @Directive({
@@ -81,23 +81,8 @@ export class FlowEdgesDirective {
     readonly list: Signal<readonly FlowEdge[]> = flowValue(this.context, () => {
         const engine = this.context.engine();
         if (!engine) return [];
-        const model = this.context.model();
-        const edges = engine.adapter.settings.onlyRenderVisible
-            ? engine.get("visible-edges")
-            : model
-                  .get("all-edges")
-                  .filter(
-                      (edge) =>
-                          edge.hidden !== true &&
-                          model.get("node-by", { id: edge.source })?.hidden !==
-                              true &&
-                          model.get("node-by", { id: edge.target })?.hidden !==
-                              true,
-                  );
-        return edges.filter(
-            (edge) =>
-                engine.get("edge-path-by", { edgeId: edge.id }) !== undefined,
-        );
+        // the core's drawing order: shown, measured, in view with `onlyRenderVisible`, by z-order
+        return engine.get("drawn-edges");
     });
 
     /** what it shows (`#edges="flowEdges"`, then `edges.state().count`) */

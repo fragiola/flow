@@ -62,6 +62,8 @@ interface NodeView {
     attributes: PartAttributes;
     x: number;
     y: number;
+    /** its structural `z-index` (`node-z-index-by`); none without an engine */
+    zIndex: number | undefined;
     focusable: boolean;
 }
 
@@ -69,7 +71,7 @@ interface NodeView {
  * A node's state, and its element bound (React's `useNode`), for a node rendered by hand: call it
  * in the constructor (or a field) of the component or directive whose host element is the node
  * (`[flowNode]` uses it). That element gets the node's attributes, its `tabindex`, its structural
- * style (absolute, at its place, with the document's size when given) and is registered with the
+ * style (absolute, at its place, its `z-index` among the nodes, with the document's size when given) and is registered with the
  * engine, which measures it and resolves presses on it.
  *
  * ```ts
@@ -110,6 +112,7 @@ export function bindNode<T extends FlowTypes>(
                 },
                 x: at?.x ?? current.position.x,
                 y: at?.y ?? current.position.y,
+                zIndex: undefined,
                 focusable: false,
             };
         }
@@ -118,6 +121,7 @@ export function bindNode<T extends FlowTypes>(
             attributes: engine.adapter.attributes("node", { nodeId: id }),
             x: rect?.x ?? current.position.x,
             y: rect?.y ?? current.position.y,
+            zIndex: engine.get("node-z-index-by", { nodeId: id }),
             focusable: engine.is("node-focusable", { nodeId: id }),
         };
     });
@@ -153,6 +157,7 @@ export function bindNode<T extends FlowTypes>(
                 top: 0,
                 left: 0,
                 transform: `translate(${shown.x}px, ${shown.y}px)`,
+                zIndex: shown.zIndex,
                 width: px(current.width),
                 height: px(current.height),
             },

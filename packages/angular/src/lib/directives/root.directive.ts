@@ -15,6 +15,7 @@ import {
 } from "@angular/core";
 import {
     type AnyTypes,
+    type AutoPanOptions,
     type CommandEvent,
     type CreateId,
     createFlowEngine,
@@ -80,6 +81,16 @@ export type RootEngineProps = Pick<
     | "interactive"
     | "onlyRenderVisible"
     | "pathOptions"
+    | "autoPan"
+    | "panActivationKey"
+    | "panOnScrollMode"
+    | "panOnScrollSpeed"
+    | "zoomActivationKey"
+    | "easing"
+    | "nodeOrigin"
+    | "nodeExtent"
+    | "elevateNodesOnSelect"
+    | "elevateEdgesOnSelect"
 >;
 
 /** A viewport change, as `(viewportMove)` tells it (React's `onViewportChange(viewport, gesture)`). */
@@ -109,14 +120,36 @@ function featureNames(features: FlowFeatures | undefined): string {
     return (features ?? []).map((feature) => feature.name).join(",");
 }
 
-/** Each engine option's value as a key: a new equal object (`pathOptions`) is the same. */
-function optionKeys(options: RootEngineProps): Record<string, string> {
+/**
+ * Each engine option's value as a key: a new equal object (`pathOptions`) is the same, a function
+ * (`easing`) is itself, and `null` (`[panActivationKey]="null"`: none) is not `undefined` (the
+ * default).
+ */
+function optionKeys(options: RootEngineProps): Record<string, unknown> {
     return Object.fromEntries(
         Object.entries(options).map(([key, value]) => [
             key,
-            JSON.stringify(value ?? null),
+            typeof value === "function" || value === undefined
+                ? value
+                : JSON.stringify(value),
         ]),
     );
+}
+
+/** `panOnDrag`'s input: a bare attribute is `true`, mouse buttons (`[panOnDrag]="[1, 2]"`) stay a list. */
+function panOnDragInput(
+    value: boolean | readonly number[] | "" | null | undefined,
+): boolean | readonly number[] | undefined {
+    return Array.isArray(value) ? value : optionalBoolean(value);
+}
+
+/** `autoPan`'s input: a bare attribute is `true`, its options (`{ speed, margin }`) stay an object. */
+function autoPanInput(
+    value: boolean | AutoPanOptions | "" | null | undefined,
+): boolean | AutoPanOptions | undefined {
+    return value !== null && typeof value === "object"
+        ? value
+        : optionalBoolean(value);
 }
 
 /** `fitView`'s input: a bare attribute is `true`, a payload stays one. */
@@ -199,7 +232,7 @@ export class FlowRootDirective<
     readonly translateExtent = input<
         FlowEngineOptions["translateExtent"] | undefined
     >(undefined);
-    readonly panOnDrag = input(undefined, { transform: optionalBoolean });
+    readonly panOnDrag = input(undefined, { transform: panOnDragInput });
     readonly panOnScroll = input(undefined, { transform: optionalBoolean });
     readonly zoomOnScroll = input(undefined, { transform: optionalBoolean });
     readonly zoomOnPinch = input(undefined, { transform: optionalBoolean });
@@ -214,6 +247,32 @@ export class FlowRootDirective<
     readonly pathOptions = input<FlowEngineOptions["pathOptions"] | undefined>(
         undefined,
     );
+    readonly autoPan = input(undefined, { transform: autoPanInput });
+    readonly panActivationKey = input<
+        FlowEngineOptions["panActivationKey"] | undefined
+    >(undefined);
+    readonly panOnScrollMode = input<
+        FlowEngineOptions["panOnScrollMode"] | undefined
+    >(undefined);
+    readonly panOnScrollSpeed = input(undefined, {
+        transform: optionalNumber,
+    });
+    readonly zoomActivationKey = input<
+        FlowEngineOptions["zoomActivationKey"] | undefined
+    >(undefined);
+    readonly easing = input<FlowEngineOptions["easing"] | undefined>(undefined);
+    readonly nodeOrigin = input<FlowEngineOptions["nodeOrigin"] | undefined>(
+        undefined,
+    );
+    readonly nodeExtent = input<FlowEngineOptions["nodeExtent"] | undefined>(
+        undefined,
+    );
+    readonly elevateNodesOnSelect = input(undefined, {
+        transform: optionalBoolean,
+    });
+    readonly elevateEdgesOnSelect = input(undefined, {
+        transform: optionalBoolean,
+    });
 
     /** the model's nodes after every command that changes them (a drag step too), but the controlled ones' */
     readonly nodesChange = output<readonly FlowNode<T>[]>();
@@ -348,6 +407,16 @@ export class FlowRootDirective<
             interactive: this.interactive(),
             onlyRenderVisible: this.onlyRenderVisible(),
             pathOptions: this.pathOptions(),
+            autoPan: this.autoPan(),
+            panActivationKey: this.panActivationKey(),
+            panOnScrollMode: this.panOnScrollMode(),
+            panOnScrollSpeed: this.panOnScrollSpeed(),
+            zoomActivationKey: this.zoomActivationKey(),
+            easing: this.easing(),
+            nodeOrigin: this.nodeOrigin(),
+            nodeExtent: this.nodeExtent(),
+            elevateNodesOnSelect: this.elevateNodesOnSelect(),
+            elevateEdgesOnSelect: this.elevateEdgesOnSelect(),
         }),
     );
 
@@ -423,7 +492,7 @@ export class FlowRootDirective<
 
         // the engine options last sent, by key: a change sends only the keys that changed (an
         // `interactive` that stays must not undo the lock of `[flowToggleInteractive]`)
-        let sentOptions: Record<string, string> = {};
+        let sentOptions: Record<string, unknown> = {};
         // the engine, once rendered in a browser (a server render never attaches nor observes
         // anything), one per model
         const rendered = signal(false);
