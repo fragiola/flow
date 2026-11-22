@@ -203,7 +203,7 @@ in one PR. `main` has no required checks: a skipped job blocks nothing.
 
 **Shards: none.** Shard a suite only when its test step alone passes about 3 minutes. Measured
 locally (4 workers; CI runs 2): the playground's 152 tests (76 per browser) in ~35 s, each
-examples app's 187 tests (95 smoke runs: 19 examples × 5 themes) in ~20 to ~45 s, its embed build
+examples app's 191 tests (95 smoke runs: 19 examples × 5 themes) in ~20 to ~45 s, its embed build
 included (measured after #28; Angular and React the slower).
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
