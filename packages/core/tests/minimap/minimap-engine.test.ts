@@ -104,4 +104,58 @@ describe("the minimap", () => {
         wheel(element, { deltaY: -100, clientX: 700, clientY: 500 });
         expect(flow.engine.get("viewport")).toEqual({ x: 0, y: 0, zoom: 1 });
     });
+
+    it("maps a client point on the minimap to a flow point", () => {
+        const flow = mount(json(), { features: [minimap()], sizes });
+        expect(
+            flow.engine.get("minimap-point-to-flow", {
+                client: { x: 650, y: 525 },
+            }),
+        ).toBeUndefined();
+        minimapElement(flow.root);
+        // the view box (-100, -75) 1000 × 750 over 200 × 150 pixels: 5 units a pixel
+        expect(
+            flow.engine.get("minimap-point-to-flow", {
+                client: { x: 650, y: 525 },
+            }),
+        ).toEqual({ x: 150, y: 300 });
+        expect(
+            flow.engine.get("minimap-point-to-flow", {
+                client: { x: 600, y: 450 },
+            }),
+        ).toEqual({ x: -100, y: -75 });
+    });
+
+    it("moves the view the other way with inversePan, without centring on the press", () => {
+        const flow = mount(json(), {
+            features: [minimap({ inversePan: true })],
+            sizes,
+        });
+        const element = minimapElement(flow.root);
+        pointer(element, "pointerdown", { clientX: 650, clientY: 525 });
+        expect(flow.engine.get("viewport")).toEqual({ x: 0, y: 0, zoom: 1 });
+        // 20 pixels right: 100 flow units, the view goes 100 left (10 up: 50 down)
+        pointer(flow.root, "pointermove", { clientX: 670, clientY: 525 });
+        expect(flow.engine.get("viewport")).toEqual({ x: 100, y: 0, zoom: 1 });
+        pointer(flow.root, "pointermove", { clientX: 650, clientY: 515 });
+        expect(flow.engine.get("viewport")).toEqual({ x: 0, y: -50, zoom: 1 });
+        pointer(flow.root, "pointerup", { clientX: 650, clientY: 515 });
+        expect(flow.engine.get("viewport")).toEqual({ x: 0, y: -50, zoom: 1 });
+    });
+
+    it("zooms by zoomStep: 20 zooms twice as fast as the default 10", () => {
+        const flow = mount(json(), {
+            features: [minimap({ zoomStep: 20 })],
+            sizes,
+        });
+        const element = minimapElement(flow.root);
+        wheel(element, { deltaY: -100, clientX: 700, clientY: 500 });
+        expect(flow.engine.get("viewport").zoom).toBeCloseTo(
+            Math.exp(200 / 600),
+        );
+        expect(minimap().options).toMatchObject({
+            inversePan: false,
+            zoomStep: 10,
+        });
+    });
 });

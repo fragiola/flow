@@ -364,6 +364,14 @@ export interface EngineGetMap<T extends FlowTypes = AnyTypes> {
         payload: { width: number; height: number };
         result: MinimapView;
     };
+    /**
+     * a client point on the minimap (the one under it, else the first) as a flow point; undefined
+     * while no minimap has a size (`minimap()`)
+     */
+    "minimap-point-to-flow": {
+        payload: { client: XY };
+        result: XY | undefined;
+    };
 }
 
 export type EngineGetKey = keyof EngineGetMap;

@@ -85,7 +85,7 @@ export const FEATURE_KEYS = Object.freeze({
         get: [],
         is: [],
         engineRun: [],
-        engineGet: ["minimap-view"],
+        engineGet: ["minimap-view", "minimap-point-to-flow"],
         engineIs: [],
         nodeFields: [],
         edgeFields: [],
