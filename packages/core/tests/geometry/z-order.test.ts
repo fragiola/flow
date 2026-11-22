@@ -64,6 +64,24 @@ describe("edgeStackValue", () => {
         ).toBe(0);
     });
 
+    it("keeps a selected parent's raise on its children's edge, above the parent", () => {
+        const group = new Map<string, FlowNode>(
+            [
+                node("g", { selected: true }),
+                node("a", { parentId: "g" }),
+                node("b", { parentId: "g", selected: true }),
+            ].map((n) => [n.id, n]),
+        );
+        const inGroup = (id: string) => group.get(id);
+        expect(nodeStackValue(group.get("g") as FlowNode, inGroup, {})).toBe(
+            SELECTED_RAISE,
+        );
+        // b's own raise is left out, g's is kept: the edge stands at a's and b's 10001
+        expect(
+            edgeStackValue({ id: "ab", source: "a", target: "b" }, inGroup, {}),
+        ).toBe(SELECTED_RAISE + 1);
+    });
+
     it("ignores the ends' selection raise", () => {
         expect(
             edgeStackValue(edge({ source: "c", target: "s" }), byId, {}),

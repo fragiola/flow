@@ -47,18 +47,19 @@ function ownValue(
 }
 
 /**
- * A node's stack value: in `"manual"` its `zIndex`; otherwise its own (raised when selected and
- * `raise`), always above its parent's.
+ * A node's stack value: in `"manual"` its `zIndex`; otherwise its own, always above its parent's.
+ * A selected node is raised, and its descendants with it; `raiseSelf: false` leaves out the node's
+ * own selection raise only (its ancestors' still counts).
  */
 export function nodeStackValue(
     node: FlowNode,
     nodeById: (nodeId: string) => FlowNode | undefined,
     options: ZOrderOptions,
-    raise = true,
+    raiseSelf = true,
 ): number {
     if (options.zIndexMode === "manual") return zOf(node.zIndex);
     // most nodes have no parent: no chain to walk
-    if (node.parentId === undefined) return ownValue(node, options, raise);
+    if (node.parentId === undefined) return ownValue(node, options, raiseSelf);
     const chain: FlowNode[] = [];
     const seen = new Set<string>();
     for (
@@ -71,7 +72,7 @@ export function nodeStackValue(
     }
     let z: number | undefined;
     for (const at of chain.reverse()) {
-        const own = ownValue(at, options, raise);
+        const own = ownValue(at, options, at !== node || raiseSelf);
         z = z === undefined ? own : Math.max(own, z + 1);
     }
     return z ?? 0;
@@ -80,7 +81,7 @@ export function nodeStackValue(
 /**
  * An edge's stack value: in `"manual"` its `zIndex`; in `"basic"` its `zIndex`, raised when
  * selected with `elevateEdgesOnSelect` (default false); in `"auto"`, at least its ends' node values
- * (without their selection raise) when one of them is a child, raised when selected with
+ * (without their own selection raise, with their ancestors') when one of them is a child, raised when selected with
  * `elevateEdgesOnSelect` (default true).
  */
 export function edgeStackValue(
