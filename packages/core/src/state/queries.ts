@@ -54,6 +54,22 @@ export interface ModelGetMap<T extends FlowTypes = AnyTypes> {
         payload: { nodeIds: readonly string[] };
         result: readonly FlowEdge<T>[];
     };
+    /**
+     * the nodes edges come from into a node (the sources of the edges that end at it), in the
+     * document's order, each once; a self loop makes it its own
+     */
+    "incomers-by": {
+        payload: { nodeId: string };
+        result: readonly FlowNode<T>[];
+    };
+    /**
+     * the nodes a node's edges go to (the targets of the edges that start at it), in the
+     * document's order, each once; a self loop makes it its own
+     */
+    "outgoers-by": {
+        payload: { nodeId: string };
+        result: readonly FlowNode<T>[];
+    };
     /** a node's position in flow coordinates (with sub-flows: its parents' positions added) */
     "absolute-position-by": {
         payload: { nodeId: string };

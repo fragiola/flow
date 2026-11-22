@@ -6,6 +6,7 @@ import type {
     EdgeFlags,
     FlowDocumentJson,
     FlowEdge,
+    FlowNode,
     NodeFlags,
 } from "../document/types";
 import type { ComposedFeatures } from "../features/registry";
@@ -27,6 +28,28 @@ export function stringOf(payload: unknown, key: string): string | undefined {
             ? (payload as Record<string, unknown>)[key]
             : undefined;
     return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * The nodes at the other end of a node's edges that end at it (`at: "target"`: its incomers) or
+ * start from it (`"source"`: its outgoers), in the document's node order, each once. A self loop
+ * makes the node its own incomer and outgoer; hidden nodes and edges count (a graph fact, not a
+ * view's).
+ */
+function neighbours(
+    reader: FlowReader,
+    nodeId: string | undefined,
+    at: "source" | "target",
+): readonly FlowNode[] {
+    if (nodeId === undefined) return [];
+    const other = at === "target" ? "source" : "target";
+    const ids = new Set<string>();
+    for (const edge of reader.edges()) {
+        if (edge[at] === nodeId) ids.add(edge[other]);
+    }
+    return ids.size === 0
+        ? []
+        : reader.nodes().filter((node) => ids.has(node.id));
 }
 
 /** The core's `get` keys. */
@@ -71,6 +94,10 @@ export const CORE_GET: Readonly<
             .edges()
             .filter((edge) => ids.has(edge.source) || ids.has(edge.target));
     },
+    "incomers-by": ({ reader }, payload) =>
+        neighbours(reader, stringOf(payload, "nodeId"), "target"),
+    "outgoers-by": ({ reader }, payload) =>
+        neighbours(reader, stringOf(payload, "nodeId"), "source"),
     "absolute-position-by": ({ reader, features }, payload) => {
         const nodeId = stringOf(payload, "nodeId");
         const node = nodeId === undefined ? undefined : reader.node(nodeId);
