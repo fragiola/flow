@@ -1051,10 +1051,14 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     /** A node's structural `z-index`: its own, and always above its parent's (0 for none). */
     private nodeZ(nodeId: string): number {
+        // most nodes have no parent: no chain to walk (it is read per node on every pan frame)
+        const first = this.node(nodeId);
+        if (first === undefined) return 0;
+        if (first.parentId === undefined) return this.ownZ(first);
         const chain: FlowNode[] = [];
         const seen = new Set<string>();
         for (
-            let node = this.node(nodeId);
+            let node: FlowNode | undefined = first;
             node !== undefined && !seen.has(node.id);
             node =
                 node.parentId === undefined
