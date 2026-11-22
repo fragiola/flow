@@ -1,6 +1,6 @@
 ---
 title: Path helpers
-description: The edge path functions the engine draws with, bezier, simple bezier, smooth step, step and straight, each with its label point, and the types they share.
+description: The edge path functions the engine draws with, bezier, simple bezier, smooth step, step and straight, their label points and options, and their types.
 ---
 
 The engine draws the built-in edge types (`bezier`, `simplebezier`, `smoothstep`, `step`,
@@ -136,11 +136,32 @@ label is the curve's middle.
 | `curvature` | `number` | the share of the distance along a side its control point stands out by; default `0.5` |
 
 It returns a `BezierPathResult`: the `PathResult` below and `labelOffset`, the distance across
-(`x`) and down (`y`) from the source to the label point, both positive.
+(`x`) and down (`y`) from the source to the label point, both positive (as React Flow counts it),
+whichever way the edge runs.
+
+```ts
+import { bezierPath } from "@fragiola/flow";
+
+const { path, label, labelOffset } = bezierPath({
+    source: { x: 0, y: 0 },
+    sourceSide: "right",
+    target: { x: 200, y: 100 },
+    targetSide: "left",
+});
+// label is the curve's middle, { x: 100, y: 50 }; labelOffset is { x: 100, y: 50 }
+```
 
 `edgeCenter(source, target)` gives an `EdgeCenter`: `center`, the point halfway between two ends,
-and `offset`, half their distance across (`x`) and down (`y`). It is where a straight edge's label
-goes, and a point an app's own path may centre on.
+and `offset`, half their distance across (`x`) and down (`y`), both positive. It is where a
+straight edge's label goes, and a point an app's own path may centre on (a wave, an arc):
+
+```ts
+import { edgeCenter } from "@fragiola/flow";
+
+const { center, offset } = edgeCenter({ x: 0, y: 0 }, { x: 200, y: -100 });
+// center { x: 100, y: -50 }, offset { x: 100, y: 50 }
+const arc = `M 0 0 Q ${center.x} ${center.y - offset.x} 200 -100`;
+```
 
 ## `simpleBezierPath`
 
@@ -172,6 +193,20 @@ route's length. Where that one turn (or the run across) sits is the `StepTurnOpt
 
 `StepPathOptions` (with the `PathEnds` and the `StepTurnOptions`): `offset`, `stepPosition`,
 `centerX` and `centerY`, as above.
+
+The turn is placed between the two points that stand `offset` out from the ends, not between the
+ends themselves: `stepPosition: 0` turns right where the source's stand-out ends, `1` where the
+target's begins, and the route never cuts into a node's margin. `centerX` and `centerY` are flow
+coordinates, for edges that must turn on one line (a lane, a bus); a value that is not a finite
+number is ignored, and the default applies.
+
+```ts
+import { stepPath } from "@fragiola/flow";
+
+const ends = { source: { x: 0, y: 0 }, sourceSide: "right", target: { x: 300, y: 120 }, targetSide: "left" } as const;
+stepPath({ ...ends, stepPosition: 0.25 }).path; // turns a quarter of the way, near the source
+stepPath({ ...ends, centerX: 240 }).path; // turns at x = 240, whatever the ends
+```
 
 ## `straightPath`
 
@@ -221,7 +256,33 @@ every edge of the flow:
 | `centerY` | `number` | smooth step and step: the y of a horizontal turn, in flow coordinates; default none |
 
 An edge's own `pathOptions` (an `EdgePathOptions`, in the [JSON document](/docs/api/json-document))
-go over these, key by key, for that edge.
+go over these, key by key, for that edge: one flat object with the same keys, each read by the
+types it applies to (a `borderRadius` on a bezier edge changes nothing).
+
+```ts
+const edges: FlowEdgeInput<Types>[] = [
+    { id: "a-b", source: "a", target: "b", type: "step", pathOptions: { stepPosition: 0.25 } },
+    { id: "b-c", source: "b", target: "c", type: "smoothstep", pathOptions: { borderRadius: 16 } },
+];
+```
+
+`engine.get("edge-path-by", { edgeId })` draws with the merged options, so a custom edge that
+reads `state.path` gets them too. See [Custom edges](/docs/guides/custom-edges#one-edges-own-shape).
+
+## Telling a node from an edge
+
+`isNode(value)` and `isEdge(value)` are type guards for a mixed list (a clipboard, an assistant's
+answer, a drop): a node is a record with a string `id` and a `position` of two numbers, and no
+`source` or `target`; an edge one with a string `id`, `source` and `target`. They check the shape,
+not the rules: `validateFlow` does ([JSON document](/docs/api/json-document#validating)).
+
+```ts
+import { isEdge, isNode } from "@fragiola/flow";
+
+const pasted: unknown[] = JSON.parse(clipboardText);
+const nodes = pasted.filter(isNode<Types>);
+const edges = pasted.filter(isEdge<Types>);
+```
 
 `Rect`, an axis-aligned rectangle (a node's box, the selection box, a minimap's view):
 

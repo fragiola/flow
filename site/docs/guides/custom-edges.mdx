@@ -119,6 +119,59 @@ step corners, default 5) and `offset` (how far a step leaves its node before tur
 
 </Framework>
 
+The root's `pathOptions` also take `stepPosition` (where a step's turn sits between its source,
+`0`, and its target, `1`; default `0.5`) and `centerX` / `centerY` (a turn at a fixed place, in
+flow coordinates): see the [path helpers](/docs/api/path-helpers#smoothsteppath-and-steppath).
+
+## One edge's own shape
+
+An edge's own `pathOptions` go over the root's, key by key, for that edge only: one flat object
+with the same keys (`curvature`, `borderRadius`, `offset`, `stepPosition`, `centerX`, `centerY`),
+each read by the types it applies to. It is part of the document, so it is saved, validated and
+undone with the edge:
+
+```ts
+const edges: FlowEdgeInput<Types>[] = [
+    { id: "c-d", source: "c", target: "d", type: "step", pathOptions: { stepPosition: 0.25 } },
+    { id: "b-c", source: "b", target: "c", type: "smoothstep", pathOptions: { borderRadius: 16 } },
+];
+```
+
+The engine draws the edge with the merged options (`edge-path-by`), so an edge type of your own
+that reads `state.path` and calls a [path helper](/docs/api/path-helpers) can spread them too. In a
+controlled flow (`edges` given to the root), an edge whose `pathOptions` changed is replaced: the
+sync removes it and adds the new one, keeping its id.
+
+## Animated edges
+
+`animated: true` on an edge (a flag of the document, default `false`) puts `data-animated` on its
+`edge`, `edge-path` and `edge-label` parts. The package animates nothing: the motion is your CSS,
+so it follows your theme and `prefers-reduced-motion`:
+
+```css title="flow.css"
+@keyframes flow-dash {
+    to {
+        stroke-dashoffset: -10;
+    }
+}
+[data-flow-part="edge-path"][data-animated] {
+    stroke-dasharray: 6 4;
+    animation: flow-dash 0.5s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+    [data-flow-part="edge-path"][data-animated] {
+        animation: none;
+    }
+}
+```
+
+With Tailwind, the variant is `data-animated:` (`data-animated:[stroke-dasharray:6_4]`). Turn it
+on and off from code like any flag:
+
+```ts
+model.run("edge.set-flags", { edgeId: "b-c", animated: true });
+```
+
 ## An edge type of your own
 
 Name the type and its data in the registry. The engine gives an app type the bezier path, and its

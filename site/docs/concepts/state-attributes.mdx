@@ -14,7 +14,7 @@ Every element carries `data-flow-part`, the part it is: `root`, `viewport`, `nod
 (and its default `connection-path`), `selection-box`, `background` (with `background-pattern`,
 `background-mark`, `background-fill` inside), `controls`, `zoom-in`, `zoom-out`, `fit-view`,
 `toggle-interactive`, `toolbar`, `minimap`, `minimap-node`, `minimap-mask`, `resizer`,
-`resize-handle`. An entity's part also carries `data-flow-id`: a node's id, an edge's id, a
+`resize-handle`, `nodes-selection`. An entity's part also carries `data-flow-id`: a node's id, an edge's id, a
 handle's `handleId`. There is no path attribute: a flow is a graph, not a tree.
 
 ## By part
@@ -24,8 +24,8 @@ handle's `handleId`. There is no path attribute: a flow is a graph, not a tree.
 | `root` | `data-interactive` (gestures may change the flow), `data-panning`, `data-dragging` (`drag()`), `data-connecting` (`connection()`), `data-selecting` (a box is drawn, `selection()`) |
 | `node` | `data-flow-id`, `data-selected`, `data-dragging`, `data-resizing` (`resize()`), `data-measured` (its size is known), `data-hidden` |
 | `handle` | `data-flow-id` (its `handleId`), `data-handle-type` (`source` or `target`), `data-side` (`top`, `right`, `bottom`, `left`), `data-connectable`, `data-connecting` (the connection under way starts here), `data-valid` / `data-invalid` (it would end here, accepted or refused) |
-| `edge`, `edge-path` | `data-flow-id`, `data-selected`, `data-reconnecting` (one of its ends is being moved) |
-| `edge-label` | `data-flow-id`, `data-selected` |
+| `edge`, `edge-path` | `data-flow-id`, `data-selected`, `data-animated` (its `animated` flag), `data-reconnecting` (one of its ends is being moved) |
+| `edge-label` | `data-flow-id`, `data-selected`, `data-animated` |
 | `reconnect-anchor` | `data-flow-id`, `data-end` (`source` or `target`), `data-reconnecting` |
 | `connection-line` | `data-valid` / `data-invalid`: the drop would add the edge, or be refused |
 | `selection-box` | `data-selecting` |
@@ -34,6 +34,7 @@ handle's `handleId`. There is no path attribute: a flow is a graph, not a tree.
 | `toolbar`, `resizer` | `data-flow-id` (its node); a resizer has `data-resizing` too |
 | `resize-handle` | `data-position` (`top-left`, `top`, `top-right`, `right`, `bottom-right`, `bottom`, `bottom-left`, `left`) |
 | `minimap-node` | `data-flow-id`, `data-selected` |
+| `nodes-selection` | `data-dragging` (the selection is dragged by it) |
 
 Two attributes are yours to set: `data-flow-no-gesture` on an element whose presses start no
 gesture (a panel over the canvas, a part of a node), and `data-flow-no-wheel` on one that keeps its
