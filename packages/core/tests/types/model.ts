@@ -62,6 +62,20 @@ export function typedData(): void {
     });
     model.run("edge.add", { source: "a", target: "b", type: "smoothstep" });
     model.run("edge.add", { source: "a", target: "b", type: "simplebezier" });
+    model.run("edge.add", {
+        source: "a",
+        target: "b",
+        type: "smoothstep",
+        animated: true,
+        pathOptions: { stepPosition: 0.25, borderRadius: 8 },
+    });
+    model.run("edge.set-flags", { edgeId: "e", animated: false });
+    model.run("edge.add", {
+        source: "a",
+        target: "b",
+        // @ts-expect-error a path option the built-in paths do not read
+        pathOptions: { wobble: 1 },
+    });
     // @ts-expect-error: a dependency's weight is a number
     model.run("edge.add", {
         source: "a",

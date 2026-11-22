@@ -53,6 +53,25 @@ export function coreKeys(): void {
     engine.run("set-viewport", { x: 0, duration: 200 });
     engine.run("zoom-to", { zoom: 1, duration: 200 });
     engine.run("fit-view", { duration: 400 });
+    engine.run("fit-view", {
+        padding: { top: "20px", left: 0.1 },
+        includeHidden: true,
+        minZoom: 0.5,
+        maxZoom: 2,
+    });
+    engine.run("fit-view", { padding: "12px" });
+    // @ts-expect-error a padding string is in pixels
+    engine.run("fit-view", { padding: "12em" });
+    use(
+        engine.get("edge-toolbar-by", {
+            edgeId: "e",
+            point: { x: 0, y: 0 },
+            alignX: "start",
+            alignY: "end",
+        }),
+    );
+    // @ts-expect-error an alignment is start, center or end
+    engine.get("edge-toolbar-by", { edgeId: "e", alignX: "left" });
     engine.run("center-on", { x: 0, y: 0, duration: 200 });
     engine.adapter.setOptions({
         autoPan: { speed: 12, margin: 40 },
@@ -104,6 +123,8 @@ export function coreKeys(): void {
     engine.is("dragging");
     // @ts-expect-error `minimap-view` is the minimap feature's
     engine.get("minimap-view", { width: 1, height: 1 });
+    // @ts-expect-error `minimap-point-to-flow` is the minimap feature's
+    engine.get("minimap-point-to-flow", { client: { x: 0, y: 0 } });
 }
 
 export function featureKeys(): void {
@@ -114,6 +135,11 @@ export function featureKeys(): void {
     use(engine.is("dragging"));
     use(engine.is("node-dragging", { nodeId: "a" }));
     use(engine.get("minimap-view", { width: 200, height: 150 }).viewBox);
+    const point: { x: number; y: number } | undefined = engine.get(
+        "minimap-point-to-flow",
+        { client: { x: 0, y: 0 } },
+    );
+    use(point);
     // @ts-expect-error the selection box is the selection feature's
     engine.get("selection-box");
 }
