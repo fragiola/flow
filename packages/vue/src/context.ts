@@ -11,6 +11,7 @@ import type {
     FlowModel,
     FlowTypes,
     MinimapView,
+    StaticGeometry,
 } from "@fragiola/flow";
 import {
     type ComputedRef,
@@ -37,6 +38,12 @@ export interface FlowContextValue {
     readonly rootElement: Readonly<ShallowRef<HTMLElement | null>>;
     /** bumped on every commit of the model and every view change of the engine */
     readonly revision: Readonly<ShallowRef<number>>;
+    /**
+     * the flow's geometry from its document alone (`staticGeometry`, with the root's options)
+     * while there is no engine (a server render, the first client render), null once it exists:
+     * the parts draw from it, so the server's HTML and the first client render are the same
+     */
+    readonly geometry: ComputedRef<StaticGeometry | null>;
 }
 
 export const FlowKey: InjectionKey<FlowContextValue> = Symbol("Flow");
