@@ -113,6 +113,7 @@ const features = [selection(), drag()] as const;
 | `boxOnDrag` | `false` | any drag on the canvas draws a box, instead of Shift + drag (the canvas then never pans by dragging) |
 | `multiKey` | `["Meta", "Control", "Shift"]` | the keys that, held with a click, toggle the item in the selection: one key, several (any of them held) or `null` for none |
 | `boxKey` | `"Shift"` | the key that, held with a drag on the canvas, draws a box; `null` leaves the box to `boxOnDrag` |
+| `rect` | `"box"` | when the [selection rectangle](#the-selection-rectangle) shows: after a box selected two or more nodes (`"box"`), or whenever two or more are selected (`"always"`) |
 
 ```ts
 const features = [selection({ boxMode: "partial", boxOnDrag: true }), drag()] as const;
@@ -274,6 +275,106 @@ export class SelectionStatus {
 Outside a root, or without React, read the model: `model.get("selected-nodes")`,
 `model.get("selected-edges")`, and `model.is("node-selected", { nodeId })`.
 
+## The selection rectangle
+
+After a box selected two or more nodes, the engine holds the rectangle around them
+(`engine.get("selection-rect")`, a flow `Rect`), until the selection changes another way (a click,
+a modifier click, `selection.set`). `Flow.NodesSelection` draws it: render it inside
+`Flow.Viewport`, after `Flow.Nodes` (it is in flow coordinates, above the nodes), and give it its
+look. A press on it drags the whole selection, with the drag's own threshold, snap, extent and
+auto-pan; its context menu is the selection's. While no rectangle is held it renders nothing.
+
+```ts
+// the rectangle for any selection of two or more nodes, not only a box's
+const features = [selection({ rect: "always" }), drag()] as const;
+```
+
+A drag by the rectangle is told by its own events instead of `drag-start`: `selection-drag-start`,
+`selection-drag` at each step and `selection-drag-end` at the drop (after its `nodes-move`), each
+with the `nodeIds` it drags, the `client` point and the flow `point`. A cancelled one (Escape,
+`cancel-gesture`) puts the nodes back and is told as `drag-cancel`, like a node's.
+
+<Framework name="react">
+
+```tsx
+<Flow.Root
+    features={features}
+    onSelectionDragStart={(event) => setMoving(event.nodeIds)}
+    onSelectionDragStop={() => setMoving([])}
+    onNodeDragCancel={() => setMoving([])}
+>
+    <Flow.Viewport>
+        <Flow.Nodes>{(node) => <Flow.Node node={node} />}</Flow.Nodes>
+        <Flow.NodesSelection className="rounded border border-blue-500 bg-blue-500/5 data-dragging:cursor-grabbing" />
+    </Flow.Viewport>
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Root
+    :features="features"
+    @selection-drag-start="(event) => setMoving(event.nodeIds)"
+    @selection-drag-stop="() => setMoving([])"
+    @node-drag-cancel="() => setMoving([])"
+>
+    <Flow.Viewport>
+        <Flow.Nodes v-slot="{ node }"><Flow.Node :node="node" /></Flow.Nodes>
+        <Flow.NodesSelection class="rounded border border-blue-500 bg-blue-500/5 data-dragging:cursor-grabbing" />
+    </Flow.Viewport>
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Root
+    {features}
+    onselectiondragstart={(event) => setMoving(event.nodeIds)}
+    onselectiondragstop={() => setMoving([])}
+    onnodedragcancel={() => setMoving([])}
+>
+    <Flow.Viewport>
+        <Flow.Nodes>
+            {#snippet children(node)}<Flow.Node {node} />{/snippet}
+        </Flow.Nodes>
+        <Flow.NodesSelection class="rounded border border-blue-500 bg-blue-500/5 data-dragging:cursor-grabbing" />
+    </Flow.Viewport>
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div
+    flowRoot
+    [features]="features"
+    (selectionDragStart)="setMoving($event.nodeIds)"
+    (selectionDragStop)="setMoving([])"
+    (nodeDragCancel)="setMoving([])"
+>
+    <div flowViewport>
+        <div flowNodes>…</div>
+        <div flowNodesSelection class="rounded border border-blue-500 bg-blue-500/5 data-dragging:cursor-grabbing"></div>
+    </div>
+</div>
+```
+
+In Angular, `flowNodesSelection` goes on an element of yours, which is in the document only while
+the rectangle is held.
+
+</Framework>
+
+The rectangle takes no focus and no keys: from the keyboard, move the selected nodes with the
+arrows on one of them (`keyboard()`). See [`NodesSelection`](/docs/api/primitives/nodes-selection).
+
 ## A toolbar for the selection
 
 `Flow.NodeToolbar` with `nodeIds` stands beside several nodes' bounds, outside the zoom. Pass the
@@ -393,9 +494,9 @@ are selected. See [`NodeToolbar`](/docs/api/primitives/node-toolbar).
 
 The root tells what a user clicked: `onNodeClick`, `onEdgeClick`, `onPaneClick`, their
 double-click and context-menu callbacks, and `onSelectionContextMenu` for a right click on one of
-several selected nodes. Each gets the event: the node's or edge's id, the flow point (`point`), the
-client point (`client`) and the DOM event (`event`), whose default you prevent to show your own
-menu. A click is the engine's own: a press released within `nodeClickDistance` (on the pane
+several selected nodes or on the selection rectangle. Each gets the event: the node's or edge's
+id, the flow point (`point`), the client point (`client`) and the DOM event (`event`), whose
+default you prevent to show your own menu. A click is the engine's own: a press released within `nodeClickDistance` (on the pane
 `paneClickDistance`, both 3 pixels) that dragged nothing, so the click that ends a drag or a pan
 is never one. It comes after the click selected.
 

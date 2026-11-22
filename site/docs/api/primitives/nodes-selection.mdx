@@ -6,10 +6,12 @@ description: Flow.NodesSelection draws the rectangle around the nodes a box sele
 `Flow.NodesSelection` goes inside `Flow.Viewport`, after `Flow.Nodes` (it is in flow
 coordinates), and renders a `div` at the engine's `selection-rect` while two or more nodes are
 selected by a box (`selection()`; with `selection({ rect: "always" })`, whenever two or more are
-selected). A press on it drags the selection (`drag()`: the same threshold, snap, extent and
-auto-pan as a node's drag), with the root's `onSelectionDragStart`, `onSelectionDrag` and
-`onSelectionDragStop`; its context menu is the selection's (`onSelectionContextMenu`). Give it its
-look.
+selected), and nothing otherwise. A press on it drags the selection (`drag()`: the same
+threshold, snap, extent and auto-pan as a node's drag), with the root's `onSelectionDragStart`,
+`onSelectionDrag` and `onSelectionDragStop` instead of the node drag's; a cancelled drag (Escape)
+puts the nodes back and is `onNodeDragCancel` (`drag-cancel`). Its context menu is the
+selection's (`onSelectionContextMenu`). It takes no focus and no keys. Give it its look. How it fits with the box and the events:
+[Selection](/docs/guides/selection#the-selection-rectangle).
 
 <Framework name="react">
 
@@ -35,6 +37,9 @@ look.
 </Flow.Root>
 ```
 
+In Vue, the root's events are `@selection-drag-start`, `@selection-drag` and
+`@selection-drag-stop`.
+
 </Framework>
 
 <Framework name="svelte">
@@ -50,6 +55,9 @@ look.
 </Flow.Root>
 ```
 
+In Svelte, the root's callbacks are `onselectiondragstart`, `onselectiondrag` and
+`onselectiondragstop`.
+
 </Framework>
 
 <Framework name="angular">
@@ -62,6 +70,11 @@ look.
     </div>
 </div>
 ```
+
+In Angular, `flowNodesSelection` goes on an element of yours, in the document only while the
+rectangle is held; its state is the `state()` signal (`#s="flowNodesSelection"`, `null` while it
+is not shown), and the root's outputs are `(selectionDragStart)`, `(selectionDrag)` and
+`(selectionDragStop)`.
 
 </Framework>
 
