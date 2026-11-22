@@ -38,6 +38,7 @@ const PRIMITIVES = [
     "Edge",
     "EdgeLabel",
     "EdgePath",
+    "EdgeToolbar",
     "Edges",
     "FitView",
     "Handle",

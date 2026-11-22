@@ -24,6 +24,10 @@ export type {
     EdgePathProps,
     EdgePathState,
 } from "./components/edge-path.svelte";
+export type {
+    EdgeToolbarProps,
+    EdgeToolbarState,
+} from "./components/edge-toolbar.svelte";
 export type { EdgesProps, EdgesState } from "./components/edges.svelte";
 export type { FitViewProps } from "./components/fit-view.svelte";
 export type { HandleProps } from "./components/handle.svelte";

@@ -29,6 +29,8 @@ interface Case {
     setup?: (container: HTMLElement) => Promise<void>;
     /** a structural style key it sets, which a consumer's style does not override */
     structural?: [string, string, string];
+    /** the place in the flow given the props, when not its part's (the edge's toolbar) */
+    slot?: string;
 }
 
 const RENDER = {
@@ -133,6 +135,13 @@ const CASES: Case[] = [
         tag: "div",
         structural: ["position", "static", "absolute"],
     },
+    {
+        // the edge's toolbar: the same part
+        part: "toolbar",
+        slot: "edge-toolbar",
+        tag: "div",
+        structural: ["position", "static", "absolute"],
+    },
     { part: "minimap", tag: "svg" },
     { part: "minimap-node", tag: "rect" },
     { part: "minimap-mask", tag: "path" },
@@ -158,7 +167,10 @@ function find(container: HTMLElement, marker = "case"): HTMLElement {
 }
 
 async function mount(c: Case, given: Given) {
-    const view = await render(ContractFlow, { target: c.part, given });
+    const view = await render(ContractFlow, {
+        target: c.slot ?? c.part,
+        given,
+    });
     await c.setup?.(view.container);
     return view;
 }
@@ -199,7 +211,7 @@ describe.each(CASES)("the $part primitive", (c) => {
         const refOf = own.component.refOf as (name: string) => Element | null;
         expect([
             ...own.container.querySelectorAll('[data-testid="case"]'),
-        ]).toContain(refOf(c.part));
+        ]).toContain(refOf(c.slot ?? c.part));
         own.unmount();
         const rendered = await mount(c, { render: RENDER[c.tag] });
         const renderedRef = rendered.component.refOf as (
@@ -207,7 +219,7 @@ describe.each(CASES)("the $part primitive", (c) => {
         ) => Element | null;
         expect([
             ...rendered.container.querySelectorAll('[data-testid="case"]'),
-        ]).toContain(renderedRef(c.part));
+        ]).toContain(renderedRef(c.slot ?? c.part));
     });
 
     it("runs the consumer's attachments on its element", async () => {

@@ -94,12 +94,14 @@
 <!--
     @component
     A grab area of a `NodeResizer` (`data-flow-part="resize-handle"`, `data-position`): a press on
-    it resizes its node from that corner or side (`resize()`). Placed on its corner (centred) or
-    along its side; give it its size (a side's thickness) and look.
+    it resizes its node from that corner or side (`resize()`); with `keyboard()` too it takes focus
+    and the arrows move that corner or side. Placed on its corner (centred) or along its side; give
+    it its size (a side's thickness) and look.
 -->
 <script lang="ts">
     import { partAttributes } from "@fragiola/flow";
-    import { useNodeId } from "../context.js";
+    import { useFlowContext, useNodeId } from "../context.js";
+    import { flowValue } from "../runes/internal.svelte.js";
     import {
         elementProps,
         refProps,
@@ -118,6 +120,16 @@
     }: ResizeHandleProps = $props();
 
     const nodeIdOf = useNodeId("ResizeHandle", () => nodeIdProp);
+    const context = useFlowContext("ResizeHandle");
+    // the engine's record: `data-position`, and `tabindex` with `keyboard()` (arrows resize)
+    const attributes = flowValue(context, () =>
+        context.engine
+            ? context.engine.adapter.attributes("resize-handle", {
+                  nodeId: nodeIdOf(),
+                  position,
+              })
+            : { ...partAttributes("resize-handle"), "data-position": position },
+    );
     const refs = refProps((element) => {
         ref = element as HTMLDivElement | null;
     });
@@ -128,11 +140,7 @@
             className,
             style,
             state: partState,
-            own: {
-                ...partAttributes("resize-handle"),
-                "data-position": position,
-                ...refs,
-            },
+            own: { ...attributes.current, ...refs },
             structural: {
                 position: "absolute",
                 "pointer-events": "auto",
