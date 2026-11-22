@@ -1,5 +1,9 @@
 <script lang="ts">
-import type { FlowNodeInput, FlowTypes } from "@fragiola/flow-vue";
+import type {
+    FlowEngineEventOf,
+    FlowNodeInput,
+    FlowTypes,
+} from "@fragiola/flow-vue";
 import { connection } from "@fragiola/flow-vue/connection";
 import { drag } from "@fragiola/flow-vue/drag";
 import { selection } from "@fragiola/flow-vue/selection";
@@ -9,7 +13,9 @@ import { CircleIcon, DiamondIcon, SquareIcon } from "@lucide/vue";
 // and drop: the root accepts the drop, and `engine.get("screen-to-flow", { x, y })` turns the
 // drop's client point into flow coordinates, where `node.add` puts the node. A click on an item
 // adds one at the centre of the view instead. `useFlowRef` (bound with `:flow-ref`) reaches the model
-// and the engine from outside the root.
+// and the engine from outside the root. A connection dropped on the canvas adds a task there,
+// joined to where it came from: `@connect-cancel` tells where it ended (`point`, in flow
+// coordinates) and from which handle (`from`), and `to` is empty when it ended over no handle.
 
 const SHAPES = [
     { shape: "circle", label: "Start", icon: CircleIcon },
@@ -75,6 +81,34 @@ function addAtCentre(shape: Shape, event: MouseEvent) {
         });
 }
 
+/** A connection dropped over no handle: a new task there, joined to its start. */
+function onConnectCancel(event: FlowEngineEventOf<"connect-cancel">) {
+    const model = flow.value?.model;
+    if (!model || event.to || event.input !== "pointer") return;
+    count += 1;
+    const nodeId = `square-${count}`;
+    model.run("batch", {
+        commands: [
+            {
+                command: "node.add",
+                payload: {
+                    id: nodeId,
+                    type: "shape",
+                    position: { x: event.point.x - 50, y: event.point.y },
+                    data: { shape: "square", label: `Task ${count}` },
+                },
+            },
+            {
+                command: "edge.add",
+                payload:
+                    event.from.type === "source"
+                        ? { source: event.from.nodeId, target: nodeId }
+                        : { source: nodeId, target: event.from.nodeId },
+            },
+        ],
+    });
+}
+
 function onDragStart(shape: Shape, event: DragEvent) {
     if (!event.dataTransfer) return;
     event.dataTransfer.setData(MIME, shape);
@@ -118,6 +152,7 @@ function onDrop(event: DragEvent) {
             :default-viewport="{ x: 160, y: 80, zoom: 1 }"
             :flow-ref="flow"
             :class="styles.root"
+            @connect-cancel="onConnectCancel"
             @dragover="onDragOver"
             @drop="onDrop"
         >
