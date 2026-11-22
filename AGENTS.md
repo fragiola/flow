@@ -1895,7 +1895,8 @@ Epic #29):
 - **The Epic review's follow-ups.** Every focusable handle of an example has a name:
   `workflow-builder` (`<title> input`, `<title> output`, `<title> output: yes`), `undo-redo` and
   `node-resizer` (`Resize <id>: <position>`, which now installs `keyboard()`, so keyboard resize
-  runs end to end in the four apps); `expectNamedHandles` (`e2e/examples/helpers.ts`) checks every
+  runs end to end in the four apps, and names its now focusable nodes); the smoke spec's "whatever
+  takes focus is named" covers shown handles and resize handles too, and `expectNamedHandles` (`e2e/examples/helpers.ts`) checks every
   shown handle that takes focus. `connect-start` and the first `connect-target` come in one tick, so
   a separate start message was replaced in the live region at once: `describe` takes the node a
   keyboard connection started from and says the start, the first target and the keys in one
