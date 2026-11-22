@@ -488,6 +488,7 @@ const contractFeatures = [selection(), connection(), resize(), minimap()];
                     </ng-template>
                 </div>
                 <svg flowConnectionLine #line="flowConnectionLine" [attr.data-testid]="on('connection-line') ? 'case' : null" [class]="on('connection-line') ? classes() : null" [style]="on('connection-line') ? style() : null" (click)="on('connection-line') && clicked()" [attr.data-state]="on('connection-line') ? kind(line.state()) : null"></svg>
+                <div flowNodesSelection #ns="flowNodesSelection" [attr.data-testid]="on('nodes-selection') ? 'case' : null" [class]="on('nodes-selection') ? classes() : null" [style]="on('nodes-selection') ? style() : null" (click)="on('nodes-selection') && clicked()" [attr.data-state]="on('nodes-selection') ? kind(ns.state()) : null"></div>
             </div>
             <div flowSelectionBox #box="flowSelectionBox" [attr.data-testid]="on('selection-box') ? 'case' : null" [class]="on('selection-box') ? classes() : null" [style]="on('selection-box') ? style() : null" (click)="on('selection-box') && clicked()" [attr.data-state]="on('selection-box') ? kind(box.state()) : null"></div>
             <div flowControls #controls="flowControls" [attr.data-testid]="on('controls') ? 'case' : null" [class]="on('controls') ? classes() : null" [style]="on('controls') ? style() : null" (click)="on('controls') && clicked()" [attr.data-state]="on('controls') ? kind(controls.state()) : null">
@@ -574,7 +575,7 @@ export class EarlyReader {
 export class LabelFlow extends RootInputs {}
 
 /**
- * #28: nodes `a` and `b`, an edge with a toolbar (`edgeToolbar`'s inputs), and with `nodeIds` a
+ * #28 (#36): nodes `a` and `b`, an edge with a toolbar (`edgeToolbar`'s inputs), and with `nodeIds` a
  * toolbar beside those nodes.
  */
 @Component({
@@ -587,7 +588,7 @@ export class LabelFlow extends RootInputs {}
                     <ng-template flowEdgesItem let-edge>
                         <svg:g [flowEdge]="edge">
                             <svg:path flowEdgePath />
-                            <xhtml:div flowEdgeToolbar data-testid="edge-toolbar" [open]="edgeToolbar().open" [position]="edgeToolbar().position" [offset]="edgeToolbar().offset">
+                            <xhtml:div flowEdgeToolbar data-testid="edge-toolbar" [open]="edgeToolbar().open" [position]="edgeToolbar().position" [offset]="edgeToolbar().offset" [point]="edgeToolbar().point" [alignX]="edgeToolbar().alignX" [alignY]="edgeToolbar().alignY">
                                 <xhtml:button type="button">x</xhtml:button>
                             </xhtml:div>
                         </svg:g>
@@ -611,6 +612,9 @@ export class ToolbarFlow extends RootInputs {
         open?: boolean;
         position?: "label" | "source" | "target";
         offset?: { x: number; y: number };
+        point?: { x: number; y: number };
+        alignX?: "start" | "center" | "end";
+        alignY?: "start" | "center" | "end";
     }>({});
     readonly nodeIds = input<readonly string[] | undefined>();
 }

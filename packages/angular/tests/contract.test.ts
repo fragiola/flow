@@ -53,6 +53,22 @@ async function startBox(container: HTMLElement) {
     });
 }
 
+/** A box selection of both nodes, done: the rectangle around them shows. */
+async function selectBoth(container: HTMLElement) {
+    await pointer(part(container, "viewport"), "pointerdown", {
+        clientX: -10,
+        clientY: -10,
+        shiftKey: true,
+    });
+    for (const type of ["pointermove", "pointerup"]) {
+        await pointer(part(container, "root"), type, {
+            clientX: 300,
+            clientY: 300,
+            shiftKey: true,
+        });
+    }
+}
+
 const CASES: Case[] = [
     {
         part: "root",
@@ -110,6 +126,12 @@ const CASES: Case[] = [
         part: "selection-box",
         tag: "div",
         setup: startBox,
+        structural: ["position", "static", "absolute"],
+    },
+    {
+        part: "nodes-selection",
+        tag: "div",
+        setup: selectBoth,
         structural: ["position", "static", "absolute"],
     },
     {

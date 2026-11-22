@@ -24,9 +24,16 @@ const OWN = [
     "injectEdges",
     "injectFlow",
     "injectFlowRef",
+    "injectFlowStore",
     "injectHandle",
+    "injectInternalNode",
+    "injectKeyPress",
     "injectNode",
+    "injectNodeConnections",
+    "injectNodeId",
     "injectNodes",
+    "injectNodesData",
+    "injectOnViewportChange",
     "injectSelection",
     "injectViewport",
 ];
@@ -46,6 +53,7 @@ const PRIMITIVES = [
     "Node",
     "NodeToolbar",
     "Nodes",
+    "NodesSelection",
     "ReconnectAnchor",
     "Root",
     "SelectionBox",
@@ -57,11 +65,6 @@ const PRIMITIVES = [
 
 /** The collections' templates (React's children functions of `Nodes` and `Edges`). */
 const TEMPLATES = ["EdgesItem", "NodesItem"];
-
-// #36: React's parts this adapter has not got yet; its #36 helper adds them and removes this list
-const AHEAD_IN_REACT = ["NodesSelection:nodes-selection"];
-const notAheadFile = (file: string) =>
-    !AHEAD_IN_REACT.some((entry) => entry.endsWith(`:${file}`));
 
 describe("@fragiola/flow-angular", () => {
     it("re-exports the whole core", () => {
@@ -142,7 +145,7 @@ describe("@fragiola/flow-angular", () => {
                 .map((file) => file.replace(suffix, ""))
                 .sort();
         expect(files("src/lib/directives", /\.directive\.ts$/)).toEqual(
-            files("../react/src/components", /\.tsx$/).filter(notAheadFile),
+            files("../react/src/components", /\.tsx$/),
         );
         for (const dir of ["minimap", "resize"]) {
             expect(files(`src/${dir}`, /(\.directive)?\.ts$/), dir).toEqual(
