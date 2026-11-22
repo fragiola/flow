@@ -21,7 +21,6 @@ export interface EdgeToolbarState {
 interface ToolbarView {
     anchor: EdgeToolbarPosition;
     attributes: PartAttributes;
-    selected: boolean;
 }
 
 /**
@@ -59,6 +58,12 @@ export class FlowEdgeToolbarDirective {
             const engine = this.context.engine();
             const edgeId = this.id();
             if (!engine || edgeId === undefined) return undefined;
+            // hidden, it reads nothing of the view: a pan or a zoom gives the same value (nothing
+            // is checked again); shown, an equal anchor keeps the last value
+            const shown =
+                this.open() ??
+                this.context.model().is("edge-selected", { edgeId });
+            if (!shown) return undefined;
             const anchor = engine.get("edge-toolbar-by", {
                 edgeId,
                 position: this.position() ?? "label",
@@ -70,9 +75,6 @@ export class FlowEdgeToolbarDirective {
                       attributes: engine.adapter.attributes("toolbar", {
                           edgeId,
                       }),
-                      selected: this.context
-                          .model()
-                          .is("edge-selected", { edgeId }),
                   }
                 : undefined;
         },
@@ -82,8 +84,7 @@ export class FlowEdgeToolbarDirective {
     readonly state: Signal<EdgeToolbarState | null> = computed(() => {
         const view = this.view();
         const edgeId = this.id();
-        const shown = this.open() ?? view?.selected ?? false;
-        if (!view || !shown || edgeId === undefined) return null;
+        if (!view || edgeId === undefined) return null;
         return {
             edgeId,
             position: this.position() ?? "label",

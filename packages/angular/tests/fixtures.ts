@@ -638,3 +638,36 @@ export class ToolbarFlow extends RootInputs {
     `,
 })
 export class KeyboardFlow extends RootInputs {}
+
+/**
+ * #28's review: an edge toolbar given its edge outside it, a node toolbar of `nodeIds` in each
+ * node, and with `orphan` an edge toolbar without an edge.
+ */
+@Component({
+    selector: "test-outside-toolbar-flow",
+    imports: [FLOW],
+    template: `
+        <div flowRoot ${INPUTS}>
+            <div flowViewport>
+                <div flowEdges>
+                    <svg:g *flowEdgesItem="let edge" [flowEdge]="edge"></svg:g>
+                </div>
+                <div flowNodes>
+                    <div *flowNodesItem="let node" [flowNode]="node">
+                        @if (nodeIds(); as ids) {
+                            <div flowNodeToolbar [attr.data-testid]="'node-toolbar-' + node.id" [nodeIds]="ids"></div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div flowEdgeToolbar data-testid="edge-toolbar" edgeId="ab" open></div>
+            @if (orphan()) {
+                <div flowEdgeToolbar></div>
+            }
+        </div>
+    `,
+})
+export class OutsideToolbarFlow extends RootInputs {
+    readonly orphan = input(false);
+    readonly nodeIds = input<readonly string[] | undefined>();
+}

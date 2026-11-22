@@ -37,7 +37,6 @@ export interface EdgeToolbarSlots extends RenderSlot<EdgeToolbarState> {
 interface ToolbarView {
     anchor: EdgeToolbarPosition;
     attributes: PartAttributes;
-    selected: boolean;
 }
 
 let nextToolbarKey = 0;
@@ -58,10 +57,14 @@ export const EdgeToolbar: FlowComponent<EdgeToolbarProps, EdgeToolbarSlots> =
             const { model } = context;
             const edgeId = useEdgeId("EdgeToolbar", () => props.edgeId);
             const layer = inject(EdgeLabelLayerKey, null);
+            // hidden, it reads nothing of the view: a pan or a zoom gives the same value (nothing
+            // renders again); shown, an equal anchor keeps the last value
             const view = useFlowValue<ToolbarView | undefined>(context, () => {
                 const engine = context.engine.value;
                 if (!engine) return undefined;
                 const id = edgeId();
+                if (!(props.open ?? model.is("edge-selected", { edgeId: id })))
+                    return undefined;
                 const anchor = engine.get("edge-toolbar-by", {
                     edgeId: id,
                     position: props.position ?? "label",
@@ -73,7 +76,6 @@ export const EdgeToolbar: FlowComponent<EdgeToolbarProps, EdgeToolbarSlots> =
                           attributes: engine.adapter.attributes("toolbar", {
                               edgeId: id,
                           }),
-                          selected: model.is("edge-selected", { edgeId: id }),
                       }
                     : undefined;
             });
@@ -81,8 +83,7 @@ export const EdgeToolbar: FlowComponent<EdgeToolbarProps, EdgeToolbarSlots> =
             const render = () => {
                 const current = view.value;
                 const root = context.rootElement.value;
-                const shown = props.open ?? current?.selected ?? false;
-                if (!current || !shown || !root) return null;
+                if (!current || !root) return null;
                 const state: EdgeToolbarState = {
                     edgeId: edgeId(),
                     position: props.position ?? "label",

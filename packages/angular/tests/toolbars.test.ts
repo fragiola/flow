@@ -1,17 +1,20 @@
 // #28: the edge toolbar, the toolbar of several nodes, focusable handles and resize handles
 // (keyboard connection and resize through the adapter), and the simplebezier edge (React's
 // tests/toolbars.test.tsx, Svelte's fixtures as components).
+
+import { ErrorHandler } from "@angular/core";
+import { TestBed } from "@angular/core/testing";
 import { connection } from "@fragiola/flow/connection";
 import { keyboard } from "@fragiola/flow/keyboard";
 import { resize } from "@fragiola/flow/resize";
 import { selection } from "@fragiola/flow/selection";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
     type AnyTypes,
     createFlowRef,
     type FlowFeatures,
 } from "../src/public-api";
-import { KeyboardFlow, ToolbarFlow } from "./fixtures";
+import { KeyboardFlow, OutsideToolbarFlow, ToolbarFlow } from "./fixtures";
 import { installLayout, key, part, render, settle, task } from "./flow";
 
 beforeEach(() => {
@@ -204,5 +207,57 @@ describe("the simplebezier edge", () => {
             flow.current?.engine.get("edge-path-by", { edgeId: "ab" })?.path,
         );
         expect(d).toMatch(/^M ?50[ ,]40/);
+    });
+});
+
+describe("toolbars given ids", () => {
+    it("an edge toolbar renders nothing once its edge is removed", async () => {
+        const flow = createFlowRef<AnyTypes, FlowFeatures>();
+        const { container } = await render(OutsideToolbarFlow, {
+            defaultNodes: NODES,
+            defaultEdges: EDGES,
+            features: [selection()],
+            flowRef: flow,
+        });
+        await settle();
+        const toolbar = byTestId(container, "edge-toolbar") as HTMLElement;
+        expect(toolbar.parentElement).toBe(part(container, "root"));
+        expect(toolbar).toHaveAttribute("data-flow-id", "ab");
+        flow.current?.model.run("edge.remove", { edgeId: "ab" });
+        await settle();
+        expect(byTestId(container, "edge-toolbar")).toBeNull();
+    });
+
+    it("a node toolbar with nodeIds of none stands by its enclosing node", async () => {
+        const flow = createFlowRef<AnyTypes, FlowFeatures>();
+        const { container } = await render(OutsideToolbarFlow, {
+            defaultNodes: NODES,
+            defaultEdges: EDGES,
+            features: [selection()],
+            flowRef: flow,
+            nodeIds: [],
+        });
+        flow.current?.model.run("selection.set", { nodeIds: ["b"] });
+        await settle();
+        expect(byTestId(container, "node-toolbar-a")).toBeNull();
+        const toolbar = byTestId(container, "node-toolbar-b") as HTMLElement;
+        expect(toolbar).toHaveAttribute("data-flow-id", "b");
+        expect(toolbar.style.transform).toBe(
+            "translate(50px, 190px) translate(-50%, -100%)",
+        );
+    });
+
+    it("an edge toolbar needs an edge: inside [flowEdge] or given an edgeId", async () => {
+        const handled = vi
+            .spyOn(TestBed.inject(ErrorHandler), "handleError")
+            .mockImplementation(() => {});
+        await render(OutsideToolbarFlow, {
+            defaultNodes: NODES,
+            defaultEdges: EDGES,
+            orphan: true,
+        }).catch((error: unknown) => handled(error));
+        expect(String(handled.mock.calls[0]?.[0])).toMatch(
+            /\[flowEdgeToolbar\] must be used inside \[flowEdge\]/,
+        );
     });
 });

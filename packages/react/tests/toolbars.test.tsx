@@ -5,6 +5,7 @@ import { keyboard } from "@fragiola/flow/keyboard";
 import { resize } from "@fragiola/flow/resize";
 import { selection } from "@fragiola/flow/selection";
 import { render } from "@testing-library/react";
+import * as React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
     type AnyTypes,
@@ -334,5 +335,154 @@ describe("the simplebezier edge", () => {
             flow?.current?.engine.get("edge-path-by", { edgeId: "ab" })?.path,
         );
         expect(d).toMatch(/^M ?50[ ,]40/);
+    });
+});
+
+/** Nodes `a`, `b`, `c` and edges `ab`, `bc`, with toolbars given ids, outside their parts. */
+function OutsideFlow(props: {
+    onRef: (ref: Ref) => void;
+    onRender: () => void;
+    open?: boolean;
+    edges?: boolean;
+    nodeIds?: readonly string[];
+}) {
+    const { onRef, onRender, open, edges = true, nodeIds } = props;
+    const ref = useFlowRef<AnyTypes, FlowFeatures>();
+    onRef(ref);
+    return (
+        <Flow.Root
+            flowRef={ref}
+            features={[selection()]}
+            defaultNodes={[
+                task("a", 0, 0),
+                task("b", 0, 200),
+                task("c", 0, 400),
+            ]}
+            defaultEdges={[
+                { id: "ab", source: "a", target: "b" },
+                { id: "bc", source: "b", target: "c" },
+            ]}
+        >
+            <Flow.Viewport>
+                {edges ? (
+                    <Flow.Edges>
+                        {(edge) => <Flow.Edge edge={edge} />}
+                    </Flow.Edges>
+                ) : null}
+                <Flow.Nodes>
+                    {(node) => (
+                        <Flow.Node node={node}>
+                            {nodeIds ? (
+                                <Flow.NodeToolbar
+                                    data-testid={`node-toolbar-${node.id}`}
+                                    nodeIds={nodeIds}
+                                />
+                            ) : null}
+                        </Flow.Node>
+                    )}
+                </Flow.Nodes>
+            </Flow.Viewport>
+            <React.Profiler id="toolbars" onRender={onRender}>
+                <Flow.EdgeToolbar
+                    data-testid="edge-toolbar"
+                    edgeId="ab"
+                    open={open}
+                />
+                <Flow.EdgeToolbar edgeId="bc" open={open} />
+                <Flow.NodeToolbar nodeId="a" open={open} />
+                <Flow.NodeToolbar nodeIds={["a", "b"]} open={open} />
+            </React.Profiler>
+        </Flow.Root>
+    );
+}
+
+describe("toolbars across the view", () => {
+    it("render nothing again on a pan or a zoom while hidden, and follow it while shown", async () => {
+        let flow: Ref | undefined;
+        const renders = vi.fn();
+        const pan = async () => {
+            for (let i = 1; i <= 10; i++) {
+                flow?.current?.engine.run("set-viewport", {
+                    x: i * 5,
+                    y: i * 3,
+                    zoom: 1 + i / 20,
+                });
+                await settle();
+            }
+        };
+        const { rerender } = render(
+            <OutsideFlow
+                onRef={(ref) => {
+                    flow = ref;
+                }}
+                onRender={renders}
+            />,
+        );
+        await settle();
+        await settle();
+        renders.mockClear();
+        await pan();
+        expect(renders).not.toHaveBeenCalled();
+        rerender(
+            <OutsideFlow
+                onRef={(ref) => {
+                    flow = ref;
+                }}
+                onRender={renders}
+                open
+            />,
+        );
+        await settle();
+        renders.mockClear();
+        await pan();
+        // shown, each frame moves them: one commit per frame
+        expect(renders).toHaveBeenCalledTimes(10);
+        renders.mockClear();
+        // an equal view (the same viewport again) renders nothing
+        flow?.current?.engine.run("set-viewport", { x: 50, y: 30, zoom: 1.5 });
+        await settle();
+        expect(renders).not.toHaveBeenCalled();
+    });
+
+    it("an edge toolbar given an edgeId renders nothing once that edge is removed", async () => {
+        let flow: Ref | undefined;
+        const { queryByTestId } = render(
+            <OutsideFlow
+                onRef={(ref) => {
+                    flow = ref;
+                }}
+                onRender={() => {}}
+                open
+            />,
+        );
+        await settle();
+        await settle();
+        expect(queryByTestId("edge-toolbar")).not.toBeNull();
+        flow?.current?.model.run("edge.remove", { edgeId: "ab" });
+        await settle();
+        expect(queryByTestId("edge-toolbar")).toBeNull();
+    });
+
+    it("a node toolbar with nodeIds={[]} stands by its enclosing node", async () => {
+        let flow: Ref | undefined;
+        const { queryByTestId } = render(
+            <OutsideFlow
+                onRef={(ref) => {
+                    flow = ref;
+                }}
+                onRender={() => {}}
+                nodeIds={[]}
+            />,
+        );
+        await settle();
+        flow?.current?.model.run("selection.set", { nodeIds: ["b"] });
+        await settle();
+        expect(queryByTestId("node-toolbar-a")).toBeNull();
+        const toolbar = queryByTestId("node-toolbar-b") as HTMLElement;
+        expect(toolbar).toHaveAttribute("data-flow-id", "b");
+        // b's top centre (50, 200), 10 pixels above
+        expect(toolbar.style.transform).toBe(
+            "translate(50px, 190px) translate(-50%, -100%)",
+        );
     });
 });

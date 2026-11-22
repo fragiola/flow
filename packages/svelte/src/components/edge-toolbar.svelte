@@ -60,10 +60,13 @@
 
     const edgeIdOf = useEdgeId("EdgeToolbar", () => edgeIdProp);
     const context = useFlowContext("EdgeToolbar");
+    // hidden, it reads nothing of the view: a pan or a zoom gives the same value (nothing
+    // updates); shown, an equal anchor keeps the last value
     const view = flowValue(context, () => {
         const { engine, model } = context;
         if (!engine) return undefined;
         const edgeId = edgeIdOf();
+        if (!(open ?? model.is("edge-selected", { edgeId }))) return undefined;
         const anchor = engine.get("edge-toolbar-by", {
             edgeId,
             position,
@@ -73,14 +76,12 @@
             ? {
                   anchor,
                   attributes: engine.adapter.attributes("toolbar", { edgeId }),
-                  selected: model.is("edge-selected", { edgeId }),
               }
             : undefined;
     });
     const refs = refProps((element) => {
         ref = element as HTMLDivElement | null;
     });
-    const shown = $derived(open ?? view.current?.selected ?? false);
     const partState = $derived.by((): EdgeToolbarState | undefined =>
         view.current
             ? { edgeId: edgeIdOf(), position, anchor: view.current.anchor }
@@ -119,6 +120,6 @@
     {/if}
 {/snippet}
 
-{#if partState && shown}
+{#if partState}
     <Portal target={context.rootElement}>{@render toolbar()}</Portal>
 {/if}

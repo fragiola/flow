@@ -51,7 +51,6 @@ interface ToolbarView {
     position: NodeToolbarPosition;
     nodeIds: readonly string[];
     attributes: PartAttributes;
-    selected: boolean;
 }
 
 /**
@@ -82,12 +81,20 @@ export const NodeToolbar: FlowComponent<NodeToolbarProps, NodeToolbarSlots> =
                 }
                 return id;
             };
+            // hidden, it reads nothing of the view: a pan or a zoom gives the same value (nothing
+            // renders again); shown, an equal anchor keeps the last value
             const view = useFlowValue<ToolbarView | undefined>(context, () => {
                 const engine = context.engine.value;
                 if (!engine) return undefined;
                 const id = nodeId();
                 const nodeIds =
                     id === undefined ? [...(props.nodeIds ?? [])] : [id];
+                const shown =
+                    props.open ??
+                    nodeIds.every((node) =>
+                        model.is("node-selected", { nodeId: node }),
+                    );
+                if (!shown) return undefined;
                 const position = engine.get("node-toolbar-by", {
                     ...(id === undefined ? { nodeIds } : { nodeId: id }),
                     side: props.side ?? "top",
@@ -102,17 +109,13 @@ export const NodeToolbar: FlowComponent<NodeToolbarProps, NodeToolbarSlots> =
                               "toolbar",
                               id === undefined ? {} : { nodeId: id },
                           ),
-                          selected: nodeIds.every((node) =>
-                              model.is("node-selected", { nodeId: node }),
-                          ),
                       }
                     : undefined;
             });
             return () => {
                 const current = view.value;
                 const root = context.rootElement.value;
-                const shown = props.open ?? current?.selected ?? false;
-                if (!current || !shown || !root) return null;
+                if (!current || !root) return null;
                 const state: NodeToolbarState = {
                     nodeId: nodeId(),
                     nodeIds: current.nodeIds,

@@ -31,7 +31,6 @@ interface ToolbarView {
     nodeId: string | undefined;
     nodeIds: readonly string[];
     attributes: PartAttributes;
-    selected: boolean;
 }
 
 /**
@@ -81,13 +80,21 @@ export class FlowNodeToolbarDirective {
             if (!engine || (!many && nodeId === undefined)) return undefined;
             const nodeIds =
                 nodeId === undefined ? [...(this.nodeIds() ?? [])] : [nodeId];
+            // hidden, it reads nothing of the view: a pan or a zoom gives the same value (nothing
+            // is checked again); shown, an equal anchor keeps the last value
+            const model = this.context.model();
+            const shown =
+                this.open() ??
+                nodeIds.every((id) =>
+                    model.is("node-selected", { nodeId: id }),
+                );
+            if (!shown) return undefined;
             const position = engine.get("node-toolbar-by", {
                 ...(nodeId === undefined ? { nodeIds } : { nodeId }),
                 side: this.side() ?? "top",
                 align: this.align(),
                 offset: this.offset(),
             });
-            const model = this.context.model();
             return position
                 ? {
                       position,
@@ -97,9 +104,6 @@ export class FlowNodeToolbarDirective {
                           "toolbar",
                           nodeId === undefined ? {} : { nodeId },
                       ),
-                      selected: nodeIds.every((id) =>
-                          model.is("node-selected", { nodeId: id }),
-                      ),
                   }
                 : undefined;
         },
@@ -108,8 +112,7 @@ export class FlowNodeToolbarDirective {
     /** the toolbar's state (`null` while it is not shown) */
     readonly state: Signal<NodeToolbarState | null> = computed(() => {
         const view = this.view();
-        const shown = this.open() ?? view?.selected ?? false;
-        if (!view || !shown) return null;
+        if (!view) return null;
         return {
             nodeId: view.nodeId,
             nodeIds: view.nodeIds,

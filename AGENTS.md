@@ -1830,6 +1830,19 @@ Decisions of the toolbars and keyboard handles in the adapters (#28, Epic #29):
   notifications, so a keyboard connection's `data-connecting` / `data-valid` move with Tab (tested
   end to end in each adapter: Enter, Tab, Enter adds the edge; an arrow on a focused resize handle
   resizes). No adapter handles or stops a key: the engine listens on the root.
+- **A hidden toolbar reads nothing of the view** (#28's review): each toolbar's reader decides
+  `open ?? selected` first (the edge's, or every listed node's) and, hidden, returns `undefined`
+  without calling `edge-toolbar-by` / `node-toolbar-by` or `attributes`, so a pan or a zoom gives
+  the same value and nothing renders again (before, every toolbar of every edge re-rendered on
+  every frame: a fresh anchor each read, 171 renders for 19 hidden edge toolbars over 10 frames).
+  Shown, the value is compared by its fields (`sameValue`: the anchor's `x`, `y`, `anchorX`,
+  `anchorY`), so an unchanged view renders nothing either. Tested by render counts over pan frames
+  (React's `Profiler`, Vue's `onVnodeUpdated`). While hidden, Angular's element carries no
+  attributes (it is out of the document anyway). Also tested: a toolbar given an `edgeId` renders
+  nothing once its edge is removed (and comes back with it), `nodeIds` of none falls back to the
+  node, Vue's direct `Teleport` outside `Flow.Edges`, the missing-edge error in Vue (an
+  `errorHandler`), Svelte (the mount rejects) and Angular (the `ErrorHandler`), and Svelte's
+  portal content leaving the root with the toolbar or the root.
 - **`simplebezier` needs no adapter code**: the default `EdgePath` takes `d` from `edge-path-by`;
   each adapter's test draws one. No adapter enumerates the built-in types.
 - **Parity tests**: each adapter's `index.test` lists `EdgeToolbar` among the primitives (Angular

@@ -74,11 +74,16 @@
     const context = useFlowContext("NodeToolbar");
     // several nodes (`nodeIds` not empty), or one: the given one or the enclosing node's
     const many = $derived(nodeIdsProp !== undefined && nodeIdsProp.length > 0);
+    // hidden, it reads nothing of the view: a pan or a zoom gives the same value (nothing
+    // updates); shown, an equal anchor keeps the last value
     const view = flowValue(context, () => {
         const { engine, model } = context;
         if (!engine) return undefined;
         const nodeId = many ? undefined : nodeIdOf();
         const nodeIds = nodeId === undefined ? [...plain(nodeIdsProp ?? [])] : [nodeId];
+        const shown =
+            open ?? nodeIds.every((id) => model.is("node-selected", { nodeId: id }));
+        if (!shown) return undefined;
         const position = engine.get("node-toolbar-by", {
             ...(nodeId === undefined ? { nodeIds } : { nodeId }),
             side,
@@ -94,16 +99,12 @@
                       "toolbar",
                       nodeId === undefined ? {} : { nodeId },
                   ),
-                  selected: nodeIds.every((id) =>
-                      model.is("node-selected", { nodeId: id }),
-                  ),
               }
             : undefined;
     });
     const refs = refProps((element) => {
         ref = element as HTMLDivElement | null;
     });
-    const shown = $derived(open ?? view.current?.selected ?? false);
     const partState = $derived.by((): NodeToolbarState | undefined =>
         view.current
             ? {
@@ -147,6 +148,6 @@
     {/if}
 {/snippet}
 
-{#if partState && shown}
+{#if partState}
     <Portal target={context.rootElement}>{@render toolbar()}</Portal>
 {/if}

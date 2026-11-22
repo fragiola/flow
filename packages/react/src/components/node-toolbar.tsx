@@ -63,9 +63,15 @@ export function NodeToolbar(props: NodeToolbarProps) {
         );
     }
     const { model, engine, rootElement } = useFlowContext("NodeToolbar");
+    // hidden, it reads nothing of the view: a pan or a zoom gives the same value (no re-render);
+    // shown, an equal anchor keeps the last value (records compared by their fields)
     const view = useFlowValue(model, engine, () => {
         if (!engine) return undefined;
         const nodeIds = many ? nodeIdsProp : [nodeId as string];
+        const shown =
+            open ??
+            nodeIds.every((id) => model.is("node-selected", { nodeId: id }));
+        if (!shown) return undefined;
         const position = engine.get("node-toolbar-by", {
             ...(many ? { nodeIds } : { nodeId }),
             side,
@@ -80,14 +86,10 @@ export function NodeToolbar(props: NodeToolbarProps) {
                       "toolbar",
                       many ? {} : { nodeId },
                   ),
-                  selected: nodeIds.every((id) =>
-                      model.is("node-selected", { nodeId: id }),
-                  ),
               }
             : undefined;
     });
-    const shown = open ?? view?.selected ?? false;
-    if (!view || !shown || !rootElement) return null;
+    if (!view || !rootElement) return null;
     return createPortal(
         <NodeToolbarElement
             {...rest}

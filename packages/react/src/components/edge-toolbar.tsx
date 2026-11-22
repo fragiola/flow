@@ -41,8 +41,11 @@ export function EdgeToolbar(props: EdgeToolbarProps) {
     } = props;
     const edgeId = useEdgeId("EdgeToolbar", edgeIdProp);
     const { model, engine, rootElement } = useFlowContext("EdgeToolbar");
+    // hidden, it reads nothing of the view: a pan or a zoom gives the same value (no re-render);
+    // shown, an equal anchor keeps the last value (records compared by their fields)
     const view = useFlowValue(model, engine, () => {
         if (!engine) return undefined;
+        if (!(open ?? model.is("edge-selected", { edgeId }))) return undefined;
         const anchor = engine.get("edge-toolbar-by", {
             edgeId,
             position,
@@ -52,12 +55,10 @@ export function EdgeToolbar(props: EdgeToolbarProps) {
             ? {
                   anchor,
                   attributes: engine.adapter.attributes("toolbar", { edgeId }),
-                  selected: model.is("edge-selected", { edgeId }),
               }
             : undefined;
     });
-    const shown = open ?? view?.selected ?? false;
-    if (!view || !shown || !rootElement) return null;
+    if (!view || !rootElement) return null;
     return createPortal(
         <EdgeToolbarElement
             {...rest}

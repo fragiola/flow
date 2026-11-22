@@ -7,6 +7,7 @@ import { resize } from "@fragiola/flow/resize";
 import { beforeEach, describe, expect, it } from "vitest";
 import { type AnyTypes, createFlowRef, type FlowFeatures } from "../src/index";
 import KeyboardFlow from "./fixtures/keyboard-flow.svelte";
+import OutsideToolbarFlow from "./fixtures/outside-toolbar-flow.svelte";
 import ToolbarFlow from "./fixtures/toolbar-flow.svelte";
 import { installLayout, key, part, render, settle } from "./flow";
 
@@ -184,5 +185,63 @@ describe("the simplebezier edge", () => {
             flow.current?.engine.get("edge-path-by", { edgeId: "ab" })?.path,
         );
         expect(d).toMatch(/^M ?50[ ,]40/);
+    });
+});
+
+describe("toolbars given ids", () => {
+    it("an edge toolbar renders nothing once its edge is removed, and its portal goes with it or the root", async () => {
+        const flow = createFlowRef<AnyTypes, FlowFeatures>();
+        const { container, rerender, unmount } = await render(
+            OutsideToolbarFlow,
+            { flowRef: flow },
+        );
+        await settle();
+        const root = part(container, "root");
+        expect(byTestId(container, "edge-toolbar")?.parentElement).toBe(root);
+        // the toolbar goes: its mounted content leaves the root
+        await rerender({ toolbar: false });
+        expect(byTestId(container, "edge-toolbar")).toBeNull();
+        await rerender({ toolbar: true });
+        expect(byTestId(container, "edge-toolbar")).not.toBeNull();
+        flow.current?.model.run("edge.remove", { edgeId: "ab" });
+        await settle();
+        expect(byTestId(container, "edge-toolbar")).toBeNull();
+        flow.current?.model.run("edge.add", {
+            id: "ab",
+            source: "a",
+            target: "b",
+        });
+        await settle();
+        expect(byTestId(container, "edge-toolbar")).not.toBeNull();
+        // the root goes: nothing of the toolbar stays in the document
+        unmount();
+        expect(
+            document.querySelector('[data-testid="edge-toolbar"]'),
+        ).toBeNull();
+    });
+
+    it("a node toolbar with nodeIds of none stands by its enclosing node", async () => {
+        const flow = createFlowRef<AnyTypes, FlowFeatures>();
+        const { container } = await render(OutsideToolbarFlow, {
+            flowRef: flow,
+            toolbar: false,
+            nodeIds: [],
+        });
+        flow.current?.model.run("selection.set", { nodeIds: ["b"] });
+        await settle();
+        expect(byTestId(container, "node-toolbar-a")).toBeNull();
+        const toolbar = byTestId(container, "node-toolbar-b") as HTMLElement;
+        expect(toolbar).toHaveAttribute("data-flow-id", "b");
+        expect(toolbar.style.transform).toBe(
+            "translate(50px, 190px) translate(-50%, -100%)",
+        );
+    });
+
+    it("an edge toolbar needs an edge: inside Flow.Edge or given an edgeId", async () => {
+        await expect(
+            render(OutsideToolbarFlow, { toolbar: false, orphan: true }),
+        ).rejects.toThrow(
+            /Flow\.EdgeToolbar must be rendered inside Flow\.Edge/,
+        );
     });
 });
