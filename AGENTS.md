@@ -202,9 +202,9 @@ the playground, `examples/shared` and `examples/react`), and **never runs `playw
 in one PR. `main` has no required checks: a skipped job blocks nothing.
 
 **Shards: none.** Shard a suite only when its test step alone passes about 3 minutes. Measured
-locally (4 workers; CI runs 2): the playground's 182 tests (91 per browser) in ~46 s, each
-examples app's 203 tests (100 smoke runs: 20 examples × 5 themes) in ~22 to ~55 s, its embed build
-included (measured after #33; Angular and React the slower).
+locally (4 workers; CI runs 2): the playground's 196 tests (98 per browser) in ~80 s, each
+examples app's 215 tests (105 smoke runs: 21 examples × 5 themes) in ~24 to ~55 s, its embed build
+included (measured after #36; Angular and React the slower).
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
