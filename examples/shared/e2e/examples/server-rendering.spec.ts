@@ -62,30 +62,42 @@ async function pathNumbers(page: Page, edgeId: string) {
     return (d.match(/-?\d+(\.\d+)?/g) ?? []).map(Number);
 }
 
-test("every node has its declared size, and every edge is drawn", async ({
+test("every node has its declared size, every edge is drawn, and the flow fits at the identity viewport", async ({
     page,
 }) => {
     await openExample(page, "server-rendering");
     await expect(part(page, "node")).toHaveCount(5);
     await expect(part(page, "edge-path")).toHaveCount(4);
-    const { zoom } = await viewportOf(page);
-    for (const id of ["request", "render", "html", "hydrate"]) {
+    // the viewport the server drew: no fitView, so nothing moves once the engine is attached
+    expect(await viewportOf(page)).toEqual({ x: 0, y: 0, zoom: 1 });
+    const stage = await boxOf(page.getByTestId("stage"));
+    for (const id of ["request", "render", "html", "hydrate", "measure"]) {
         const box = await boxOf(node(page, id));
-        near(box.width / zoom, 150, 1);
-        near(box.height / zoom, 56, 1);
+        if (id !== "measure") {
+            near(box.width, 150, 1);
+            near(box.height, 56, 1);
+        }
+        expect(box.x, id).toBeGreaterThanOrEqual(stage.x);
+        expect(box.y, id).toBeGreaterThanOrEqual(stage.y);
+        expect(box.x + box.width, id).toBeLessThanOrEqual(
+            stage.x + stage.width,
+        );
+        expect(box.y + box.height, id).toBeLessThanOrEqual(
+            stage.y + stage.height,
+        );
     }
 });
 
 test("the edges end at the declared handles", async ({ page }) => {
     await openExample(page, "server-rendering");
-    // request's right side (150, 28) to render's left one (220, 28)
+    // request's right side (190, 68) to render's left one (260, 68)
     const request = await pathNumbers(page, "request-render");
-    expect(request.slice(0, 2)).toEqual([150, 28]);
-    expect(request.slice(-2)).toEqual([220, 28]);
-    // html's bottom (515, 56) to hydrate's top (515, 120)
+    expect(request.slice(0, 2)).toEqual([190, 68]);
+    expect(request.slice(-2)).toEqual([260, 68]);
+    // html's bottom (555, 96) to hydrate's top (555, 160)
     const hydrate = await pathNumbers(page, "html-hydrate");
-    expect(hydrate.slice(0, 2)).toEqual([515, 56]);
-    expect(hydrate.slice(-2)).toEqual([515, 120]);
+    expect(hydrate.slice(0, 2)).toEqual([555, 96]);
+    expect(hydrate.slice(-2)).toEqual([555, 160]);
 });
 
 test("a node's own origin places it by its top centre", async ({ page }) => {

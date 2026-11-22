@@ -28,20 +28,20 @@ const numbers = (d: string) => (d.match(/-?\d+(\.\d+)?/g) ?? []).map(Number);
 describe("the server-rendering example on the server", () => {
     it("holds every edge's path, from a declared handle to a declared handle", () => {
         expect(html.match(/<path [^>]*d="M/g)).toHaveLength(4);
-        // request's right handle (150, 28) to render's left one (220, 28)
+        // request's right handle (190, 68) to render's left one (260, 68)
         const request = numbers(pathOf("request-render"));
-        expect(request.slice(0, 2)).toEqual([150, 28]);
-        expect(request.slice(-2)).toEqual([220, 28]);
-        // html's bottom handle (515, 56) to hydrate's top one (515, 120): hydrate's own origin
+        expect(request.slice(0, 2)).toEqual([190, 68]);
+        expect(request.slice(-2)).toEqual([260, 68]);
+        // html's bottom handle (555, 96) to hydrate's top one (555, 160): hydrate's own origin
         const hydrate = numbers(pathOf("html-hydrate"));
-        expect(hydrate.slice(0, 2)).toEqual([515, 56]);
-        expect(hydrate.slice(-2)).toEqual([515, 120]);
+        expect(hydrate.slice(0, 2)).toEqual([555, 96]);
+        expect(hydrate.slice(-2)).toEqual([555, 160]);
         // to measure's right side, from its initial size (its targetPosition)
         const measure = numbers(pathOf("hydrate-measure"));
-        expect(measure.slice(-2)).toEqual([370, 148]);
+        expect(measure.slice(-2)).toEqual([410, 188]);
     });
 
-    it("places every node, hydrate by its own origin (its top centre)", () => {
+    it("places every node, hydrate by its own origin (its top centre), at the identity viewport", () => {
         expect(html.match(/data-flow-part="node"/g)).toHaveLength(5);
         const place = (id: string) =>
             /transform:translate\(([^)]+)\)/.exec(
@@ -49,9 +49,14 @@ describe("the server-rendering example on the server", () => {
                     html.indexOf(`data-flow-part="node" data-flow-id="${id}"`),
                 ),
             )?.[1];
-        expect(place("request")).toBe("0px, 0px");
-        expect(place("html")).toBe("440px, 0px");
-        expect(place("hydrate")).toBe("440px, 120px");
-        expect(place("measure")).toBe("220px, 120px");
+        expect(place("request")).toBe("40px, 40px");
+        expect(place("html")).toBe("480px, 40px");
+        expect(place("hydrate")).toBe("480px, 160px");
+        expect(place("measure")).toBe("260px, 160px");
+        // at the identity viewport: no transform (only the engine writes one), the nodes placed
+        // to fit the frame at zoom 1
+        const viewport = /<div data-flow-part="viewport"[^>]*>/.exec(html)?.[0];
+        expect(viewport).toBeDefined();
+        expect(viewport).not.toMatch(/transform/);
     });
 });

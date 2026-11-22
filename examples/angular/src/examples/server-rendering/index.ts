@@ -19,6 +19,9 @@ import { styles } from "./styles";
 // of its edges' end while no handle gives one. A node's own `origin` places it by another point of
 // its box than the root's `nodeOrigin` (here its top centre). Each node renders the handles it
 // declares, and draws its frame inside its element, so a handle sits exactly on the node's side.
+// The server draws the identity viewport (only the engine writes one), and `fitView` or a
+// `defaultViewport` would move the whole flow once the engine is attached: none here, the nodes
+// are placed to fit the frame at zoom 1.
 
 export interface Types extends FlowTypes {
     readonly nodes: { step: { label: string } };
@@ -33,7 +36,7 @@ const nodes: FlowNodeInput<Types>[] = [
     {
         id: "request",
         type: "step",
-        position: { x: 0, y: 0 },
+        position: { x: 40, y: 40 },
         width: WIDTH,
         height: HEIGHT,
         handles: [
@@ -44,7 +47,7 @@ const nodes: FlowNodeInput<Types>[] = [
     {
         id: "render",
         type: "step",
-        position: { x: 220, y: 0 },
+        position: { x: 260, y: 40 },
         width: WIDTH,
         height: HEIGHT,
         handles: [
@@ -56,7 +59,7 @@ const nodes: FlowNodeInput<Types>[] = [
     {
         id: "html",
         type: "step",
-        position: { x: 440, y: 0 },
+        position: { x: 480, y: 40 },
         width: WIDTH,
         height: HEIGHT,
         handles: [
@@ -69,7 +72,7 @@ const nodes: FlowNodeInput<Types>[] = [
         // placed by its top centre: right under the HTML node's bottom handle
         id: "hydrate",
         type: "step",
-        position: { x: 440 + WIDTH / 2, y: 120 },
+        position: { x: 480 + WIDTH / 2, y: 160 },
         origin: { x: 0.5, y: 0 },
         width: WIDTH,
         height: HEIGHT,
@@ -83,7 +86,7 @@ const nodes: FlowNodeInput<Types>[] = [
         // sized by its content once measured; until then by its initial size
         id: "measure",
         type: "step",
-        position: { x: 220, y: 120 },
+        position: { x: 260, y: 160 },
         initialWidth: WIDTH,
         initialHeight: HEIGHT,
         targetPosition: "right",
@@ -108,7 +111,7 @@ const edges: FlowEdgeInput<Types>[] = [
     imports: [FLOW],
     host: { class: "contents" },
     template: `
-        <div flowRoot [model]="model" [fitView]="{ padding: 0.15, maxZoom: 1 }" [class]="styles.root">
+        <div flowRoot [model]="model" [class]="styles.root">
             <svg flowBackground variant="dots" [size]="2" [class]="styles.dots"></svg>
             <svg flowBackground variant="lines" [class]="styles.lines"></svg>
             <svg flowBackground variant="cross" [class]="styles.cross"></svg>
