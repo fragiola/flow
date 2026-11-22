@@ -139,13 +139,13 @@ naming both.
 
 | feature | entry | gives | options (defaults) |
 | --- | --- | --- | --- |
-| `selection()` | `/selection` | click and modifier click, box selection, `selection.set`, `selection.clear`, `selection.remove`, the `selected` field | `boxMode: "full"`, `multiple: true`, `boxOnDrag: false` |
+| `selection()` | `/selection` | click and modifier click, box selection, `selection.set`, `selection.clear`, `selection.remove`, the `selected` field | `boxMode: "full"`, `multiple: true`, `boxOnDrag: false`, `multiKey: ["Meta", "Control", "Shift"]`, `boxKey: "Shift"` |
 | `drag()` | `/drag` | dragging nodes and the selection, snapping | `snapGrid` (none), `threshold: 1` |
-| `connection()` | `/connection` | drawing an edge from a handle, the connection line | `radius: 20`, `mode: "strict"` |
+| `connection()` | `/connection` | drawing an edge from a handle, the connection line | `radius: 20`, `mode: "strict"`, `clickToConnect: false` |
 | `reconnection()` | `/reconnection` | moving an edge's end, `edge.reconnect` (requires `connection()`) | `radius: 10` |
 | `resize()` | `/resize` | the `NodeResizer` gestures | `minWidth: 10`, `minHeight: 10`, `maxWidth`, `maxHeight`, `keepAspectRatio: false` |
 | `subflows()` | `/subflows` | `parentId`, `extent` (`"parent"` or a rectangle), `expandParent`, `node.set-parent` | none |
-| `keyboard()` | `/keyboard` | focus on nodes and edges, arrows, Delete, Enter, Escape | `step: 5`, `fastStep: 20` |
+| `keyboard()` | `/keyboard` | focus on nodes and edges, arrows, Delete, Enter, Escape | `step: 5`, `fastStep: 20`, `deleteKeys: ["Delete", "Backspace"]` |
 | `minimap()` | `/minimap` | the `MiniMap` view, pan and zoom from it | `pannable: true`, `zoomable: true`, `padding: 0.1` |
 
 Each entry is `@fragiola/flow-react/<feature>` (`@fragiola/flow-vue/<feature>` in Vue,

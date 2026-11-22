@@ -220,8 +220,10 @@ A `NodeResizer`'s own limits override these for its node.
 
 `subflows()` from `@fragiola/flow-react/subflows` returns a `SubflowsFeature` (its
 `SubflowsOptions` are empty for now): a node may live in another (`parentId`), its position
-relative to its parent; with `extent: "parent"` it stays inside its parent's box, and with
-`expandParent` the parent grows to keep it. Removing a parent removes its children. It owns those
+relative to its parent; with `extent: "parent"` it stays inside its parent's box, with a
+rectangle `extent` (`{ x, y, width, height }`, in its position's coordinates) inside that rectangle
+(kept by the gestures: drags, the arrows and resizes), and with `expandParent` the parent grows to
+keep it. Removing a parent removes its children. It owns those
 fields, the command `node.set-parent` and the keys `"node-children-by"` and `"node-parent-by"`.
 See [Sub-flows](/docs/guides/sub-flows).
 
