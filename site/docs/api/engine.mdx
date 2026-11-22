@@ -219,7 +219,8 @@ the result is the viewport it ends at (zoom limits and extent kept), and every f
 | `"node-z-index-by"` | `{ nodeId }` | a node's structural `z-index` among the nodes: its `zIndex` (a selected node and its descendants raised with `elevateNodesOnSelect`), always above its parent's |
 | `"handles-by"` | `{ nodeId }` | a node's registered handles (`FlowHandle[]`), with their centres |
 | `"background-pattern"` | `BackgroundPatternPayload` | one tile of a background pattern at the current viewport |
-| `"node-toolbar-by"` | `NodeToolbarPayload` | where a node's toolbar goes, outside the zoom |
+| `"node-toolbar-by"` | `NodeToolbarPayload` | where a node's toolbar goes, outside the zoom: beside a node, or beside several nodes' bounds (`nodeIds`); undefined until one of them has a size |
+| `"edge-toolbar-by"` | `EdgeToolbarPayload` | where an edge's toolbar goes, outside the zoom (an `EdgeToolbarPosition`): at its label point or one of its ends; undefined until the edge is drawn |
 | `"selection-box"` | none | the box being drawn (a root-relative `SelectionBox`), or null (`selection()`; `undefined` without it) |
 | `"dragging-node-ids"` | none | the nodes being dragged (`drag()`) |
 | `"connection"` | none | the `Connection` being drawn, or null (`connection()`; `undefined` without it) |
@@ -278,7 +279,8 @@ render, a thumbnail, a saved view), with no engine. Its `ViewportForBoundsOption
 
 | field | type | description |
 | --- | --- | --- |
-| `nodeId` | `string` | the node |
+| `nodeId` | `string` | the node it stands beside (without `nodeIds`) |
+| `nodeIds` | `string[]` | the nodes whose bounds it stands beside (their measured boxes); wins over `nodeId` when not empty |
 | `side` | `HandleSide` | the side it stands on; default `"top"` |
 | `align` | `"start" \| "center" \| "end"` | where along that side; default `"center"` |
 | `offset` | `number` | the gap to the node, in pixels; default 10 |
@@ -291,6 +293,18 @@ render, a thumbnail, a saved view), with no engine. Its `ViewportForBoundsOption
 | `y` | `number` | the anchor's top |
 | `anchorX` | `number` | which point of the toolbar goes there, as a share of its width (`0.5`: its centre) |
 | `anchorY` | `number` | the same along its height (`1`: its bottom) |
+
+`EdgeToolbarPayload`:
+
+| field | type | description |
+| --- | --- | --- |
+| `edgeId` | `string` | the edge |
+| `position` | `"label" \| "source" \| "target"` | the point of the edge it stands at: its label point (default) or one of its ends |
+| `offset` | `XY` | a screen offset from that point, in pixels; default `{ x: 0, y: 0 }` |
+
+`EdgeToolbarPosition` is a `NodeToolbarPosition` whose `anchorX` and `anchorY` are `0.5`: the
+toolbar's centre goes to the point. The `toolbar` part's attributes take `{ edgeId }` for an
+edge's toolbar (its `data-flow-id`), `{ nodeId }` for a node's, nothing for several nodes'.
 
 `Connection`, the connection being drawn:
 

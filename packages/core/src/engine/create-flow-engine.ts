@@ -77,6 +77,7 @@ import { type AutoPanOptions, autoPanOffset } from "./auto-pan";
 import { backgroundPattern } from "./background-pattern";
 import { asElement, pressTargetOf, viewOf } from "./dom";
 import { edgeEnds, type PathOptions, pathOf } from "./edge-geometry";
+import { edgeToolbarPosition } from "./edge-toolbar";
 import type { FlowEngineEvent } from "./events";
 import { Measurements } from "./measurements";
 import { nodeToolbarPosition } from "./node-toolbar";
@@ -89,6 +90,7 @@ import {
 import { TAP_TOLERANCE } from "./tap";
 import type {
     BackgroundPatternPayload,
+    EdgeToolbarPayload,
     EngineActionKey,
     EngineActionPayload,
     EngineActionResult,
@@ -572,12 +574,36 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                     payloadRecord(p) as BackgroundPatternPayload,
                 ),
             "node-toolbar-by": (p) => {
-                const request = payloadRecord(
-                    p,
-                ) as unknown as NodeToolbarPayload;
-                const rect = this.knownRect(String(request.nodeId));
+                const request = payloadRecord(p) as NodeToolbarPayload;
+                const many = Array.isArray(request.nodeIds)
+                    ? request.nodeIds.filter(
+                          (nodeId): nodeId is string =>
+                              typeof nodeId === "string",
+                      )
+                    : [];
+                const rect =
+                    many.length > 0
+                        ? this.boundsOf(many)
+                        : typeof request.nodeId === "string"
+                          ? this.knownRect(request.nodeId)
+                          : undefined;
                 return rect
                     ? nodeToolbarPosition(rect, this.current, request)
+                    : undefined;
+            },
+            "edge-toolbar-by": (p) => {
+                const request = payloadRecord(
+                    p,
+                ) as unknown as EdgeToolbarPayload;
+                const path =
+                    typeof request.edgeId === "string"
+                        ? this.edgePath(request.edgeId)
+                        : undefined;
+                return path
+                    ? edgeToolbarPosition(path, this.current, {
+                          ...request,
+                          offset: pointOf(request.offset),
+                      })
                     : undefined;
             },
         } satisfies {
@@ -2032,7 +2058,9 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 const nodeId = id("nodeId");
                 const node =
                     nodeId === undefined ? undefined : this.node(nodeId);
-                into[ID_ATTRIBUTE] = nodeId;
+                // an edge's toolbar stands for its edge
+                into[ID_ATTRIBUTE] =
+                    nodeId ?? (part === "toolbar" ? id("edgeId") : undefined);
                 if (part !== "resizer" && part !== "toolbar") {
                     into["data-selected"] = flag(node?.selected === true);
                 }

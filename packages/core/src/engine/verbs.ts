@@ -102,9 +102,12 @@ export interface BackgroundPattern {
     readonly strokeWidth: number;
 }
 
-/** Where a node's toolbar goes (`node-toolbar-by`). */
+/** Where a node's toolbar goes (`node-toolbar-by`): beside one node, or beside several nodes' bounds. */
 export interface NodeToolbarPayload {
-    nodeId: string;
+    /** the node it stands beside (without `nodeIds`) */
+    nodeId?: string | undefined;
+    /** the nodes whose bounds it stands beside (their measured boxes); wins over `nodeId` when not empty */
+    nodeIds?: readonly string[] | undefined;
     /** the node's side it stands on; default `"top"` */
     side?: HandleSide | undefined;
     /** where along that side; default `"center"` */
@@ -124,6 +127,21 @@ export interface NodeToolbarPosition {
     readonly anchorX: number;
     readonly anchorY: number;
 }
+
+/** Where an edge's toolbar goes (`edge-toolbar-by`). */
+export interface EdgeToolbarPayload {
+    edgeId: string;
+    /** the point of the edge it stands at: its label point (default), its source or its target end */
+    position?: "label" | "source" | "target" | undefined;
+    /** a screen offset from that point, in pixels; default `{ x: 0, y: 0 }` */
+    offset?: XY | undefined;
+}
+
+/**
+ * An edge toolbar's anchor on the screen (relative to the root, outside the zoom): the toolbar's
+ * centre goes there (`anchorX`, `anchorY` are 0.5).
+ */
+export type EdgeToolbarPosition = NodeToolbarPosition;
 
 /** The selection box (`selection-box`, `selection()`): on the screen, relative to the root. */
 export type SelectionBox = Rect;
@@ -309,10 +327,21 @@ export interface EngineGetMap<T extends FlowTypes = AnyTypes> {
         payload: BackgroundPatternPayload;
         result: BackgroundPattern;
     };
-    /** where a node's toolbar goes, outside the zoom */
+    /**
+     * where a node's toolbar goes, outside the zoom: beside a node, or beside several nodes'
+     * bounds (`nodeIds`); undefined until one of them has a size
+     */
     "node-toolbar-by": {
         payload: NodeToolbarPayload;
         result: NodeToolbarPosition | undefined;
+    };
+    /**
+     * where an edge's toolbar goes, outside the zoom: at its label point or one of its ends, until
+     * its path is drawn (undefined before)
+     */
+    "edge-toolbar-by": {
+        payload: EdgeToolbarPayload;
+        result: EdgeToolbarPosition | undefined;
     };
     /** the selection box being drawn, or null (`selection()`) */
     "selection-box": { payload: NoPayload; result: SelectionBox | null };

@@ -115,6 +115,8 @@ export type {
     BackgroundPatternPayload,
     BackgroundVariant,
     Connection,
+    EdgeToolbarPayload,
+    EdgeToolbarPosition,
     EngineActionKey,
     EngineActionMap,
     EngineActionPayload,
