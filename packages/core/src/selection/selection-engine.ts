@@ -194,13 +194,17 @@ export function selectionEngine(
                     const current = box;
                     box = undefined;
                     if (!current?.active) return;
-                    model.run("selection.set", {
+                    const result = model.run("selection.set", {
                         nodeIds: current.nodeIds,
                         edgeIds: current.edgeIds,
                         mode: "replace",
                     });
+                    // the rectangle only for the box's own selection (not one a middleware vetoed
+                    // or changed)
                     boxed =
-                        current.nodeIds.length >= 2
+                        result.ok &&
+                        current.nodeIds.length >= 2 &&
+                        sameSet(current.nodeIds, selected().nodeIds)
                             ? current.nodeIds
                             : undefined;
                     host.changed();

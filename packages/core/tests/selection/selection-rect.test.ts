@@ -5,6 +5,7 @@
 // `selection-drag-start`, `selection-drag`, `selection-drag-end`; its context menu is the
 // selection's.
 import { afterEach, describe, expect, it } from "vitest";
+import { veto } from "../../src/commands/veto";
 import { drag } from "../../src/drag/drag";
 import type { FlowEngineEvent } from "../../src/engine/events";
 import type { FlowFeatures } from "../../src/features/types";
@@ -93,6 +94,46 @@ describe("the selection-rect read", () => {
         });
         pointer(root, "pointerup", { clientX: 150, clientY: 90 });
         expect(engine.get("selection-rect")).toBeNull();
+    });
+
+    it("is null when a middleware vetoes or changes the box's final selection", () => {
+        const vetoed = mountWithRect({ features: [selection()] });
+        vetoed.model.use((ctx, next) =>
+            ctx.command === "selection.set" && !ctx.transient
+                ? veto("kept")
+                : next(),
+        );
+        boxAroundPQ(vetoed.root);
+        expect(vetoed.engine.get("selection-rect")).toBeNull();
+
+        // a box around p, q and r that a middleware narrows to p and q
+        const narrowed = mountWithRect({ features: [selection()] });
+        narrowed.model.use((ctx, next) => {
+            if (ctx.command === "selection.set" && !ctx.transient) {
+                ctx.payload = {
+                    ...ctx.payload,
+                    nodeIds: (ctx.payload.nodeIds ?? []).filter(
+                        (id) => id !== "r",
+                    ),
+                };
+            }
+            return next();
+        });
+        pointer(narrowed.root, "pointerdown", {
+            clientX: 20,
+            clientY: 10,
+            shiftKey: true,
+        });
+        pointer(narrowed.root, "pointermove", {
+            clientX: 700,
+            clientY: 500,
+            shiftKey: true,
+        });
+        pointer(narrowed.root, "pointerup", { clientX: 700, clientY: 500 });
+        expect(
+            narrowed.model.get("selected-nodes").map((node) => node.id),
+        ).toEqual(["p", "q"]);
+        expect(narrowed.engine.get("selection-rect")).toBeNull();
     });
 
     it("clears when the selection changes otherwise, and does not come back with it", () => {
