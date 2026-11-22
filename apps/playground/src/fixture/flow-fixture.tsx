@@ -128,6 +128,8 @@ const GESTURE_EVENTS = new Set([
     "resize-cancel",
     "selection-drag-start",
     "selection-drag-end",
+    // carries the tapped minimap element, which JSON cannot write; `minimap-clicks` logs its point
+    "minimap-click",
 ]);
 
 const features = [
