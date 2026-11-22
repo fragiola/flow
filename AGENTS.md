@@ -387,7 +387,8 @@ offset? }` (a root-relative anchor outside the zoom); features: `selection-box` 
   edges, the connection line, the selection box, the minimap, toolbars and state attributes
   re-render from it; node and edge data from `model.subscribe`. Measurements are told once per
   task (the root window's microtask), so a mount re-renders once.
-- `settings.onlyRenderVisible`: render `visible-nodes` / `visible-edges` instead of every one.
+- `settings.onlyRenderVisible`: render `visible-nodes` instead of every node (the edges' list,
+  `drawn-edges`, applies it itself: #25's adapters render it and filter nothing).
 
 ## The React adapter (Issue #5)
 
