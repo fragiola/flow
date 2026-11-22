@@ -8,6 +8,7 @@ import {
     inject,
     input,
     type OnInit,
+    type OutputEmitterRef,
     output,
     type Signal,
     signal,
@@ -20,10 +21,14 @@ import {
     type CreateId,
     createFlowEngine,
     createFlowModel,
+    type DefaultEdgeOptions,
+    ENGINE_EVENT_CALLBACKS,
     type FitViewPayload,
     type FlowEdge,
     type FlowEdgeInput,
     type FlowEngine,
+    type FlowEngineEvent,
+    type FlowEngineEventOf,
     type FlowEngineOptions,
     type FlowFeatures,
     type FlowModel,
@@ -91,6 +96,11 @@ export type RootEngineProps = Pick<
     | "nodeExtent"
     | "elevateNodesOnSelect"
     | "elevateEdgesOnSelect"
+    | "paneClickDistance"
+    | "nodeClickDistance"
+    | "preventScrolling"
+    | "nodesFocusable"
+    | "edgesFocusable"
 >;
 
 /** A viewport change, as `(viewportMove)` tells it (React's `onViewportChange(viewport, gesture)`). */
@@ -98,6 +108,11 @@ export interface ViewportMoveEvent {
     readonly viewport: Viewport;
     /** a gesture moved it (a pan, the wheel, a pinch), not an action */
     readonly gesture: boolean;
+}
+
+/** `NodeClick` → `nodeClick`: an engine event's output, from the core's callback name. */
+function outputName(name: string): string {
+    return name.charAt(0).toLowerCase() + name.slice(1);
 }
 
 /** The `meta` of the commands that bring the model to the controlled inputs. */
@@ -218,6 +233,13 @@ export class FlowRootDirective<
     readonly features = input<F | undefined>(undefined);
     /** the id generator of the model the root creates (read once, when it creates it) */
     readonly createId = input<CreateId | undefined>(undefined);
+    /**
+     * the fields every `edge.add` of the model the root creates fills in where it leaves them out
+     * (read once, when it creates it: the model option `defaultEdgeOptions`)
+     */
+    readonly defaultEdgeOptions = input<DefaultEdgeOptions<T> | undefined>(
+        undefined,
+    );
     /** controlled viewport (`[(viewport)]`): a new value is set on the engine (`set-viewport`) */
     readonly viewport = input<Viewport | undefined>(undefined);
     /** the viewport the flow starts at (read once); default `{ x: 0, y: 0, zoom: 1 }` */
@@ -273,6 +295,17 @@ export class FlowRootDirective<
     readonly elevateEdgesOnSelect = input(undefined, {
         transform: optionalBoolean,
     });
+    readonly paneClickDistance = input(undefined, {
+        transform: optionalNumber,
+    });
+    readonly nodeClickDistance = input(undefined, {
+        transform: optionalNumber,
+    });
+    readonly preventScrolling = input(undefined, {
+        transform: optionalBoolean,
+    });
+    readonly nodesFocusable = input(undefined, { transform: optionalBoolean });
+    readonly edgesFocusable = input(undefined, { transform: optionalBoolean });
 
     /** the model's nodes after every command that changes them (a drag step too), but the controlled ones' */
     readonly nodesChange = output<readonly FlowNode<T>[]>();
@@ -282,6 +315,62 @@ export class FlowRootDirective<
     readonly viewportChange = output<Viewport>();
     /** every viewport change with what made it (`gesture: true` for a pan, the wheel, a pinch) */
     readonly viewportMove = output<ViewportMoveEvent>();
+
+    // One output per engine event, named from the core's table (`ENGINE_EVENT_CALLBACKS`: React's
+    // `onNodeClick` is `(nodeClick)`), each emitted with the event. Angular needs them declared;
+    // `tests/interaction.test.ts` keeps this list equal to the table.
+    // (the viewport events' types written out: inferred, they would name the core's unexported
+    // `ViewportMove` in the bundled declarations)
+    readonly moveStart: OutputEmitterRef<
+        FlowEngineEventOf<"viewport-change-start">
+    > = output();
+    readonly moveEnd: OutputEmitterRef<
+        FlowEngineEventOf<"viewport-change-end">
+    > = output();
+    readonly init = output<FlowEngineEventOf<"ready">>();
+    readonly nodeClick = output<FlowEngineEventOf<"node-click">>();
+    readonly nodeDoubleClick = output<FlowEngineEventOf<"node-double-click">>();
+    readonly nodeContextMenu = output<FlowEngineEventOf<"node-context-menu">>();
+    readonly edgeClick = output<FlowEngineEventOf<"edge-click">>();
+    readonly edgeDoubleClick = output<FlowEngineEventOf<"edge-double-click">>();
+    readonly edgeContextMenu = output<FlowEngineEventOf<"edge-context-menu">>();
+    readonly paneClick = output<FlowEngineEventOf<"pane-click">>();
+    readonly paneDoubleClick = output<FlowEngineEventOf<"pane-double-click">>();
+    readonly paneContextMenu = output<FlowEngineEventOf<"pane-context-menu">>();
+    readonly selectionContextMenu =
+        output<FlowEngineEventOf<"selection-context-menu">>();
+    readonly selectionStart = output<FlowEngineEventOf<"box-select-start">>();
+    readonly selectionEnd = output<FlowEngineEventOf<"box-select">>();
+    readonly nodeDragStart = output<FlowEngineEventOf<"drag-start">>();
+    readonly nodesMove = output<FlowEngineEventOf<"nodes-move">>();
+    readonly nodeDragCancel = output<FlowEngineEventOf<"drag-cancel">>();
+    readonly connectStart = output<FlowEngineEventOf<"connect-start">>();
+    readonly connectTarget = output<FlowEngineEventOf<"connect-target">>();
+    readonly connect = output<FlowEngineEventOf<"connect">>();
+    readonly connectCancel = output<FlowEngineEventOf<"connect-cancel">>();
+    readonly reconnectStart = output<FlowEngineEventOf<"reconnect-start">>();
+    readonly reconnect = output<FlowEngineEventOf<"reconnect">>();
+    readonly reconnectCancel = output<FlowEngineEventOf<"reconnect-cancel">>();
+    readonly resizeStart = output<FlowEngineEventOf<"resize-start">>();
+    readonly resizeEnd = output<FlowEngineEventOf<"resize">>();
+    readonly resizeCancel = output<FlowEngineEventOf<"resize-cancel">>();
+    readonly delete = output<FlowEngineEventOf<"remove">>();
+
+    /** each engine event's output, by the event's type */
+    private readonly eventOutputs: ReadonlyMap<
+        string,
+        OutputEmitterRef<FlowEngineEvent>
+    > = new Map(
+        Object.entries(ENGINE_EVENT_CALLBACKS).map(([type, name]) => [
+            type,
+            (
+                this as unknown as Record<
+                    string,
+                    OutputEmitterRef<FlowEngineEvent>
+                >
+            )[outputName(name)] as OutputEmitterRef<FlowEngineEvent>,
+        ]),
+    );
 
     private readonly host = injectHost();
     /** its inputs are set (`ngOnInit`) */
@@ -308,7 +397,11 @@ export class FlowRootDirective<
                     nodes: [...(this.nodes() ?? this.defaultNodes() ?? [])],
                     edges: [...(this.edges() ?? this.defaultEdges() ?? [])],
                 } as never,
-                { features, createId: this.createId() },
+                {
+                    features,
+                    createId: this.createId(),
+                    defaultEdgeOptions: this.defaultEdgeOptions(),
+                },
             );
         });
         return this.own;
@@ -417,6 +510,11 @@ export class FlowRootDirective<
             nodeExtent: this.nodeExtent(),
             elevateNodesOnSelect: this.elevateNodesOnSelect(),
             elevateEdgesOnSelect: this.elevateEdgesOnSelect(),
+            paneClickDistance: this.paneClickDistance(),
+            nodeClickDistance: this.nodeClickDistance(),
+            preventScrolling: this.preventScrolling(),
+            nodesFocusable: this.nodesFocusable(),
+            edgesFocusable: this.edgesFocusable(),
         }),
     );
 
@@ -516,7 +614,11 @@ export class FlowRootDirective<
                 const stops = [
                     created.adapter.subscribe(this.bump),
                     created.subscribe((event) => {
-                        if (event.type !== "viewport-change") return;
+                        if (event.type !== "viewport-change") {
+                            // the event's output (`nodeClick`, `moveStart`, …)
+                            this.eventOutputs.get(event.type)?.emit(event);
+                            return;
+                        }
                         this.start = event.viewport;
                         this.viewportChange.emit(event.viewport);
                         this.viewportMove.emit({

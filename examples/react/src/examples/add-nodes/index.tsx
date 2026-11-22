@@ -1,5 +1,6 @@
 import {
     Flow,
+    type FlowEngineEventOf,
     type FlowNode,
     type FlowNodeInput,
     type FlowTypes,
@@ -16,7 +17,9 @@ import { styles } from "./styles";
 // and drop: the root accepts the drop, and `engine.get("screen-to-flow", { x, y })` turns the
 // drop's client point into flow coordinates, where `node.add` puts the node. A click on an item
 // adds one at the centre of the view instead. `useFlowRef` reaches the model and the engine from
-// outside the root.
+// outside the root. A connection dropped on the canvas adds a task there, joined to where it came
+// from: `onConnectCancel` tells where it ended (`point`, in flow coordinates) and from which
+// handle (`from`), and `to` is empty when it ended over no handle.
 
 const SHAPES = [
     { shape: "circle", label: "Start", icon: CircleIcon },
@@ -91,6 +94,35 @@ export default function AddNodes() {
             });
     }
 
+    /** A connection dropped over no handle: a new task there, joined to its start. */
+    function onConnectCancel(event: FlowEngineEventOf<"connect-cancel">) {
+        const model = flow.current?.model;
+        if (!model || !event.dropped || event.to || event.input !== "pointer")
+            return;
+        count += 1;
+        const nodeId = `square-${count}`;
+        model.run("batch", {
+            commands: [
+                {
+                    command: "node.add",
+                    payload: {
+                        id: nodeId,
+                        type: "shape",
+                        position: { x: event.point.x - 50, y: event.point.y },
+                        data: { shape: "square", label: `Task ${count}` },
+                    },
+                },
+                {
+                    command: "edge.add",
+                    payload:
+                        event.from.type === "source"
+                            ? { source: event.from.nodeId, target: nodeId }
+                            : { source: nodeId, target: event.from.nodeId },
+                },
+            ],
+        });
+    }
+
     function onDrop(event: DragEvent<HTMLDivElement>) {
         const shape = event.dataTransfer.getData(MIME) as Shape;
         if (!SHAPES.some((item) => item.shape === shape)) return;
@@ -126,6 +158,7 @@ export default function AddNodes() {
                 defaultNodes={nodes}
                 defaultViewport={{ x: 160, y: 80, zoom: 1 }}
                 flowRef={flow}
+                onConnectCancel={onConnectCancel}
                 onDragOver={(event) => {
                     if (!event.dataTransfer.types.includes(MIME)) return;
                     event.preventDefault();

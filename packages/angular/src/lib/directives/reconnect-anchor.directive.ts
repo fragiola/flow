@@ -10,6 +10,7 @@ import {
     bindStructuralStyle,
     injectHost,
 } from "../utils/helpers";
+import { bindPresence } from "../utils/presence";
 
 export interface ReconnectAnchorState {
     readonly edgeId: string;
@@ -24,8 +25,9 @@ export interface ReconnectAnchorState {
 /**
  * An edge end's grab area (`data-flow-part="reconnect-anchor"`, `data-end`), on the app's SVG
  * circle inside `[flowEdge]`: `<svg:circle flowReconnectAnchor end="target" />`, at that end.
- * With `reconnection()`, a press on it moves that end to another handle. Transparent by default;
- * give it its radius (`r`, default 10) and look.
+ * With `reconnection()`, a press on it moves that end to another handle; an end its edge's
+ * `reconnectable` keeps fixed (`false`, or the other end's name) has none: the element leaves the
+ * document meanwhile. Transparent by default; give it its radius (`r`, default 10) and look.
  */
 @Directive({
     selector: "[flowReconnectAnchor]",
@@ -45,6 +47,16 @@ export class FlowReconnectAnchorDirective {
         "edge",
     );
     private readonly path = edgePathOf(this.context, this.id);
+    /**
+     * this end may move (`edge-reconnectable`): `reconnectable: "source"` (or `"target"`, or
+     * false) keeps the other end fixed, which draws no anchor
+     */
+    private readonly movable = flowValue(this.context, () => {
+        const edgeId = this.id();
+        const end = beforeInputs(undefined, this.end);
+        if (edgeId === undefined || !end) return true;
+        return this.context.model().is("edge-reconnectable", { edgeId, end });
+    });
     private readonly view = flowValue(this.context, () => {
         const edgeId = this.id();
         const engine = this.context.engine();
@@ -60,12 +72,14 @@ export class FlowReconnectAnchorDirective {
         };
     });
 
-    /** the anchor's state (`undefined` while its edge has no path) */
+    /** the anchor's state (`undefined` while its edge has no path, or its end may not move) */
     readonly state: Signal<ReconnectAnchorState | undefined> = computed(() => {
         const edgeId = this.id();
         const path = this.path();
         const view = this.view();
-        if (edgeId === undefined || !path || !view) return undefined;
+        if (edgeId === undefined || !path || !view || !this.movable()) {
+            return undefined;
+        }
         return {
             edgeId,
             end: view.end,
@@ -88,5 +102,6 @@ export class FlowReconnectAnchorDirective {
             };
         });
         bindStructuralStyle(host, () => ({ pointerEvents: "all" }));
+        bindPresence(host, () => (this.movable() ? "here" : null));
     }
 }

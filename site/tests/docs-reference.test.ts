@@ -498,6 +498,13 @@ describe("the React reference", () => {
             (m) => m[1] ?? "",
         );
         expect(engineProps.length).toBeGreaterThan(10);
+        // and its event callbacks, one per entry of the core's table (`RootEventProps`)
+        const callbackProps = [
+            ...read(join(CORE_SRC, "engine/event-callbacks.ts")).matchAll(
+                /^ {4}(?:"[\w-]+"|\w+): "(\w+)",$/gm,
+            ),
+        ].map((m) => `on${m[1] ?? ""}`);
+        expect(callbackProps.length).toBeGreaterThan(20);
         let states = 0;
         for (const { name, slug, source } of primitives) {
             expect(source, `${name}Props`).toMatch(
@@ -506,7 +513,7 @@ describe("the React reference", () => {
             const mdx = page(slug);
             const props = [
                 ...allFields(source, `${name}Props`),
-                ...(name === "Root" ? engineProps : []),
+                ...(name === "Root" ? [...engineProps, ...callbackProps] : []),
             ];
             const state = stateFields(name);
             if (state.length > 0) states++;
@@ -714,7 +721,7 @@ describe("the Vue reference", () => {
         const root = read(join(VUE_SRC, "components/root.ts"));
         const events = [
             ...(
-                /export type RootEmits[\s\S]*?\n\};/.exec(root)?.[0] ?? ""
+                /export type RootEmits[\s\S]*?\n\}/.exec(root)?.[0] ?? ""
             ).matchAll(/^ {4}"update:(\w+)":/gm),
         ].map((match) => match[1] ?? "");
         expect(events).toEqual(["nodes", "edges", "viewport"]);

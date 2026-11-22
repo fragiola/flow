@@ -136,6 +136,7 @@ Every part takes the props of its React page (for example [Root](/docs/api/primi
 | `onnodeschange` | `Flow.Root` | called with the model's nodes after every command that changes them |
 | `onedgeschange` | `Flow.Root` | called with the model's edges after every command that changes them |
 | `onviewportchange` | `Flow.Root` | called on every viewport change, `(viewport, gesture)`, `gesture` true for a pan, a zoom or a pinch |
+| `onnodeclick`, `onmovestart`, … | `Flow.Root` | one callback per [root callback](/docs/api/primitives/root#props), lowercase as the root's other callbacks (`oninit`, `onnodeclick`, `onpanecontextmenu`, `onconnectcancel`, `onresizeend`, `ondelete`, …), called with the engine event |
 
 | snippet | of | receives |
 | --- | --- | --- |
@@ -167,7 +168,7 @@ What differs from React, part by part:
   `@fragiola/flow-svelte/resize`, with `MiniMapNode`, `MiniMapMask`, `ResizeHandle` and
   `RESIZE_POSITIONS`.
 
-The props and state of each part are typed by its exports: `RootProps`, `RootEngineProps`,
+The props and state of each part are typed by its exports: `RootProps`, `RootEngineProps`, `RootEventProps`,
 `RootState`; `ViewportProps`, `ViewportState`; `BackgroundProps`, `BackgroundState`; `NodesProps`,
 `NodesState`; `NodeProps`; `HandleProps`; `EdgesProps`, `EdgesState`; `EdgeProps`;
 `EdgePathProps`, `EdgePathState`; `EdgeLabelProps`, `EdgeLabelState`; `EdgeToolbarProps`,

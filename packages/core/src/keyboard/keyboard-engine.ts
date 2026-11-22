@@ -5,13 +5,16 @@
 //   with Shift, kept inside their extents (`node.move`, a `batch` for several: one step);
 // - Enter and Space select it (with Ctrl, ⌘ or Shift they toggle it);
 // - the delete keys (`deleteKeys`: Delete and Backspace by default) remove the selection
-//   (`selection.remove`), or without `selection()` the focused node or edge;
+//   (`selection.remove`), or without `selection()` the focused node or edge; a `beforeDelete`
+//   is asked first and may narrow it, refuse it, or answer later (a promise: what is still there
+//   when it settles goes, in one step);
 // - Escape clears the selection (a gesture under way is cancelled by the engine first).
 // With `connection()`, handles take focus too (`tabindex` in their attributes) and Enter or Space
 // on one starts a keyboard connection (Tab, Shift + Tab or the arrows walk the targets the model
 // accepts, nearest first; Enter or Space connect; Escape cancels); with `resize()`, resize handles
 // take focus and the arrows move their sides. Both are reached through the host's keyboard links,
 // never by importing those features.
+import type { BatchEntry } from "../commands/types";
 import type { FlowEdge, FlowNode, XY } from "../document/types";
 import { movedRoots, runMoves } from "../engine/node-moves";
 import {
@@ -24,7 +27,7 @@ import type {
     FeatureGesture,
 } from "../features/types";
 import { centeredOn, viewRect } from "../geometry/viewport-math";
-import type { KeyboardOptions } from "./keyboard";
+import type { DeleteDecision, KeyboardOptions } from "./keyboard";
 
 const ARROWS: Readonly<Record<string, XY>> = {
     ArrowUp: { x: 0, y: -1 },
@@ -95,6 +98,7 @@ function connectionGesture(
         }),
     );
     return {
+        kind: "connect",
         move: () => {},
         end: cancel,
         cancel,
@@ -130,6 +134,9 @@ export function keyboardEngine(
 ): FeatureEngine {
     const { model } = host;
     const links = keyboardLinks(host);
+    /** a `beforeDelete` promise is pending: another delete key waits for it */
+    let deciding = false;
+    let destroyed = false;
 
     const move = (
         direction: XY,
@@ -172,10 +179,153 @@ export function keyboardEngine(
         return true;
     };
 
+    const nodeOf = (id: string) =>
+        model.get("node-by", { id }) as FlowNode | undefined;
+    const edgeOf = (id: string) =>
+        model.get("edge-by", { id }) as FlowEdge | undefined;
+
+    /** What a delete key would remove now: the selection's, or the focused node's or edge's. */
+    const toRemove = (
+        nodeId: string | undefined,
+        edgeId: string | undefined,
+    ): { nodeIds: string[]; edgeIds: string[] } | undefined => {
+        const removed = (result: { ok: boolean; value?: unknown }) => {
+            if (!result.ok) return undefined;
+            const { removedNodeIds, removedEdgeIds } = result.value as {
+                removedNodeIds: string[];
+                removedEdgeIds: string[];
+            };
+            return { nodeIds: removedNodeIds, edgeIds: removedEdgeIds };
+        };
+        if (model.can("selection.remove", {}))
+            return removed(model.check("selection.remove", {}));
+        if (nodeId !== undefined)
+            return removed(model.check("node.remove", { nodeId }));
+        if (edgeId !== undefined && model.can("edge.remove", { edgeId }))
+            return { nodeIds: [], edgeIds: [edgeId] };
+        return undefined;
+    };
+
+    /**
+     * Removes the nodes and edges still there among those given, in one step (a node takes its
+     * edges and children; one carried by a removed parent is not removed twice), and tells it.
+     */
+    const removeIds = (
+        nodeIds: readonly string[],
+        edgeIds: readonly string[],
+    ): boolean => {
+        const nodes = nodeIds.filter(
+            (id) =>
+                nodeOf(id) !== undefined &&
+                model.is("node-deletable", { nodeId: id }),
+        );
+        const roots = movedRoots(model, nodes);
+        const gone = new Set(nodes);
+        const edges = edgeIds.filter((id) => {
+            const edge = edgeOf(id);
+            return (
+                edge !== undefined &&
+                !gone.has(edge.source) &&
+                !gone.has(edge.target) &&
+                model.is("edge-deletable", { edgeId: id })
+            );
+        });
+        const commands: BatchEntry[] = [
+            ...edges.map((id) => ({
+                command: "edge.remove" as const,
+                payload: { edgeId: id },
+            })),
+            ...roots.map((id) => ({
+                command: "node.remove" as const,
+                payload: { nodeId: id },
+            })),
+        ];
+        if (commands.length === 0) return false;
+        const nodesBefore = model.get("all-nodes") as readonly FlowNode[];
+        const edgesBefore = model.get("all-edges") as readonly FlowEdge[];
+        const [only] = commands;
+        const result =
+            commands.length === 1 && only
+                ? model.run(only.command, only.payload as object)
+                : model.run("batch", { commands });
+        if (!result.ok) return false;
+        const removedNodeIds = nodesBefore
+            .filter((node) => !nodeOf(node.id))
+            .map((node) => node.id);
+        const removedEdgeIds = edgesBefore
+            .filter((edge) => !edgeOf(edge.id))
+            .map((edge) => edge.id);
+        host.emit({
+            type: "remove",
+            nodeIds: removedNodeIds,
+            edgeIds: removedEdgeIds,
+        });
+        return true;
+    };
+
+    /** What a `beforeDelete` answer keeps of the nodes and edges it was asked about. */
+    const decided = (
+        decision: DeleteDecision,
+        asked: { nodeIds: string[]; edgeIds: string[] },
+    ): { nodeIds: string[]; edgeIds: string[] } => {
+        if (decision === true) return asked;
+        if (decision === false || typeof decision !== "object")
+            return { nodeIds: [], edgeIds: [] };
+        // a subset only: what it names that was asked about
+        const nodes = new Set((decision.nodes ?? []).map((node) => node?.id));
+        const edges = new Set((decision.edges ?? []).map((edge) => edge?.id));
+        return {
+            nodeIds: asked.nodeIds.filter((id) => nodes.has(id)),
+            edgeIds: asked.edgeIds.filter((id) => edges.has(id)),
+        };
+    };
+
+    /** A delete key with a `beforeDelete`: asked first, and waited for when it answers later. */
+    const removeAsked = (
+        nodeId: string | undefined,
+        edgeId: string | undefined,
+    ): boolean => {
+        const before = options.beforeDelete;
+        if (!before) return false;
+        // a decision under way: this key waits for it (and is taken)
+        if (deciding) return true;
+        const asked = toRemove(nodeId, edgeId);
+        if (!asked || asked.nodeIds.length + asked.edgeIds.length === 0)
+            return false;
+        const answer = before(
+            asked.nodeIds.flatMap((id) => nodeOf(id) ?? []),
+            asked.edgeIds.flatMap((id) => edgeOf(id) ?? []),
+        );
+        if (
+            typeof answer === "object" &&
+            answer !== null &&
+            typeof (answer as Promise<unknown>).then === "function"
+        ) {
+            deciding = true;
+            (answer as Promise<DeleteDecision>).then(
+                (decision) => {
+                    deciding = false;
+                    // the flow locked or gone meanwhile: nothing goes
+                    if (destroyed || !host.interactive()) return;
+                    const kept = decided(decision, asked);
+                    removeIds(kept.nodeIds, kept.edgeIds);
+                },
+                () => {
+                    deciding = false;
+                },
+            );
+            return true;
+        }
+        const kept = decided(answer as DeleteDecision, asked);
+        removeIds(kept.nodeIds, kept.edgeIds);
+        return true;
+    };
+
     const remove = (
         nodeId: string | undefined,
         edgeId: string | undefined,
     ): boolean => {
+        if (options.beforeDelete) return removeAsked(nodeId, edgeId);
         if (model.can("selection.remove", {})) {
             const result = model.run("selection.remove", {});
             if (!result.ok) return false;
@@ -216,16 +366,26 @@ export function keyboardEngine(
     return {
         is: {
             "node-focusable": (payload) => {
-                const node = model.get("node-by", {
-                    id: String((payload as { nodeId?: unknown }).nodeId),
-                }) as FlowNode | undefined;
-                return node !== undefined && node.hidden !== true;
+                const node = nodeOf(
+                    String((payload as { nodeId?: unknown }).nodeId),
+                );
+                return (
+                    node !== undefined &&
+                    node.hidden !== true &&
+                    node.focusable !== false &&
+                    host.focusable("node")
+                );
             },
             "edge-focusable": (payload) => {
-                const edge = model.get("edge-by", {
-                    id: String((payload as { edgeId?: unknown }).edgeId),
-                }) as FlowEdge | undefined;
-                return edge !== undefined && edge.hidden !== true;
+                const edge = edgeOf(
+                    String((payload as { edgeId?: unknown }).edgeId),
+                );
+                return (
+                    edge !== undefined &&
+                    edge.hidden !== true &&
+                    edge.focusable !== false &&
+                    host.focusable("edge")
+                );
             },
         },
         keydown: (event, target) => {
@@ -272,6 +432,7 @@ export function keyboardEngine(
             if (direction) {
                 if (event.altKey || event.ctrlKey || event.metaKey)
                     return false;
+                if (!host.allows("drag")) return false;
                 return move(direction, event.shiftKey, nodeId);
             }
             if (
@@ -281,7 +442,11 @@ export function keyboardEngine(
             ) {
                 return remove(nodeId, edgeId);
             }
-            if ((event.key === "Enter" || event.key === " ") && onEntity) {
+            if (
+                (event.key === "Enter" || event.key === " ") &&
+                onEntity &&
+                host.allows("select")
+            ) {
                 const mode =
                     event.shiftKey || event.ctrlKey || event.metaKey
                         ? "toggle"
@@ -317,6 +482,8 @@ export function keyboardEngine(
                 const nodeId = payload.nodeId;
                 if (
                     payload.connectable !== false &&
+                    payload.connectableStart !== false &&
+                    host.allows("connect") &&
                     typeof nodeId === "string" &&
                     model.is("node-connectable", { nodeId })
                 ) {
@@ -327,7 +494,12 @@ export function keyboardEngine(
             }
         },
         focus: (target) => {
-            if (target.kind !== "node" || target.nodeId === undefined) return;
+            if (
+                !options.panOnFocus ||
+                target.kind !== "node" ||
+                target.nodeId === undefined
+            )
+                return;
             const rect = host.measured(target.nodeId)
                 ? host.nodeRect(target.nodeId)
                 : undefined;
@@ -352,6 +524,9 @@ export function keyboardEngine(
                     ),
                 );
             }
+        },
+        destroy: () => {
+            destroyed = true;
         },
     };
 }

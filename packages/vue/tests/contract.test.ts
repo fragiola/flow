@@ -563,7 +563,10 @@ describe("the control buttons", () => {
         expect(zoomIn).toHaveAttribute("data-disabled");
         const lock = find(container, "lock");
         await click(lock);
-        expect(flow.value?.engine.is("interactive")).toBe(false);
+        // the lock switches dragging, connecting and selecting (#33)
+        expect(flow.value?.engine.is("interactive-by", { kind: "drag" })).toBe(
+            false,
+        );
         expect(lock).toHaveAttribute("aria-pressed", "true");
         expect(lock).not.toHaveAttribute("data-interactive");
         await settle();

@@ -114,6 +114,8 @@ export class FlowModelBus {
     private readonly ids: IdSource;
     private readonly features: ComposedFeatures;
     private readonly freeze: boolean;
+    /** the fields `edge.add` fills in where its payload leaves them out (`defaultEdgeOptions`) */
+    private readonly defaultEdge: Readonly<Record<string, unknown>> | undefined;
     private readonly definitions: ReadonlyMap<string, CommandDefinition>;
     private readonly infos: readonly CommandInfo[];
     private readonly middleware: Middleware[] = [];
@@ -130,7 +132,9 @@ export class FlowModelBus {
         ids: IdSource,
         features: ComposedFeatures,
         freeze: boolean,
+        defaultEdge?: Readonly<Record<string, unknown>> | undefined,
     ) {
+        this.defaultEdge = defaultEdge;
         this.committed = committed;
         this.ids = ids;
         this.features = features;
@@ -168,6 +172,7 @@ export class FlowModelBus {
             reader: readerOf(this.committed),
             features: this.features,
             commands: this.infos,
+            defaultEdge: this.defaultEdge,
         };
     }
 
@@ -407,6 +412,21 @@ export class FlowModelBus {
     ): { result: CommandResult<unknown>; payload: unknown } {
         const { draft, dryRun, options } = execution;
         const definition = this.definitions.get(command);
+        // the default edge fields go under what an `edge.add` gives, before anything sees it
+        if (
+            command === "edge.add" &&
+            this.defaultEdge !== undefined &&
+            isObject(payload)
+        ) {
+            payload = {
+                ...this.defaultEdge,
+                ...Object.fromEntries(
+                    Object.entries(payload).filter(
+                        ([, value]) => value !== undefined,
+                    ),
+                ),
+            };
+        }
         if (!definition) {
             return {
                 result:

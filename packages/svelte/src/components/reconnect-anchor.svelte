@@ -27,7 +27,8 @@
 <!--
     @component
     An edge end's grab area (`data-flow-part="reconnect-anchor"`, `data-end`): an SVG circle at the
-    end, inside `Flow.Edge`. With `reconnection()`, a press on it moves that end to another handle.
+    end, inside `Flow.Edge`. With `reconnection()`, a press on it moves that end to another handle;
+    an end its edge's `reconnectable` keeps fixed (`false`, or the other end's name) draws none.
     Transparent by default; give it its radius (`r`, default 10) and look.
 -->
 <script lang="ts">
@@ -63,6 +64,8 @@
                       end,
                   }),
                   reconnecting: engine.is("edge-reconnecting", { edgeId }),
+                  // `reconnectable: "source"` (or `"target"`, or false): no anchor at the other end
+                  movable: context.model.is("edge-reconnectable", { edgeId, end }),
               }
             : undefined;
     });
@@ -72,7 +75,7 @@
     const partState = $derived.by((): ReconnectAnchorState | undefined => {
         const current = path.current;
         const own = view.current;
-        return current && own
+        return current && own?.movable
             ? {
                   edgeId: edgeIdOf(),
                   end,

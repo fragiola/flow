@@ -51,6 +51,8 @@
         side,
         handleId,
         connectable,
+        connectableStart,
+        connectableEnd,
         nodeId,
         children,
         render,
@@ -65,6 +67,8 @@
         side,
         handleId,
         connectable,
+        connectableStart,
+        connectableEnd,
         nodeId,
     }));
     const refs = refProps((element) => {

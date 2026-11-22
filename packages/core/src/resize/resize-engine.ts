@@ -272,7 +272,7 @@ export function resizeEngine(
         // the flow point pressed: an auto-pan moves the flow under a still pointer
         const anchor = host.toFlow(client);
         return {
-            autoPan: true,
+            autoPan: "resize",
             move: (event) => {
                 const pointer = host.toFlow({
                     x: event.clientX,
@@ -286,6 +286,12 @@ export function resizeEngine(
                     if (delta.x === 0 && delta.y === 0) return;
                     active = true;
                     resizing = start.nodeId;
+                    host.emit({
+                        type: "resize-start",
+                        nodeId: start.nodeId,
+                        width: start.rect.width,
+                        height: start.rect.height,
+                    });
                 }
                 const rect = kept(
                     start,
@@ -316,6 +322,7 @@ export function resizeEngine(
                 run(stepOf(start, start.rect), false);
                 // the children go back to where they were
                 host.changed();
+                host.emit({ type: "resize-cancel", nodeId: start.nodeId });
             },
             active: () => active,
         };

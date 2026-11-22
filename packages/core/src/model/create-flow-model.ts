@@ -12,9 +12,15 @@ import type {
     RunOptions,
 } from "../commands/types";
 import { type CreateId, IdSource } from "../document/create-id";
+import { edgeSchema } from "../document/document-schema";
 import { FlowValidationError } from "../document/flow-validation-error";
 import { loadDocument } from "../document/load-document";
-import type { AnyTypes, FlowJson, FlowTypes } from "../document/types";
+import type {
+    AnyTypes,
+    FlowEdgeInput,
+    FlowJson,
+    FlowTypes,
+} from "../document/types";
 import { composeFeatures, registerFeatures } from "../features/registry";
 import type {
     CommandNameOf,
@@ -22,6 +28,9 @@ import type {
     ModelGetKeyOf,
     ModelIsKeyOf,
 } from "../features/types";
+import { validate } from "../schema/validator";
+import { cloneJson } from "../state/clone-json";
+import { deepFreeze } from "../state/deep-freeze";
 import type {
     ModelGetPayload,
     ModelGetResult,
@@ -101,8 +110,22 @@ export interface FlowModel<
     subscribe(listener: CommandListener<T>): () => void;
 }
 
+/**
+ * The fields `edge.add` fills in when its payload leaves them out (the `defaultEdgeOptions` model
+ * option): an edge's type, data, `zIndex` and flags, never its id or its ends.
+ */
+export type DefaultEdgeOptions<T extends FlowTypes = AnyTypes> = Partial<
+    Omit<
+        FlowEdgeInput<T>,
+        "id" | "source" | "target" | "sourceHandle" | "targetHandle"
+    >
+>;
+
 /** Options of {@link createFlowModel}. */
-export interface FlowModelOptions<F extends FlowFeatures = readonly []> {
+export interface FlowModelOptions<
+    F extends FlowFeatures = readonly [],
+    T extends FlowTypes = AnyTypes,
+> {
     /**
      * the opt-in features (`[selection(), subflows()]`), each from its own entry
      * (`@fragiola/flow/<feature>`): fixed for the model's life. Without them, a bare flow
@@ -112,6 +135,12 @@ export interface FlowModelOptions<F extends FlowFeatures = readonly []> {
     createId?: CreateId | undefined;
     /** freeze the document (default true) */
     freeze?: boolean | undefined;
+    /**
+     * the fields every `edge.add` fills in where its payload leaves them out, before the
+     * middleware sees it (`{ type: "smoothstep" }`: a connection's new edges are smooth steps);
+     * the document's edges are loaded as they are. An invalid one throws a `TypeError`
+     */
+    defaultEdgeOptions?: DefaultEdgeOptions<T> | undefined;
 }
 
 const EMPTY_FLOW: FlowJson = { version: 1, nodes: [], edges: [] };
@@ -126,15 +155,22 @@ const EMPTY_FLOW: FlowJson = { version: 1, nodes: [], edges: [] };
 export function createFlowModel<
     T extends FlowTypes = AnyTypes,
     const F extends FlowFeatures = readonly [],
->(json?: FlowJson<T>, options: FlowModelOptions<F> = {}): FlowModel<T, F> {
+>(json?: FlowJson<T>, options: FlowModelOptions<F, T> = {}): FlowModel<T, F> {
     const features = composeFeatures(options.features);
+    const defaults = edgeDefaults(options.defaultEdgeOptions);
     const ids = new IdSource(options.createId);
     const freeze = options.freeze ?? true;
     const loaded = loadDocument(json ?? EMPTY_FLOW, ids, features, freeze);
     if (!loaded.ok) {
         throw new FlowValidationError(loaded.issues);
     }
-    const bus = new FlowModelBus(loaded.indexed, ids, features, freeze);
+    const bus = new FlowModelBus(
+        loaded.indexed,
+        ids,
+        features,
+        freeze,
+        defaults,
+    );
     // the verbs only, bound: the surface stays exact (the bus's internals are not reachable)
     const model = Object.freeze({
         run: bus.run,
@@ -148,4 +184,36 @@ export function createFlowModel<
     }) as unknown as FlowModel<T, F>;
     registerFeatures(model, features);
     return model;
+}
+
+/** The default edge fields, checked against the edge schema once (a copy, frozen). */
+function edgeDefaults(
+    defaults: object | undefined,
+): Readonly<Record<string, unknown>> | undefined {
+    if (defaults === undefined) return undefined;
+    const copy = cloneJson(defaults) as Record<string, unknown>;
+    for (const key of [
+        "id",
+        "source",
+        "target",
+        "sourceHandle",
+        "targetHandle",
+    ]) {
+        if (key in copy) {
+            throw new TypeError(
+                `defaultEdgeOptions cannot set "${key}": an edge's id and ends are its own`,
+            );
+        }
+    }
+    const issues = validate(
+        edgeSchema,
+        { source: "a", target: "b", ...copy },
+        "/defaultEdgeOptions",
+    );
+    if (issues.length > 0) {
+        throw new TypeError(
+            `defaultEdgeOptions is not valid: ${issues.map((issue) => `${issue.path} ${issue.message}`).join("; ")}`,
+        );
+    }
+    return deepFreeze(copy);
 }

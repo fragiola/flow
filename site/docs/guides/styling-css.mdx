@@ -74,7 +74,7 @@ Every part's name is on its API page; the most used are `root`, `viewport`, `nod
 | `data-handle-type`, `data-side` | handle | `source` / `target`; `top`, `right`, `bottom`, `left` |
 | `data-reconnecting` | edge, edge path, reconnect anchor | one of its ends is being moved (`reconnection()`) |
 | `data-panning`, `data-selecting` | root | a pan, a box selection is under way |
-| `data-interactive` | root, toggle | the flow may be changed (absent while locked) |
+| `data-interactive` | root, toggle | the flow may be changed: absent from the root while `interactive` is off, from the toggle while it is locked |
 | `data-disabled` | zoom and fit buttons | the engine refuses the action now |
 | `data-position`, `data-end` | resize handle, reconnect anchor | which corner or side, which end |
 

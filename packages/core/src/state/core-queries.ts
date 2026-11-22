@@ -1,7 +1,7 @@
 // The core's `get` and `is` keys, answered from the committed document. A feature's keys are its
 // own (`FlowFeature.get` / `is`); the model asks them through its composed features.
 import type { CommandInfo } from "../commands/types";
-import { edgeFlag, nodeFlag } from "../document/flags";
+import { edgeFlag, nodeFlag, reconnectableEnd } from "../document/flags";
 import type {
     EdgeFlags,
     FlowDocumentJson,
@@ -19,6 +19,8 @@ export interface QueryContext {
     readonly reader: FlowReader;
     readonly features: ComposedFeatures;
     readonly commands: readonly CommandInfo[];
+    /** the fields `edge.add` fills in (`defaultEdgeOptions`) */
+    readonly defaultEdge?: Readonly<Record<string, unknown>> | undefined;
 }
 
 /** A string field of a payload of unknown shape (a key's payload is not validated). */
@@ -110,7 +112,8 @@ export const CORE_GET: Readonly<
             edges: [...reader.edges()],
         }),
     commands: ({ commands }) => commands,
-    "commands-to": ({ reader, commands }, payload) => {
+    "commands-to": (context, payload) => {
+        const { reader, commands } = context;
         const target = (
             typeof payload === "object" && payload !== null ? payload : {}
         ) as CommandsToPayload;
@@ -121,6 +124,7 @@ export const CORE_GET: Readonly<
                 edges: Array.isArray(target.edges) ? target.edges : undefined,
             },
             new Set(commands.map((command) => command.name)),
+            context.defaultEdge,
         );
     },
 };
@@ -153,5 +157,13 @@ export const CORE_IS: Readonly<
     "edge-selectable": edgeAsks("selectable"),
     "edge-deletable": edgeAsks("deletable"),
     "edge-hidden": edgeAsks("hidden"),
-    "edge-reconnectable": edgeAsks("reconnectable"),
+    "edge-reconnectable": ({ reader }: QueryContext, payload: unknown) => {
+        const edgeId = stringOf(payload, "edgeId");
+        const edge = edgeId === undefined ? undefined : reader.edge(edgeId);
+        if (edge === undefined) return false;
+        const end = stringOf(payload, "end");
+        return end === "source" || end === "target"
+            ? reconnectableEnd(edge, end)
+            : edgeFlag(edge, "reconnectable");
+    },
 };

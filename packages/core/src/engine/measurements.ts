@@ -205,12 +205,17 @@ export class Measurements {
 
     private view(entry: RegisteredHandle): FlowHandle {
         const { registration, bounds } = entry;
+        const connectable = registration.connectable !== false;
         return {
             nodeId: registration.nodeId,
             handleId: registration.handleId,
             type: registration.type,
             side: registration.side,
-            connectable: registration.connectable !== false,
+            connectable,
+            connectableStart:
+                connectable && registration.connectableStart !== false,
+            connectableEnd:
+                connectable && registration.connectableEnd !== false,
             center: undefined,
             bounds,
         };

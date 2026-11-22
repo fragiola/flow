@@ -5,10 +5,13 @@
         type CreateId,
         createFlowEngine,
         createFlowModel,
+        type DefaultEdgeOptions,
+        ENGINE_EVENT_CALLBACKS,
         type FitViewPayload,
         type FlowEdge,
         type FlowEdgeInput,
         type FlowEngine,
+        type FlowEngineEventOf,
         type FlowEngineOptions,
         type FlowFeatures,
         type FlowModel,
@@ -60,13 +63,43 @@
         | "nodeExtent"
         | "elevateNodesOnSelect"
         | "elevateEdgesOnSelect"
+        | "paneClickDistance"
+        | "nodeClickDistance"
+        | "preventScrolling"
+        | "nodesFocusable"
+        | "edgesFocusable"
     >;
+
+    type Callbacks = typeof ENGINE_EVENT_CALLBACKS;
+
+    /**
+     * The root's event callbacks, one per engine event (`ENGINE_EVENT_CALLBACKS`), lowercase as
+     * Svelte's event props: `onnodeclick`, `onmovestart`, `onconnectcancel`, … each called with
+     * the event.
+     */
+    export type RootEventProps = {
+        [K in keyof Callbacks as `on${Lowercase<Callbacks[K]>}`]?:
+            | ((event: FlowEngineEventOf<K>) => void)
+            | undefined;
+    };
+
+    /** Each engine event's callback prop, from the core's table (`node-click` → `onnodeclick`). */
+    const CALLBACK_BY_TYPE: ReadonlyMap<string, string> = new Map(
+        Object.entries(ENGINE_EVENT_CALLBACKS).map(([type, name]) => [
+            type,
+            `on${name.toLowerCase()}`,
+        ]),
+    );
+    const CALLBACK_PROPS: ReadonlySet<string> = new Set(
+        CALLBACK_BY_TYPE.values(),
+    );
 
     export interface RootProps<
         T extends FlowTypes = AnyTypes,
         F extends FlowFeatures = readonly [],
     > extends Omit<DivPrimitiveProps<RootState>, "children">,
-            RootEngineProps {
+            RootEngineProps,
+            RootEventProps {
         /**
          * the flow model. Its middleware (`model.use`) sees every command the flow runs, and its
          * listeners (`model.subscribe`) every change. Give it, or let the root create one from
@@ -98,6 +131,11 @@
         features?: F | undefined;
         /** the id generator of the model the root creates (read once, at mount) */
         createId?: CreateId | undefined;
+        /**
+         * the fields every `edge.add` of the model the root creates fills in where it leaves them
+         * out (read once, at mount: the model option `defaultEdgeOptions`)
+         */
+        defaultEdgeOptions?: DefaultEdgeOptions<T> | undefined;
         /**
          * controlled viewport (`bind:viewport`, or `viewport` with `onviewportchange`): a new value
          * is set on the engine (`set-viewport`), every change is written back
@@ -178,6 +216,7 @@
         onedgeschange,
         features,
         createId,
+        defaultEdgeOptions,
         viewport = $bindable(),
         defaultViewport,
         onviewportchange,
@@ -205,6 +244,11 @@
         nodeExtent,
         elevateNodesOnSelect,
         elevateEdgesOnSelect,
+        paneClickDistance,
+        nodeClickDistance,
+        preventScrolling,
+        nodesFocusable,
+        edgesFocusable,
         children,
         render,
         class: className,
@@ -233,6 +277,7 @@
                 {
                     features: plainList(features) as F | undefined,
                     createId,
+                    defaultEdgeOptions: plain(defaultEdgeOptions),
                 },
             ),
         );
@@ -275,6 +320,11 @@
         nodeExtent: plain(nodeExtent),
         elevateNodesOnSelect,
         elevateEdgesOnSelect,
+        paneClickDistance,
+        nodeClickDistance,
+        preventScrolling,
+        nodesFocusable,
+        edgesFocusable,
     });
     // the viewport a new engine starts at: the last one's (another model), else the props'
     let start: Viewport = untrack(() =>
@@ -429,7 +479,15 @@
         const stops = [
             created.adapter.subscribe(bump),
             created.subscribe((event) => {
-                if (event.type !== "viewport-change") return;
+                if (event.type !== "viewport-change") {
+                    // the event's callback (`onnodeclick`, `onmovestart`, …): the latest prop
+                    const name = CALLBACK_BY_TYPE.get(event.type);
+                    const callback = name
+                        ? untrack(() => (rest as Record<string, unknown>)[name])
+                        : undefined;
+                    if (typeof callback === "function") callback(event);
+                    return;
+                }
                 start = event.viewport;
                 // a copy: the engine's viewport is frozen, and a parent's deep `$state` would proxy it
                 if (viewport !== undefined) viewport = { ...event.viewport };
@@ -533,6 +591,14 @@
         return () => live.adapter.detachRoot();
     };
 
+    // the consumer's props for the element, without the event callbacks (never a listener of an
+    // element event `nodeclick`); a spread keeps the symbol keys (the consumer's `{@attach}`)
+    const elementRest = $derived.by(() => {
+        const copy: Record<string | symbol, unknown> = { ...rest };
+        for (const name of CALLBACK_PROPS) delete copy[name];
+        return copy as typeof rest;
+    });
+
     const attributes = flowValue(context, () =>
         engine ? engine.adapter.attributes("root") : partAttributes("root"),
     );
@@ -550,7 +616,7 @@
     });
     const attrs: RenderedProps<HTMLDivElement> = $derived(
         elementProps({
-            rest,
+            rest: elementRest,
             className,
             style,
             state: partState,

@@ -25,7 +25,8 @@ import { styles } from "./styles";
 // over what the root does not show; dragging in it pans the flow, the wheel over it zooms.
 // `Flow.Controls` groups the buttons; each runs one engine action and is disabled while the engine
 // refuses it (at the zoom limits); `duration` animates its change over 200 ms. The lock
-// (`Flow.ToggleInteractive`) stops every gesture that changes the flow; pan and zoom stay.
+// (`Flow.ToggleInteractive`) turns dragging, connecting and selecting off (`set-interactive`'s
+// switches, React Flow's interactive button); pan and zoom stay.
 
 interface Types extends FlowTypes {
     readonly nodes: { city: { label: string } };

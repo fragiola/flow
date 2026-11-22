@@ -2,8 +2,14 @@
     import type { Snippet } from "svelte";
     import type { ButtonPrimitiveProps } from "../utils/render.js";
 
+    /** The switches the lock turns off and on (React Flow's: dragging, connecting, selecting). */
+    const LOCKED_KINDS = ["drag", "connect", "select"] as const;
+
     export interface ToggleInteractiveState {
-        /** the gestures and keys may change the flow */
+        /**
+         * the flow is not locked: it is interactive and one of dragging, connecting and selecting
+         * at least is on (`interactive-by`)
+         */
         readonly interactive: boolean;
     }
 
@@ -20,8 +26,10 @@
 <!--
     @component
     A toggle button (`data-flow-part="toggle-interactive"`, `aria-pressed` while the flow is
-    locked, `data-interactive`): locks and unlocks the flow (`set-interactive`): while locked,
-    gestures and keys change nothing, pan and zoom stay. It renders only its children.
+    locked, `data-interactive`): locks and unlocks the flow, React Flow's interactive button:
+    locking turns dragging, connecting and selecting off (`set-interactive { drag, connect,
+    select }`), unlocking turns them and `interactive` on; pan and zoom stay. It renders only its
+    children.
 -->
 <script lang="ts">
     import { useFlowContext } from "../context.js";
@@ -42,16 +50,22 @@
     }: ToggleInteractiveProps = $props();
 
     const context = useFlowContext("ToggleInteractive");
-    const interactive = flowValue(context, () =>
-        context.engine ? context.engine.is("interactive") : true,
-    );
+    const interactive = flowValue(context, () => {
+        const engine = context.engine;
+        return engine
+            ? LOCKED_KINDS.some((kind) => engine.is("interactive-by", { kind }))
+            : true;
+    });
     const refs = refProps((element) => {
         ref = element as HTMLButtonElement | null;
     });
     const onclick = () => {
-        context.engine?.run("set-interactive", {
-            interactive: !interactive.current,
-        });
+        context.engine?.run(
+            "set-interactive",
+            interactive.current
+                ? { drag: false, connect: false, select: false }
+                : { interactive: true, drag: true, connect: true, select: true },
+        );
     };
     const partState = $derived<ToggleInteractiveState>({
         interactive: interactive.current,

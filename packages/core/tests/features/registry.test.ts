@@ -173,7 +173,11 @@ describe("the feature registry", () => {
 
 describe("the feature factories", () => {
     it("resolve their options with defaults, frozen", () => {
-        expect(drag().options).toEqual({ snapGrid: undefined, threshold: 1 });
+        expect(drag().options).toEqual({
+            snapGrid: undefined,
+            threshold: 1,
+            selectOnDrag: true,
+        });
         expect(drag({ snapGrid: [10, 10] }).options.snapGrid).toEqual([10, 10]);
         expect(resize({ minWidth: 40 }).options).toEqual({
             minWidth: 40,
@@ -186,6 +190,8 @@ describe("the feature factories", () => {
             radius: 20,
             mode: "strict",
             clickToConnect: false,
+            threshold: 1,
+            lineType: "bezier",
         });
         expect(reconnection().options).toEqual({ radius: 10 });
         expect(reconnection().requires).toEqual(["connection"]);
@@ -193,6 +199,8 @@ describe("the feature factories", () => {
             step: 1,
             fastStep: 20,
             deleteKeys: ["Delete", "Backspace"],
+            panOnFocus: true,
+            beforeDelete: undefined,
         });
         expect(minimap().options).toEqual({
             pannable: true,

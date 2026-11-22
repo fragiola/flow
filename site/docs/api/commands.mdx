@@ -33,6 +33,7 @@ Adds a node at the end of the drawing order: its type, position and data, option
 | `connectable` | `boolean` | no | edges may start or end at it (`edge.add`, `edge.reconnect`); default true |
 | `deletable` | `boolean` | no | it may be removed (`node.remove`, `selection.remove`); default true |
 | `hidden` | `boolean` | no | it is not shown; default false |
+| `focusable` | `boolean` | no | it takes DOM focus (with the keyboard feature); default true |
 | `selected` | `boolean` | no | it is selected (requires the selection feature) |
 | `parentId` | `string` | no | the node it lives in, its position relative to it (requires the subflows feature) |
 | `extent` | `"parent" \| object` | no | "parent": it stays inside its parent's box; a rectangle (x, y, width, height): it stays inside it, in the coordinates of its position (requires the subflows feature) |
@@ -201,7 +202,7 @@ model.run("node.set-data", {
 
 ### `node.set-flags`
 
-Sets some of a node's flags (draggable, selectable, connectable, deletable, hidden); the others stay. A node made unselectable is deselected.
+Sets some of a node's flags (draggable, selectable, connectable, deletable, hidden, focusable); the others stay. A node made unselectable is deselected.
 
 **Payload** (`NodeFlagsPayload`)
 
@@ -213,6 +214,7 @@ Sets some of a node's flags (draggable, selectable, connectable, deletable, hidd
 | `connectable` | `boolean` | no | edges may start or end at it (`edge.add`, `edge.reconnect`); default true |
 | `deletable` | `boolean` | no | it may be removed (`node.remove`, `selection.remove`); default true |
 | `hidden` | `boolean` | no | it is not shown; default false |
+| `focusable` | `boolean` | no | it takes DOM focus (with the keyboard feature); default true |
 
 **Result** (`{ nodeId: string }`)
 
@@ -320,7 +322,8 @@ Adds an edge from a source node to a target node, optionally between two of thei
 | `selectable` | `boolean` | no | it may be selected (`selection.set`); default true |
 | `deletable` | `boolean` | no | it may be removed (`edge.remove`, `selection.remove`); default true |
 | `hidden` | `boolean` | no | it is not shown; default false |
-| `reconnectable` | `boolean` | no | its ends may be moved to other nodes (`edge.reconnect`); default true |
+| `reconnectable` | `boolean \| "source" \| "target"` | no | its ends may be moved to other nodes or handles (`edge.reconnect`): both (true), none (false), or only its "source" or its "target" end; default true |
+| `focusable` | `boolean` | no | it takes DOM focus (with the keyboard feature); default true |
 | `selected` | `boolean` | no | it is selected (requires the selection feature) |
 
 **Result** (`{ edgeId: string }`)
@@ -405,7 +408,7 @@ model.run("edge.set-data", {
 
 ### `edge.set-flags`
 
-Sets some of an edge's flags (selectable, deletable, hidden, reconnectable); the others stay. An edge made unselectable is deselected.
+Sets some of an edge's flags (selectable, deletable, hidden, reconnectable, focusable); the others stay. An edge made unselectable is deselected.
 
 **Payload** (`EdgeFlagsPayload`)
 
@@ -415,7 +418,8 @@ Sets some of an edge's flags (selectable, deletable, hidden, reconnectable); the
 | `selectable` | `boolean` | no | it may be selected (`selection.set`); default true |
 | `deletable` | `boolean` | no | it may be removed (`edge.remove`, `selection.remove`); default true |
 | `hidden` | `boolean` | no | it is not shown; default false |
-| `reconnectable` | `boolean` | no | its ends may be moved to other nodes (`edge.reconnect`); default true |
+| `reconnectable` | `boolean \| "source" \| "target"` | no | its ends may be moved to other nodes or handles (`edge.reconnect`): both (true), none (false), or only its "source" or its "target" end; default true |
+| `focusable` | `boolean` | no | it takes DOM focus (with the keyboard feature); default true |
 
 **Result** (`{ edgeId: string }`)
 
@@ -468,7 +472,7 @@ model.run("edge.set-z-index", {
 
 ### `edge.reconnect`
 
-Moves an edge's ends: its new source and target nodes and, optionally, handles (a handle left out is none). Its id, type and data stay. Refused when the edge is not reconnectable, a node is not connectable, or another edge already joins the same handles.
+Moves an edge's ends: its new source and target nodes and, optionally, handles (a handle left out is none). Its id, type and data stay. Refused when the edge is not reconnectable (or an end it moves is not: `reconnectable` "source" or "target"), a node is not connectable, or another edge already joins the same handles.
 
 It comes with the reconnection feature: install `reconnection()` from `@fragiola/flow/reconnection` (without it, the command is `not_found`).
 

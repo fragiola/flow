@@ -6,8 +6,22 @@
 import type { XY } from "../document/types";
 import type { Size } from "../geometry/viewport-math";
 
-/** How auto-pan pans (`autoPan: { speed, margin }`). */
+/** The gestures auto-pan follows, each of which may be turned off alone. */
+export type AutoPanGesture = "node" | "connect" | "selection" | "resize";
+
+/**
+ * How auto-pan pans (`autoPan: { speed, margin }`), and which gestures it follows (each one left
+ * out does: `{ connect: false }` keeps the view still while drawing an edge).
+ */
 export interface AutoPanOptions {
+    /** a node drag; default true */
+    node?: boolean | undefined;
+    /** a connection or a reconnection; default true */
+    connect?: boolean | undefined;
+    /** a selection box; default true */
+    selection?: boolean | undefined;
+    /** a resize; default true */
+    resize?: boolean | undefined;
     /** the pixels a frame it pans with the pointer at the edge (or past it); default 10 */
     speed?: number | undefined;
     /** how near the edge (in pixels) the pointer starts it; default 30 */
@@ -16,6 +30,18 @@ export interface AutoPanOptions {
 
 const DEFAULT_SPEED = 10;
 const DEFAULT_MARGIN = 30;
+
+/** Whether auto-pan follows a gesture of a kind (`true`: one that names no kind) under `option`. */
+export function autoPans(
+    option: boolean | AutoPanOptions | undefined,
+    gesture: boolean | AutoPanGesture | undefined,
+): boolean {
+    if (gesture === undefined || gesture === false || option === false)
+        return false;
+    if (gesture === true || option === true || option === undefined)
+        return true;
+    return option[gesture] !== false;
+}
 
 /**
  * The viewport offset of one auto-pan frame (zero when it does not pan) for a pointer at `point`

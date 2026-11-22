@@ -24,6 +24,10 @@ export interface UseHandleOptions {
     handleId?: string | undefined;
     /** whether a connection may start or end here; default true */
     connectable?: boolean | undefined;
+    /** whether a connection may start here (a drag, a tap, a key); default true */
+    connectableStart?: boolean | undefined;
+    /** whether a connection may end here (be its target); default true */
+    connectableEnd?: boolean | undefined;
     /** its node; default the enclosing `Flow.Node`'s */
     nodeId?: string | undefined;
 }
@@ -36,6 +40,10 @@ export interface HandleState {
     readonly side: HandleSide;
     /** a connection may start or end here (its flag and its node's): `data-connectable` */
     readonly connectable: boolean;
+    /** a connection may start here: `data-connectable-start` */
+    readonly connectableStart: boolean;
+    /** a connection may end here: `data-connectable-end` */
+    readonly connectableEnd: boolean;
     /** the connection under way starts here (`connection()`): `data-connecting` */
     readonly connecting: boolean;
     /** the connection under way would end here and be accepted: `data-valid` */
@@ -65,6 +73,8 @@ function registrationKey(registration: HandleRegistration): string {
         registration.type,
         registration.side,
         registration.connectable ?? null,
+        registration.connectableStart ?? null,
+        registration.connectableEnd ?? null,
     ]);
 }
 
@@ -79,8 +89,23 @@ export function useHandle(
     const nodeIdOf = useNodeId("Handle", () => toValue(options).nodeId);
     // the last object while its fields stay: a new one registers the handle again
     const registration = computed<HandleRegistration>((previous) => {
-        const { type, side, handleId, connectable } = toValue(options);
-        const next = { nodeId: nodeIdOf(), handleId, type, side, connectable };
+        const {
+            type,
+            side,
+            handleId,
+            connectable,
+            connectableStart,
+            connectableEnd,
+        } = toValue(options);
+        const next = {
+            nodeId: nodeIdOf(),
+            handleId,
+            type,
+            side,
+            connectable,
+            connectableStart,
+            connectableEnd,
+        };
         return previous !== undefined &&
             registrationKey(previous) === registrationKey(next)
             ? previous
@@ -116,6 +141,8 @@ export function useHandle(
             type: value.type,
             side: value.side,
             connectable: current["data-connectable"] !== undefined,
+            connectableStart: current["data-connectable-start"] !== undefined,
+            connectableEnd: current["data-connectable-end"] !== undefined,
             connecting: current["data-connecting"] !== undefined,
             valid: current["data-valid"] !== undefined,
             invalid: current["data-invalid"] !== undefined,

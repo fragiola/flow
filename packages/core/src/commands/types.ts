@@ -43,6 +43,7 @@ export interface NodeFlagsPayload {
     connectable?: boolean;
     deletable?: boolean;
     hidden?: boolean;
+    focusable?: boolean;
 }
 
 /** The flags `edge.set-flags` sets: each one given is written, the others stay. */
@@ -51,7 +52,8 @@ export interface EdgeFlagsPayload {
     selectable?: boolean;
     deletable?: boolean;
     hidden?: boolean;
-    reconnectable?: boolean;
+    reconnectable?: boolean | "source" | "target";
+    focusable?: boolean;
 }
 
 /** Where an edge goes: its nodes and, optionally, their handles. */

@@ -46,6 +46,12 @@ export function typed() {
             ],
             "onUpdate:nodes": (nodes: readonly FlowNode<Types>[]) =>
                 nodes[0]?.type,
+            // one event per engine event (#33), with its event (`@node-click` in a template)
+            onNodeClick: (event) => event.nodeId,
+            onMoveStart: (event) => event.viewport.zoom,
+            onInit: (event) => event.type === "ready",
+            // @ts-expect-error: a pane click has no node
+            onPaneClick: (event) => event.nodeId,
         },
         () =>
             h(Flow.Viewport, null, () => [

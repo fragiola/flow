@@ -167,6 +167,7 @@ element drags only from it, and a dragged node's box stays inside its `extent` a
 | --- | --- | --- | --- |
 | `snapGrid` | `[number, number]` | none | the grid a dragged node snaps to, in flow units (the others move by the same offset) |
 | `threshold` | `number` | `1` | how far, in pixels, a press moves before it is a drag |
+| `selectOnDrag` | `boolean` | `true` | a drag of a node that is not selected selects it first (it is then dragged alone); `false` drags it unselected and keeps the selection |
 
 ## `connection()`
 
@@ -183,6 +184,8 @@ adds `"connection"` and `"connecting"` to the engine.
 | `radius` | `number` | `20` | how near, in screen pixels, a handle must be for the drop to snap to it |
 | `mode` | `ConnectionMode` | `"strict"` | `"strict"`: a source ends at a target (or the reverse); `"loose"`: at any other handle |
 | `clickToConnect` | `boolean` | `false` | a tap on a handle starts a connection that follows the pointer (`connection`, `data-connecting`); a tap on another handle ends it like a drop (the same validity and events), a tap elsewhere, Escape or `cancel-gesture` cancels it |
+| `threshold` | `number` | `1` | how far, in pixels, a press on a handle moves before it draws a connection (with `clickToConnect`, a press within the engine's `nodeClickDistance` stays a tap) |
+| `lineType` | `BuiltInEdgeType` | `"bezier"` | the connection line's path (`"bezier"`, `"simplebezier"`, `"smoothstep"`, `"step"`, `"straight"`), with the engine's `pathOptions` |
 
 ## `reconnection()`
 
@@ -251,6 +254,8 @@ with Shift) in one `node.resize` step, within the resizer's limits (a `"resize"`
 | `step` | `number` | `5` | how far an arrow moves a node (with `resize()`, a focused resize handle's sides), in flow units |
 | `fastStep` | `number` | `20` | how far Shift with an arrow moves it (or the sides) |
 | `deleteKeys` | `string[]` | `["Delete", "Backspace"]` | the keys (`KeyboardEvent.key` or `.code`) that remove the selection; `[]` for none |
+| `panOnFocus` | `boolean` | `true` | a node that takes focus is panned into view when it is not wholly in it |
+| `beforeDelete` | `BeforeDelete` | none | asked before a delete key removes anything, with the nodes and the edges it would remove (a removed node's edges among them): `true` removes them, `false` nothing, a `{ nodes, edges }` subset only those (never more); a promise of one waits (the key is taken at once, another delete key meanwhile does nothing) and, when it resolves, removes in one step what is still there (`DeleteDecision`) |
 
 ## `minimap()`
 
@@ -329,8 +334,8 @@ and `engine(host)`, its part of each engine.
 | type | is |
 | --- | --- |
 | `FeatureEngine` | what a feature adds to one engine: `run`, `get` and `is` keys, and the hooks `pointerdown`, `tap`, `wheel`, `keydown`, `focus`, `attributes`, `attached`, `detached`, `destroy`, walked in install order |
-| `FeatureEngineHost` | what the engine lends its features: the model (as a `FeatureModel`), a `shared` slot, the root, the viewport, measured rects and handles, edge paths, `absolutePosition`, `positionFor`, `extentOf`, `keepInExtent`, `held`, `interactive`, `partOptions`, `changed` and `emit` |
-| `FeatureGesture` | what a `pointerdown` that takes the press returns: `move`, `end`, `cancel` and `active`; the engine owns the capture, Escape, a cancel and a missed release |
+| `FeatureEngineHost` | what the engine lends its features: the model (as a `FeatureModel`), a `shared` slot, the root, the viewport, measured rects and handles, edge paths, `absolutePosition`, `positionFor`, `extentOf`, `keepInExtent`, `held`, `interactive`, `allows` (a kind's `set-interactive` switch), `tapDistance`, `focusable`, `toClient`, `path` (a built-in edge path with the engine's `pathOptions`), `partOptions`, `changed` and `emit` |
+| `FeatureGesture` | what a `pointerdown` that takes the press returns: `move`, `end`, `cancel` and `active`, and `autoPan` (`true`, or the `AutoPanGesture` it is: `"node"`, `"connect"`, `"selection"`, `"resize"`); the engine owns the capture, Escape, a cancel and a missed release |
 | `FeatureModel` | the model's verbs as a feature's engine side calls them, typed loosely |
 | `FlowReader` | `nodes()`, `edges()`, `node(id)`, `edge(id)` of a document |
 | `FeatureNamesOf<F>` | the names of a list's features |

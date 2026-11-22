@@ -7,7 +7,6 @@
 // starts a keyboard connection (its keys are the keyboard's; the session's `keyboard`).
 import { connectSessionOf } from "../connect-session/connect-session";
 import type { FlowHandle, PressTarget } from "../engine/adapter";
-import { TAP_TOLERANCE } from "../engine/tap";
 import { keyboardLinks } from "../features/keyboard-links";
 import type { FeatureEngine, FeatureEngineHost } from "../features/types";
 import type { ConnectionOptions } from "./connection";
@@ -20,13 +19,14 @@ export function connectionEngine(
     const session = connectSessionOf(host);
     session.radius = options.radius;
     session.mode = options.mode;
+    session.lineType = options.lineType;
 
     /** The handle a press or a tap on `target` starts a connection from, if it may. */
     const startable = (target: PressTarget): FlowHandle | undefined => {
         const handle = target.handle;
         return target.kind === "handle" &&
-            handle?.connectable === true &&
-            host.interactive() &&
+            handle?.connectableStart === true &&
+            host.allows("connect") &&
             session.current() === null &&
             host.model.is("node-connectable", { nodeId: handle.nodeId })
             ? handle
@@ -52,8 +52,13 @@ export function connectionEngine(
                       { from: handle },
                       { x: event.clientX, y: event.clientY },
                       options.clickToConnect
-                          ? { tolerance: TAP_TOLERANCE }
-                          : {},
+                          ? {
+                                tolerance: Math.max(
+                                    host.tapDistance("node"),
+                                    options.threshold,
+                                ),
+                            }
+                          : { threshold: options.threshold },
                   )
                 : undefined;
         },

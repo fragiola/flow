@@ -97,7 +97,7 @@ export type {
     PressTarget,
     ViewChange,
 } from "./engine/adapter";
-export type { AutoPanOptions } from "./engine/auto-pan";
+export type { AutoPanGesture, AutoPanOptions } from "./engine/auto-pan";
 export {
     createFlowEngine,
     type FlowEngine,
@@ -105,11 +105,25 @@ export {
     type PanOnScrollMode,
 } from "./engine/create-flow-engine";
 export type { PathOptions } from "./engine/edge-geometry";
+export {
+    type CallbackEventType,
+    ENGINE_EVENT_CALLBACKS,
+    type EventCallbackName,
+} from "./engine/event-callbacks";
 export type {
+    ConnectionDrop,
+    ConnectionEnd,
     FlowEngineEvent,
+    FlowEngineEventOf,
     FlowEngineEventType,
+    FlowPointerInfo,
     MoveSource,
 } from "./engine/events";
+export type {
+    InteractionKind,
+    Interactivity,
+    InteractivityPayload,
+} from "./engine/interactivity";
 export type {
     BackgroundPattern,
     BackgroundPatternPayload,
@@ -195,6 +209,7 @@ export {
 export {
     type CommandArgs,
     createFlowModel,
+    type DefaultEdgeOptions,
     type DispatchOptions,
     type FlowModel,
     type FlowModelOptions,

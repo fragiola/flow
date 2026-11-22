@@ -153,10 +153,18 @@ describe("the viewport", () => {
             interactive: true,
             minZoom: 0.5,
         });
+        // an `interactive` that stays never undoes the lock (#33: the lock's switches)
         await click(byTestId(container, "lock"));
-        expect(part(container, "root")).not.toHaveAttribute("data-interactive");
+        expect(byTestId(container, "lock")).toHaveAttribute(
+            "aria-pressed",
+            "true",
+        );
         await set({ minZoom: 0.25 });
-        expect(part(container, "root")).not.toHaveAttribute("data-interactive");
+        expect(byTestId(container, "lock")).toHaveAttribute(
+            "aria-pressed",
+            "true",
+        );
+        expect(part(container, "root")).toHaveAttribute("data-interactive");
     });
 
     it("draws the background pattern at the viewport", async () => {

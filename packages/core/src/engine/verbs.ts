@@ -13,6 +13,11 @@ import type {
 import type { EdgePath, HandleSide, Rect, Viewport } from "../geometry/types";
 import type { NoPayload } from "../state/queries";
 import type { FlowHandle } from "./adapter";
+import type {
+    InteractionKind,
+    Interactivity,
+    InteractivityPayload,
+} from "./interactivity";
 
 /** Options of `fit-view` (and of the `fitView` engine option). */
 export interface FitViewPayload {
@@ -239,10 +244,15 @@ export interface EngineActionMap {
     };
     /** gives DOM focus to a node's element, panning it into view */
     "focus-node": { payload: { nodeId: string }; result: { nodeId: string } };
-    /** lets the gestures and keys change the flow, or not (the Controls' toggle); pan and zoom stay */
+    /**
+     * lets the gestures and keys change the flow, or not: all of them (`interactive`) or one kind
+     * (`drag`, `connect`, `select`, `reconnect`), the switches left out kept (the Controls' lock);
+     * pan and zoom stay. A switch turned off cancels the gesture under way. Its result is every
+     * switch
+     */
     "set-interactive": {
-        payload: { interactive: boolean };
-        result: { interactive: boolean };
+        payload: InteractivityPayload;
+        result: Interactivity;
     };
     /**
      * cancels the gesture under way (what Escape does) and stops a viewport animation where it is;
@@ -368,6 +378,10 @@ export type EngineGetResult<
 export interface EngineIsMap {
     /** the gestures and keys may change the flow (`set-interactive`) */
     interactive: NoPayload;
+    /** the gestures and keys of a kind may change the flow (`interactive` and that kind's switch) */
+    "interactive-by": { kind: InteractionKind };
+    /** the root has a size and every shown node was measured (the `ready` event came) */
+    ready: NoPayload;
     /** the viewport is being panned by a drag or a pinch */
     panning: NoPayload;
     /** a node's size is known (measured, or given by the document) */
@@ -386,9 +400,15 @@ export interface EngineIsMap {
     connecting: NoPayload;
     /** an edge's end is being moved (`reconnection()`) */
     "edge-reconnecting": { edgeId: string };
-    /** a node takes DOM focus (`tabindex="0"`, `keyboard()`) */
+    /**
+     * a node takes DOM focus (`tabindex="0"`, `keyboard()`): shown, its `focusable` not false and
+     * the `nodesFocusable` option on
+     */
     "node-focusable": { nodeId: string };
-    /** an edge takes DOM focus (`tabindex="0"`, `keyboard()`) */
+    /**
+     * an edge takes DOM focus (`tabindex="0"`, `keyboard()`): shown, its `focusable` not false and
+     * the `edgesFocusable` option on
+     */
     "edge-focusable": { edgeId: string };
 }
 

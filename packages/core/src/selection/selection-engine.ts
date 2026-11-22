@@ -97,7 +97,7 @@ export function selectionEngine(
         pointerdown: (event, target) => {
             if (
                 target.kind !== "pane" ||
-                !host.interactive() ||
+                !host.allows("select") ||
                 !(options.boxOnDrag || holds(options.boxKey, event))
             ) {
                 return undefined;
@@ -114,7 +114,8 @@ export function selectionEngine(
                 active: false,
             };
             return {
-                autoPan: true,
+                autoPan: "selection",
+                kind: "select",
                 move: (moved) => {
                     const current = box;
                     if (!current) return;
@@ -126,6 +127,11 @@ export function selectionEngine(
                         );
                         if (travel < 1) return;
                         current.active = true;
+                        host.emit({
+                            type: "box-select-start",
+                            client: start,
+                            point: current.anchor,
+                        });
                     }
                     const held = inBox(current);
                     if (
@@ -172,6 +178,7 @@ export function selectionEngine(
             };
         },
         tap: (event, target) => {
+            if (!host.allows("select")) return false;
             const toggle = options.multiple && holds(options.multiKey, event);
             const mode = toggle ? "toggle" : "replace";
             if (target.kind === "node" && target.nodeId !== undefined) {

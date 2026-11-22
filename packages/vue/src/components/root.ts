@@ -4,10 +4,13 @@ import {
     type CreateId,
     createFlowEngine,
     createFlowModel,
+    type DefaultEdgeOptions,
+    ENGINE_EVENT_CALLBACKS,
     type FitViewPayload,
     type FlowEdge,
     type FlowEdgeInput,
     type FlowEngine,
+    type FlowEngineEventOf,
     type FlowEngineOptions,
     type FlowFeatures,
     type FlowModel,
@@ -97,11 +100,26 @@ export type RootEngineProps = Omit<
         | "nodeExtent"
         | "elevateNodesOnSelect"
         | "elevateEdgesOnSelect"
+        | "paneClickDistance"
+        | "nodeClickDistance"
+        | "preventScrolling"
+        | "nodesFocusable"
+        | "edgesFocusable"
     >,
-    "panOnScrollSpeed"
+    "panOnScrollSpeed" | "paneClickDistance" | "nodeClickDistance"
 > & {
     /** the factor of the wheel's pixels when it pans; the attribute's text is its number */
     panOnScrollSpeed?: number | `${number}` | undefined;
+    /**
+     * how far (px) a press on the pane may move and still be a click; the attribute's text is its
+     * number
+     */
+    paneClickDistance?: number | `${number}` | undefined;
+    /**
+     * how far (px) a press on a node may move and still be a click; the attribute's text is its
+     * number
+     */
+    nodeClickDistance?: number | `${number}` | undefined;
 };
 
 export interface RootProps<
@@ -135,6 +153,11 @@ export interface RootProps<
     features?: F | undefined;
     /** the id generator of the model the root creates (read once, at mount) */
     createId?: CreateId | undefined;
+    /**
+     * the fields every `edge.add` of the model the root creates fills in where it leaves them out
+     * (read once, at mount: the model option `defaultEdgeOptions`)
+     */
+    defaultEdgeOptions?: DefaultEdgeOptions<T> | undefined;
     /** controlled viewport (`v-model:viewport`): a new value is set on the engine (`set-viewport`) */
     viewport?: Viewport | undefined;
     /** the viewport the flow starts at (read once, at mount); default `{ x: 0, y: 0, zoom: 1 }` */
@@ -150,7 +173,23 @@ export interface RootSlots extends RenderSlot<RootState> {
     default?: SlotFunction<{ state: RootState }>;
 }
 
-/** The events of `Flow.Root`: the controlled values, for `v-model` (or `@update:…`). */
+type Callbacks = typeof ENGINE_EVENT_CALLBACKS;
+
+/**
+ * The root's engine events, one per entry of `ENGINE_EVENT_CALLBACKS`, named by the callback with
+ * its first letter lowercased (`nodeClick`, `moveStart`, `init`, `connectCancel`, …), each emitted
+ * with the event: `@node-click` in a template, `onNodeClick` in `h()` or TSX.
+ */
+export type RootEventEmits = {
+    [K in keyof Callbacks as Uncapitalize<Callbacks[K]>]: (
+        event: FlowEngineEventOf<K>,
+    ) => void;
+};
+
+/**
+ * The events of `Flow.Root`: the controlled values, for `v-model` (or `@update:…`), and one per
+ * engine event (`RootEventEmits`).
+ */
 export type RootEmits<T extends FlowTypes = AnyTypes> = {
     /** the model's nodes, after every command that changes them (a drag step too) */
     "update:nodes": (nodes: readonly FlowNode<T>[]) => void;
@@ -158,7 +197,18 @@ export type RootEmits<T extends FlowTypes = AnyTypes> = {
     "update:edges": (edges: readonly FlowEdge<T>[]) => void;
     /** every viewport change, by a gesture (`gesture: true`) or an action */
     "update:viewport": (viewport: Viewport, gesture: boolean) => void;
-};
+} & RootEventEmits;
+
+/** Each engine event's Vue event, from the core's table (`node-click` → `nodeClick`, `ready` → `init`). */
+const EVENT_EMITS: ReadonlyMap<string, keyof RootEventEmits> = new Map(
+    Object.entries(ENGINE_EVENT_CALLBACKS).map(
+        ([type, name]) =>
+            [
+                type,
+                `${name[0]?.toLowerCase()}${name.slice(1)}` as keyof RootEventEmits,
+            ] as const,
+    ),
+);
 
 const ENGINE_PROPS = [
     "minZoom",
@@ -183,7 +233,19 @@ const ENGINE_PROPS = [
     "nodeExtent",
     "elevateNodesOnSelect",
     "elevateEdgesOnSelect",
+    "paneClickDistance",
+    "nodeClickDistance",
+    "preventScrolling",
+    "nodesFocusable",
+    "edgesFocusable",
 ] as const satisfies readonly (keyof RootEngineProps)[];
+
+/** The engine props whose attribute's text is its number (`pane-click-distance="5"`). */
+const NUMBER_PROPS: ReadonlySet<string> = new Set([
+    "panOnScrollSpeed",
+    "paneClickDistance",
+    "nodeClickDistance",
+]);
 
 const ROOT_PROPS = [
     "model",
@@ -193,6 +255,7 @@ const ROOT_PROPS = [
     "edges",
     "features",
     "createId",
+    "defaultEdgeOptions",
     "viewport",
     "defaultViewport",
     "fitView",
@@ -213,13 +276,17 @@ const ROOT_BOOLEANS = [
     "autoPan",
     "elevateNodesOnSelect",
     "elevateEdgesOnSelect",
+    "preventScrolling",
+    "nodesFocusable",
+    "edgesFocusable",
 ] as const satisfies readonly (keyof RootProps)[];
 
-const ROOT_EMITS = [
+const ROOT_EMITS: readonly (keyof RootEmits)[] = [
     "update:nodes",
     "update:edges",
     "update:viewport",
-] as const satisfies readonly (keyof RootEmits)[];
+    ...EVENT_EMITS.values(),
+];
 
 /** The root's props as its implementation reads them: any registry, any features. */
 type AnyRootProps = RootProps<AnyTypes, FlowFeatures>;
@@ -325,6 +392,7 @@ const RootFlow = definePrimitive<AnyRootProps, RootSlots, RootEmits<AnyTypes>>(
                   {
                       features: plain(props.features),
                       createId: props.createId,
+                      defaultEdgeOptions: plain(props.defaultEdgeOptions),
                   },
               );
         const typed = (given ?? ownModel) as FlowModel<AnyTypes, FlowFeatures>;
@@ -348,7 +416,7 @@ const RootFlow = definePrimitive<AnyRootProps, RootSlots, RootEmits<AnyTypes>>(
             Object.fromEntries(
                 ENGINE_PROPS.map((name) => [
                     name,
-                    name === "panOnScrollSpeed"
+                    NUMBER_PROPS.has(name)
                         ? numberProp(props[name])
                         : plain(props[name]),
                 ]),
@@ -383,7 +451,11 @@ const RootFlow = definePrimitive<AnyRootProps, RootSlots, RootEmits<AnyTypes>>(
                 created.subscribe((event) => {
                     if (event.type === "viewport-change") {
                         emit("update:viewport", event.viewport, event.gesture);
+                        return;
                     }
+                    // the event's own (`nodeClick`, `moveStart`, …): Vue calls the listener given now
+                    const name = EVENT_EMITS.get(event.type);
+                    if (name) emit(name, event);
                 }),
             );
             facade.set(created as unknown as FlowEngine);
@@ -609,6 +681,8 @@ const RootFlow = definePrimitive<AnyRootProps, RootSlots, RootEmits<AnyTypes>>(
             autoPan: [Boolean, Object] as PropType<unknown>,
             // `pan-on-scroll-speed="2"` is its number
             panOnScrollSpeed: NUMBER_PROP,
+            paneClickDistance: NUMBER_PROP,
+            nodeClickDistance: NUMBER_PROP,
         },
         emits: ROOT_EMITS,
     },

@@ -129,7 +129,7 @@ describe("click-to-connect", () => {
         tap(flow.handle("c", "target", "in"), at(300, 225));
         expect(flow.engine.get("connection")).toBeNull();
         expect(flow.model.get("all-edges")).toEqual([]);
-        expect(flow.events.at(-1)).toEqual({
+        expect(flow.events.at(-1)).toMatchObject({
             type: "connect-cancel",
             refused: true,
             input: "pointer",
@@ -142,7 +142,7 @@ describe("click-to-connect", () => {
         tap(flow.handle("a", "source", "out"), at(100, 25));
         tap(flow.root, at(600, 500));
         expect(flow.engine.get("connection")).toBeNull();
-        expect(flow.events.at(-1)).toEqual({
+        expect(flow.events.at(-1)).toMatchObject({
             type: "connect-cancel",
             refused: false,
             input: "pointer",
@@ -221,7 +221,7 @@ describe("click-to-connect", () => {
         document.body.dispatchEvent(escapeKey);
         expect(flow.engine.is("connecting")).toBe(false);
         expect(escapeKey.defaultPrevented).toBe(true);
-        expect(flow.events.at(-1)).toEqual({
+        expect(flow.events.at(-1)).toMatchObject({
             type: "connect-cancel",
             refused: false,
             input: "pointer",

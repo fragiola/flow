@@ -193,13 +193,16 @@ describe("the viewport", () => {
                 h(Flow.ToggleInteractive, { "data-testid": "lock" }),
             ]),
         );
-        await click(
-            container.querySelector('[data-testid="lock"]') as HTMLElement,
-        );
-        expect(part(container, "root")).not.toHaveAttribute("data-interactive");
+        // an `interactive` that stays never undoes the lock (#33: the lock's switches)
+        const lock = container.querySelector(
+            '[data-testid="lock"]',
+        ) as HTMLElement;
+        await click(lock);
+        expect(lock).toHaveAttribute("aria-pressed", "true");
         minZoom.value = 0.25;
         await settle();
-        expect(part(container, "root")).not.toHaveAttribute("data-interactive");
+        expect(lock).toHaveAttribute("aria-pressed", "true");
+        expect(part(container, "root")).toHaveAttribute("data-interactive");
     });
 
     it("draws the background pattern at the viewport", async () => {

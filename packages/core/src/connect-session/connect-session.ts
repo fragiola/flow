@@ -10,14 +10,14 @@ import {
     type MutablePartAttributes,
 } from "../attributes/part-attributes";
 import type { ConnectionPayload } from "../commands/types";
-import type { XY } from "../document/types";
+import type { BuiltInEdgeType, XY } from "../document/types";
 import type { FlowHandle } from "../engine/adapter";
-import type { MoveSource } from "../engine/events";
+import type { ConnectionEnd, MoveSource } from "../engine/events";
 import type { Connection } from "../engine/verbs";
 import type { KeyboardConnection } from "../features/keyboard-links";
 import type { FeatureEngineHost, FeatureGesture } from "../features/types";
-import { bezierPath } from "../geometry/bezier-path";
 import { oppositeSide } from "../geometry/path-format";
+import type { HandleSide } from "../geometry/types";
 
 /** Which handles a connection may end at (`connection({ mode })`). */
 export type ConnectMode = "strict" | "loose";
@@ -34,8 +34,19 @@ export interface ConnectStart {
 export interface GestureOptions {
     /** it has started already: a tap began it */
     readonly following?: boolean | undefined;
-    /** it starts only once the pointer moved past this many pixels; default: 1 pixel */
+    /** it starts only once the pointer moved past this many pixels (a tap's distance) */
     readonly tolerance?: number | undefined;
+    /** without `tolerance`, it starts once the pointer moved this many pixels; default 1 */
+    readonly threshold?: number | undefined;
+}
+
+/** A handle as a connection's events name it. */
+function endOf(handle: FlowHandle): ConnectionEnd {
+    return {
+        nodeId: handle.nodeId,
+        handleId: handle.handleId,
+        type: handle.type,
+    };
 }
 
 /** The shared connection state of one engine. */
@@ -43,6 +54,8 @@ export class ConnectSession {
     /** how near (in pixels) a handle snaps; set by `connection()` */
     radius = 20;
     mode: ConnectMode = "strict";
+    /** the connection line's path (`connection({ lineType })`) */
+    lineType: BuiltInEdgeType = "bezier";
     private state: Connection | null = null;
 
     constructor(private readonly host: FeatureEngineHost) {}
@@ -80,7 +93,7 @@ export class ConnectSession {
 
     /** Whether a connection from `from` may end at `handle` (the model not asked yet). */
     private eligible(from: FlowHandle, handle: FlowHandle): boolean {
-        if (!handle.center || !handle.connectable) return false;
+        if (!handle.center || !handle.connectableEnd) return false;
         const same =
             handle.nodeId === from.nodeId &&
             handle.type === from.type &&
@@ -119,12 +132,7 @@ export class ConnectSession {
     ): void {
         const toPoint = to?.center ?? from.center;
         const toSide = to?.side ?? oppositeSide(from.side);
-        const { path } = bezierPath({
-            source: from.center,
-            sourceSide: from.side,
-            target: toPoint,
-            targetSide: toSide,
-        });
+        const path = this.linePath(from.center, from.side, toPoint, toSide);
         this.state = Object.freeze({
             from,
             fromPoint: from.center,
@@ -210,15 +218,43 @@ export class ConnectSession {
                         return;
                     }
                 }
-                this.cancelled(start, to !== undefined, "keyboard");
+                this.cancelled(
+                    start,
+                    to !== undefined,
+                    "keyboard",
+                    this.keyboardDrop(source, to),
+                    true,
+                );
             },
             cancel: () => {
                 if (!open) return;
+                const to = targets[index];
                 finish();
-                this.cancelled(start, false, "keyboard");
+                this.cancelled(
+                    start,
+                    false,
+                    "keyboard",
+                    this.keyboardDrop(source, to),
+                    false,
+                );
             },
             open: () => open,
         };
+    }
+
+    /** The connection line's path (`lineType`), from the engine's path helpers. */
+    private linePath(
+        source: XY,
+        sourceSide: HandleSide,
+        target: XY,
+        targetSide: HandleSide,
+    ): string {
+        return this.host.path(this.lineType, {
+            source,
+            sourceSide,
+            target,
+            targetSide,
+        }).path;
     }
 
     private update(start: ConnectStart, client: XY): void {
@@ -233,12 +269,7 @@ export class ConnectSession {
                 ? "valid"
                 : "invalid"
             : null;
-        const { path } = bezierPath({
-            source: fromPoint,
-            sourceSide: from.side,
-            target: toPoint,
-            targetSide: toSide,
-        });
+        const path = this.linePath(fromPoint, from.side, toPoint, toSide);
         this.state = Object.freeze({
             from,
             fromPoint,
@@ -279,9 +310,11 @@ export class ConnectSession {
     gesture(
         start: ConnectStart,
         client: XY,
-        { following = false, tolerance }: GestureOptions = {},
+        { following = false, tolerance, threshold = 1 }: GestureOptions = {},
     ): FeatureGesture {
         let active = following;
+        // where the pointer was last: a cancel without a release (Escape) ends there
+        let last = client;
         const finish = () => {
             this.state = null;
             this.host.changed();
@@ -291,9 +324,11 @@ export class ConnectSession {
             this.update(start, client);
         }
         return {
-            autoPan: true,
+            autoPan: "connect",
+            kind: start.reconnecting ? "reconnect" : "connect",
             move: (event) => {
                 const point = { x: event.clientX, y: event.clientY };
+                last = point;
                 if (!active) {
                     const travel = Math.hypot(
                         point.x - client.x,
@@ -301,7 +336,7 @@ export class ConnectSession {
                     );
                     if (
                         tolerance === undefined
-                            ? travel < 1
+                            ? travel < threshold
                             : travel <= tolerance
                     )
                         return;
@@ -312,7 +347,8 @@ export class ConnectSession {
             },
             end: (event) => {
                 if (!active) return;
-                this.update(start, { x: event.clientX, y: event.clientY });
+                const drop = { x: event.clientX, y: event.clientY };
+                this.update(start, drop);
                 const state = this.state;
                 finish();
                 const to = state?.to;
@@ -350,31 +386,66 @@ export class ConnectSession {
                         }
                     }
                 }
-                this.cancelled(start, to !== undefined);
+                this.cancelled(
+                    start,
+                    to !== undefined,
+                    "pointer",
+                    { to, client: drop, point: this.host.toFlow(drop) },
+                    true,
+                );
             },
             cancel: () => {
                 if (!active) return;
+                const to = this.state?.to;
                 finish();
-                this.cancelled(start, false);
+                this.cancelled(
+                    start,
+                    false,
+                    "pointer",
+                    { to, client: last, point: this.host.toFlow(last) },
+                    false,
+                );
             },
             active: () => active,
         };
     }
 
+    /**
+     * Tells a connection ended without an edge, with where it ended: the handle it was over (if
+     * any) and the drop point, as a client point and a flow point; `dropped` when it was released
+     * (or confirmed), not cancelled (Escape, the lock, a `pointercancel`).
+     */
     private cancelled(
         start: ConnectStart,
         refused: boolean,
-        input: MoveSource = "pointer",
+        input: MoveSource,
+        at: { to: FlowHandle | undefined; client: XY; point: XY },
+        dropped: boolean,
     ): void {
+        const drop = {
+            dropped,
+            from: endOf(start.from),
+            to: at.to ? endOf(at.to) : undefined,
+            client: at.client,
+            point: at.point,
+        };
         if (start.reconnecting) {
             this.host.emit({
                 type: "reconnect-cancel",
                 edgeId: start.reconnecting.edgeId,
+                end: start.reconnecting.end,
                 refused,
+                ...drop,
             });
         } else {
-            this.host.emit({ type: "connect-cancel", refused, input });
+            this.host.emit({ type: "connect-cancel", refused, input, ...drop });
         }
+    }
+
+    /** Where a keyboard connection pointing at `to` ends: its target's centre, or its start's. */
+    private keyboardDrop(from: FlowHandle & { center: XY }, to?: FlowHandle) {
+        const point = to?.center ?? from.center;
+        return { to, point, client: this.host.toClient(point) };
     }
 
     /** The state attributes of the connection's parts. */

@@ -8,8 +8,14 @@ import {
 } from "../utils/primitive";
 import { type RenderSlot, renderElement } from "../utils/render";
 
+/** The switches the lock turns off and on (React Flow's: dragging, connecting, selecting). */
+const LOCKED_KINDS = ["drag", "connect", "select"] as const;
+
 export interface ToggleInteractiveState {
-    /** the gestures and keys may change the flow */
+    /**
+     * the flow is not locked: it is interactive and one of dragging, connecting and selecting at
+     * least is on (`interactive-by`)
+     */
     readonly interactive: boolean;
 }
 
@@ -23,8 +29,9 @@ export interface ToggleInteractiveSlots
 
 /**
  * A toggle button (`data-flow-part="toggle-interactive"`, `aria-pressed` while the flow is locked,
- * `data-interactive`): locks and unlocks the flow (`set-interactive`): while locked, gestures and
- * keys change nothing, pan and zoom stay. It renders only its default slot.
+ * `data-interactive`): locks and unlocks the flow, React Flow's interactive button: locking turns
+ * dragging, connecting and selecting off (`set-interactive { drag, connect, select }`), unlocking
+ * turns them and `interactive` on; pan and zoom stay. It renders only its default slot.
  */
 export const ToggleInteractive: FlowComponent<
     ToggleInteractiveProps,
@@ -34,14 +41,26 @@ export const ToggleInteractive: FlowComponent<
     ["as"],
     (props, { attrs, slots }) => {
         const context = useFlowContext("ToggleInteractive");
-        const interactive = useFlowValue(
-            context,
-            () => context.engine.value?.is("interactive") ?? true,
-        );
+        const interactive = useFlowValue(context, () => {
+            const engine = context.engine.value;
+            return engine
+                ? LOCKED_KINDS.some((kind) =>
+                      engine.is("interactive-by", { kind }),
+                  )
+                : true;
+        });
         const onClick = () => {
-            context.engine.value?.run("set-interactive", {
-                interactive: !interactive.value,
-            });
+            context.engine.value?.run(
+                "set-interactive",
+                interactive.value
+                    ? { drag: false, connect: false, select: false }
+                    : {
+                          interactive: true,
+                          drag: true,
+                          connect: true,
+                          select: true,
+                      },
+            );
         };
         return () => {
             const state: ToggleInteractiveState = {

@@ -98,16 +98,28 @@ describe("createFlowEngine", () => {
             value: { x: 10, y: 0, zoom: 0.5 },
         });
         expect(engine.get("viewport").zoom).toBe(2);
-        expect(events).toEqual([
+        // an action that does not animate starts and ends its move at once
+        expect(events.filter((e) => e.type !== "ready")).toEqual([
+            {
+                type: "viewport-change-start",
+                viewport: { x: 0, y: 0, zoom: 1 },
+                gesture: false,
+            },
             {
                 type: "viewport-change",
                 viewport: { x: 10, y: 0, zoom: 2 },
                 gesture: false,
             },
+            {
+                type: "viewport-change-end",
+                viewport: { x: 10, y: 0, zoom: 2 },
+                gesture: false,
+            },
         ]);
         // the same viewport again changes nothing
+        const told = events.length;
         engine.run("set-viewport", { x: 10 });
-        expect(events).toHaveLength(1);
+        expect(events).toHaveLength(told);
     });
 
     it("writes the transform to the viewport element directly", () => {
@@ -241,7 +253,13 @@ describe("createFlowEngine", () => {
         expect(engine.adapter.attributes("root")["data-interactive"]).toBe("");
         expect(engine.run("set-interactive", { interactive: false })).toEqual({
             ok: true,
-            value: { interactive: false },
+            value: {
+                interactive: false,
+                drag: true,
+                connect: true,
+                select: true,
+                reconnect: true,
+            },
         });
         expect(engine.is("interactive")).toBe(false);
         expect(

@@ -86,6 +86,7 @@ for (const [id, count] of [
     ["gestures/origin-extent-and-z-order", 4],
     ["gestures/keyboard-and-toolbars", 4],
     ["api/graph-and-geometry-helpers", 6],
+    ["gestures/interaction-and-events", 4],
 ] as const) {
     test(`${id} renders its flow without an error`, async ({ page }) => {
         const errors: string[] = [];
@@ -136,4 +137,17 @@ test("the helpers scenario lists a node's neighbours and what it overlaps", asyn
         .all()) {
         expect(await path.getAttribute("d")).toMatch(/^M[^C]+C[^C]+$/);
     }
+});
+
+test("the interaction scenario logs the root's callbacks", async ({ page }) => {
+    await page.goto("/?scenario=gestures/interaction-and-events");
+    await expect(
+        page.locator('[data-flow-part="node"]:not([data-measured])'),
+    ).toHaveCount(0);
+    const log = page.getByTestId("scenario-log");
+    await expect(log).toContainText("ready");
+    await page.locator('[data-flow-part="node"][data-flow-id="a"]').click();
+    await expect(log.locator("li").first()).toContainText(
+        'node-click {"nodeId":"a"',
+    );
 });

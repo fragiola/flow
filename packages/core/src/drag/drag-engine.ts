@@ -1,5 +1,6 @@
 // The drag feature's engine side (D9, D10): a press on a node that moves past the threshold drags
-// it, with the selection when it is selected (and selects it first when it is not); every pointer
+// it, with the selection when it is selected (and, `selectOnDrag`, selects it first when it is not;
+// a node dragged unselected is dragged alone); every pointer
 // move is a transient step (`node.move`, a `batch` for several), the drop the final one. Positions
 // snap to the grid (the pressed node snaps, the others keep their offsets), and a node with
 // an extent (`extent: "parent"`, a rectangle `extent`, the engine's `nodeExtent`) stays inside it
@@ -42,7 +43,11 @@ export function dragEngine(
         grid > 0 ? Math.round(value / grid) * grid : value;
 
     const begin = (nodeId: string): Drag => {
-        if (!model.is("node-selected", { nodeId })) {
+        if (
+            options.selectOnDrag &&
+            host.allows("select") &&
+            !model.is("node-selected", { nodeId })
+        ) {
             // a node dragged alone becomes the selection (refused without `selection()`)
             model.run("selection.set", { nodeIds: [nodeId] });
         }
@@ -100,7 +105,8 @@ export function dragEngine(
             });
         };
         return {
-            autoPan: true,
+            autoPan: "node",
+            kind: "drag",
             move: (event) => {
                 const client = { x: event.clientX, y: event.clientY };
                 if (!active) {
@@ -173,7 +179,7 @@ export function dragEngine(
                 target.nodeId === undefined ||
                 target.outsideDragHandle === true ||
                 drag !== undefined ||
-                !host.interactive() ||
+                !host.allows("drag") ||
                 !model.is("node-draggable", { nodeId: target.nodeId })
             ) {
                 return undefined;

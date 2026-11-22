@@ -40,14 +40,16 @@ test("the zoom buttons zoom, and stop at the limits", async ({ page }) => {
         .toBeLessThan(1);
 });
 
-test("the lock stops dragging, and pan still works", async ({ page }) => {
+test("the lock stops dragging and selecting, and pan still works", async ({
+    page,
+}) => {
     const lock = page.getByRole("button", { name: "Lock the flow" });
     await lock.click();
     await expect(lock).toHaveAttribute("aria-pressed", "true");
-    await expect(part(page, "root")).not.toHaveAttribute(
-        "data-interactive",
-        "",
-    );
+    // the lock switches dragging, connecting and selecting off: the flow stays interactive
+    await expect(part(page, "root")).toHaveAttribute("data-interactive", "");
+    await node(page, "rome").click();
+    await expect(node(page, "rome")).not.toHaveAttribute("data-selected", "");
     const paris = node(page, "paris");
     const rome = node(page, "rome");
     const gap = async () => (await boxOf(rome)).x - (await boxOf(paris)).x;

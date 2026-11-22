@@ -202,9 +202,9 @@ the playground, `examples/shared` and `examples/react`), and **never runs `playw
 in one PR. `main` has no required checks: a skipped job blocks nothing.
 
 **Shards: none.** Shard a suite only when its test step alone passes about 3 minutes. Measured
-locally (4 workers; CI runs 2): the playground's 152 tests (76 per browser) in ~35 s, each
-examples app's 191 tests (95 smoke runs: 19 examples × 5 themes) in ~20 to ~45 s, its embed build
-included (measured after #28; Angular and React the slower).
+locally (4 workers; CI runs 2): the playground's 182 tests (91 per browser) in ~46 s, each
+examples app's 203 tests (100 smoke runs: 20 examples × 5 themes) in ~22 to ~55 s, its embed build
+included (measured after #33; Angular and React the slower).
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
@@ -311,15 +311,21 @@ margin: 30 }`: pixels a frame at the edge, pixels from the edge it starts at), `
 ease in and out; `ViewportEasing`), `nodeOrigin` `{ x: 0, y: 0 }` (#24: the point of a node's box
 its position stands at, as shares of its size, for the nodes on the flow), `nodeExtent` (#24: a
 flow `Rect` every node's box stays inside when dragged, moved by the arrows or resized),
-`elevateNodesOnSelect` true, `elevateEdgesOnSelect` false (#24). `adapter.setOptions` takes each
-of them (the four adapters' roots take the new ones in #25).
+`elevateNodesOnSelect` true, `elevateEdgesOnSelect` false (#24), and #32's `paneClickDistance` 3,
+`nodeClickDistance` 3 (the tap distances on the pane and on anything else), `preventScrolling` true
+(the wheel over the flow never scrolls the page), `nodesFocusable` true, `edgesFocusable` true, and
+`autoPan`'s per-gesture switches (`{ node, connect, selection, resize }`). `adapter.setOptions`
+takes each of them (the four adapters' roots take the new ones in #25 and #33).
 
 **Actions** (`engine.run`; `can`/`check` are their dry runs): `set-viewport { x?, y?, zoom? }`,
 `pan-by { x, y }` (pixels), `zoom-in` / `zoom-out { step?, around? }` (refused at the limit: a
 Controls button's disabled state is `!engine.can("zoom-in")`), `zoom-to { zoom, around? }`,
 `fit-view { padding? 0.1, nodeIds?, minZoom?, maxZoom? }` (refused before a size is known),
-`center-on { x, y, zoom? }`, `focus-node { nodeId }`, `set-interactive { interactive }` (the
-Controls' toggle: gestures and keys stop changing the flow, pan and zoom stay), `cancel-gesture`
+`center-on { x, y, zoom? }`, `focus-node { nodeId }`, `set-interactive { interactive?, drag?,
+connect?, select?, reconnect? }` (gestures and keys stop changing the flow, all of them or one
+kind, pan and zoom stay; #32: the per-kind switches, its result every switch; #33: the Controls'
+toggle switches `drag`, `connect` and `select`),
+`cancel-gesture`
 (also stops a viewport animation; refused when neither is under way). `set-viewport`, `zoom-in`,
 `zoom-out`, `zoom-to`, `fit-view` and `center-on` take `duration` (ms, default 0: at once; a
 negative or non-number one is `invalid_payload` at `/duration`): the result is the final viewport
@@ -349,7 +355,8 @@ size); features: `selection-box` (selection),
 `dragging-node-ids` (drag), `connection` (connection: `from`, `fromPoint`, `toPoint`, `toSide`,
 `to`, `status` valid/invalid/null, `path`, `reconnecting`), `minimap-view { width, height }`
 (minimap: `viewBox`, `viewBoxAttribute`, `scale`, `nodes`, `view`, `maskPath` for
-`fill-rule="evenodd"`). **Questions** (`engine.is`): `interactive`, `panning`, `node-measured`;
+`fill-rule="evenodd"`). **Questions** (`engine.is`): `interactive`, `interactive-by { kind }` (#32), `ready` (#32),
+`panning`, `node-measured`;
 `box-selecting`; `dragging`, `node-dragging`; `resizing`, `node-resizing`; `connecting`;
 `edge-reconnecting`; `node-focusable`, `edge-focusable` (keyboard: the adapter sets `tabindex="0"`).
 
@@ -357,10 +364,15 @@ size); features: `selection-box` (selection),
 `viewport-change { viewport, gesture }`, `drag-start`, `nodes-move { nodeIds, source: "pointer" |
 "keyboard" }`, `drag-cancel`, `connect-start { nodeId, handleId, handleType, input }`,
 `connect-target { nodeId, handleId, handleType, index, count }` (#27, keyboard only),
-`connect { edgeId, source, target, input }`, `connect-cancel { refused, input }` (#27: `input`
-is a `MoveSource`, `"pointer"` or `"keyboard"`), `reconnect-start`, `reconnect`,
-`reconnect-cancel { refused }`, `resize { nodeId, width, height, source }` (#27: `source`),
-`box-select`, `remove { nodeIds, edgeIds }`.
+`connect { edgeId, source, target, input }`, `connect-cancel { refused, input, dropped, from, to, client,
+point }` (#27: `input` is a `MoveSource`, `"pointer"` or `"keyboard"`; #32: where it ended, a
+`ConnectionDrop`), `reconnect-start`, `reconnect`, `reconnect-cancel { edgeId, end, refused, dropped, from,
+to, client, point }`, `resize { nodeId, width, height, source }` (#27: `source`), `box-select`,
+`remove { nodeIds, edgeIds }`; #32: `viewport-change-start` / `viewport-change-end { viewport,
+gesture }`, `ready`, `node-click` / `edge-click` / `pane-click`, the `*-double-click` and
+`*-context-menu` variants and `selection-context-menu` (`{ nodeId | edgeId | nodeIds, edgeIds,
+point, client, event }`, a `FlowPointerInfo`), `box-select-start { client, point }`,
+`resize-start { nodeId, width, height }`, `resize-cancel { nodeId }`.
 
 **The adapter contract** (`engine.adapter`, what `Flow.*` primitives call; an app never does):
 
@@ -377,8 +389,10 @@ is a `MoveSource`, `"pointer"` or `"keyboard"`), `reconnect-start`, `reconnect`,
   document's `width`/`height` when given (a resize writes them). Edges are drawn in `drawn-edges`'
   order (#24): an SVG's order is its drawing order.
 - `registerNode(nodeId, element | null)` (observed: its `offsetWidth`/`offsetHeight`),
-  `registerHandle({ nodeId, handleId?, type, side, connectable? }, element | null)` (D8: its centre
-  relative to its node, from the client rects divided by the zoom).
+  `registerHandle({ nodeId, handleId?, type, side, connectable?, connectableStart?,
+  connectableEnd? }, element | null)` (D8: its centre relative to its node, from the client rects
+  divided by the zoom; #32: a handle may only start or only end connections, `data-connectable-start`
+  / `data-connectable-end` on its part).
 - `attributes(part, payload)`: the record to spread on each part (`data-flow-part`, `data-flow-id`,
   the state booleans as `""`/absent). Every press, key and wheel is resolved from these attributes
   (`dom.ts`), so every part must carry them: `root`, `viewport`, `nodes`, `edges`, `background` are
@@ -441,7 +455,7 @@ engine's state attributes from `engine.adapter.attributes(part, payload)`):
 | `Background` | `svg` `background` | `background-pattern`: `pattern` `background-pattern`, `circle`/`path` `background-mark` in `currentColor`, `rect` `background-fill` |
 | `Controls` | `div` `controls` | a group for the buttons |
 | `ZoomIn`, `ZoomOut`, `FitView` | `button` `zoom-in`, `zoom-out`, `fit-view` | run their action (with their `duration` prop, #25); `disabled` / `data-disabled` while `!engine.can(...)` |
-| `ToggleInteractive` | `button` `toggle-interactive` | `set-interactive`; `aria-pressed` while locked, `data-interactive` |
+| `ToggleInteractive` | `button` `toggle-interactive` | `set-interactive`; #33: switches `drag`, `connect` and `select` (React Flow's interactive button), locked (`aria-pressed`) while none of them is allowed (`interactive-by`); `data-interactive` while unlocked |
 | `NodeToolbar` | `div` `toolbar` | portal into the root at `node-toolbar-by` (outside the zoom); `open`, default while its node is selected; #28: `nodeIds` (not empty: beside their bounds, no enclosing node needed, no `data-flow-id`, shown while every one is selected) |
 | `EdgeToolbar` | `div` `toolbar` | #28: portal into the root at `edge-toolbar-by` (outside the zoom, its centre on the point); `edgeId` (default the enclosing `Edge`'s), `position` (`"label"` / `"source"` / `"target"`), `offset` (`XY`), `open`, default while its edge is selected; `data-flow-id` its edge's id |
 | `MiniMap` (`/minimap`) | `svg` `minimap` | `width` × `height` (200 × 150), `minimap-view`; children default: a `MiniMapNode` per node and the `MiniMapMask` |
@@ -457,8 +471,19 @@ engine options `minZoom`, `maxZoom`, `translateExtent`, `panOnDrag`, `panOnScrol
 `zoomOnPinch`, `zoomOnDoubleClick`, `zoomStep`, `interactive`, `onlyRenderVisible`, `pathOptions`,
 and #23's and #24's (#25) `autoPan`, `panActivationKey`, `panOnScrollMode`, `panOnScrollSpeed`,
 `zoomActivationKey`, `easing`, `nodeOrigin`, `nodeExtent`, `elevateNodesOnSelect`,
-`elevateEdgesOnSelect` (the core's names and defaults; `panOnDrag` takes mouse buttons too; a
-change sends only the keys that changed, `adapter.setOptions`); `flowRef`.
+`elevateEdgesOnSelect`, and #33's `paneClickDistance`, `nodeClickDistance`, `preventScrolling`,
+`nodesFocusable`, `edgesFocusable` (the core's names and defaults; `panOnDrag` takes mouse
+buttons too; a change sends only the keys that changed, `adapter.setOptions`);
+`defaultEdgeOptions` (#33, read once: the model option); `flowRef`; and #33's event callbacks
+(`RootEventProps`): one `on<Name>` per entry of the core's `ENGINE_EVENT_CALLBACKS` (`onInit`,
+`onMoveStart`, `onMoveEnd`, `onNodeClick`, `onNodeDoubleClick`, `onNodeContextMenu`, the edge's
+and the pane's, `onSelectionContextMenu`, `onSelectionStart`, `onSelectionEnd`,
+`onNodeDragStart`, `onNodesMove`, `onNodeDragCancel`, `onConnectStart`, `onConnectTarget`,
+`onConnect`, `onConnectCancel`, `onReconnectStart`, `onReconnect`, `onReconnectCancel`,
+`onResizeStart`, `onResizeEnd`, `onResizeCancel`, `onDelete`), each called with the engine
+event, the latest prop read, none spread on the element. `Handle` / `useHandle` take
+`connectableStart` and `connectableEnd` (#33); `ReconnectAnchor` renders nothing at an end its
+edge's `reconnectable` keeps fixed (`model.is("edge-reconnectable", { edgeId, end })`).
 
 **Hooks:** `useFlow<T, F>()` → `{ model, engine }` (the engine a facade: there from the first
 render, an action refused before the mount); part hooks `useNode(node)`, `useEdge(edge)`,
@@ -986,7 +1011,7 @@ while its app is written (the test uses a fake one).
 the authoring guide): Basics `basic`, `custom-nodes`, `edge-types`, `edge-labels`, `backgrounds`,
 `read-only`; Interaction `selection-and-keyboard`, `connection-validation`, `edge-reconnect`,
 `snap-to-grid`, `minimap-and-controls`; Building blocks `sub-flows`, `node-resizer`,
-`node-toolbar`, `add-nodes`, `save-and-restore`, `undo-redo`, `announcements`; Apps
+`node-toolbar`, `add-nodes`, `save-and-restore`, `undo-redo`, `announcements`, `context-menu` (#33); Apps
 `workflow-builder` (the landing's showcase). `_kit/persistence.ts` and `_kit/undo.ts` are the
 copyable app policy. Epic #26's options where they are natural (#25): `custom-nodes`' preview drags
 only by its title bar (`data-flow-drag-handle`, `styles.dragHandle` and `styles.grip` from the
@@ -1066,7 +1091,7 @@ Decisions of #6:
 
 ## The Vue examples and the Vue docs (Issue #10)
 
-`examples/vue` (`examples-vue`, private) is `examples/react` in Vue: the 19 examples with the same
+`examples/vue` (`examples-vue`, private) is `examples/react` in Vue: the 20 examples (19 before #33) with the same
 ids, metadata, text, names, roles and test ids, and the same scripts (`generate`, `dev` (port
 5186), `build`, `typecheck` (`vue-tsc`, TypeScript 6.0.3 pinned in this app, Splitter's), `e2e`,
 `test`); `src/examples/README.md` says how an example is written in Vue. Its
@@ -1121,7 +1146,7 @@ Decisions of #10:
 
 ## The Svelte examples and the Svelte docs (Issue #13)
 
-`examples/svelte` (`examples-svelte`, private) is `examples/react` in Svelte 5 (runes): the 19
+`examples/svelte` (`examples-svelte`, private) is `examples/react` in Svelte 5 (runes): the 20
 examples with the same ids, metadata, text, names, roles and test ids, and the same scripts
 (`generate`, `dev` (port 5187), `build`, `typecheck` (`svelte-check --fail-on-warnings`, TypeScript
 6.0.3 pinned in this app, as `packages/svelte`), `e2e`, `test`); `src/examples/README.md` says how an
@@ -1190,7 +1215,7 @@ Decisions of #13:
 ## The Angular examples and the Angular docs (Issue #16)
 
 `examples/angular` (`examples-angular`, private) is `examples/react` in Angular 22 (standalone
-components, signals, zoneless, OnPush): the 19 examples with the same ids, metadata, text, names,
+components, signals, zoneless, OnPush): the 20 examples with the same ids, metadata, text, names,
 roles and test ids, and the same scripts as Splitter's Angular app (`generate`, `dev` (port 5188),
 `build` (Vite + `@analogjs/vite-plugin-angular`, `tsconfig.app.json`), `typecheck` (`ngc -p
 tsconfig.json --noEmit`, strict templates, TypeScript 6.0.3 pinned in this app, as
@@ -1504,7 +1529,10 @@ its reason.
   box instead of Shift + drag), `minimap({ padding: 0.1 })` (a share of its size). #24 extended
   them: `selection({ multiKey: ["Meta", "Control", "Shift"], boxKey: "Shift" })` (`SelectionKey`:
   a key, several, or `null` for none), `keyboard({ deleteKeys: ["Delete", "Backspace"] })` (`[]`
-  for none), `connection({ clickToConnect: false })`.
+  for none), `connection({ clickToConnect: false })`. #32 extended them: `drag({ selectOnDrag: true
+  })`, `connection({ threshold: 1, lineType: "bezier" })`, `keyboard({ panOnFocus: true,
+  beforeDelete })`; the model option `defaultEdgeOptions`; the document's `focusable` flag (nodes,
+  edges) and `reconnectable: boolean | "source" | "target"`.
 
 Decisions of the engine (#3):
 
@@ -1905,3 +1933,134 @@ Epic #29):
   so `resizing.mdx` and `limitations.mdx` say to pass your own `ResizeHandle`s with `keyboard()`;
   the playground's scenario names its own. The playground spec asserts an arrow across a resize
   handle's sides reaches the page with its default kept (`defaultPrevented` false on the window).
+
+Decisions of the interaction options and gesture events (#32, Epic #34; React Flow's props studied,
+none of xyflow's code):
+
+- **Taps are the engine's.** The pointer is captured on the root at every press, so a browser's
+  `click`, `dblclick` and (during a press) `contextmenu` target the root. A tap is a primary press
+  released within the tap distance (`paneClickDistance` on the pane, `nodeClickDistance` on
+  anything else, both 3 px by default: React Flow's 0 would make a jittery click a pan) that
+  started no gesture, was no key pan, no click-to-connect follow press and opened no context menu.
+  The tap events (`node-click`, `edge-click`, `pane-click`) are told after the features' `tap`
+  (the selection is already changed), and also while the flow is not interactive (they change
+  nothing). A pan that stayed within the pane's tap distance is still a tap (its few pixels stay),
+  as React Flow's `paneClickDistance` reads. A double click counts when the last press was a tap
+  (`released`, cleared by every new press), on that press's target; a `dblclick` on a control
+  (`other`) is the control's; the pane's still zooms (`zoomOnDoubleClick`), a node's no longer
+  does. A context menu during a press is the press's (its release is then no tap); several
+  selected nodes take a menu on one of them as `selection-context-menu` (no selection rectangle
+  part exists: React Flow's `NodesSelection`). The events carry the DOM `event`: the app prevents
+  the browser's menu itself.
+- **A viewport move** starts at its first change (`viewport-change-start`, the viewport before it)
+  and ends once nothing holds it: no press, pinch, animation or resting wheel, and no press or
+  wheel being handled (the minimap's press centres before the press exists). The wheel ends after
+  150 ms at rest (`WHEEL_REST`, on the root window's `setTimeout`; without one at once). An action
+  without `duration` starts and ends at once; a stopped animation ends its move at once (even inside
+  a press). `gesture` is the first change's.
+- **Per-kind interactivity is engine state** (`Interactivity`, `host.allows(kind)` read when a
+  feature acts; nothing is installed again). `drag`: node drags and the arrows; `connect`: drags,
+  taps, Enter on a handle (whose `tabindex` goes); `select`: taps, the box, Enter/Space and a
+  drag's select-on-drag; `reconnect` (and `connect`: moving an end connects it anew, so the lock,
+  which turns `connect` off, stops reconnection too, as React Flow's does: one under way is
+  cancelled). A resize and the delete keys follow `interactive` only.
+  Turning a kind off cancels only a gesture of that kind (`FeatureGesture.kind`); `interactive:
+  false` cancels everything, as before. No engine option per kind (React Flow's
+  `nodesDraggable`, … props): the switches are `set-interactive`'s, the Controls' lock in #33.
+- **`preventScrolling`** prevents the wheel's default over every flow part but `other` and
+  `data-flow-no-wheel`, whatever the wheel does; `false` gives the page a wheel the flow does not
+  use (before #32 that was the only behaviour).
+- **Auto-pan per gesture**: `FeatureGesture.autoPan` names its kind (`"node"`, `"connect"`,
+  `"selection"`, `"resize"`), `autoPans(option, kind)` reads `AutoPanOptions`' switches (absent:
+  on); `true` stays "any".
+- **Focusability**: `focusable` is a core document flag on nodes and edges (default true, set by
+  the flag commands, synced by `commands-to`); `node-focusable` / `edge-focusable` (keyboard) also
+  read `host.focusable(kind)`, the `nodesFocusable` / `edgesFocusable` options.
+- **`reconnectable: "source" | "target"`** moves that end only: `edge.reconnect` refuses a payload
+  moving the other end (`/source` or `/target`, code can't bypass it), `edge-reconnectable` takes an
+  optional `end`, a press near (or the anchor of) the fixed end grabs nothing, and `commands-to`
+  replaces an edge whose wanted ends move an end that may not. `edgeFlag(edge, "reconnectable")`
+  is true unless false; `reconnectableEnd(edge, end)` the per-end answer.
+- **`connectableStart` / `connectableEnd`** are a handle's registration fields (`FlowHandle` has
+  them, `connectable` included): a start-only-not handle starts no drag, tap or keyboard
+  connection and gets no `tabindex`; an end-only-not handle is never `eligible` (drags, keyboard
+  targets, reconnection drops).
+- **`connection({ threshold, lineType })`**: `threshold` is the 1 px a drag needed before (with
+  click-to-connect the start waits past the larger of it and `nodeClickDistance`); `lineType` draws
+  the line through `host.path(type, ends)`, the engine's path helpers with its `pathOptions`.
+- **`drag({ selectOnDrag: false })`** drags an unselected node alone and keeps the selection.
+- **`keyboard({ panOnFocus, beforeDelete })`**: `beforeDelete(nodes, edges)` gets what the delete
+  key would remove (`selection.remove`'s dry run, or the focused node's or edge's), answers
+  `true`, `false`, a `{ nodes, edges }` subset (only what it was asked about; a node still takes
+  its edges and children) or a promise of one. A promise takes the key at once and blocks the next
+  delete keys until it settles; then only what is still there and deletable goes, in one step (a
+  `batch` of `edge.remove` / `node.remove`, not `selection.remove`: a middleware keyed on
+  `selection.remove` does not see a delete made through `beforeDelete`), unless the engine was
+  destroyed or the flow locked meanwhile; a rejection removes nothing. The model's middleware
+  stays synchronous.
+- **`defaultEdgeOptions`** is a model option (`DefaultEdgeOptions<T>`: type, data, `zIndex`,
+  flags; never an id or an end), validated once against the edge schema (a `TypeError`), merged
+  under every `edge.add` payload in the bus before the middleware (runs, dry runs, batch steps).
+  `commands-to` merges it under the wanted edges too, so a controlled edge the defaults filled is
+  synced once, not on every render: under a new edge every default, under an edge the model holds
+  only the defaults it holds the same value for (a document edge, loaded without them, is not
+  rewritten by them when the controlled list changes). The document's edges load as they are (React Flow also applies
+  them when rendering; ours are data in the document).
+- **Resize steps are the transient `node.resize` commands** (`model.subscribe`, `onNodesChange`):
+  no `resize-step` event; `resize-start` (at the size it starts from) and `resize-cancel` frame
+  them, `resize` stays the end.
+- **The cancel events tell where they ended** (`ConnectionDrop`: `dropped`, `from`, `to`, `client`,
+  `point`): a release's point, a cancel's last pointer point (Escape), a keyboard connection's
+  target centre (or its start's) with `client` from `host.toClient`. `reconnect-cancel` names the
+  moved `end`. `dropped` is `true` for a release (or a keyboard confirm) and `false` for a cancel
+  (Escape, `cancel-gesture`, the lock, a `pointercancel`), so "drop on the canvas adds a node"
+  adds nothing on a cancel (React Flow's `onConnectEnd` fires on release only).
+- **`ready`** is told once per engine, at the first measurement flush with a sized root, every
+  shown node measured and a pending `fitView` done (`is("ready")`). Known limit: an empty flow whose
+  root measured 0 × 0 when attached is not ready until something is measured again (the root is
+  not observed).
+
+Decisions of the interaction options and events in the adapters, the docs, examples and E2E (#33,
+Epic #34):
+
+- **One table names every callback** (`ENGINE_EVENT_CALLBACKS`, core, `engine/event-callbacks.ts`):
+  each engine event but `viewport-change` to a name after `on` (`NodeClick`), React Flow's where it
+  has one (`MoveStart`, `Init` for `ready`, `SelectionStart` / `SelectionEnd` for the box,
+  `ConnectCancel` for React Flow's `onConnectEnd` with its connection state, `ResizeEnd` for
+  `resize`, `Delete` for `remove`). React: `onNodeClick`; Vue: the emit `nodeClick`
+  (`RootEventEmits`, in `ROOT_EMITS`, declared camelCase so an `h()` call or TSX types `onNodeClick`;
+  a template writes `@node-click`); Svelte:
+  `onnodeclick`, lowercase as the adapter's other callbacks (`onnodeschange`), not the Epic's
+  `onNodeClick`; Angular: the output `nodeClick`, declared one by one (a type-level map and a test
+  of `ɵdir.outputs` keep them equal to the table; `moveStart` / `moveEnd` have their types written
+  out, ng-packagr could not name the core's `ViewportMove`). Every callback gets the event object
+  (`FlowEngineEventOf<K>`), never positional arguments. Each adapter's `tests/interaction.test.*`.
+- **The lock is React Flow's**: `ToggleInteractive` switches `drag`, `connect` and `select`;
+  `interactive` (the root prop, `data-interactive` on the root) stays the whole flow's switch, and
+  a locked flow by `interactive={false}` unlocks whole from the button. A resize and the delete
+  keys stay unlocked by the button (React Flow's do too).
+- **A reconnect anchor at a fixed end is not rendered** (Angular: out of the document), rather
+  than rendered and inert.
+- **The playground fixture logs the gesture callbacks** in its `gestures` list (through the root's
+  callbacks, so the adapter is under test), apart from `events`, so the specs written before
+  keep their exact event lists; its new queries: `selectOnDrag=0`, `roles=1`,
+  `reconnectable=target`, `dropToAdd=1`, `confirmDelete=1`, `preventScrolling=0`,
+  `zoomOnScroll=0`, `threshold=10`, `tall=1` (`e2e/interaction.spec.ts`). The scenario
+  `gestures/interaction-and-events` puts the options behind controls and logs every callback.
+- **Examples**: a new `context-menu` (Building blocks, order 8: the menus of a node, the selection
+  and the canvas at the press, a double click marking a task done), `add-nodes` adds a task where
+  a connection is dropped on the canvas (`onConnectCancel`'s `point`), and `minimap-and-controls`'
+  lock keeps the flow `interactive` (its spec checks a click selects nothing). The gallery has 20
+  examples. The rest of the options (`selectOnDrag`, the tap distances, `preventScrolling`, the
+  threshold, roles, per-end reconnection, `beforeDelete`) stay in the docs and the playground: no
+  gallery example needs them, as #25 decided for its options.
+- **Docs**: the root's props table lists every callback (the docs test reads the core's table),
+  the four primitives pages name each framework's spelling (Angular one row per output),
+  `concepts/handles-and-connections.mdx` (a handle's role, a drop on the canvas, the threshold and
+  the line, default edge fields, per-end reconnection), `guides/selection.mdx` (clicks, double
+  clicks and context menus, drag without selecting), `guides/keyboard.mdx` (confirm before
+  deleting, focus and the view), `guides/minimap-and-controls.mdx` and `toggle-interactive.mdx`
+  (the lock's switches), `limitations.mdx` (`onConnect` is no longer "on purpose" missing;
+  `nodesDraggable`-like props are `set-interactive`'s switches; `onConnectEnd` is
+  `onConnect` + `onConnectCancel`; the known limits of #32).
+

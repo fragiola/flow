@@ -374,7 +374,10 @@ describe("the control buttons", () => {
         expect(getByTestId("in")).toBeDisabled();
         expect(getByTestId("in")).toHaveAttribute("data-disabled");
         fireEvent.click(getByTestId("lock"));
-        expect(flow?.current?.engine.is("interactive")).toBe(false);
+        // the lock switches dragging, connecting and selecting (#33)
+        expect(
+            flow?.current?.engine.is("interactive-by", { kind: "drag" }),
+        ).toBe(false);
         expect(getByTestId("lock")).toHaveAttribute("aria-pressed", "true");
         expect(getByTestId("lock")).not.toHaveAttribute("data-interactive");
     });

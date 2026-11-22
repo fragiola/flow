@@ -22,6 +22,12 @@ export class FlowHandleDirective {
     readonly handleId = input<string | undefined>(undefined);
     /** whether a connection may start or end here; default true */
     readonly connectable = input(undefined, { transform: optionalBoolean });
+    /** whether a connection may start here (a drag, a tap, a key); default true */
+    readonly connectableStart = input(undefined, {
+        transform: optionalBoolean,
+    });
+    /** whether a connection may end here (be its target); default true */
+    readonly connectableEnd = input(undefined, { transform: optionalBoolean });
     /** its node; default the enclosing `[flowNode]`'s */
     readonly nodeId = input<string | undefined>(undefined);
 
@@ -44,6 +50,8 @@ export class FlowHandleDirective {
                     side: this.side(),
                     handleId: this.handleId(),
                     connectable: this.connectable(),
+                    connectableStart: this.connectableStart(),
+                    connectableEnd: this.connectableEnd(),
                     nodeId: nodeId(),
                 })),
         ).state;

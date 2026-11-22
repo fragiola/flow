@@ -85,6 +85,8 @@ export interface NodeFlags {
     readonly deletable?: boolean;
     /** it is not shown; default false */
     readonly hidden?: boolean;
+    /** it takes DOM focus (with `keyboard()`); default true */
+    readonly focusable?: boolean;
 }
 
 /** An edge's permission flags; an absent flag is its default (`hidden` false, the others true). */
@@ -95,8 +97,13 @@ export interface EdgeFlags {
     readonly deletable?: boolean;
     /** it is not shown; default false */
     readonly hidden?: boolean;
-    /** its ends may be moved to other nodes (`edge.reconnect`); default true */
-    readonly reconnectable?: boolean;
+    /**
+     * its ends may be moved to other nodes or handles (`edge.reconnect`): both (`true`), none
+     * (`false`), or only its `"source"` or its `"target"` end; default true
+     */
+    readonly reconnectable?: boolean | "source" | "target";
+    /** it takes DOM focus (with `keyboard()`); default true */
+    readonly focusable?: boolean;
 }
 
 /** The fields the `selection()` feature owns on a node and on an edge. */

@@ -1,13 +1,15 @@
 ---
 title: ToggleInteractive
-description: Flow.ToggleInteractive is a toggle button that locks the flow, so gestures and keys change nothing while pan and zoom keep working.
+description: Flow.ToggleInteractive is a toggle button that locks the flow, turning dragging, connecting and selecting off while pan and zoom keep working.
 ---
 
-`Flow.ToggleInteractive` renders a `button` (`type="button"`) that runs the engine's
-`"set-interactive"` action with the opposite of `engine.is("interactive")`. While the flow is
-locked, gestures and keys change nothing (no drag, no connection, no selection, no Delete), and
-pan and zoom keep working. It is `aria-pressed` while locked and carries `data-interactive` while
-unlocked; it is disabled until the root is mounted. A `disabled` of yours replaces that rule (your props win), unlike the zoom and fit buttons, which stay disabled while their action is refused whatever you pass. It sets no text: switch its icon on
+`Flow.ToggleInteractive` renders a `button` (`type="button"`) that locks and unlocks the flow
+the way React Flow's interactive button does: locking runs `"set-interactive"` with `{ drag:
+false, connect: false, select: false }` (no drag, no connection, no selection, nor their keys),
+unlocking with those three and `interactive` on. Pan and zoom keep working, and so do resizing and
+the delete keys (the root's `interactive={false}` stops those too). It is locked, `aria-pressed`,
+while none of the three kinds is allowed (`engine.is("interactive-by", { kind })`, or the flow is
+not `interactive`), and carries `data-interactive` while unlocked; it is disabled until the root is mounted. A `disabled` of yours replaces that rule (your props win), unlike the zoom and fit buttons, which stay disabled while their action is refused whatever you pass. It sets no text: switch its icon on
 `state.interactive` and give it an `aria-label`.
 
 <Framework name="react">
@@ -80,8 +82,9 @@ In Angular, the button is yours and its state is the `state()` signal, through i
 
 </Framework>
 
-The root's `interactive` prop sets the same lock from your state; a root whose `interactive` does
-not change leaves the toggle's lock alone.
+The root's `interactive` prop locks the whole flow from your state (the toggle then shows locked,
+and a click unlocks it whole); a root whose `interactive` does not change leaves the toggle's lock
+alone.
 
 ## Props
 
@@ -98,7 +101,7 @@ and every `button` attribute.
 
 | field | type | description |
 | --- | --- | --- |
-| `interactive` | `boolean` | gestures and keys may change the flow |
+| `interactive` | `boolean` | the flow is not locked: it is interactive and dragging, connecting or selecting is on |
 
 ## Data attributes
 

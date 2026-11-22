@@ -22,6 +22,10 @@ export interface HandleRegistration {
     readonly side: HandleSide;
     /** whether a connection may start or end at it; default true */
     readonly connectable?: boolean | undefined;
+    /** whether a connection may start at it (a drag, a tap, a key); default true */
+    readonly connectableStart?: boolean | undefined;
+    /** whether a connection may end at it (be its target); default true */
+    readonly connectableEnd?: boolean | undefined;
 }
 
 /** A registered handle and where it is. */
@@ -31,6 +35,10 @@ export interface FlowHandle {
     readonly type: HandleType;
     readonly side: HandleSide;
     readonly connectable: boolean;
+    /** a connection may start at it (and it is `connectable`) */
+    readonly connectableStart: boolean;
+    /** a connection may end at it (and it is `connectable`) */
+    readonly connectableEnd: boolean;
     /** its centre in absolute flow coordinates, once it and its node are measured */
     readonly center: XY | undefined;
     /** its box relative to its node's top-left corner, in flow units, once measured */

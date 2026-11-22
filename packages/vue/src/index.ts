@@ -52,6 +52,7 @@ export type {
 export type {
     RootEmits,
     RootEngineProps,
+    RootEventEmits,
     RootProps,
     RootSlots,
     RootState,
