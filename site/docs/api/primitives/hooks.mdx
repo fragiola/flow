@@ -1,9 +1,10 @@
 ---
 title: Hooks
-description: The hooks read the enclosing root's model, engine, viewport, connection, selection, nodes and edges, and render nodes, edges and handles by hand.
+description: The hooks read the root's model, engine, view, selection, nodes, edges and keys, select one value or node's data, and render nodes, edges and handles by hand.
 ---
 
-Every hook reads the enclosing `Flow.Root` (outside one it throws). Two kinds:
+Every hook reads the enclosing `Flow.Root` (outside one it throws, but `useNodeId` and
+`useKeyPress`). Three kinds:
 
 - **Values**: `useFlow`, `useViewport`, `useConnection`, `useSelection`, `useNodes`, `useEdges`.
   Each re-renders its component when its value changes, and only then.
@@ -11,6 +12,9 @@ Every hook reads the enclosing `Flow.Root` (outside one it throws). Two kinds:
   state, and the props to spread on your own element (its attributes, the ref that registers it
   with the engine, its structural style). `Flow.Node`, `Flow.Edge` and `Flow.Handle` are built on
   them.
+- **Selections**: `useFlowStore`, `useNodeId`, `useNodesData`, `useNodeConnections`,
+  `useInternalNode`, `useKeyPress`, `useOnViewportChange`. Each reads one thing and re-renders
+  only when it changed (`useOnViewportChange` never: it calls you back).
 
 From outside the root (a toolbar beside it, a test), use a [flow ref](/docs/api/primitives/flow-ref).
 
@@ -381,26 +385,616 @@ element, inside a node.
 
 ## Selecting hooks
 
-Each re-renders its component only when what it selected changed (React's for now; the other
-adapters' land in the same Issue).
+The hooks below read one thing and change only when it does: a component built on them is not
+rendered again when a node moves or the viewport pans, unless what it reads changed. The same
+seven are in every adapter:
 
-- `useFlowStore(selector, equal?)`: `selector({ model, engine })`, compared with `equal` (default
-  `Object.is`; `sameFlowValue` for a built value).
-- `useNodeId()`: the enclosing `Flow.Node`'s id, or `null`.
-- `useNodesData(nodeId)` / `useNodesData(nodeIds)`: `NodeData` (`nodes-data-by`), `null` for an
-  unknown id.
-- `useNodeConnections(options?)`: the node's `NodeConnection`s (`node-connections-by`).
-- `useInternalNode(nodeId)`: the engine's `InternalNode` (`internal-node-by`).
-- `useKeyPress(keys, options?)`: whether a combo is held (`watchKeyPress`: `"Shift"`,
-  `"Meta+s"`, `["Meta+z", "Control+z"]`), read on the root's window.
-- `useOnViewportChange(options)`: the viewport's start, changes and end, without re-rendering.
+| React | Vue (composable) | Svelte (rune) | Angular (injection function) |
+| --- | --- | --- | --- |
+| `useFlowStore` | `useFlowStore`: a `ComputedRef` | `useFlowStore`: a `FlowValue` | `injectFlowStore`: a `Signal` |
+| `useNodeId` | `useNodeId`: a `ComputedRef` | `useNodeId`: the id itself | `injectNodeId`: a `Signal` |
+| `useNodesData` | `useNodesData`: a `ComputedRef` | `useNodesData`: a `FlowValue` | `injectNodesData`: a `Signal` |
+| `useNodeConnections` | `useNodeConnections`: a `ComputedRef` | `useNodeConnections`: a `FlowValue` | `injectNodeConnections`: a `Signal` |
+| `useInternalNode` | `useInternalNode`: a `ComputedRef` | `useInternalNode`: a `FlowValue` | `injectInternalNode`: a `Signal` |
+| `useKeyPress` | `useKeyPress`: a read-only `Ref<boolean>` | `useKeyPress`: a `FlowValue<boolean>` | `injectKeyPress`: a `Signal<boolean>` |
+| `useOnViewportChange` | `useOnViewportChange` | `useOnViewportChange` (`onstart`, `onchange`, `onend`) | `injectOnViewportChange` |
+
+Their arguments follow each framework: in Vue a value, a ref or a getter (`() => props.nodeId`);
+in Svelte a value or a getter; in Angular a value, a signal or a getter. A getter is read again
+when what it reads changes, so the hook follows a prop.
+
+## `useFlowStore`
+
+`useFlowStore<S, T, F>(selector, equal?)` returns `selector({ model, engine })`, the model and the
+engine of the root (`useFlow()`'s), and renders its component again only when the selected value
+changed: `equal(previous, next)`, by default `Object.is`. The selector runs again on every change
+of the model, on every view change of the engine (a measurement, the viewport, a gesture) and on
+every render. Pass the registry and the features after the selected value's type
+(`useFlowStore<number, Types, typeof features>(…)`).
+
+<Framework name="react">
+
+```tsx title="selected-count.tsx"
+import { useFlowStore } from "@fragiola/flow-react";
+
+export function SelectedCount() {
+    const count = useFlowStore<number, Types, typeof features>(
+        ({ model }) => model.get("selected-nodes").length,
+    );
+    return <output>{count} selected</output>;
+}
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="selected-count.vue"
+<script setup lang="ts">
+import { useFlowStore } from "@fragiola/flow-vue";
+
+const count = useFlowStore<number, Types, typeof features>(
+    ({ model }) => model.get("selected-nodes").length,
+);
+</script>
+
+<template>
+    <output>{{ count }} selected</output>
+</template>
+```
+
+In Vue, it is a computed ref that triggers its readers only when the value changed; the selector
+also runs again when a reactive value it reads changes.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="selected-count.svelte"
+<script lang="ts">
+    import { useFlowStore } from "@fragiola/flow-svelte";
+
+    const count = useFlowStore<number, Types, typeof features>(
+        ({ model }) => model.get("selected-nodes").length,
+    );
+</script>
+
+<output>{count.current} selected</output>
+```
+
+In Svelte, it is a `FlowValue` whose `current` notifies only when the value changed.
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="selected-count.ts"
+import { Component } from "@angular/core";
+import { injectFlowStore } from "@fragiola/flow-angular";
+
+// rendered inside [flowRoot]
+@Component({
+    selector: "app-selected-count",
+    template: `<output>{{ count() }} selected</output>`,
+})
+export class SelectedCount {
+    protected readonly count = injectFlowStore<number, Types, typeof features>(
+        ({ model }) => model.get("selected-nodes").length,
+    );
+}
+```
+
+In Angular, `injectFlowStore` gives the selector the model and the engine themselves (not
+signals), and returns a signal that changes only when the value did; the selector also runs again
+when a signal it reads changes.
+
+</Framework>
+
+A selector that builds an object or an array builds a new one at each change: give it an `equal`
+that compares by value, `sameFlowValue` (from the package: arrays and plain records compared all
+the way down), or it renders again every time.
+
+```ts
+const ids = useFlowStore(
+    ({ model }) => model.get("selected-nodes").map((node) => node.id),
+    sameFlowValue,
+);
+```
+
+## `useNodeId`
+
+`useNodeId()` returns the id of the node the component renders inside (`Flow.Node`), or `null`
+outside one: a piece of a custom node (a badge, a menu, a handle of yours) reads its node without
+being given its id.
+
+<Framework name="react">
+
+```tsx title="node-badge.tsx"
+import { useNodeId } from "@fragiola/flow-react";
+
+export function NodeBadge() {
+    const nodeId = useNodeId();
+    return <span className="text-xs opacity-60">{nodeId}</span>;
+}
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="node-badge.vue"
+<script setup lang="ts">
+import { useNodeId } from "@fragiola/flow-vue";
+
+const nodeId = useNodeId();
+</script>
+
+<template>
+    <span class="text-xs opacity-60">{{ nodeId }}</span>
+</template>
+```
+
+In Vue, it is a computed ref (the node a `Flow.Node` renders may change).
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="node-badge.svelte"
+<script lang="ts">
+    import { useNodeId } from "@fragiola/flow-svelte";
+
+    const nodeId = useNodeId();
+</script>
+
+<span class="text-xs opacity-60">{nodeId}</span>
+```
+
+In Svelte, it is the id itself, a `string | null`, read once in the component's script.
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="node-badge.ts"
+import { Component } from "@angular/core";
+import { injectNodeId } from "@fragiola/flow-angular";
+
+// rendered inside a [flowNode] element
+@Component({
+    selector: "app-node-badge",
+    template: `<span class="text-xs opacity-60">{{ nodeId() }}</span>`,
+})
+export class NodeBadge {
+    protected readonly nodeId = injectNodeId();
+}
+```
+
+In Angular, `injectNodeId()` is a `Signal<string | null>`: the id of the enclosing `[flowNode]`.
+
+</Framework>
+
+## `useNodesData` and `useNodeConnections`
+
+`useNodesData<T>(nodeId)` returns a node's `NodeData<T>` (`{ id, type, data }`, the model's
+`nodes-data-by`), or `null` while it does not exist. Given a list of ids,
+`useNodesData<T>(nodeIds)` returns each existing node's, in the order given (an unknown id is
+left out). It changes only when one of them changes its type or its data (compared by value), not
+when a node moves or another node changes. `type` narrows `data`: check it before reading a
+type's fields.
+
+`useNodeConnections(options?)` returns the connections at a node, `NodeConnection[]` (the model's
+`node-connections-by`): one per edge that starts or ends there, as its `edgeId`, `source`,
+`sourceHandle`, `target` and `targetHandle`, in the document's order. It changes only when they do
+(an edge added, removed or reconnected there), not when a node moves or an edge's data changes.
+By default it reads the enclosing node; outside a node, give an `id` (without one it throws).
+
+`UseNodeConnectionsOptions` (Angular: `InjectNodeConnectionsOptions`):
+
+| option | type | default | description |
+| --- | --- | --- | --- |
+| `id` | `string` | the enclosing `Flow.Node`'s | the node |
+| `handleId` | `string` | any | only the connections at this handle of it |
+| `type` | `HandleType` | both | only those that end (`"target"`) or start (`"source"`) at it |
+
+Together they make a node that follows its inputs: the sum of the nodes connected into it,
+updated when an input's value changes or an edge is drawn or removed.
+
+<Example id="connected-data" />
+
+<Framework name="react">
+
+```tsx title="sum-body.tsx"
+import { useNodeConnections, useNodesData } from "@fragiola/flow-react";
+
+/** Inside the sum node's Flow.Node: the values of the nodes connected into it. */
+export function SumBody() {
+    const connections = useNodeConnections({ type: "target" });
+    const inputs = useNodesData<Types>(connections.map((connection) => connection.source));
+    let total = 0;
+    for (const input of inputs) if (input.type === "number") total += input.data.value;
+    return <output>{total}</output>;
+}
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="sum-body.vue"
+<script setup lang="ts">
+import { useNodeConnections, useNodesData } from "@fragiola/flow-vue";
+import { computed } from "vue";
+
+// inside the sum node's Flow.Node: the values of the nodes connected into it
+const connections = useNodeConnections({ type: "target" });
+const inputs = useNodesData<Types>(() => connections.value.map((connection) => connection.source));
+const total = computed(() => {
+    let sum = 0;
+    for (const input of inputs.value) if (input.type === "number") sum += input.data.value;
+    return sum;
+});
+</script>
+
+<template>
+    <output>{{ total }}</output>
+</template>
+```
+
+In Vue, both are computed refs; pass the ids as a getter (`() => …`) so the data follows the
+connections.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="sum-body.svelte"
+<script lang="ts">
+    import { useNodeConnections, useNodesData } from "@fragiola/flow-svelte";
+
+    // inside the sum node's Flow.Node: the values of the nodes connected into it
+    const connections = useNodeConnections({ type: "target" });
+    const inputs = useNodesData<Types>(() => connections.current.map((connection) => connection.source));
+    const total = $derived(
+        inputs.current.reduce((sum, input) => (input.type === "number" ? sum + input.data.value : sum), 0),
+    );
+</script>
+
+<output>{total}</output>
+```
+
+In Svelte, both are `FlowValue`s; pass the ids as a getter so the data follows the connections.
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="sum-body.ts"
+import { Component, computed } from "@angular/core";
+import { injectNodeConnections, injectNodesData } from "@fragiola/flow-angular";
+
+// rendered inside the sum node's [flowNode] element
+@Component({
+    selector: "app-sum-body",
+    template: `<output>{{ total() }}</output>`,
+})
+export class SumBody {
+    private readonly connections = injectNodeConnections({ type: "target" });
+    private readonly inputs = injectNodesData<Types>(() =>
+        this.connections().map((connection) => connection.source),
+    );
+    protected readonly total = computed(() =>
+        this.inputs().reduce((sum, input) => (input.type === "number" ? sum + input.data.value : sum), 0),
+    );
+}
+```
+
+In Angular, both are signals; pass the ids as a getter (or a signal) so the data follows the
+connections.
+
+</Framework>
+
+## `useInternalNode`
+
+`useInternalNode<T>(nodeId)` returns the node as the engine knows it on screen, an
+`InternalNode<T>` (the engine's `internal-node-by`), or `undefined` while the node does not exist
+or before the root is mounted. It changes only when one of its fields does (compared by value): a
+pan or a zoom does not change it, a drag does.
+
+| field | type | description |
+| --- | --- | --- |
+| `id` | `string` | its id |
+| `node` | `FlowNode<T>` | the node, as the model holds it |
+| `absolutePosition` | `XY` | its position in absolute flow coordinates (a child's added to its parents') |
+| `rect` | `Rect` | its box in absolute flow coordinates, `nodeOrigin` applied (size 0 until measured) |
+| `measured` | `boolean` | its size is known: measured, or given by the document |
+| `zIndex` | `number` | its structural `z-index` |
+| `handles` | `readonly FlowHandle[]` | its registered handles, with their centres and bounds (`handles-by`) |
+
+<Framework name="react">
+
+```tsx title="node-position.tsx"
+import { useInternalNode } from "@fragiola/flow-react";
+
+export function NodePosition({ nodeId }: { nodeId: string }) {
+    const internal = useInternalNode(nodeId);
+    if (!internal) return null;
+    const { x, y } = internal.absolutePosition;
+    return <output>{`${Math.round(x)}, ${Math.round(y)}`}</output>;
+}
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="node-position.vue"
+<script setup lang="ts">
+import { useInternalNode } from "@fragiola/flow-vue";
+
+const props = defineProps<{ nodeId: string }>();
+const internal = useInternalNode(() => props.nodeId);
+</script>
+
+<template>
+    <output v-if="internal">
+        {{ Math.round(internal.absolutePosition.x) }}, {{ Math.round(internal.absolutePosition.y) }}
+    </output>
+</template>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="node-position.svelte"
+<script lang="ts">
+    import { useInternalNode } from "@fragiola/flow-svelte";
+
+    let { nodeId }: { nodeId: string } = $props();
+    const internal = useInternalNode(() => nodeId);
+</script>
+
+{#if internal.current}
+    {@const { x, y } = internal.current.absolutePosition}
+    <output>{Math.round(x)}, {Math.round(y)}</output>
+{/if}
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="node-position.ts"
+import { Component, input } from "@angular/core";
+import { injectInternalNode } from "@fragiola/flow-angular";
+
+// rendered inside [flowRoot]
+@Component({
+    selector: "app-node-position",
+    template: `
+        @if (internal(); as node) {
+            <output>{{ round(node.absolutePosition.x) }}, {{ round(node.absolutePosition.y) }}</output>
+        }
+    `,
+})
+export class NodePosition {
+    readonly nodeId = input.required<string>();
+    protected readonly internal = injectInternalNode(this.nodeId);
+    protected readonly round = Math.round;
+}
+```
+
+</Framework>
+
+## `useKeyPress`
+
+`useKeyPress(keys, options?)` returns whether a key, or a combo of keys, is held, and changes when
+that does. `keys` is a combo or a list of combos (any of them):
+
+- a combo is key names joined by `+`, all held at once: `"Shift"`, `"Meta+s"`,
+  `"Control+Shift+z"` (other keys held too do not matter);
+- a name is a `KeyboardEvent.key` (`"a"`, `"Shift"`, `"Delete"`, `" "` for Space) or a
+  `KeyboardEvent.code` (`"KeyA"`, `"Space"`), compared without case;
+- a list is any of its combos: `["Meta+z", "Control+z"]`.
+
+The keys are read on `target`, by default the window of the root's element (its
+`ownerDocument.defaultView`: the right one in an iframe or a pop-up window), never the global
+`window`. Before the root is mounted, or outside a root with no `target`, it is `false`. The keys
+held are forgotten when that window loses focus, and when Meta is released. It reads the keys
+only: it prevents no default, and it does not tell a key typed in a field from another (check
+`document.activeElement` yourself when that matters).
+
+`UseKeyPressOptions` (Angular: `InjectKeyPressOptions`, whose `target` may be a signal):
+
+| option | type | default | description |
+| --- | --- | --- | --- |
+| `target` | `KeyPressTarget \| null` | the root's window | where the keys are read: a window, a document or an element; `null`: nowhere |
+
+<Framework name="react">
+
+```tsx title="box-hint.tsx"
+import { useKeyPress } from "@fragiola/flow-react";
+
+export function BoxHint() {
+    const held = useKeyPress("Shift");
+    return held ? <p role="status">Drag on the canvas to draw a box</p> : null;
+}
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="box-hint.vue"
+<script setup lang="ts">
+import { useKeyPress } from "@fragiola/flow-vue";
+
+const held = useKeyPress("Shift");
+</script>
+
+<template>
+    <p v-if="held" role="status">Drag on the canvas to draw a box</p>
+</template>
+```
+
+In Vue, it is a read-only `Ref<boolean>`; the keys and the options may be refs or getters.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="box-hint.svelte"
+<script lang="ts">
+    import { useKeyPress } from "@fragiola/flow-svelte";
+
+    const held = useKeyPress("Shift");
+</script>
+
+{#if held.current}
+    <p role="status">Drag on the canvas to draw a box</p>
+{/if}
+```
+
+In Svelte, it is a `FlowValue<boolean>`; the keys and the options may be getters.
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="box-hint.ts"
+import { Component } from "@angular/core";
+import { injectKeyPress } from "@fragiola/flow-angular";
+
+// rendered inside [flowRoot]
+@Component({
+    selector: "app-box-hint",
+    template: `
+        @if (held()) {
+            <p role="status">Drag on the canvas to draw a box</p>
+        }
+    `,
+})
+export class BoxHint {
+    protected readonly held = injectKeyPress("Shift");
+}
+```
+
+In Angular, it is a `Signal<boolean>`; the keys and `target` may be signals or getters.
+
+</Framework>
+
+The same matcher without a component is the core's `watchKeyPress(target, keys, onChange)`
+([engine](/docs/api/engine#helpers-for-the-hooks)).
+
+## `useOnViewportChange`
+
+`useOnViewportChange(options)` calls back on the viewport's changes (the engine's
+`viewport-change-start`, `viewport-change` and `viewport-change-end`) and renders nothing again:
+save the view when it settles, hide a popover while the flow moves. `gesture` is `true` for a pan,
+the wheel, a pinch or auto-pan, `false` for an action (`fit-view`, a control button). The latest
+callbacks are called.
+
+`UseOnViewportChangeOptions` (Svelte: lowercase `onstart`, `onchange`, `onend`; Angular:
+`InjectOnViewportChangeOptions`):
 
 | option | type | description |
 | --- | --- | --- |
-| `id` | `string` | `UseNodeConnectionsOptions`: the node; default the enclosing one's |
-| `handleId` | `string` | `UseNodeConnectionsOptions`: only those at this handle |
-| `type` | `HandleType` | `UseNodeConnectionsOptions`: only those that start (`"source"`) or end (`"target"`) there |
-| `target` | `KeyPressTarget \| null` | `UseKeyPressOptions`: where the keys are read; default the root's window |
-| `onStart` | `(viewport, gesture) => void` | `UseOnViewportChangeOptions`: the viewport starts changing |
-| `onChange` | `(viewport, gesture) => void` | `UseOnViewportChangeOptions`: each change |
-| `onEnd` | `(viewport, gesture) => void` | `UseOnViewportChangeOptions`: it stopped changing |
+| `onStart` | `(viewport: Viewport, gesture: boolean) => void` | the viewport starts changing: a pan, a zoom, an animation |
+| `onChange` | `(viewport: Viewport, gesture: boolean) => void` | each change of the viewport |
+| `onEnd` | `(viewport: Viewport, gesture: boolean) => void` | the viewport stopped changing (a wheel's 150 ms after its last event) |
+
+<Framework name="react">
+
+```tsx title="save-view.tsx"
+import { useOnViewportChange } from "@fragiola/flow-react";
+
+export function SaveView({ onMoving }: { onMoving: (moving: boolean) => void }) {
+    useOnViewportChange({
+        onStart: () => onMoving(true),
+        onEnd: (viewport) => {
+            onMoving(false);
+            localStorage.setItem("flow-view", JSON.stringify(viewport));
+        },
+    });
+    return null;
+}
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="save-view.vue"
+<script setup lang="ts">
+import { useOnViewportChange } from "@fragiola/flow-vue";
+
+const emit = defineEmits<{ moving: [moving: boolean] }>();
+
+useOnViewportChange({
+    onStart: () => emit("moving", true),
+    onEnd: (viewport) => {
+        emit("moving", false);
+        localStorage.setItem("flow-view", JSON.stringify(viewport));
+    },
+});
+</script>
+```
+
+In Vue, the callbacks are read at each event (a reactive object's latest).
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="save-view.svelte"
+<script lang="ts">
+    import { useOnViewportChange } from "@fragiola/flow-svelte";
+
+    let { onmoving }: { onmoving: (moving: boolean) => void } = $props();
+
+    useOnViewportChange({
+        onstart: () => onmoving(true),
+        onend: (viewport) => {
+            onmoving(false);
+            localStorage.setItem("flow-view", JSON.stringify(viewport));
+        },
+    });
+</script>
+```
+
+In Svelte, the callbacks are lowercase, as a Svelte component's (`onstart`, `onchange`, `onend`);
+the options may be a getter, read at each event.
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="save-view.ts"
+import { Component, output } from "@angular/core";
+import { injectOnViewportChange } from "@fragiola/flow-angular";
+
+// rendered inside [flowRoot]
+@Component({ selector: "app-save-view", template: "" })
+export class SaveView {
+    readonly moving = output<boolean>();
+
+    constructor() {
+        injectOnViewportChange({
+            onStart: () => this.moving.emit(true),
+            onEnd: (viewport) => {
+                this.moving.emit(false);
+                localStorage.setItem("flow-view", JSON.stringify(viewport));
+            },
+        });
+    }
+}
+```
+
+In Angular, it marks nothing for a check; the options may be a signal or a getter, read at each
+event.
+
+</Framework>
+
+For every event of the engine, subscribe to it: `engine.subscribe(listener)`
+([engine](/docs/api/engine)), or the root's callbacks.
