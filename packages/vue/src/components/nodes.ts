@@ -5,7 +5,7 @@ import {
     partAttributes,
 } from "@fragiola/flow";
 import { defineComponent, h, type PropType, type Slot } from "vue";
-import { useFlowValue } from "../composables/internal";
+import { useDrawnLayers, useFlowValue } from "../composables/internal";
 import { useFlowContext } from "../context";
 import {
     definePrimitive,
@@ -31,14 +31,18 @@ export interface NodesSlots<T extends FlowTypes = AnyTypes>
     default?: SlotFunction<{ node: FlowNode<T> }>;
 }
 
-// its own stacking context: the nodes' z-index (a selected one raised) orders them among
-// themselves, never above what follows the layer (the connection line)
+// one render level: its own stacking context, the nodes' z-index (a selected one raised) orders
+// them among themselves, never above what follows the layer (the connection line)
 const NODES_STYLE = {
     position: "absolute",
     top: "0",
     left: "0",
     isolation: "isolate",
 };
+
+// several levels: no stacking context of its own, so the nodes' (negative) z-indexes interleave
+// with the edges' layers (`render-layers`), still below what follows
+const LAYERED_NODES_STYLE = { position: "absolute", top: "0", left: "0" };
 
 /**
  * One node's rendering, again only when its node changes (the model shares the nodes a command
@@ -62,7 +66,9 @@ const NodeSlot = defineComponent({
  * The layer of the nodes (`data-flow-part="nodes"`), inside `Flow.Viewport`: renders its default
  * slot for each node that is not hidden (with `onlyRenderVisible`, each one in view,
  * `visible-nodes`), in drawing order, keyed by its id (a node keeps its element when it moves).
- * You render each node.
+ * You render each node. It is its own stacking context (`isolation`), but while some edges stand
+ * above nodes (several `render-layers`), when the nodes' z-indexes interleave with the edges'
+ * layers.
  *
  * ```vue
  * <Flow.Nodes v-slot="{ node }"><Flow.Node :node="node">…</Flow.Node></Flow.Nodes>
@@ -80,8 +86,10 @@ export const Nodes: FlowComponent<NodesProps, NodesSlots> = definePrimitive<
             ? engine.get("visible-nodes")
             : model.get("all-nodes").filter((node) => node.hidden !== true);
     });
+    const layers = useDrawnLayers(context);
     return () => {
         const nodes = list.value;
+        const layered = layers.value.length > 1;
         return renderElement({
             tag: "div",
             as: props.as,
@@ -89,7 +97,7 @@ export const Nodes: FlowComponent<NodesProps, NodesSlots> = definePrimitive<
             render: slots.render,
             state: { count: nodes.length },
             props: { ...partAttributes("nodes") },
-            style: NODES_STYLE,
+            style: layered ? LAYERED_NODES_STYLE : NODES_STYLE,
             children: () =>
                 nodes.map((node) =>
                     h(NodeSlot, {
