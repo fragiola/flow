@@ -123,10 +123,12 @@
             {/snippet}
         </Flow.Nodes>
         <Flow.ConnectionLine class={styles.connection} />
+        <Flow.NodesSelection class={styles.nodesSelection} />
     </Flow.Viewport>
     <Flow.SelectionBox class={styles.box} />
     <SelectionStatus />
     <p class={styles.hint}>
-        Shift + drag draws a box · Tab, arrows, Delete, Escape · Enter on a handle connects
+        Shift + drag draws a box, drag its rectangle to move it · Tab, arrows, Delete, Escape ·
+        Enter on a handle connects
     </p>
 </Flow.Root>
