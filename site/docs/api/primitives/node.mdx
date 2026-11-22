@@ -141,7 +141,9 @@ every `div` attribute.
 ## Structural style
 
 `position: absolute; top: 0; left: 0; transform: translate(<x>px, <y>px)` (its box's top-left
-corner, the root's `nodeOrigin` applied), `z-index` (`node-z-index-by`: its `zIndex`, raised by
-10 000 while selected with `elevateNodesOnSelect`, at least its parent's + 1), and `width` /
-`height` when the document gives them. Before the engine is attached (the first render, a server
-render) the position is the top-left corner and there is no `z-index`. Its look is yours.
+corner, its `origin` or the root's `nodeOrigin` applied), `z-index` (`node-z-index-by`: its
+`zIndex`, raised by 10 000 while selected with `elevateNodesOnSelect`, at least its parent's + 1;
+a negative rank while edges stand above nodes), and `width` / `height` when the document gives
+them. Before the engine is attached (the first render, a server render) the same place and
+`z-index` come from the document's [static geometry](/docs/guides/server-rendering), so nothing
+moves when the engine takes over. Its look is yours.

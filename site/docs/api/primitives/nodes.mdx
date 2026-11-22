@@ -123,5 +123,10 @@ every `div` attribute but `children`.
 
 `position: absolute` at the viewport's origin, and `isolation: isolate`: the nodes' `z-index` (a
 selected node raised) orders them among themselves and never lifts one above what follows the
-layer in `Flow.Viewport` (the connection line). The layer is part of the pane: a press on it, off
+layer in `Flow.Viewport` (the connection line). While an edge stands above some node
+(`render-layers` has several levels), the layer drops its `isolation`, so the nodes' z-indexes
+(negative ranks, then) interleave with the edges' layers in the viewport; the nodes never leave
+it. Keep it, and `Flow.Edges`, free of anything that makes a stacking context (`opacity` below 1,
+`transform`, `filter`, `isolation`, a `z-index`), or the layering breaks
+([z-order](/docs/concepts/nodes-and-edges#z-order)). The layer is part of the pane: a press on it, off
 any node, pans or draws a selection box.
