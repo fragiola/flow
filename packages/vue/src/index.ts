@@ -45,6 +45,11 @@ export type {
 } from "./components/node-toolbar";
 export type { NodesProps, NodesSlots, NodesState } from "./components/nodes";
 export type {
+    NodesSelectionProps,
+    NodesSelectionSlots,
+    NodesSelectionState,
+} from "./components/nodes-selection";
+export type {
     ReconnectAnchorProps,
     ReconnectAnchorSlots,
     ReconnectAnchorState,
@@ -90,6 +95,7 @@ export {
 export { useEdges } from "./composables/use-edges";
 export { type UseFlowResult, useFlow } from "./composables/use-flow";
 export { useFlowRef } from "./composables/use-flow-ref";
+export { useFlowStore } from "./composables/use-flow-store";
 export {
     type HandleElementProps,
     type HandleState,
@@ -97,13 +103,28 @@ export {
     type UseHandleResult,
     useHandle,
 } from "./composables/use-handle";
+export { useInternalNode } from "./composables/use-internal-node";
+export {
+    type UseKeyPressOptions,
+    useKeyPress,
+} from "./composables/use-key-press";
 export {
     type NodeElementProps,
     type NodeState,
     type UseNodeResult,
     useNode,
 } from "./composables/use-node";
+export {
+    type UseNodeConnectionsOptions,
+    useNodeConnections,
+} from "./composables/use-node-connections";
+export { useNodeId } from "./composables/use-node-id";
 export { useNodes } from "./composables/use-nodes";
+export { useNodesData } from "./composables/use-nodes-data";
+export {
+    type UseOnViewportChangeOptions,
+    useOnViewportChange,
+} from "./composables/use-on-viewport-change";
 export { type FlowSelection, useSelection } from "./composables/use-selection";
 export { useViewport } from "./composables/use-viewport";
 export * as Flow from "./parts";
