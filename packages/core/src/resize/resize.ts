@@ -18,7 +18,18 @@ export interface ResizeOptions {
     readonly maxHeight: number;
     /** whether a resize keeps the node's width-to-height ratio; default false */
     readonly keepAspectRatio: boolean;
+    /**
+     * the grid (flow units) the moved sides snap to while resizing by pointer, so sizes and
+     * positions land on it; none: no snap (the drag feature's `snapGrid` is its own)
+     */
+    readonly snap: { readonly x: number; readonly y: number } | undefined;
 }
+
+/**
+ * The sides a resizer moves (its own option, `engine.adapter.setPartOptions("resizer", nodeId,
+ * { direction })`): `horizontal` only widths and x, `vertical` only heights and y; none: both.
+ */
+export type ResizeDirection = "horizontal" | "vertical";
 
 /** The resize feature, as `resize()` makes it. */
 export type ResizeFeature = FlowFeature<"resize", ResizeOptions>;
@@ -31,6 +42,9 @@ export function resize(options: Partial<ResizeOptions> = {}): ResizeFeature {
         maxWidth: options.maxWidth ?? Number.POSITIVE_INFINITY,
         maxHeight: options.maxHeight ?? Number.POSITIVE_INFINITY,
         keepAspectRatio: options.keepAspectRatio ?? false,
+        snap: options.snap
+            ? Object.freeze({ x: options.snap.x, y: options.snap.y })
+            : undefined,
     });
     return Object.freeze({
         name: "resize",
