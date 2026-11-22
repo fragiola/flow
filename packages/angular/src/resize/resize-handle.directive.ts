@@ -1,5 +1,9 @@
 import { computed, Directive, input, type Signal } from "@angular/core";
-import { partAttributes } from "@fragiola/flow";
+import {
+    type ResizeHandleDirection,
+    type ResizeHandleVariant,
+    resizeHandleAttributes,
+} from "@fragiola/flow";
 import {
     ɵbeforeInputs as beforeInputs,
     ɵbindAttributes as bindAttributes,
@@ -39,6 +43,16 @@ export const RESIZE_POSITIONS: readonly ResizePosition[] = Object.freeze([
 export interface ResizeHandleState {
     readonly nodeId: string;
     readonly position: ResizePosition;
+    /** its own direction, over its resizer's (`data-direction`); none: the resizer's */
+    readonly direction: ResizeHandleDirection | undefined;
+    /** how it is drawn (`data-variant`): a corner is always a `handle` */
+    readonly variant: ResizeHandleVariant;
+}
+
+/** A resize handle's own direction and variant (`bindResizeHandle`). */
+export interface ResizeHandleLook {
+    readonly direction?: ResizeHandleDirection | undefined;
+    readonly variant?: ResizeHandleVariant | undefined;
 }
 
 /**
@@ -87,28 +101,31 @@ const PLACE: Record<ResizePosition, StructuralStyle> = {
     },
 };
 
-const ATTRIBUTES = partAttributes("resize-handle");
-
 /**
  * @internal binds a resize handle of the node `nodeId` onto `element`: the engine's record
- * (`data-position`, and `tabindex` with `keyboard()`: the arrows resize)
+ * (`data-position`, `data-variant`, `data-direction`, and `tabindex` with `keyboard()`: the
+ * arrows resize)
  */
 export function bindResizeHandle(
     element: HTMLElement,
     context: FlowContext,
     nodeId: () => string | undefined,
     position: () => ResizePosition | undefined,
+    look: () => ResizeHandleLook = () => ({}),
 ): void {
     const attributes = flowValue(context, () => {
         const id = nodeId();
         const at = position();
+        const { direction, variant } = look();
         const engine = context.engine();
         return engine && id !== undefined && at !== undefined
             ? engine.adapter.attributes("resize-handle", {
                   nodeId: id,
                   position: at,
+                  direction,
+                  variant,
               })
-            : { ...ATTRIBUTES, "data-position": at };
+            : resizeHandleAttributes(at, { direction, variant });
     });
     bindAttributes(element, attributes);
     bindStructuralStyle(element, () => {
@@ -126,7 +143,8 @@ export function bindResizeHandle(
  * the app's element: `<div flowResizeHandle position="bottom-right">`. A press on it resizes its
  * node from that corner or side (`resize()`); with `keyboard()` too it takes focus and the arrows
  * move that corner or side. Placed on its corner (centred) or along its side; give it its size (a
- * side's thickness) and look.
+ * side's thickness) and look. Its `direction` overrides its resizer's; `variant="line"` marks a
+ * side's handle as a line for your styles.
  */
 @Directive({ selector: "[flowResizeHandle]", exportAs: "flowResizeHandle" })
 export class FlowResizeHandleDirective {
@@ -134,6 +152,16 @@ export class FlowResizeHandleDirective {
     readonly position = input.required<ResizePosition>();
     /** its node; default the enclosing `[flowNode]`'s */
     readonly nodeId = input<string | undefined>(undefined);
+    /**
+     * the sides it moves, over its resizer's `direction` (`data-direction`): `"horizontal"` only
+     * the width (and x), `"vertical"` only the height (and y); default the resizer's
+     */
+    readonly direction = input<ResizeHandleDirection | undefined>(undefined);
+    /**
+     * how it is drawn (`data-variant`, for your styles): `"handle"` (default) or `"line"`, a
+     * side's whole length; a corner's `"line"` is ignored
+     */
+    readonly variant = input<ResizeHandleVariant | undefined>(undefined);
 
     private readonly id = partOwnerId(
         "[flowResizeHandle]",
@@ -144,14 +172,27 @@ export class FlowResizeHandleDirective {
     private readonly at = computed(() =>
         beforeInputs(undefined, this.position),
     );
+    private readonly look = computed(
+        (): ResizeHandleLook => ({
+            direction: this.direction(),
+            variant: this.variant(),
+        }),
+    );
 
     /** the handle's state */
     readonly state: Signal<ResizeHandleState | undefined> = computed(() => {
         const nodeId = this.id();
         const position = this.at();
-        return nodeId === undefined || position === undefined
-            ? undefined
-            : { nodeId, position };
+        if (nodeId === undefined || position === undefined) return undefined;
+        const own = resizeHandleAttributes(position, this.look());
+        return {
+            nodeId,
+            position,
+            direction: own["data-direction"] as
+                | ResizeHandleDirection
+                | undefined,
+            variant: own["data-variant"] as ResizeHandleVariant,
+        };
     });
 
     constructor() {
@@ -160,6 +201,7 @@ export class FlowResizeHandleDirective {
             injectFlowContext("[flowResizeHandle]"),
             this.id,
             this.at,
+            this.look,
         );
     }
 }
