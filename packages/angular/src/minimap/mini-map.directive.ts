@@ -4,10 +4,15 @@ import {
     effect,
     inject,
     input,
+    output,
     type Signal,
     untracked,
 } from "@angular/core";
-import { type MinimapView, partAttributes } from "@fragiola/flow";
+import {
+    type FlowEngineEventOf,
+    type MinimapView,
+    partAttributes,
+} from "@fragiola/flow";
 import {
     ɵbindAttributes as bindAttributes,
     ɵbindStructuralStyle as bindStructuralStyle,
@@ -16,6 +21,7 @@ import {
     ɵinjectFlowContext as injectFlowContext,
     ɵinjectHost as injectHost,
     ɵonDestroy as onDestroy,
+    ɵoptionalBoolean as optionalBoolean,
     ɵoptionalNumber as optionalNumber,
     ɵpx as px,
 } from "@fragiola/flow-angular";
@@ -88,6 +94,19 @@ export class FlowMiniMapDirective {
     readonly height = input(150, {
         transform: (value: unknown) => optionalNumber(value) ?? 150,
     });
+    /**
+     * a drag on it moves the view the other way (as grabbing the flow), and a press does not
+     * centre the view; default `minimap()`'s `inversePan`
+     */
+    readonly inversePan = input(undefined, { transform: optionalBoolean });
+    /** how fast its wheel zooms: 10 is the flow's own wheel, 20 twice as fast; default `minimap()`'s `zoomStep` */
+    readonly zoomStep = input(undefined, { transform: optionalNumber });
+    /**
+     * a tap on it (the engine's `minimap-click`: `point`, the flow point under the pointer on the
+     * minimap, `client` and the DOM `event`): center the view there, add a node there. The root
+     * captures the pointer, so a DOM `(click)` never follows a press on it
+     */
+    readonly minimapClick = output<FlowEngineEventOf<"minimap-click">>();
 
     private readonly context = injectFlowContext("[flowMiniMap]");
 
@@ -125,6 +144,33 @@ export class FlowMiniMapDirective {
             width: px(this.width()),
             height: px(this.height()),
         }));
+        // its options over `minimap()`'s, one set for the root's minimaps (the engine's part options)
+        effect((onCleanup) => {
+            const engine = this.context.engine();
+            if (!engine) return;
+            const options = Object.fromEntries(
+                Object.entries({
+                    inversePan: this.inversePan(),
+                    zoomStep: this.zoomStep(),
+                }).filter(([, value]) => value !== undefined),
+            );
+            untracked(() =>
+                engine.adapter.setPartOptions("minimap", "", options),
+            );
+            onCleanup(() => engine.adapter.setPartOptions("minimap", "", null));
+        });
+        effect((onCleanup) => {
+            const engine = this.context.engine();
+            if (!engine) return;
+            const stop = untracked(() =>
+                engine.subscribe((event) => {
+                    if (event.type === "minimap-click") {
+                        this.minimapClick.emit(event);
+                    }
+                }),
+            );
+            onCleanup(stop);
+        });
         // React's default children: a node per node, then the mask
         defaultContent(host, (document) => {
             const mask = document.createElementNS(SVG, "path");

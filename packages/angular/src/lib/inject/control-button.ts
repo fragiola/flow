@@ -24,15 +24,10 @@ export function controlButton(
     part: string,
     action: EngineActionKey,
     disabledInput: () => boolean | undefined,
-    duration: () => number | undefined = () => undefined,
+    payload: () => object = () => ({}),
 ): { state: Signal<ControlButtonState>; click: () => void } {
     const context = injectFlowContext(`[flow${pascal(part)}]`);
     const host = injectHost<HTMLButtonElement>();
-    // its `duration` when given (an absent one is the engine's default)
-    const payload = () => {
-        const value = duration();
-        return value === undefined ? {} : { duration: value };
-    };
     const allowed = flowValue(context, () => {
         const engine = context.engine();
         return engine ? engine.can(action, payload() as never) : false;
@@ -54,6 +49,13 @@ export function controlButton(
             engine.run(action, payload() as never);
         },
     };
+}
+
+/** @internal a control's payload: the fields its inputs give (an absent one is the engine's default) */
+export function givenPayload<P extends object>(fields: P): Partial<P> {
+    return Object.fromEntries(
+        Object.entries(fields).filter(([, value]) => value !== undefined),
+    ) as Partial<P>;
 }
 
 /** `zoom-in` → `ZoomIn`. */
