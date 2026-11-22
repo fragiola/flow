@@ -415,9 +415,9 @@ engine's state attributes from `engine.adapter.attributes(part, payload)`):
 | `Root` | `div` `root` | owns the model (or takes `model`) and the engine, attaches the root; `position: relative; overflow: hidden` |
 | `Viewport` | `div` `viewport` | `attachViewport`: the engine writes its transform, React never does |
 | `Nodes` | `div` `nodes` | children function per node not hidden (`visible-nodes` with `onlyRenderVisible`), keyed by id |
-| `Node` | `div` `node` | `registerNode`; `transform: translate(x, y)` from `node-rect-by`, the document's `width`/`height`; `tabIndex` from `node-focusable` |
+| `Node` | `div` `node` | `registerNode`; `transform: translate(x, y)` from `node-rect-by` (its `nodeOrigin` applied), `z-index` from `node-z-index-by` (#25), the document's `width`/`height`; `tabIndex` from `node-focusable` |
 | `Handle` | `div` `handle` | `registerHandle({ nodeId, handleId, type, side, connectable })`; centred on its side by default (a style may move it) |
-| `Edges` | `div` + `svg` `edges` | children function per edge whose `edge-path-by` is defined; the `div` is the HTML layer labels portal into |
+| `Edges` | `div` + `svg` `edges` | children function per edge of `drawn-edges`, in its order (#25: shown, measured, by z-order); the `div` is the HTML layer labels portal into |
 | `Edge` | `g` `edge` | default child `EdgePath`; `pointer-events: visibleStroke`; `tabIndex` from `edge-focusable` |
 | `EdgePath` | `path` `edge-path` | `d` from `edge-path-by` (a `d` of your own draws an app type), `fill="none"` |
 | `EdgeLabel` | `div` `edge-label` | portal into the edges' HTML layer, centred on the label point |
@@ -426,7 +426,7 @@ engine's state attributes from `engine.adapter.attributes(part, payload)`):
 | `SelectionBox` | `div` `selection-box` | while a box is drawn, root-relative |
 | `Background` | `svg` `background` | `background-pattern`: `pattern` `background-pattern`, `circle`/`path` `background-mark` in `currentColor`, `rect` `background-fill` |
 | `Controls` | `div` `controls` | a group for the buttons |
-| `ZoomIn`, `ZoomOut`, `FitView` | `button` `zoom-in`, `zoom-out`, `fit-view` | run their action; `disabled` / `data-disabled` while `!engine.can(...)` |
+| `ZoomIn`, `ZoomOut`, `FitView` | `button` `zoom-in`, `zoom-out`, `fit-view` | run their action (with their `duration` prop, #25); `disabled` / `data-disabled` while `!engine.can(...)` |
 | `ToggleInteractive` | `button` `toggle-interactive` | `set-interactive`; `aria-pressed` while locked, `data-interactive` |
 | `NodeToolbar` | `div` `toolbar` | portal into the root at `node-toolbar-by` (outside the zoom); `open`, default while its node is selected |
 | `MiniMap` (`/minimap`) | `svg` `minimap` | `width` × `height` (200 × 150), `minimap-view`; children default: a `MiniMapNode` per node and the `MiniMapMask` |
@@ -439,8 +439,11 @@ engine's state attributes from `engine.adapter.attributes(part, payload)`):
 `features` warns); `viewport` (controlled: `set-viewport`) / `defaultViewport` and
 `onViewportChange(viewport, gesture)` (the `viewport-change` event); `fitView` (read once); the
 engine options `minZoom`, `maxZoom`, `translateExtent`, `panOnDrag`, `panOnScroll`, `zoomOnScroll`,
-`zoomOnPinch`, `zoomOnDoubleClick`, `zoomStep`, `interactive`, `onlyRenderVisible`, `pathOptions`
-(a change sends only the keys that changed, `adapter.setOptions`); `flowRef`.
+`zoomOnPinch`, `zoomOnDoubleClick`, `zoomStep`, `interactive`, `onlyRenderVisible`, `pathOptions`,
+and #23's and #24's (#25) `autoPan`, `panActivationKey`, `panOnScrollMode`, `panOnScrollSpeed`,
+`zoomActivationKey`, `easing`, `nodeOrigin`, `nodeExtent`, `elevateNodesOnSelect`,
+`elevateEdgesOnSelect` (the core's names and defaults; `panOnDrag` takes mouse buttons too; a
+change sends only the keys that changed, `adapter.setOptions`); `flowRef`.
 
 **Hooks:** `useFlow<T, F>()` → `{ model, engine }` (the engine a facade: there from the first
 render, an action refused before the mount); part hooks `useNode(node)`, `useEdge(edge)`,
@@ -493,6 +496,20 @@ Decisions of the adapter (#5):
   the gestures' real feel is the playground E2E's (#6, Chromium and Firefox, mouse and touch).
 - **A resize corner is above its sides** (`zIndex: 1` in its structural place, #6): the side
   handles span their whole side.
+- **The viewport and gesture options (#25).** An engine option's sent key tells `null` from
+  `undefined` (`panActivationKey={null}` is none, an absent one the default: undefined in
+  `setOptions` puts the default back) and keeps a function (`easing`) by identity (JSON drops it);
+  an equal new object (`nodeOrigin={{ x: 0.5, y: 0.5 }}` on each render) sends nothing. The node's
+  structural `z-index` is `node-z-index-by` (every node gets one, 0 by default, so each node is a
+  stacking context, as in xyflow); a render without an engine (the first, the server's) has none
+  and places nodes at `absolute-position-by`, which knows no `nodeOrigin` (the first client render
+  with the engine moves them). `ZoomIn`, `ZoomOut`, `FitView` take `duration` only (the payload
+  has it when given: `can` and `run` get `{ duration }`, or `{}`); `FitView`'s other payload
+  fields (`padding`, `nodeIds`) stay the engine's defaults. The edges' own filter is gone: `Edges`
+  renders `drawn-edges`, which applies `onlyRenderVisible` itself. `DRAG_HANDLE_ATTRIBUTE`
+  reaches the package through `export *`. Tested through a wrapped engine
+  (`tests/options.test.tsx`: `vi.mock` of the core's `createFlowEngine`, its frozen engine and
+  adapter inherited by a wrapper that records `setOptions` and `run`).
 
 For the playground and examples (#6, see [The playground and the examples](#the-playground-and-the-examples-issue-6)): wrap the flow in a sized element (the root fills it); put
 `Edges` before `Nodes` inside `Viewport`, and `Background`, `SelectionBox`, `Controls`, `MiniMap`

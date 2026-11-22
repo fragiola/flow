@@ -37,7 +37,7 @@ export interface UseNodeResult<T extends FlowTypes = AnyTypes> {
     state: NodeState<T>;
     /**
      * what goes on the node's element: its attributes, `tabIndex`, its structural style (absolute,
-     * at its position, with the document's size when given) and the ref that registers it with the
+     * at its position, its `z-index` among the nodes, with the document's size when given) and the ref that registers it with the
      * engine (measured)
      */
     props: {
@@ -51,6 +51,8 @@ interface NodeView {
     attributes: PartAttributes;
     x: number;
     y: number;
+    /** its structural `z-index` (`node-z-index-by`); none without an engine */
+    zIndex: number | undefined;
     focusable: boolean;
 }
 
@@ -73,6 +75,7 @@ export function useNode<T extends FlowTypes = AnyTypes>(
                 },
                 x: at?.x ?? node.position.x,
                 y: at?.y ?? node.position.y,
+                zIndex: undefined,
                 focusable: false,
             };
         }
@@ -81,6 +84,7 @@ export function useNode<T extends FlowTypes = AnyTypes>(
             attributes: engine.adapter.attributes("node", { nodeId }),
             x: rect?.x ?? node.position.x,
             y: rect?.y ?? node.position.y,
+            zIndex: engine.get("node-z-index-by", { nodeId }),
             focusable: engine.is("node-focusable", { nodeId }),
         };
     });
@@ -98,6 +102,7 @@ export function useNode<T extends FlowTypes = AnyTypes>(
         top: 0,
         left: 0,
         transform: `translate(${view.x}px, ${view.y}px)`,
+        ...(view.zIndex === undefined ? {} : { zIndex: view.zIndex }),
         ...(node.width === undefined ? {} : { width: node.width }),
         ...(node.height === undefined ? {} : { height: node.height }),
     };

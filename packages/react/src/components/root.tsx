@@ -57,6 +57,16 @@ export type RootEngineProps = Pick<
     | "interactive"
     | "onlyRenderVisible"
     | "pathOptions"
+    | "autoPan"
+    | "panActivationKey"
+    | "panOnScrollMode"
+    | "panOnScrollSpeed"
+    | "zoomActivationKey"
+    | "easing"
+    | "nodeOrigin"
+    | "nodeExtent"
+    | "elevateNodesOnSelect"
+    | "elevateEdgesOnSelect"
 >;
 
 export interface RootProps<
@@ -127,19 +137,27 @@ function useWarnOnce() {
     };
 }
 
-/** Each engine option's value as a key: a new equal object (`pathOptions`) is the same. */
-function optionKeys(options: RootEngineProps): Record<string, string> {
+/**
+ * Each engine option's value as a key: a new equal object (`pathOptions`) is the same, a function
+ * (`easing`) is itself, and `null` (`panActivationKey={null}`: none) is not `undefined` (the
+ * default).
+ */
+function optionKeys(options: RootEngineProps): Record<string, unknown> {
     return Object.fromEntries(
         Object.entries(options).map(([key, value]) => [
             key,
-            JSON.stringify(value ?? null),
+            typeof value === "function" || value === undefined
+                ? value
+                : JSON.stringify(value),
         ]),
     );
 }
 
-/** A key that changes when an engine option's value does. */
+/** A key that changes when an engine option's value does (but a function's: see `easing`). */
 function optionsKey(options: RootEngineProps): string {
-    return JSON.stringify(optionKeys(options));
+    return JSON.stringify(optionKeys(options), (_key, value) =>
+        value === undefined ? "undefined" : value,
+    );
 }
 
 const DEFAULT_VIEWPORT: Viewport = Object.freeze({ x: 0, y: 0, zoom: 1 });
@@ -186,6 +204,16 @@ export function Root<
         interactive,
         onlyRenderVisible,
         pathOptions,
+        autoPan,
+        panActivationKey,
+        panOnScrollMode,
+        panOnScrollSpeed,
+        zoomActivationKey,
+        easing,
+        nodeOrigin,
+        nodeExtent,
+        elevateNodesOnSelect,
+        elevateEdgesOnSelect,
         children,
         ...rest
     } = props;
@@ -227,6 +255,16 @@ export function Root<
         interactive,
         onlyRenderVisible,
         pathOptions,
+        autoPan,
+        panActivationKey,
+        panOnScrollMode,
+        panOnScrollSpeed,
+        zoomActivationKey,
+        easing,
+        nodeOrigin,
+        nodeExtent,
+        elevateNodesOnSelect,
+        elevateEdgesOnSelect,
     };
     const engineKey = optionsKey(engineProps);
     // the callbacks and the creation options are read when needed: a new function each render
@@ -253,7 +291,7 @@ export function Root<
     const [engine, setEngine] = React.useState<AnyFlowEngine | null>(null);
     // the engine options last sent, by key: a change sends only the keys that changed (an
     // `interactive` that stays must not undo the lock of `Flow.ToggleInteractive`)
-    const sentOptions = React.useRef<Record<string, string>>({});
+    const sentOptions = React.useRef<Record<string, unknown>>({});
     // the engine is created once mounted, in the commit (StrictMode's second mount creates a new
     // one), so that no render ever attaches or observes anything
     useIsomorphicLayoutEffect(() => {
@@ -298,7 +336,7 @@ export function Root<
         live.adapter.setOptions(
             Object.fromEntries(changed.map((key) => [key, props[key]])),
         );
-    }, [live, engineKey]);
+    }, [live, engineKey, easing]);
 
     // a controlled viewport that differs from the engine's is set on it
     useIsomorphicLayoutEffect(() => {
