@@ -143,6 +143,36 @@ describe("keyboard resizing", () => {
         expect(box(flow, "n")).toMatchObject({ x: 90, y: 95 });
     });
 
+    it("keeps the ratio of a node placed at its centre (nodeOrigin), the box's position turned back", () => {
+        const flow = mount(flowOf({ n: [100, 100] }), {
+            features: [resize({ keepAspectRatio: true }), keyboard()],
+            sizes: { n: [100, 50] },
+            engine: { nodeOrigin: { x: 0.5, y: 0.5 } },
+        }) as unknown as Flow;
+        // its box: (50, 75), 100 × 50
+        key(resizeHandle(flow.node("n"), "right"), "ArrowRight", {
+            shiftKey: true,
+        });
+        expect(flow.engine.get("node-rect-by", { nodeId: "n" })).toEqual({
+            x: 50,
+            y: 75,
+            width: 120,
+            height: 60,
+        });
+        expect(box(flow, "n")).toEqual({
+            x: 110,
+            y: 105,
+            width: 120,
+            height: 60,
+        });
+        key(resizeHandle(flow.node("n"), "top-left"), "ArrowLeft");
+        const rect = flow.engine.get("node-rect-by", { nodeId: "n" });
+        expect(rect?.x).toBeCloseTo(45);
+        expect(rect?.y).toBeCloseTo(72.5);
+        expect(rect?.width).toBeCloseTo(125);
+        expect(rect?.height).toBeCloseTo(62.5);
+    });
+
     it("is refused while not interactive", () => {
         const flow = one([resize(), keyboard()]);
         flow.engine.run("set-interactive", { interactive: false });

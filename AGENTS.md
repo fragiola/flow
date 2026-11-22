@@ -1728,7 +1728,15 @@ Decisions of the graph and geometry helpers, the toolbars and the keyboard flows
   `active()` answers false). So Escape (in the root or anywhere in the page), `cancel-gesture`,
   `set-interactive false`, a detach and `destroy` cancel it with no new code, and Escape never
   also clears the selection. A pointer press while it waits cancels it (its `end`); pointer moves do
-  nothing.
+  nothing. **It keeps to its source handle** (#27's review): only keys whose target is inside that
+  handle are its own (a field's Space, a toolbar button's Enter reach them untouched), it cancels
+  when focus leaves the handle (`focusout`: a field clicked, a button focused, the window left) and
+  when its source node goes away (a model commit without it: a delete key, code); the engine
+  forgets a waiting gesture whose `active()` turned false before every press, move, key and
+  `cancel-gesture` (`dropEnded`). Delete keys are not swallowed while it waits: they remove as
+  usual, and removing the source node cancels the connection first. A held Enter's or Space's
+  repeats (`event.repeat`) neither start nor connect (a repeat while it waits is taken, so the page
+  does not get it either).
 - **Keys of a keyboard connection**: Enter or Space (no Ctrl, Alt, Meta) on a focused handle
   starts; Tab / ArrowRight / ArrowDown point at the next target, Shift + Tab / ArrowLeft / ArrowUp
   the previous, round the list; Enter or Space connect (`edge.add`, one non-transient commit);

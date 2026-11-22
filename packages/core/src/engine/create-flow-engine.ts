@@ -472,6 +472,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 return ok({ interactive });
             },
             "cancel-gesture": (_payload, dryRun) => {
+                this.dropEnded();
                 if (
                     !this.press &&
                     !this.pinch &&
@@ -1547,6 +1548,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     private pointerDown(event: PointerEvent): void {
         if (this.destroyed) return;
+        this.dropEnded();
         const client = { x: event.clientX, y: event.clientY };
         // only touch pointers pinch: the others are never tracked
         if (event.pointerType === "touch") {
@@ -1673,6 +1675,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     /** A key went down or up in the root's document: the activation keys read it. */
     private keyHeld(event: KeyboardEvent, down: boolean): void {
+        this.dropEnded();
         // a connection a tap started waits without a press, often with focus outside the root (the
         // handle's press kept it from moving): Escape anywhere in the page cancels it
         if (down && event.key === "Escape" && this.following && !this.press) {
@@ -1736,6 +1739,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     private pointerMove(event: PointerEvent): void {
         if (this.destroyed) return;
+        this.dropEnded();
         const client = { x: event.clientX, y: event.clientY };
         if (this.pointers.has(event.pointerId))
             this.pointers.set(event.pointerId, client);
@@ -1861,6 +1865,14 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             return;
         }
         if (this.press?.pointerId === event.pointerId) this.cancelPress();
+    }
+
+    /**
+     * Forgets a gesture going on without a press that ended by itself (a keyboard connection whose
+     * handle lost focus or whose node went away): its `active()` answers false.
+     */
+    private dropEnded(): void {
+        if (this.following?.active?.() === false) this.following = undefined;
     }
 
     /** Ends the gesture a tap started without committing. */
@@ -2011,6 +2023,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     private keyDown(event: KeyboardEvent): void {
         if (this.destroyed) return;
+        this.dropEnded();
         if (
             event.key === "Escape" &&
             (this.press || this.pinch || this.following)

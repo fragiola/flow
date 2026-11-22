@@ -326,3 +326,115 @@ describe("handle focusability", () => {
         expect(enter.defaultPrevented).toBe(false);
     });
 });
+
+describe("a waiting keyboard connection keeps to its handle", () => {
+    /** Both features and the selection, a's handle focusable and an input inside a. */
+    function focused() {
+        const flow = flow3();
+        const out = flow.handle("a", "source", "out");
+        out.tabIndex = 0;
+        const field = document.createElement("input");
+        flow.node("a").append(field);
+        out.focus();
+        return { ...flow, out, field };
+    }
+
+    it("ends when focus goes to a field, which then types its keys", () => {
+        const { engine, events, model, out, field } = focused();
+        key(out, "Enter");
+        expect(engine.is("connecting")).toBe(true);
+        field.focus();
+        expect(events.at(-1)).toEqual({
+            type: "connect-cancel",
+            refused: false,
+            input: "keyboard",
+        });
+        expect(engine.is("connecting")).toBe(false);
+        for (const name of [" ", "Enter", "Tab", "ArrowLeft"]) {
+            expect(key(field, name).defaultPrevented, name).toBe(false);
+        }
+        expect(model.get("all-edges")).toEqual([]);
+        // the ended gesture is gone: nothing to cancel
+        expect(engine.run("cancel-gesture").ok).toBe(false);
+    });
+
+    it("takes no key from elsewhere while it waits (a field, a button in the root)", () => {
+        const { engine, model, root, out, field } = focused();
+        key(out, "Enter");
+        // keys dispatched elsewhere without moving focus are still not its own
+        expect(key(field, " ").defaultPrevented).toBe(false);
+        const controls = document.createElement("div");
+        controls.setAttribute("data-flow-part", "controls");
+        const button = document.createElement("button");
+        controls.append(button);
+        root.append(controls);
+        expect(key(button, "Enter").defaultPrevented).toBe(false);
+        expect(model.get("all-edges")).toEqual([]);
+        expect(engine.is("connecting")).toBe(true);
+        key(out, "Enter");
+        expect(model.get("all-edges")).toHaveLength(1);
+    });
+
+    it("cancels when its source node is removed (a delete key)", () => {
+        const { engine, events, model, out } = focused();
+        model.run("selection.set", { nodeIds: ["a"] });
+        key(out, "Enter");
+        key(out, "Delete");
+        expect(model.get("node-by", { id: "a" })).toBeUndefined();
+        expect(events.at(-1)).toEqual({
+            type: "remove",
+            nodeIds: ["a"],
+            edgeIds: [],
+        });
+        expect(events.at(-2)).toEqual({
+            type: "connect-cancel",
+            refused: false,
+            input: "keyboard",
+        });
+        expect(engine.is("connecting")).toBe(false);
+        expect(engine.run("cancel-gesture").ok).toBe(false);
+    });
+
+    it("a held Enter's repeats neither start nor connect", () => {
+        const { engine, events, model, out } = focused();
+        expect(key(out, "Enter", { repeat: true }).defaultPrevented).toBe(
+            false,
+        );
+        expect(events).toEqual([]);
+        key(out, "Enter");
+        expect(key(out, "Enter", { repeat: true }).defaultPrevented).toBe(true);
+        expect(engine.is("connecting")).toBe(true);
+        expect(model.get("all-edges")).toEqual([]);
+    });
+
+    it("Escape on the page's body cancels it", () => {
+        const { engine, events, out } = focused();
+        key(out, "Enter");
+        key(document.body, "Escape");
+        expect(events.at(-1)).toMatchObject({
+            type: "connect-cancel",
+            input: "keyboard",
+        });
+        expect(engine.is("connecting")).toBe(false);
+    });
+
+    it("Enter on a handle while a click-to-connect connection waits starts nothing", () => {
+        const clicks = flow([connection({ clickToConnect: true }), keyboard()]);
+        const out = clicks.handle("a", "source", "out");
+        pointer(out, "pointerdown", { clientX: 100, clientY: 25 });
+        pointer(clicks.root, "pointerup", { clientX: 100, clientY: 25 });
+        expect(clicks.events.map((event) => event.type)).toEqual([
+            "connect-start",
+        ]);
+        key(clicks.handle("b", "source", "b-out"), "Enter");
+        expect(clicks.events.map((event) => event.type)).toEqual([
+            "connect-start",
+        ]);
+        expect(clicks.engine.get("connection")?.from.nodeId).toBe("a");
+        key(out, "Escape");
+        expect(clicks.events.at(-1)).toMatchObject({
+            type: "connect-cancel",
+            input: "pointer",
+        });
+    });
+});
