@@ -399,7 +399,7 @@ viewport from it.
 | `"selection-context-menu"` | `nodeIds`, `edgeIds`, `point`, `client`, `event` | a context menu on a selected node while several nodes are selected (instead of `node-context-menu`), or on the rectangle around the selection (`nodes-selection`) |
 | `"drag-start"` | `nodeIds` | a drag of these nodes started (`drag()`) |
 | `"nodes-move"` | `nodeIds`, `source` | nodes were dropped after a drag, or moved by the arrows; `source` is a `MoveSource`, `"pointer"` or `"keyboard"` |
-| `"drag-cancel"` | `nodeIds` | a drag was cancelled: its nodes went back |
+| `"drag-cancel"` | `nodeIds` | a drag was cancelled: its nodes went back (also the cancel of a drag of the selection rectangle, which has no event of its own) |
 | `"minimap-click"` | `point`, `client`, `event` (a `FlowPointerInfo`) | a tap on a minimap (`minimap()`), `point` the flow point under it on the minimap; not a root callback (the `MiniMap`'s `onClick`) |
 | `"selection-drag-start"`, `"selection-drag"`, `"selection-drag-end"` | `nodeIds`, `client`, `point` (a `SelectionDragStep`) | a press on the rectangle around the selection (`nodes-selection`, `drag()`) dragged the selection, as a node drag (threshold, snap, extent, auto-pan): it started (instead of `drag-start`), moved its nodes (each step), dropped them (after their `nodes-move`); a cancel is `drag-cancel` |
 | `"connect-start"` | `nodeId`, `handleId`, `handleType`, `input` | a connection started from a handle (`connection()`); `input` (a `MoveSource`): `"pointer"` (a drag or a tap) or `"keyboard"` (Enter on a focused handle, with `keyboard()`) |
