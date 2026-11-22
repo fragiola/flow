@@ -75,7 +75,7 @@ const Flow = typedFlow<Types, typeof features>();
         <Flow.Background variant="cross" :class="styles.cross" />
         <Flow.Viewport>
             <Flow.Nodes v-slot="{ node }">
-                <Flow.Node :node="node" :class="styles.node">
+                <Flow.Node :node="node" :aria-label="node.data.label" :class="styles.node">
                     <span :class="styles.title">{{ node.data.label }}</span>
                     <template v-if="node.type === 'note'">
                         <p :class="styles.text">{{ node.data.text }}</p>

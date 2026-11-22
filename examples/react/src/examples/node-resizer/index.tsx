@@ -74,7 +74,11 @@ function Handles({ nodeId }: { nodeId: string }) {
 
 function renderNode(node: FlowNode<Types>) {
     return (
-        <Flow.Node<Types> node={node} className={styles.node}>
+        <Flow.Node<Types>
+            node={node}
+            aria-label={node.data.label}
+            className={styles.node}
+        >
             <span className={styles.title}>{node.data.label}</span>
             {node.type === "note" ? (
                 <>

@@ -71,7 +71,7 @@
     <Flow.Viewport>
         <Flow.Nodes>
             {#snippet children(node)}
-                <Flow.Node {node} class={styles.node}>
+                <Flow.Node {node} aria-label={node.data.label} class={styles.node}>
                     <span class={styles.title}>{node.data.label}</span>
                     {#if node.type === "note"}
                         <p class={styles.text}>{node.data.text}</p>

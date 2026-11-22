@@ -72,7 +72,7 @@ const nodes: FlowNodeInput<Types>[] = [
             <div flowViewport>
                 <div flowNodes>
                     <ng-template [flowNodesItem]="model" let-node>
-                        <div [flowNode]="node" [class]="styles.node">
+                        <div [flowNode]="node" [attr.aria-label]="node.data.label" [class]="styles.node">
                             <span [class]="styles.title">{{ node.data.label }}</span>
                             @if (node.type === "note") {
                                 <p [class]="styles.text">{{ node.data.text }}</p>
