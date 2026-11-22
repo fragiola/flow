@@ -581,7 +581,7 @@ describe("the React reference", () => {
 const AHEAD_IN_REACT: Record<"vue" | "svelte" | "angular", readonly string[]> =
     {
         vue: [],
-        svelte: ["NodesSelection"],
+        svelte: [],
         angular: ["NodesSelection"],
     };
 const notAhead =

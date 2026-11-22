@@ -136,6 +136,7 @@ Every part takes the props of its React page (for example [Root](/docs/api/primi
 | `onnodeschange` | `Flow.Root` | called with the model's nodes after every command that changes them |
 | `onedgeschange` | `Flow.Root` | called with the model's edges after every command that changes them |
 | `onviewportchange` | `Flow.Root` | called on every viewport change, `(viewport, gesture)`, `gesture` true for a pan, a zoom or a pinch |
+| `onclick` | `MiniMap` | a tap on it, `(event, point)` with the flow point under the pointer: React's `onClick`, the engine's `minimap-click` (the root captures the pointer, so a DOM `click` never reaches the minimap; give it `ondblclick` or another handler for those) |
 | `onnodeclick`, `onmovestart`, … | `Flow.Root` | one callback per [root callback](/docs/api/primitives/root#props), lowercase as the root's other callbacks (`oninit`, `onnodeclick`, `onpanecontextmenu`, `onconnectcancel`, `onresizeend`, `ondelete`, …), called with the engine event |
 
 | snippet | of | receives |
@@ -164,13 +165,16 @@ What differs from React, part by part:
   and **`Flow.EdgeToolbar`** in the root's element: Svelte has no portal, so each one mounts its content there with every
   context of its place (`useFlow` works inside) and unmounts it with the part. `bind:ref` and an
   attachment reach the mounted element.
+- **`Flow.NodesSelection`** goes inside `Flow.Viewport` after `Flow.Nodes` (it is in flow
+  coordinates), and renders only while `selection-rect` is there; its `children` snippet gets
+  `{ state }` (`rect`, `dragging`).
 - **`MiniMap`** and **`NodeResizer`** come from `@fragiola/flow-svelte/minimap` and
   `@fragiola/flow-svelte/resize`, with `MiniMapNode`, `MiniMapMask`, `ResizeHandle` and
   `RESIZE_POSITIONS`.
 
 The props and state of each part are typed by its exports: `RootProps`, `RootEngineProps`, `RootEventProps`,
 `RootState`; `ViewportProps`, `ViewportState`; `BackgroundProps`, `BackgroundState`; `NodesProps`,
-`NodesState`; `NodeProps`; `HandleProps`; `EdgesProps`, `EdgesState`; `EdgeProps`;
+`NodesState`; `NodesSelectionProps`, `NodesSelectionState`; `NodeProps`; `HandleProps`; `EdgesProps`, `EdgesState`; `EdgeProps`;
 `EdgePathProps`, `EdgePathState`; `EdgeLabelProps`, `EdgeLabelState`; `EdgeToolbarProps`,
 `EdgeToolbarState`; `ReconnectAnchorProps`,
 `ReconnectAnchorState`; `ConnectionLineProps`, `ConnectionLineState`; `SelectionBoxProps`,
@@ -202,6 +206,13 @@ once in the script, its value would stay the first one.
 | `useHandle(options)` | `useHandle(optionsOrGetter)`: `UseHandleResult`, `state` (`HandleState`) and `props` (`HandleElementProps`) as getters; `UseHandleOptions` as React's |
 | `useFlowRef()`, `createFlowRef()` | the same names: a `FlowRef<T, F>` whose `current` is reactive |
 | `ControlButtonState` | the same: the state of `Flow.ZoomIn`, `Flow.ZoomOut` and `Flow.FitView` |
+| `useFlowStore<S, T, F>(selector, equal)` | `useFlowStore<S, T, F>(selector, equal = Object.is)`: `FlowValue<S>`, which notifies only when the selected value changes |
+| `useNodeId()` | `useNodeId()`: `string \| null`, the enclosing `Flow.Node`'s id (read once: a node's id does not change) |
+| `useNodesData<T>(id)`, `useNodesData<T>(ids)` | `useNodesData<T>(idOrGetter)`: `FlowValue<NodeData<T> \| null>`; `useNodesData<T>(idsOrGetter)`: `FlowValue<readonly NodeData<T>[]>` |
+| `useNodeConnections(options)` | `useNodeConnections(optionsOrGetter)`: `FlowValue<readonly NodeConnection[]>`; `UseNodeConnectionsOptions` as React's (`id`, `handleId`, `type`); it throws outside a `Flow.Node` without an `id` |
+| `useInternalNode<T>(id)` | `useInternalNode<T>(idOrGetter)`: `FlowValue<InternalNode<T> \| undefined>` |
+| `useKeyPress(keys, options)` | `useKeyPress(keysOrGetter, optionsOrGetter)`: `FlowValue<boolean>`; `UseKeyPressOptions` as React's (`target`, default the root's window); outside a root it needs a `target` |
+| `useOnViewportChange({ onStart, onChange, onEnd })` | `useOnViewportChange(optionsOrGetter)`: `UseOnViewportChangeOptions` with lowercase callbacks, `onstart`, `onchange`, `onend`, each `(viewport, gesture)`, read at each event |
 
 ```svelte title="selected-count.svelte"
 <script lang="ts">
