@@ -202,11 +202,9 @@ the playground, `examples/shared` and `examples/react`), and **never runs `playw
 in one PR. `main` has no required checks: a skipped job blocks nothing.
 
 **Shards: none.** Shard a suite only when its test step alone passes about 3 minutes. Measured
-locally (4 workers; CI runs 2): the playground's 90 tests (45 per browser) in ~23 s, the React
-examples' 175 tests (95 smoke runs: 19 examples × 5 themes) in ~45 s, the embed build included;
-the Vue examples' 175 tests in ~16 s (~17 s with its embed build); the Svelte examples' 175 tests
-in ~17 s (~19 s with its embed build); the Angular examples' 175 tests in ~28 s (~29 s with its
-embed build).
+locally (4 workers; CI runs 2): the playground's 120 tests (60 per browser) in ~30 s, each
+examples app's 178 tests (95 smoke runs: 19 examples × 5 themes) in ~20 to ~45 s, its embed build
+included (measured after #25; Angular and React the slower).
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
@@ -935,7 +933,10 @@ the authoring guide): Basics `basic`, `custom-nodes`, `edge-types`, `edge-labels
 `snap-to-grid`, `minimap-and-controls`; Building blocks `sub-flows`, `node-resizer`,
 `node-toolbar`, `add-nodes`, `save-and-restore`, `undo-redo`, `announcements`; Apps
 `workflow-builder` (the landing's showcase). `_kit/persistence.ts` and `_kit/undo.ts` are the
-copyable app policy.
+copyable app policy. Epic #26's options where they are natural (#25): `custom-nodes`' preview drags
+only by its title bar (`data-flow-drag-handle`, `styles.dragHandle` and `styles.grip` from the
+theme tokens), `minimap-and-controls`' zoom and fit-view buttons animate for 200 ms (`duration`),
+the same in the four apps; the shared specs cover both.
 
 **Theme tokens** (`--fl-*`; `tests/themes.test.ts` holds the list, `e2e/themes.spec.ts` checks the
 shapes differ on computed styles): shape `font`, `font-size`, `title-weight`, `node-padding`,
@@ -950,13 +951,19 @@ square everything, dashed edges, crosses.
 
 **The playground** (`apps/playground`, `pnpm dev`, port 5197): the examples in place (themes,
 source panel), scenarios (`src/scenarios/<area>/<id>.tsx`, default export only: `gestures/every-
-feature`, `performance/five-hundred-nodes`, `api/commands`), the inspector
+feature`, `gestures/viewport-options`, `gestures/click-to-connect-and-drag-handles`,
+`gestures/origin-extent-and-z-order` (#25: every option of Epic #26 behind a control),
+`performance/five-hundred-nodes`, `api/commands`), the inspector
 (`src/inspector/flow-inspector.tsx`: viewport, gestures under way, selection, engine events, the
 document) and `fixtures/basic`, the unstyled flow its specs drive (`src/fixture/flow-fixture.tsx`:
 every feature, an 800 × 500 root at the page's corner, the viewport at `{ x: 100, y: 100, zoom:
-1 }`, its document, viewport and events printed beside it). Its suite runs on Chromium and Firefox:
-pan, wheel, double-click and pinch zoom, drag (selection, cancel, extent, snap), connect,
-reconnect, box select, resize, keyboard and minimap, each with the mouse and with fingers
+1 }`, its document, viewport and events printed beside it; its query turns options on:
+`boxOnDrag=1`, `snap=20`, and since #25 `clickToConnect=1`, `dragHandle=1` (a `grip` drag handle in a and b),
+`origin=0.5` (`nodeOrigin`), `panOnDrag=0,1`, `duration=300` (the controls)). Its suite runs on
+Chromium and Firefox: pan, wheel, double-click and pinch zoom, drag (selection, cancel, extent,
+snap), connect, reconnect, box select, resize, keyboard and minimap, and (`e2e/gestures.spec.ts`,
+#25) auto-pan, animated controls, the middle-button and Space pans, click-to-connect, drag handles,
+`nodeOrigin` and a selected node's z-order, each with the mouse and with fingers
 (`e2e/helpers.ts` `touch`: Chromium's real touch input through the DevTools protocol, touch
 pointer events in Firefox), and the 500-node scenario's re-render count.
 
@@ -1074,8 +1081,8 @@ markup, the file without its `<script>` / `<style>` blocks, has `<Flow.Root>` in
 no `class="…"`, string inside `class={…}`, `class:` directive or `cn()`).
 
 **The docs.** Every `<Framework name="vue">` block is followed by its `<Framework name="svelte">`
-twin (129 each, as React's): a `svelte` component, or the same `ts` with `@fragiola/flow-svelte`,
-and an "In Svelte, …" note where it differs. Installation adds `pnpm add @fragiola/flow-svelte`;
+twin (136 each since #25, as React's): a `svelte` component, or the same `ts` with
+`@fragiola/flow-svelte`, and an "In Svelte, …" note where it differs. Installation adds `pnpm add @fragiola/flow-svelte`;
 the Hero's eyebrow is `@fragiola/flow · React · Vue · Svelte`; `api/primitives/svelte` (sidebar:
 after `vue`) maps React's API onto Svelte's and names every Svelte export.
 
@@ -1147,8 +1154,8 @@ template has `flowRoot`; no `class="…"` / `class='…'`, string inside `[class
 `contents`).
 
 **The docs.** Every `<Framework name="svelte">` block is followed by its `<Framework
-name="angular">` twin (129 each, as React's): a standalone component in a `ts` fence, a template
-excerpt in an `html` fence, or the same `ts` with `@fragiola/flow-angular`, and an "In Angular, …"
+name="angular">` twin (136 each since #25, as React's): a standalone component in a `ts` fence, a
+template excerpt in an `html` fence, or the same `ts` with `@fragiola/flow-angular`, and an "In Angular, …"
 note where it differs. Installation adds `pnpm add @fragiola/flow-angular`; the Hero's eyebrow is
 `@fragiola/flow · React · Vue · Svelte · Angular` (the title unchanged); `api/primitives/angular`
 ("Angular directives", sidebar: after `svelte`) maps React's API onto Angular's and names every
@@ -1611,3 +1618,28 @@ z-order (#24, Epic #26):
   since the handle's press may have kept the focus outside the root.
 - **Resizing a node already past its bounds** gives it its least size (`minWidth`/`minHeight`) on
   that side instead of a negative one.
+
+Decisions of the docs, examples and E2E of the new options (#25, part 2, Epic #26):
+
+- **The playground's fixture takes query options** (`clickToConnect`, `dragHandle`, `origin`,
+  `panOnDrag`, `duration`) rather than a second fixture page: the specs keep one known layout
+  (800 × 500, viewport at `{ x: 100, y: 100 }`) and `openFixture`'s checks. The three new
+  `gestures/` scenarios are for a human (controls over every option, the inspector beside); a
+  scenarios spec only proves they render without an error.
+- **An animation is proven by its frames**: the specs sample the viewport element's computed
+  `transform` on every `requestAnimationFrame` after the press and expect zooms strictly between
+  the start and the end (and none without `duration`). Specs that read a zoom after a button wait
+  for it to settle (two equal polls), so they pass with or without an animation.
+- **The examples use what a reader would copy**: a title-bar drag handle (the common node UI) and
+  a 200 ms animation on the controls; auto-pan, the pan key and elevate-on-select are defaults, so
+  every example already has them. `nodeOrigin`, `nodeExtent` and click-to-connect stay in the
+  docs and the playground: no example needs them, and a gallery example built only to show an
+  option would not be one an app copies.
+- **The drag handle is the literal attribute** (`data-flow-drag-handle`) in the examples and the
+  docs, identical in the four frameworks; `DRAG_HANDLE_ATTRIBUTE` is named for code that builds
+  it.
+- **Edges over nodes and a per-node origin are "Not yet"** in `limitations.mdx` (a cost decision,
+  not a principle); the first render's top-left placement and missing `z-index`, the overridden
+  `z-index` and the gesture-only extent rectangle are known limits there.
+- **No adapter or core change was needed**: every new spec passed on the first run in the
+  playground (Chromium, Firefox) and in the four examples apps.
