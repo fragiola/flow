@@ -15,6 +15,7 @@ const engines = vi.hoisted(
             options: FlowEngineOptions;
             setOptions: ReturnType<typeof vi.fn>;
             run: ReturnType<typeof vi.fn>;
+            refocus: ReturnType<typeof vi.fn>;
         }[],
 );
 
@@ -33,10 +34,14 @@ vi.mock("@fragiola/flow", async (importOriginal) => {
                     payload,
                 ),
             );
-            engines.push({ options, setOptions, run });
-            // the engine and its adapter are frozen: a wrapper inherits them and overrides two
+            const refocus = vi.fn((element: Element) =>
+                engine.adapter.refocus(element),
+            );
+            engines.push({ options, setOptions, run, refocus });
+            // the engine and its adapter are frozen: a wrapper inherits them and overrides three
             const adapter = Object.create(engine.adapter, {
                 setOptions: { value: setOptions },
+                refocus: { value: refocus },
             });
             return Object.create(engine, {
                 adapter: { value: adapter },
@@ -69,6 +74,7 @@ const OPTIONS = {
     nodeExtent: { x: -100, y: -100, width: 500, height: 500 },
     elevateNodesOnSelect: false,
     elevateEdgesOnSelect: true,
+    zIndexMode: "manual",
 } satisfies Partial<RootProps>;
 
 const last = () => {
@@ -134,6 +140,14 @@ describe("the viewport and gesture options (#25)", () => {
         expect(setOptions).toHaveBeenLastCalledWith({
             panActivationKey: undefined,
         });
+        rerender(
+            <App
+                panOnScrollMode="vertical"
+                easing={other}
+                zIndexMode="basic"
+            />,
+        );
+        expect(setOptions).toHaveBeenLastCalledWith({ zIndexMode: "basic" });
     });
 
     it("runs the controls' actions with their duration", async () => {
@@ -157,7 +171,7 @@ describe("the viewport and gesture options (#25)", () => {
         expect(run).toHaveBeenLastCalledWith("zoom-in", {});
     });
 
-    it("places a node by its origin (node-rect-by), and at its position without an engine", async () => {
+    it("places a node by its origin (node-rect-by)", async () => {
         const { container, rerender } = render(
             <TestFlow
                 defaultNodes={[task("a", 200, 100)]}
@@ -204,7 +218,7 @@ describe("the viewport and gesture options (#25)", () => {
         expect(z("b")).toBe("0");
     });
 
-    it("draws the edges in the core's order (drawn-edges: by zIndex, a selected one raised with elevateEdgesOnSelect)", async () => {
+    it("draws the edges in the core's order (drawn-edges with zIndexMode basic: by zIndex, a selected one raised with elevateEdgesOnSelect)", async () => {
         const nodes = [task("a"), task("b", 0, 200), task("c", 200, 200)];
         const edges = [
             { id: "e1", source: "a", target: "b", zIndex: 2 },
@@ -220,6 +234,7 @@ describe("the viewport and gesture options (#25)", () => {
                 features={features}
                 defaultNodes={nodes}
                 defaultEdges={edges}
+                zIndexMode="basic"
             />,
         );
         await settle();
@@ -229,10 +244,59 @@ describe("the viewport and gesture options (#25)", () => {
                 features={features}
                 defaultNodes={nodes}
                 defaultEdges={edges}
+                zIndexMode="basic"
                 elevateEdgesOnSelect
             />,
         );
         expect(order()).toEqual(["e3", "e1", "e2"]);
+    });
+
+    it("raises a selected edge by default with zIndexMode auto, in a level of its own, unless elevateEdgesOnSelect is off", async () => {
+        const nodes = [task("a"), task("b", 0, 200), task("c", 200, 200)];
+        const edges = [
+            { id: "e1", source: "a", target: "b" },
+            { id: "e2", source: "a", target: "c", selected: true },
+            { id: "e3", source: "b", target: "c" },
+        ];
+        const order = () =>
+            [...container.querySelectorAll('[data-flow-part="edge"]')].map(
+                (edge) => edge.getAttribute("data-flow-id"),
+            );
+        const levels = () =>
+            container.querySelectorAll('[data-flow-part="edges-layer"]').length;
+        const { container, rerender } = render(
+            <TestFlow
+                features={features}
+                defaultNodes={nodes}
+                defaultEdges={edges}
+            />,
+        );
+        await settle();
+        expect(order()).toEqual(["e1", "e3", "e2"]);
+        expect(levels()).toBe(2);
+        rerender(
+            <TestFlow
+                features={features}
+                defaultNodes={nodes}
+                defaultEdges={edges}
+                elevateEdgesOnSelect={false}
+            />,
+        );
+        expect(order()).toEqual(["e1", "e2", "e3"]);
+        expect(levels()).toBe(0);
+    });
+
+    it("asks the engine to give the focus back to each edge it mounts (adapter.refocus)", async () => {
+        const { container } = render(
+            <TestFlow
+                defaultNodes={[task("a"), task("b", 0, 200)]}
+                defaultEdges={[{ id: "ab", source: "a", target: "b" }]}
+            />,
+        );
+        await settle();
+        expect(last().refocus).toHaveBeenCalledWith(
+            part(container, "edge", "ab"),
+        );
     });
 
     it("keeps the nodes' z-index inside their layer (isolation), so a raised node never covers the connection line", async () => {
