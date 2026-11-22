@@ -47,6 +47,11 @@ function between(from: number, to: number, share: number): number {
     return share === 0.5 ? (from + to) / 2 : from + (to - from) * share;
 }
 
+/** A finite number as given; anything else (none, NaN, an infinity) as `fallback`. */
+function finiteOr<T>(value: number | undefined, fallback: T): number | T {
+    return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
 function plus(point: XY, direction: XY, distance: number): XY {
     return {
         x: point.x + direction.x * distance,
@@ -73,7 +78,9 @@ export function orthogonalRoute(
     turn: StepTurnOptions = {},
 ): XY[] {
     const { source, target } = ends;
-    const share = Math.min(Math.max(turn.stepPosition ?? 0.5, 0), 1);
+    const share = Math.min(Math.max(finiteOr(turn.stepPosition, 0.5), 0), 1);
+    const centerX = finiteOr(turn.centerX, undefined);
+    const centerY = finiteOr(turn.centerY, undefined);
     const a = sideDirection(ends.sourceSide);
     const b = sideDirection(ends.targetSide);
     const out = plus(source, a, offset);
@@ -98,16 +105,20 @@ export function orthogonalRoute(
                     : Math.min(along(out), along(into));
             middle = [at(reach, across(source)), at(reach, across(target))];
         } else if ((along(target) - along(source)) * sign >= 0) {
-            // facing each other, the target ahead: turn halfway (or where asked)
+            // facing each other, the target ahead: turn halfway (or where asked), the share taken
+            // between the stood-out points so that a turn near an end keeps its `offset` (halfway
+            // between the handles is the same point)
             const half =
-                (horizontal ? turn.centerX : turn.centerY) ??
-                between(along(source), along(target), share);
+                (horizontal ? centerX : centerY) ??
+                (share === 0.5
+                    ? between(along(source), along(target), share)
+                    : between(along(out), along(into), share));
             middle = [at(half, across(source)), at(half, across(target))];
         } else {
             // facing each other, the target behind: out, across halfway (or where asked), back in
             const half =
-                (horizontal ? turn.centerY : turn.centerX) ??
-                between(across(source), across(target), share);
+                (horizontal ? centerY : centerX) ??
+                between(across(out), across(into), share);
             middle = [out, at(along(out), half), at(along(into), half), into];
         }
     } else {
