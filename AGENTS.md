@@ -66,7 +66,7 @@ an implementation detail. Where the Epic's decisions say nothing, the Fragiola g
      `deletable`, `hidden`), `parentId`/`extent` only with `subflows()` (`extent`: `"parent"` or,
      #24, a flow `Rect` `{ x, y, width, height }`).
    - An edge: `id`, `source`, `target`, `sourceHandle?`, `targetHandle?`, `type` (`bezier` |
-     `smoothstep` | `step` | `straight` | an app type), `data`, `zIndex` (#24), flags.
+     `simplebezier` (#27) | `smoothstep` | `step` | `straight` | an app type), `data`, `zIndex` (#24), flags.
    - A field of a feature that is not installed is a validation issue.
 4. **The viewport is view state (D4).** `{ x, y, zoom }` lives in the engine
    (`engine.get("viewport")`; engine actions `set-viewport`, `pan-by`, `zoom-in`, `zoom-out`,
@@ -224,7 +224,7 @@ surface exact). The source layout of the core:
 | `src/state/` | the draft (copy on write, untouched nodes shared), the `get`/`is` key registry (`queries.ts`) and the core's keys |
 | `src/commands/` | `defineCommand`, the core catalogue, one file per entity (`node.ts`, `edge.ts`, `batch.ts`), the shared rules |
 | `src/model/` | `createFlowModel` and its bus |
-| `src/features/` | `FEATURE_KEYS` (what each feature owns, by name), the registry (`composeFeatures`, `featuresOf`, `featureEngine`), the feature contract |
+| `src/features/` | `FEATURE_KEYS` (what each feature owns, by name), the registry (`composeFeatures`, `featuresOf`, `featureEngine`), the feature contract, the keyboard links (`keyboard-links.ts`, #27: what `connection()` and `resize()` offer `keyboard()` through `host.shared`) |
 | `src/<feature>/` | one folder per feature: its factory, its commands, its entry `index.ts` |
 
 **Commands** (`model.get("commands")`, every description and schema; reference:
@@ -255,6 +255,8 @@ Error codes: `unknown_command`, `invalid_payload` (schema, or a field of a featu
 **Keys.** `get`: `node-by { id }`, `edge-by { id }`, `all-nodes`, `all-edges`,
 `commands-to { nodes?, edges? }` (the commands that bring the document to them: controlled props),
 `node-edges-by { nodeId, handleType?, handleId? }`, `connected-edges-by { nodeIds }`,
+`incomers-by { nodeId }`, `outgoers-by { nodeId }` (#27: the nodes at the other end of the
+edges that end at a node / start from it, in the document's node order, each once),
 `absolute-position-by { nodeId }`, `flow-json`, `commands`; `selected-nodes`, `selected-edges`
 (`selection()`); `node-children-by { nodeId }`, `node-parent-by { nodeId }` (`subflows()`). `is`:
 `node-draggable`, `node-selectable`, `node-connectable`, `node-deletable`, `node-hidden`
@@ -288,9 +290,9 @@ microtask queue. It changes the flow only through `model.run`.
 
 | folder | holds |
 | --- | --- |
-| `src/geometry/` | the path helpers (`bezierPath`, `smoothStepPath`, `stepPath`, `straightPath`, each with its label point, written from the geometry), rectangles, the viewport's math |
+| `src/geometry/` | the path helpers (`bezierPath`, `simpleBezierPath` (#27), `smoothStepPath`, `stepPath`, `straightPath`, each with its label point, written from the geometry), rectangles, the viewport's math, `viewportForBounds` (#27: the framing `fit-view` uses, exported) |
 | `src/attributes/` | the part attribute names and `partAttributes` (D11) |
-| `src/engine/` | `createFlowEngine`, the key registry (`verbs.ts`), the adapter contract (`adapter.ts`), events (`events.ts`), measurement, the press target (`dom.ts`), edge geometry, the background pattern, the toolbar position, node moves shared by drag and keyboard, the one structural style writer, the viewport animation (`viewport-animation.ts`), the auto-pan step (`auto-pan.ts`) |
+| `src/engine/` | `createFlowEngine`, the key registry (`verbs.ts`), the adapter contract (`adapter.ts`), events (`events.ts`), measurement, the press target (`dom.ts`), edge geometry, the background pattern, the toolbar positions (`node-toolbar.ts`, `edge-toolbar.ts`), node moves shared by drag and keyboard, the one structural style writer, the viewport animation (`viewport-animation.ts`), the auto-pan step (`auto-pan.ts`) |
 | `src/connect-session/` | the connection under way, shared by `connection()` and `reconnection()` through `host.shared` (no entry; the bundle guard counts it as both features' code) |
 | `src/<feature>/<feature>-engine.ts` | each feature's engine side |
 
@@ -336,8 +338,14 @@ the bezier), `node-rect-by { nodeId }` (absolute, size 0 until known), `nodes-bo
 `visible-edges`, `drawn-edges` (#24: the edges to draw in drawing order, shown and with measured
 nodes, in view with `onlyRenderVisible`, by z-order), `node-z-index-by { nodeId }` (#24: the node's
 structural `z-index`), `handles-by { nodeId }`, `background-pattern { variant?, gap?, size?, offset? }`
-(one SVG pattern tile on the screen: dots, lines, cross), `node-toolbar-by { nodeId, side?, align?,
-offset? }` (a root-relative anchor outside the zoom); features: `selection-box` (selection),
+(one SVG pattern tile on the screen: dots, lines, cross), `node-toolbar-by { nodeId | nodeIds, side?,
+align?, offset? }` (a root-relative anchor outside the zoom; #27: `nodeIds` stands beside their
+bounds), `edge-toolbar-by { edgeId, position?: "label" | "source" | "target", offset?: XY }` (#27:
+the edge's point on the screen, the toolbar's centre there, undefined until it is drawn),
+`intersecting-nodes { nodeId } | { rect }, partial?` (#27: the shown nodes of known size sharing
+area with it, `partial: false` wholly inside, the node itself left out), `viewport-for-bounds
+{ bounds, padding?, minZoom?, maxZoom? }` (#27: what `fit-view` would set, undefined without a root
+size); features: `selection-box` (selection),
 `dragging-node-ids` (drag), `connection` (connection: `from`, `fromPoint`, `toPoint`, `toSide`,
 `to`, `status` valid/invalid/null, `path`, `reconnecting`), `minimap-view { width, height }`
 (minimap: `viewBox`, `viewBoxAttribute`, `scale`, `nodes`, `view`, `maskPath` for
@@ -347,9 +355,12 @@ offset? }` (a root-relative anchor outside the zoom); features: `selection-box` 
 
 **Events** (`engine.subscribe`, D12, for the app's live region or a controlled viewport):
 `viewport-change { viewport, gesture }`, `drag-start`, `nodes-move { nodeIds, source: "pointer" |
-"keyboard" }`, `drag-cancel`, `connect-start`, `connect { edgeId, source, target }`,
-`connect-cancel { refused }`, `reconnect-start`, `reconnect`, `reconnect-cancel { refused }`,
-`resize { nodeId, width, height }`, `box-select`, `remove { nodeIds, edgeIds }`.
+"keyboard" }`, `drag-cancel`, `connect-start { nodeId, handleId, handleType, input }`,
+`connect-target { nodeId, handleId, handleType, index, count }` (#27, keyboard only),
+`connect { edgeId, source, target, input }`, `connect-cancel { refused, input }` (#27: `input`
+is a `MoveSource`, `"pointer"` or `"keyboard"`), `reconnect-start`, `reconnect`,
+`reconnect-cancel { refused }`, `resize { nodeId, width, height, source }` (#27: `source`),
+`box-select`, `remove { nodeIds, edgeIds }`.
 
 **The adapter contract** (`engine.adapter`, what `Flow.*` primitives call; an app never does):
 
@@ -374,7 +385,11 @@ offset? }` (a root-relative anchor outside the zoom); features: `selection-box` 
   the pane; `node`; `handle`; `edge`/`edge-path`/`edge-label`; `reconnect-anchor { edgeId, end }`
   (`data-end`: an edge end's grab area, drawn above the handles); `resize-handle { nodeId,
   position }` (`data-position`: `top-left` … `left`, inside the node's element); `minimap`,
-  `minimap-node`, `minimap-mask`; anything else (`controls`, `toolbar`, `panel`) is left alone.
+  `minimap-node`, `minimap-mask`; anything else (`controls`, `toolbar`, `panel`) is left alone
+  (a `toolbar`'s record takes `{ nodeId }`, or since #27 `{ edgeId }` for an edge's, as its
+  `data-flow-id`, and nothing for several nodes'). With `keyboard()` and `connection()`, a
+  connectable `handle`'s record holds `tabindex: "0"`; with `keyboard()` and `resize()`, every
+  `resize-handle`'s does (#27): spread it as an attribute.
   Inside a node, fields, buttons, links and `data-flow-no-gesture` start no gesture;
   `data-flow-no-wheel` keeps its wheel; a node holding a `data-flow-drag-handle` element
   (`DRAG_HANDLE_ATTRIBUTE`, #24) drags only from it.
@@ -1467,7 +1482,8 @@ Decisions of the engine (#3):
   (`move`, `end`, `cancel`, `active`) instead of `true`, so the engine owns capture, Escape,
   `pointercancel`, a lost capture and a missed release for every gesture; `tap` (a press that did
   not become a gesture and moved at most 3 px: selection's click), `wheel`, `keydown(event,
-  target)`, `focus`, `attributes`. The host lends the viewport, measured rects, handles, edge
+  target)` (#27: it may return a gesture that goes on without a press, given the next keys first
+  by its own `keydown`), `focus`, `attributes`. The host lends the viewport, measured rects, handles, edge
   paths, `keepInParent` (#24: `keepInExtent`, with `absolutePosition`, `positionFor`, `extentOf`,
   `held`), `interactive`, `partOptions`, `changed`, `emit`. A gesture with
   `autoPan: true` (drag, connection, reconnection, selection box, resize; #23) is auto-panned by
@@ -1657,3 +1673,84 @@ Decisions of the docs, examples and E2E of the new options (#25, part 2, Epic #2
   node without a parent gets its z-index without walking a chain; 4d6b834: Vue's `duration` and
   `pan-on-scroll-speed` take a number's text). The `node.move` / `node.resize` descriptions now
   say the model keeps `extent: "parent"` only (a rectangle is the gestures').
+
+Decisions of the graph and geometry helpers, the toolbars and the keyboard flows (#27, Epic #29):
+
+- **Neighbours are graph facts** (`incomers-by`, `outgoers-by` on the model): the nodes at the
+  other end of the edges that end at (start from) a node, in the document's **node** order (not
+  the edges'), each once however many edges join them. A self loop makes a node its own incomer
+  and outgoer (the edge does come in and go out); hidden nodes and edges count (hidden is a view
+  flag); a missing node has none. A parent is a neighbour of its child only through an edge.
+- **`intersecting-nodes` compares engine boxes** (`boxOf`: measured or given sizes, `nodeOrigin`,
+  a child at its parent's corner). Any shared area by default (`partial` true; touching sides do
+  not count, a zero-size `rect` strictly inside a node does: a point query); `partial: false`
+  keeps the nodes wholly inside. Hidden nodes, nodes of unknown size and the queried node are left
+  out; `nodeId` wins over `rect`; a bad payload answers `[]`. A parent and its children intersect
+  (nothing filters the hierarchy: an app that wants otherwise filters by `parentId`).
+- **`viewportForBounds(bounds, width, height, { padding, minZoom, maxZoom })`** (defaults 0.1,
+  0.5, 2) is `fit-view`'s framing moved into its own pure file, the old `fitBounds` gone with
+  identical numbers (a `maxZoom` below `minZoom` still wins, as before, so `fit-view`'s results
+  are unchanged; its tests kept their expected values). The engine read defaults the limits to the
+  engine's and returns the viewport `fit-view` would set (`kept`: zoom limits and translate extent
+  applied), so `engine.run("set-viewport", read)` lands exactly there; a padding or limit that is
+  not a number is the default; undefined without a root size or a valid rectangle.
+- **`simpleBezierPath`**: each control point on its end's side axis, halfway (signed) to the other
+  end's projection on that axis; no least reach and no `curvature` (unlike `bezierPath`), so a
+  target behind turns back at once and a side and its opposite draw the same curve. The label is
+  the curve's `t = 0.5`. `"simplebezier"` joined `BuiltInEdgeType` (the schema's `type` is a
+  string: only its description changed, and `commands.mdx` was regenerated).
+- **`edge-toolbar-by`** stands at the edge's drawn label point (default) or one of its ends, on the
+  screen (root-relative, outside the zoom), moved by a screen `offset` (`XY`, pixels), with the
+  toolbar's centre there (`anchorX`/`anchorY` 0.5: no `align`, an app moves it by `offset`);
+  undefined until `edge-path-by` is. `EdgeToolbarPosition` is `NodeToolbarPosition`'s shape.
+  **`node-toolbar-by` takes `nodeIds`**: beside the bounds of those of known size (`nodes-bounds`'
+  boxes), winning over `nodeId` when not empty; the one-node payload is unchanged (`nodeId` became
+  optional in the type). The `toolbar` part takes `{ edgeId }` too.
+- **The keyboard reaches connection and resize through keyboard links**
+  (`src/features/keyboard-links.ts`, core code: `host.shared("keyboard-links")`), never by
+  importing them: `connection()`'s engine side fills `links.connect` (the session's `keyboard`),
+  `resize()`'s fills `links.resize` (one step with the pointer resize's own `resizedRect`, `kept`
+  and `stepOf`: limits, a resizer's own, the aspect ratio, extents, children moved back, a fixed
+  child's parent keeping its top and left), and `keyboard()` reads them lazily (at a key or an
+  attributes call), so the install order does not matter and an empty link means "not installed".
+  The keys' meaning stays the keyboard's; the session work stays the connection's (no
+  connect-session code in a keyboard-only bundle). Alternative: `keyboard()` importing the
+  connect-session folder (the guidelines' shared folder); refused, it ships the session to apps
+  without `connection()`.
+- **Focusability is a part attribute**: with both features, a connectable handle's record (and
+  its node connectable) holds `tabindex: "0"`, every resize handle's too with `resize()`; without
+  both, no record changes, so the tab order of every other app is the same (tested both ways and
+  in either install order). Not an engine `is` key (`node-focusable`'s way): the Epic asked for the
+  attributes, and every adapter already spreads them (#28: React must pass it as `tabIndex`).
+- **A keyboard connection is a gesture without a press**, the click-to-connect one's mechanism:
+  `FeatureEngine.keydown` may return a `FeatureGesture` (the engine keeps it as `following`), and
+  `FeatureGesture.keydown` takes the next keys before the features (the gesture is over once its
+  `active()` answers false). So Escape (in the root or anywhere in the page), `cancel-gesture`,
+  `set-interactive false`, a detach and `destroy` cancel it with no new code, and Escape never
+  also clears the selection. A pointer press while it waits cancels it (its `end`); pointer moves do
+  nothing.
+- **Keys of a keyboard connection**: Enter or Space (no Ctrl, Alt, Meta) on a focused handle
+  starts; Tab / ArrowRight / ArrowDown point at the next target, Shift + Tab / ArrowLeft / ArrowUp
+  the previous, round the list; Enter or Space connect (`edge.add`, one non-transient commit);
+  Escape cancels. Focus stays on the source handle (Tab is prevented while it waits): the target
+  is the connection's `to`, `data-valid` on its handle, the line drawn to it, and a
+  `connect-target` event. The targets are the handles a drag could reach (`eligible`: measured,
+  connectable, the mode's types, connectable nodes, not the handle itself) that
+  `model.can("edge.add")` accepts at the start (a vetoed one is skipped, not marked), nearest to
+  the source handle's centre first. None accepted: it still starts (`connect-target` with `index`
+  -1, `count` 0) and Enter cancels (`refused: false`); a veto arriving after the start makes Enter
+  `connect-cancel { refused: true }`.
+- **`input` on the connection events, `source` on `resize`**: `connect.source` already names the
+  source node (D5's edge end), so the connection events (`connect-start`, `connect`,
+  `connect-cancel`) carry `input: "pointer" | "keyboard"`; `resize` carries `source` like
+  `nodes-move`; both typed `MoveSource`. The reconnection events are unchanged (pointer only).
+  `connect-target` has no text (D12): `index` (0-based) and `count` are for the app's live region.
+- **Keyboard resize keys**: an arrow on a focused resize handle moves the sides that handle moves
+  by `step` (`fastStep` with Shift) flow units, one final `node.resize` (a `batch` with the
+  children's moves) and a `resize { source: "keyboard" }` event; an arrow across the handle's sides
+  (ArrowUp on `right`) and any arrow with Ctrl, Alt or Meta is not the resizer's (left to the
+  keyboard's other uses and the page); at a limit the key is still taken (no scroll) and nothing
+  runs. Without `resize()`, the arrows on a resize handle move the selection as before.
+- **Known limits:** a keyboard connection's targets are fixed at its start (a handle registered
+  meanwhile is not offered); it does not scroll the target into view; reconnection has no keyboard
+  path; a pointer press while it waits only cancels it (the press does nothing else).
