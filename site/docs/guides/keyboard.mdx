@@ -1,12 +1,13 @@
 ---
 title: Keyboard and accessibility
-description: Let keyboard users reach, select, move and delete nodes and edges, name every part yourself, and announce what happened in your own words.
+description: Let keyboard users select, move, delete, connect and resize nodes, name every part yourself, and announce what happened in your own words.
 ---
 
 `keyboard()` makes nodes and edges focusable and gives them keys: Tab walks them, the arrows move
-nodes, Enter selects, Delete removes, Escape clears. The package names nothing and says nothing
-aloud: it ships no text, no roles and no `aria-label`. The names, the descriptions and the
-announcements are yours, in your words and your language.
+nodes, Enter selects, Delete removes, Escape clears. With `connection()` it draws edges from a
+focused handle, and with `resize()` it resizes from a focused resize handle. The package names
+nothing and says nothing aloud: it ships no text, no roles and no `aria-label`. The names, the
+descriptions and the announcements are yours, in your words and your language.
 
 <Example id="selection-and-keyboard" />
 
@@ -82,6 +83,152 @@ const features = [selection(), keyboard({ deleteKeys: ["Delete"] })] as const; /
 
 A node that is not draggable does not move, and one that is not deletable stays. The root's
 `interactive={false}` (or `Flow.ToggleInteractive`) stops the keys from changing the flow.
+
+## Draw an edge from the keyboard
+
+With `connection()` installed beside `keyboard()`, every connectable handle (of a connectable
+node) takes focus too, so Tab reaches a node's handles right after the node. Without
+`connection()` handles stay out of the tab order, so an app that does not connect keeps its tab
+order.
+
+<Framework name="react">
+
+```tsx
+import { connection } from "@fragiola/flow-react/connection";
+import { keyboard } from "@fragiola/flow-react/keyboard";
+
+const features = [selection(), drag(), connection(), keyboard()] as const;
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+import { connection } from "@fragiola/flow-vue/connection";
+import { keyboard } from "@fragiola/flow-vue/keyboard";
+
+const features = [selection(), drag(), connection(), keyboard()] as const;
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```ts
+import { connection } from "@fragiola/flow-svelte/connection";
+import { keyboard } from "@fragiola/flow-svelte/keyboard";
+
+const features = [selection(), drag(), connection(), keyboard()] as const;
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+import { connection } from "@fragiola/flow-angular/connection";
+import { keyboard } from "@fragiola/flow-angular/keyboard";
+
+const features = [selection(), drag(), connection(), keyboard()] as const;
+```
+
+</Framework>
+
+On a focused handle:
+
+| key | does |
+| --- | --- |
+| Enter, Space | start a connection from it: the root gets `data-connecting`, and it points at the nearest handle that accepts it |
+| Tab, Arrow Right, Arrow Down | point at the next target, round the list |
+| Shift + Tab, Arrow Left, Arrow Up | point at the previous target |
+| Enter, Space (again) | connect: `edge.add` to the target, one undo step |
+| Escape | cancel |
+
+The targets are the handles a drag could end at (the connection's `mode`, connectable nodes and
+handles) that `model.can("edge.add", …)` accepts when the connection starts, nearest first. So a
+rule of yours ([Connection rules](/docs/guides/connection-rules)) skips a handle it vetoes, and an
+existing edge's handles are not offered again. The handle pointed at carries `data-valid` and the
+connection line is drawn to it; the focus stays on the source handle. A connection with no target
+still starts, and Enter then cancels it.
+
+It ends by itself when the focus leaves the source handle (a click in a field, a button
+focused, the window left), when its node is removed (a delete key while it waits), on a pointer
+press, and on `set-interactive false`. A held Enter does not connect twice. Keys pressed anywhere
+else (a field, a toolbar button) are never taken by it.
+
+Name the handles, since a screen reader reads a focused handle by its name:
+
+<Framework name="react">
+
+```tsx
+<Flow.Node<Types> node={node} aria-label={node.data.label} className="node">
+    {node.data.label}
+    <Flow.Handle type="target" side="left" aria-label={`${node.data.label} input`} className="handle" />
+    <Flow.Handle type="source" side="right" aria-label={`${node.data.label} output`} className="handle" />
+</Flow.Node>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Node :node="node" :aria-label="node.data.label" class="node">
+    {{ node.data.label }}
+    <Flow.Handle type="target" side="left" :aria-label="`${node.data.label} input`" class="handle" />
+    <Flow.Handle type="source" side="right" :aria-label="`${node.data.label} output`" class="handle" />
+</Flow.Node>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Node {node} aria-label={node.data.label} class="node">
+    {node.data.label}
+    <Flow.Handle type="target" side="left" aria-label="{node.data.label} input" class="handle" />
+    <Flow.Handle type="source" side="right" aria-label="{node.data.label} output" class="handle" />
+</Flow.Node>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div [flowNode]="node" [attr.aria-label]="node.data.label" class="node">
+    {{ node.data.label }}
+    <div flowHandle type="target" side="left" [attr.aria-label]="node.data.label + ' input'" class="handle"></div>
+    <div flowHandle type="source" side="right" [attr.aria-label]="node.data.label + ' output'" class="handle"></div>
+</div>
+```
+
+</Framework>
+
+Show the target as you show a valid drop, and the focused handle as any focus:
+
+```css
+[data-flow-part="handle"]:focus-visible {
+    outline: var(--fl-focus-width) solid var(--fl-focus-line);
+    outline-offset: 2px;
+}
+
+[data-flow-part="handle"][data-valid] {
+    background: var(--fl-valid);
+}
+```
+
+## Resize from the keyboard
+
+With `resize()` installed beside `keyboard()`, every resize handle of a `NodeResizer` takes focus.
+The arrows on a focused handle move the sides that handle moves, by `step` flow units (`fastStep`
+with Shift): Arrow Right on the `right` side grows the node, Arrow Left shrinks it, and a corner
+takes both of its axes. An arrow across the handle (Arrow Up on `right`), or with Ctrl, Alt or ⌘,
+is left to the page. Each press is one `node.resize` within the resizer's limits (at a limit the
+key does nothing), and a `resize` event with `source: "keyboard"`. See
+[Resizing nodes](/docs/guides/resizing#from-the-keyboard) to name the handles.
 
 ## Name every part
 
@@ -405,8 +552,39 @@ export class LiveRegion {
 
 Render `LiveRegion` inside the root (it reads the root's engine through `useFlow`).
 
-## What a keyboard cannot do yet
+A keyboard connection has more to say: where it starts, which handle it points at, and how it ends.
+`connect-start`, `connect` and `connect-cancel` carry `input: "keyboard"` (or `"pointer"`), and
+`connect-target` comes on every move of the target, with its place in the list (`index`, from 0,
+of `count`; `-1` of `0` when no handle accepts the connection). Add their cases to your
+`describe`:
 
-Drawing a new edge and resizing a node are pointer gestures. Give keyboard users another way with
-the commands they run: a menu that runs `edge.add` between two chosen nodes, fields that run
-`node.resize`. The commands are the same for every input.
+```ts
+case "connect-start":
+    return event.input === "keyboard"
+        ? `Connecting from ${name(event.nodeId)}. Tab to choose a target, Enter to connect, Escape to cancel.`
+        : undefined;
+case "connect-target":
+    return event.nodeId === undefined
+        ? "No handle accepts this connection."
+        : `Target ${event.index + 1} of ${event.count}: ${name(event.nodeId)}.`;
+case "connect-cancel":
+    if (event.refused) return "That connection is not allowed.";
+    return event.input === "keyboard" ? "Connection cancelled." : undefined;
+case "resize":
+    return event.source === "keyboard" ? `${name(event.nodeId)} is ${event.width} by ${event.height}.` : undefined;
+```
+
+The `announcements` example above does it: Tab to a handle and press Enter.
+
+## Known limits
+
+- **A keyboard connection's targets are fixed when it starts**: a handle rendered meanwhile is not
+  offered, and a rule that changes meanwhile is checked again only by the final `edge.add` (a
+  veto then ends it with `connect-cancel { refused: true }`).
+- **The target is not scrolled into view**: a target outside the viewport is pointed at, announced
+  and connected, but not shown. Announce it by name, or frame the nodes yourself
+  ([The viewport](/docs/concepts/viewport#frame-an-area)).
+- **An edge's end cannot be moved from the keyboard** (reconnection is a pointer gesture): remove
+  the edge and draw it again, or run `edge.reconnect` from a menu of yours.
+- **A pointer press while a keyboard connection waits only cancels it**: the press does nothing
+  else.

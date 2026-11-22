@@ -276,6 +276,47 @@ the view changes. `flowZoomIn`, `flowZoomOut` and `flowFitView` are (their `stat
 `Flow.ZoomOut` and `Flow.FitView` are these actions as buttons, disabled while `engine.can` says
 no ([Minimap and controls](/docs/guides/minimap-and-controls)).
 
+## Frame an area
+
+`fit-view` frames nodes. To frame any rectangle of the flow (a region, a search hit and its
+neighbours, the selection with room around it), ask the engine for the viewport that shows it,
+then go there. `viewport-for-bounds` answers what `fit-view` would set (the padding, the zoom
+limits and the `translateExtent` kept), so nothing moves until you run it:
+
+```ts
+/** Frames the selected nodes with 30 % of room around them, in 300 ms. */
+function frameSelection(model: FlowModel<Types, typeof features>, engine: FlowEngine<Types, typeof features>) {
+    const nodeIds = model.get("selected-nodes").map((node) => node.id);
+    const bounds = engine.get("nodes-bounds", { nodeIds });
+    if (!bounds) return;
+    const viewport = engine.get("viewport-for-bounds", { bounds, padding: 0.3, maxZoom: 1.5 });
+    if (viewport) engine.run("set-viewport", { ...viewport, duration: 300 });
+}
+```
+
+Call it from a button inside the root with `useFlow()`'s `model` and `engine` (`injectFlow()` in
+Angular, whose `model` is a signal: `this.flow.model()`). The read is undefined while the root
+has no size.
+
+The same framing without an engine is the pure `viewportForBounds(bounds, width, height,
+options?)`, for a picture of a size you choose: an export, a thumbnail, a server render. It knows
+no root, so it takes the size and its own limits (`padding` 0.1, `minZoom` 0.5, `maxZoom` 2 by
+default):
+
+```ts
+import { viewportForBounds } from "@fragiola/flow"; // the core: every adapter re-exports it too
+
+// an image of 1200 × 630 pixels showing the whole flow
+const bounds = engine.get("nodes-bounds", {});
+if (bounds) {
+    const { x, y, zoom } = viewportForBounds(bounds, 1200, 630, { padding: 0.05, minZoom: 0.1 });
+    // draw the viewport's content at translate(x, y) scale(zoom) into a 1200 × 630 frame
+}
+```
+
+Both are on the [engine page](/docs/api/engine), beside `intersecting-nodes`, which lists the
+nodes inside or overlapping a rectangle of the flow.
+
 ## Animated changes
 
 `duration`, in milliseconds, animates an action instead of jumping (default `0`: at once). The

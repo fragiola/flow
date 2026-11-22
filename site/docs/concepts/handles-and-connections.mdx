@@ -180,6 +180,14 @@ const features = [selection(), drag(), connection({ clickToConnect: true })] as 
 It is off by default: a tap on a handle then does nothing, and a slightly shaky press on a handle
 starts a drag after 1 pixel instead of 3.
 
+## From the keyboard
+
+With `keyboard()` installed too, a connectable handle takes focus: Enter on it starts a
+connection that points at the nearest handle the model accepts, Tab or the arrows point at the
+next one, Enter connects through the same `edge.add` and Escape cancels. The handle pointed at is
+`data-valid`, and each move is a `connect-target` event for your live region. See
+[Keyboard and accessibility](/docs/guides/keyboard#draw-an-edge-from-the-keyboard).
+
 ## Rules are middleware
 
 There is no `isValidConnection` callback. A rule is a middleware on `edge.add`, and because the
@@ -209,5 +217,7 @@ by the model like `edge.add`. An edge with `reconnectable: false` keeps its ends
 ## Events
 
 `engine.subscribe` hears `connect-start` (`nodeId`, `handleId`, `handleType`), `connect` (the new
-`edgeId`, `source`, `target`), `connect-cancel` (`refused`), and for reconnection
-`reconnect-start`, `reconnect` and `reconnect-cancel`.
+`edgeId`, `source`, `target`), `connect-cancel` (`refused`), each with `input` (`"pointer"` or
+`"keyboard"`); `connect-target` (`nodeId`, `handleId`, `index`, `count`) while a keyboard
+connection moves its target; and for reconnection `reconnect-start`, `reconnect` and
+`reconnect-cancel`.

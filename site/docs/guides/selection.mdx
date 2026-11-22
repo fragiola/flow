@@ -274,6 +274,121 @@ export class SelectionStatus {
 Outside a root, or without React, read the model: `model.get("selected-nodes")`,
 `model.get("selected-edges")`, and `model.is("node-selected", { nodeId })`.
 
+## A toolbar for the selection
+
+`Flow.NodeToolbar` with `nodeIds` stands beside several nodes' bounds, outside the zoom. Pass the
+selected nodes' ids: by default it shows while every listed node is selected, so it follows the
+selection as it grows, shrinks and moves. Render it inside the root, outside `Flow.Nodes`:
+
+<Example id="node-toolbar" />
+
+<Framework name="react">
+
+```tsx title="selection-toolbar.tsx"
+import { Flow, useFlow, useSelection } from "@fragiola/flow-react";
+
+export function SelectionToolbar() {
+    const { model } = useFlow<Types, typeof features>();
+    const selected = useSelection<Types>();
+    if (selected.nodes.length < 2) return null;
+    const nodeIds = selected.nodes.map((node) => node.id);
+    return (
+        <Flow.NodeToolbar nodeIds={nodeIds} side="bottom" role="toolbar" aria-label={`${nodeIds.length} nodes: actions`}>
+            <button type="button" onClick={() => model.run("selection.remove", {})}>
+                Delete them
+            </button>
+        </Flow.NodeToolbar>
+    );
+}
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="selection-toolbar.vue"
+<script setup lang="ts">
+import { typedFlow, useFlow, useSelection } from "@fragiola/flow-vue";
+import { computed } from "vue";
+
+const Flow = typedFlow<Types, typeof features>();
+const { model } = useFlow<Types, typeof features>();
+const selected = useSelection<Types>();
+const nodeIds = computed(() => selected.value.nodes.map((node) => node.id));
+</script>
+
+<template>
+    <Flow.NodeToolbar
+        v-if="nodeIds.length >= 2"
+        :node-ids="nodeIds"
+        side="bottom"
+        role="toolbar"
+        :aria-label="`${nodeIds.length} nodes: actions`"
+    >
+        <button type="button" @click="model.run('selection.remove', {})">Delete them</button>
+    </Flow.NodeToolbar>
+</template>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="selection-toolbar.svelte"
+<script lang="ts">
+    import { typedFlow, useFlow, useSelection } from "@fragiola/flow-svelte";
+
+    const Flow = typedFlow<Types, typeof features>();
+    const flow = useFlow<Types, typeof features>();
+    const selected = useSelection<Types>();
+    const nodeIds = $derived(selected.current.nodes.map((node) => node.id));
+</script>
+
+{#if nodeIds.length >= 2}
+    <Flow.NodeToolbar {nodeIds} side="bottom" role="toolbar" aria-label="{nodeIds.length} nodes: actions">
+        <button type="button" onclick={() => flow.model.run("selection.remove", {})}>Delete them</button>
+    </Flow.NodeToolbar>
+{/if}
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="selection-toolbar.ts"
+import { Component, computed } from "@angular/core";
+import { FLOW, injectFlow, injectSelection } from "@fragiola/flow-angular";
+
+// rendered inside [flowRoot]
+@Component({
+    selector: "app-selection-toolbar",
+    imports: [FLOW],
+    template: `
+        @if (nodeIds().length >= 2) {
+            <div flowNodeToolbar [nodeIds]="nodeIds()" side="bottom" role="toolbar" [attr.aria-label]="nodeIds().length + ' nodes: actions'">
+                <button type="button" (click)="remove()">Delete them</button>
+            </div>
+        }
+    `,
+})
+export class SelectionToolbar {
+    private readonly flow = injectFlow<Types, typeof features>();
+    private readonly selected = injectSelection<Types>();
+    protected readonly nodeIds = computed(() => this.selected().nodes.map((node) => node.id));
+
+    protected remove(): void {
+        this.flow.model().run("selection.remove", {});
+    }
+}
+```
+
+</Framework>
+
+A node's own toolbar still shows while it is selected; give the selection's another `side` (here
+below the nodes), or pass each node's toolbar `open` from your own rule. A toolbar for a fixed
+group of nodes (a lane, a cluster) takes their ids the same way and shows only while all of them
+are selected. See [`NodeToolbar`](/docs/api/primitives/node-toolbar).
+
 ## Change it from code
 
 The selection is three commands, so a button, a shortcut or an assistant changes it the way a

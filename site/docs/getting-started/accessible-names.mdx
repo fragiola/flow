@@ -5,8 +5,9 @@ description: The primitives set no role, no name and no text, so you name the fl
 
 The package ships no text, in any language, so it cannot name anything. No primitive sets an
 `aria-label`, and nodes and edges get no role: `aria-roledescription` would be text too. What the
-package does give is focus (with `keyboard()`, nodes and edges take `tabindex="0"`), the state as
-attributes, and events for everything a screen reader user should hear about. The words are yours.
+package does give is focus (with `keyboard()`, nodes and edges take `tabindex="0"`, and so do
+handles with `connection()` and resize handles with `resize()`), the state as attributes, and
+events for everything a screen reader user should hear about. The words are yours.
 
 <Example id="announcements" />
 
@@ -244,7 +245,8 @@ while their action is refused (a zoom at its limit). The minimap is an SVG: give
 
 The engine tells what happened on screen through `engine.subscribe`, as events with ids and no
 text: `nodes-move` (with `source: "pointer"` or `"keyboard"`), `drag-cancel`, `connect`,
-`connect-cancel` (with `refused`), `reconnect`, `resize`, `box-select`, `remove`, and more
+`connect-cancel` (with `refused`), `connect-target` (each target of a keyboard connection, its
+`index` of `count`), `reconnect`, `resize`, `box-select`, `remove`, and more
 ([Engine](/docs/api/engine)). Turn the ones your users need into words, and write them into a live
 region of your own:
 
@@ -440,6 +442,9 @@ carry ids, so the words can name the nodes the way your app names them, in its l
 
 With `keyboard()`, Tab reaches every node and edge, the arrows move the selection (or the focused
 node), Shift with an arrow moves it further, Enter or Space selects, Delete and Backspace remove,
-Escape cancels a gesture and clears the selection. See [Keyboard and accessibility](/docs/guides/keyboard).
-Give focused nodes and edges a visible focus style: `focus-visible:` is enough, the element is the
-one that takes focus.
+Escape cancels a gesture and clears the selection. With `connection()` too, Tab reaches the
+handles and Enter on one draws an edge; with `resize()`, the arrows on a focused resize handle
+resize its node. See [Keyboard and accessibility](/docs/guides/keyboard). Give focused nodes,
+edges and handles a visible focus style: `focus-visible:` is enough, the element is the one that
+takes focus. A focusable handle is read by its name: give it one (the `title` above, or an
+`aria-label`), and never `aria-hidden`.
