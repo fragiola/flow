@@ -43,6 +43,7 @@ export type {
 } from "./components/reconnect-anchor.svelte";
 export type {
     RootEngineProps,
+    RootEventProps,
     RootProps,
     RootState,
 } from "./components/root.svelte";

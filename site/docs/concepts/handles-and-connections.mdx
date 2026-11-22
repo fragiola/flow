@@ -237,9 +237,17 @@ it was over (`to`, none here) and the drop point, as a client point (`client`) a
 <Flow.Root
     features={features}
     onConnectCancel={(event) => {
-        if (event.to) return;
+        if (event.to || event.input !== "pointer") return;
         const added = model.run("node.add", { type: "task", position: event.point, data: {} });
-        if (added.ok) model.run("edge.add", { source: event.from.nodeId, target: added.value.nodeId });
+        if (!added.ok) return;
+        const { nodeId } = added.value;
+        // from a target handle, the new edge runs the other way
+        model.run(
+            "edge.add",
+            event.from.type === "source"
+                ? { source: event.from.nodeId, target: nodeId }
+                : { source: nodeId, target: event.from.nodeId },
+        );
     }}
 >
     {/* … */}

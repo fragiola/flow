@@ -329,7 +329,15 @@ describe("reconnectable: source | target", () => {
         ).toMatchObject({ ok: false, error: { code: "invalid_payload" } });
     });
 
-    it("set-interactive reconnect: false stops it", () => {
+    it("set-interactive reconnect: false, or connect: false (the lock), stops it", () => {
+        const locked = flow(true);
+        locked.engine.run("set-interactive", { connect: false });
+        pointer(locked.edge("e"), "pointerdown", at(293, 25));
+        pointer(locked.root, "pointermove", at(298, 222));
+        expect(locked.engine.is("edge-reconnecting", { edgeId: "e" })).toBe(
+            false,
+        );
+        unmountAll();
         const both = flow(true);
         both.engine.run("set-interactive", { reconnect: false });
         pointer(both.edge("e"), "pointerdown", at(293, 25));

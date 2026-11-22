@@ -62,7 +62,9 @@ export function reconnectionEngine(
             if (
                 target.kind !== "edge" ||
                 target.edgeId === undefined ||
+                // moving an end connects it anew: the lock's `connect: false` stops it too
                 !host.allows("reconnect") ||
+                !host.allows("connect") ||
                 session.current() !== null ||
                 !host.model.is("edge-reconnectable", { edgeId: target.edgeId })
             ) {

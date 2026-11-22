@@ -37,6 +37,7 @@ export type {
 } from "./components/reconnect-anchor";
 export type {
     RootEngineProps,
+    RootEventProps,
     RootProps,
     RootState,
 } from "./components/root";

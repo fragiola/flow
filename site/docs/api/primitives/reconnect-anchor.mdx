@@ -8,7 +8,9 @@ description: Flow.ReconnectAnchor is the grab area at one end of an edge; with r
 runs from the fixed end, and a drop on another handle runs `edge.reconnect` (the edge keeps its
 id); dropped nowhere or on a refused handle, it goes back. A press on the edge's stroke within
 `reconnection({ radius })` of an end grabs it too, without an anchor. An edge with
-`reconnectable: false` cannot be moved.
+`reconnectable: false` cannot be moved; with `reconnectable: "source"` (or `"target"`) only that
+end moves, and the anchor of the other end renders nothing (in Angular its element leaves the
+document).
 
 <Example id="edge-reconnect" />
 

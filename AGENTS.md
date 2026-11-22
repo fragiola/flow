@@ -322,8 +322,9 @@ takes each of them (the four adapters' roots take the new ones in #25 and #33).
 Controls button's disabled state is `!engine.can("zoom-in")`), `zoom-to { zoom, around? }`,
 `fit-view { padding? 0.1, nodeIds?, minZoom?, maxZoom? }` (refused before a size is known),
 `center-on { x, y, zoom? }`, `focus-node { nodeId }`, `set-interactive { interactive?, drag?,
-connect?, select?, reconnect? }` (the Controls' toggle: gestures and keys stop changing the flow, all
-of them or one kind, pan and zoom stay; #32: the per-kind switches, its result every switch),
+connect?, select?, reconnect? }` (gestures and keys stop changing the flow, all of them or one
+kind, pan and zoom stay; #32: the per-kind switches, its result every switch; #33: the Controls'
+toggle switches `drag`, `connect` and `select`),
 `cancel-gesture`
 (also stops a viewport animation; refused when neither is under way). `set-viewport`, `zoom-in`,
 `zoom-out`, `zoom-to`, `fit-view` and `center-on` take `duration` (ms, default 0: at once; a
@@ -1960,7 +1961,8 @@ none of xyflow's code):
 - **Per-kind interactivity is engine state** (`Interactivity`, `host.allows(kind)` read when a
   feature acts; nothing is installed again). `drag`: node drags and the arrows; `connect`: drags,
   taps, Enter on a handle (whose `tabindex` goes); `select`: taps, the box, Enter/Space and a
-  drag's select-on-drag; `reconnect`. A resize and the delete keys follow `interactive` only.
+  drag's select-on-drag; `reconnect` (and `connect`: moving an end connects it anew, so the lock,
+  which turns `connect` off, stops reconnection too, as React Flow's does). A resize and the delete keys follow `interactive` only.
   Turning a kind off cancels only a gesture of that kind (`FeatureGesture.kind`); `interactive:
   false` cancels everything, as before. No engine option per kind (React Flow's
   `nodesDraggable`, … props): the switches are `set-interactive`'s, the Controls' lock in #33.

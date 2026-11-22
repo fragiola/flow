@@ -196,7 +196,7 @@ one stays as it is):
 | `drag` | dragging nodes, and moving them with the arrows (`drag()`, `keyboard()`) |
 | `connect` | drawing edges from handles: a drag, a tap (click-to-connect), Enter on a handle (whose `tabindex` goes) |
 | `select` | a tap's selection, the selection box, Enter and Space; a drag no longer selects the node it drags |
-| `reconnect` | moving an edge's ends (`reconnection()`) |
+| `reconnect` | moving an edge's ends (`reconnection()`); `connect: false` stops it too (moving an end connects it anew) |
 
 `InteractionKind` names the four kinds. The switches are the engine's state, read by every
 feature at the moment it would act: no feature is installed again.

@@ -8,23 +8,32 @@ import {
     type XY,
 } from "@fragiola/flow-react";
 import { drag } from "@fragiola/flow-react/drag";
+import { keyboard } from "@fragiola/flow-react/keyboard";
 import { selection } from "@fragiola/flow-react/selection";
-import { useEffect, useRef, useState } from "react";
+import {
+    type KeyboardEvent as ReactKeyboardEvent,
+    useEffect,
+    useRef,
+    useState,
+} from "react";
 import { styles } from "./styles";
 
 // A context menu of your own. The root tells a right click (or the menu key) where it happened:
 // `onNodeContextMenu` on a node, `onSelectionContextMenu` on one of several selected nodes,
 // `onPaneContextMenu` on the canvas, each with the client point (`client`), the flow point
 // (`point`) and the DOM event, whose default the example prevents to show its menu instead of the
-// browser's. The menu stands at the client point inside the frame; a click on the canvas, Escape,
-// a pan or a choice closes it. `onNodeDoubleClick` marks a task done. These come from the engine's
-// own taps: a right click that ended a pan opens nothing.
+// browser's. The menu stands at the client point inside the frame; a click on the canvas or a
+// node, Escape, a pan, focus leaving it or a choice closes it, and focus goes back to the task (or
+// the canvas) it was opened on. With `keyboard()` tasks take focus, so the menu key (or Shift +
+// F10) opens a task's menu too; the arrows walk its items. `onNodeDoubleClick` marks a task done,
+// as the menu's first item does. These come from the engine's own taps: a right click that ended
+// a pan opens nothing.
 
 interface Types extends FlowTypes {
     readonly nodes: { task: { label: string; done: boolean } };
 }
 
-const features = [selection(), drag()] as const;
+const features = [selection(), drag(), keyboard()] as const;
 
 const nodes: FlowNodeInput<Types>[] = [
     {
@@ -114,8 +123,59 @@ export default function ContextMenu() {
             at: where,
         }));
 
-    const close = () => setMenu(null);
+    /** Closes the menu, giving focus back to the task it was opened on (or the canvas). */
+    const close = () => {
+        if (!menu) return;
+        const opener =
+            (menu.kind === "node"
+                ? frame.current?.querySelector<HTMLElement>(
+                      `[data-flow-part="node"][data-flow-id="${menu.nodeId}"]`,
+                  )
+                : undefined) ??
+            frame.current?.querySelector<HTMLElement>(
+                '[data-flow-part="root"]',
+            );
+        setMenu(null);
+        opener?.focus({ preventScroll: true });
+    };
     const model = () => flow.current?.model;
+
+    /** The arrows, Home and End walk the menu's items; Escape closes it. */
+    const onMenuKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            close();
+            return;
+        }
+        const items = [
+            ...event.currentTarget.querySelectorAll<HTMLElement>(
+                '[role="menuitem"]',
+            ),
+        ];
+        const at = items.indexOf(document.activeElement as HTMLElement);
+        const next =
+            event.key === "ArrowDown"
+                ? (at + 1) % items.length
+                : event.key === "ArrowUp"
+                  ? (at - 1 + items.length) % items.length
+                  : event.key === "Home"
+                    ? 0
+                    : event.key === "End"
+                      ? items.length - 1
+                      : -1;
+        if (next < 0) return;
+        event.preventDefault();
+        items[next]?.focus();
+    };
+
+    const toggleDone = (nodeId: string) => {
+        const node = model()?.get("node-by", { id: nodeId });
+        if (node)
+            model()?.run("node.set-data", {
+                nodeId,
+                data: { done: !node.data.done },
+            });
+    };
 
     const duplicate = (nodeId: string) => {
         const node = model()?.get("node-by", { id: nodeId });
@@ -160,17 +220,9 @@ export default function ContextMenu() {
                 onSelectionContextMenu={onSelection}
                 onPaneContextMenu={onPane}
                 onPaneClick={close}
+                onNodeClick={close}
                 onMoveStart={close}
-                onNodeDoubleClick={(event) => {
-                    const node = model()?.get("node-by", {
-                        id: event.nodeId,
-                    });
-                    if (node)
-                        model()?.run("node.set-data", {
-                            nodeId: node.id,
-                            data: { done: !node.data.done },
-                        });
-                }}
+                onNodeDoubleClick={(event) => toggleDone(event.nodeId)}
                 className={styles.root}
             >
                 <Flow.Background
@@ -189,8 +241,11 @@ export default function ContextMenu() {
                     role="menu"
                     aria-label="Actions"
                     tabIndex={-1}
-                    onKeyDown={(event) => {
-                        if (event.key === "Escape") close();
+                    onKeyDown={onMenuKey}
+                    onBlur={(event) => {
+                        // focus left the menu (Tab, a click elsewhere): it closes
+                        if (!event.currentTarget.contains(event.relatedTarget))
+                            setMenu(null);
                     }}
                     style={{ left: menu.at.x, top: menu.at.y }}
                     className={styles.menu}
@@ -199,6 +254,20 @@ export default function ContextMenu() {
                         <>
                             <button
                                 ref={first}
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                    toggleDone(menu.nodeId);
+                                    close();
+                                }}
+                                className={styles.item}
+                            >
+                                {model()?.get("node-by", { id: menu.nodeId })
+                                    ?.data.done
+                                    ? "Mark not done"
+                                    : "Mark done"}
+                            </button>
+                            <button
                                 type="button"
                                 role="menuitem"
                                 onClick={() => duplicate(menu.nodeId)}
