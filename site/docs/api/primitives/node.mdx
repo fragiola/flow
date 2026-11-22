@@ -140,5 +140,8 @@ every `div` attribute.
 
 ## Structural style
 
-`position: absolute; top: 0; left: 0; transform: translate(<x>px, <y>px)`, and `width` / `height`
-when the document gives them. Its look is yours.
+`position: absolute; top: 0; left: 0; transform: translate(<x>px, <y>px)` (its box's top-left
+corner, the root's `nodeOrigin` applied), `z-index` (`node-z-index-by`: its `zIndex`, raised by
+10 000 while selected with `elevateNodesOnSelect`, at least its parent's + 1), and `width` /
+`height` when the document gives them. Before the engine is attached (the first render, a server
+render) the position is the top-left corner and there is no `z-index`. Its look is yours.

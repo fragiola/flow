@@ -8,7 +8,9 @@ renders a `div` holding an SVG where its children function draws each edge (usua
 `Flow.Edge`), and is the HTML layer `Flow.EdgeLabel`s are portalled into. An edge is drawn once
 both its nodes have a size (`edge-path-by` is defined): on the first paint, edges wait for their
 nodes' measurements. Hidden edges, and edges of hidden nodes, are left out; with
-`onlyRenderVisible`, only those in view (`visible-edges`).
+`onlyRenderVisible`, only those in view (`visible-edges`). They are drawn in the engine's order
+(`drawn-edges`): by `zIndex`, a selected edge last with `elevateEdgesOnSelect`, then in the
+document's order; every edge stays below every node.
 
 <Framework name="react">
 

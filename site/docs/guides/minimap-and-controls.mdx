@@ -142,6 +142,68 @@ A disabled button has `disabled` and `data-disabled`: style it with `disabled:op
 locked, gestures and keys change nothing (no drag, no connection, no selection, no Delete), and
 panning and zooming stay; the root and the toggle lose `data-interactive`.
 
+## Animated buttons
+
+`duration`, in milliseconds, on `Flow.ZoomIn`, `Flow.ZoomOut` or `Flow.FitView` animates its change
+instead of jumping (default `0`: at once), eased by the root's `easing`
+([The viewport](/docs/concepts/viewport#animated-changes)). A press during an animation starts
+the next one from where the view is. The example's buttons take 200 ms:
+
+<Framework name="react">
+
+```tsx
+<Flow.ZoomIn duration={200} aria-label="Zoom in" className="control">
+    <PlusIcon />
+</Flow.ZoomIn>
+<Flow.FitView duration={200} aria-label="Fit view" className="control">
+    <MaximizeIcon />
+</Flow.FitView>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.ZoomIn :duration="200" aria-label="Zoom in" class="control">
+    <PlusIcon />
+</Flow.ZoomIn>
+<Flow.FitView :duration="200" aria-label="Fit view" class="control">
+    <MaximizeIcon />
+</Flow.FitView>
+```
+
+In Vue, bind it (`:duration="200"`): a plain `duration="200"` is a string, which the engine refuses,
+so the button stays disabled.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.ZoomIn duration={200} aria-label="Zoom in" class="control">
+    <PlusIcon />
+</Flow.ZoomIn>
+<Flow.FitView duration={200} aria-label="Fit view" class="control">
+    <MaximizeIcon />
+</Flow.FitView>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<button flowZoomIn [duration]="200" aria-label="Zoom in" class="control">
+    <svg lucidePlus aria-hidden="true"></svg>
+</button>
+<button flowFitView [duration]="200" aria-label="Fit view" class="control">
+    <svg lucideMaximize aria-hidden="true"></svg>
+</button>
+```
+
+</Framework>
+
 ## The zoom limits
 
 The root's `minZoom` (default 0.5) and `maxZoom` (default 2) bound every zoom, the buttons', the

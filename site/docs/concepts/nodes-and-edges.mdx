@@ -15,10 +15,11 @@ handles, and is drawn as a path of its type. The viewport is not in the document
 const node: FlowNodeInput<Types> = {
     id: "fetch",                    // optional on input: generated when missing
     type: "task",                   // a node type of your registry
-    position: { x: 120, y: 80 },    // its top-left corner, in flow coordinates
+    position: { x: 120, y: 80 },    // its top-left corner (the root's nodeOrigin), in flow coordinates
     data: { title: "Fetch orders", done: false },
     width: 180,                     // optional: the size the document gives
     height: 64,
+    zIndex: 1,                      // optional: drawn above the nodes with less (default 0)
     draggable: true,                // flags, each with its default
     selectable: true,
     connectable: true,
@@ -43,6 +44,7 @@ const edge: FlowEdgeInput<Types> = {
     targetHandle: "in",             // optional: the target node's handle
     type: "smoothstep",             // bezier (default), smoothstep, step, straight, or your own
     data: { weight: 1 },            // optional
+    zIndex: 1,                      // optional: drawn above the edges with less (default 0)
     selectable: true,
     deletable: true,
     hidden: false,
@@ -54,6 +56,126 @@ An edge without a handle uses its node's first handle of that type (a source han
 source, a target handle at its target), or, when the node has none, leaves the source by its
 bottom and enters the target by its top. An edge of a type of yours gets the bezier path, and its
 ends to draw your own ([Custom edges](/docs/guides/custom-edges)).
+
+## Where a node may go
+
+With `subflows()`, a node's `extent` bounds it: `"parent"` keeps it inside its parent, a flow
+rectangle `{ x, y, width, height }` inside that rectangle (in its position's coordinates, so
+relative to its parent's top-left corner for a child). The root's `nodeExtent` bounds every node
+at once. Drags, the arrow keys and resizes keep a node's whole box inside every bound it has; a
+node larger than its bounds keeps to their top-left corner.
+
+```ts
+const nodes: FlowNodeInput<Types>[] = [
+    // with subflows(): this node stays inside a 400 × 300 area
+    { id: "note", type: "note", position: { x: 20, y: 20 }, extent: { x: 0, y: 0, width: 400, height: 300 }, data: { text: "" } },
+];
+```
+
+<Framework name="react">
+
+```tsx
+<Flow.Root defaultNodes={nodes} nodeExtent={{ x: -500, y: -500, width: 1000, height: 1000 }} className="h-96">
+    …
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Root
+    :default-nodes="nodes"
+    :node-extent="{ x: -500, y: -500, width: 1000, height: 1000 }"
+    class="h-96"
+>
+    …
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Root defaultNodes={nodes} nodeExtent={{ x: -500, y: -500, width: 1000, height: 1000 }} class="h-96">
+    …
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowRoot [defaultNodes]="nodes" [nodeExtent]="{ x: -500, y: -500, width: 1000, height: 1000 }" class="h-96">
+    …
+</div>
+```
+
+</Framework>
+
+The model itself keeps only `"parent"` (with the sizes the document gives): a rectangle is kept by
+the gestures, so `node.move` from your code may place a node outside it.
+
+## Which is drawn above
+
+Nodes are drawn in the order of their `zIndex` (default 0), then of the document; a child is
+always above its parent. A selected node rises above the others, its children with it, while the
+root's `elevateNodesOnSelect` is on (the default). Edges are ordered among themselves the same way,
+and a selected edge rises above the other edges with `elevateEdgesOnSelect` (off by default).
+Change an order from code with two commands, `null` putting the default back:
+
+```ts
+model.run("node.set-z-index", { nodeId: "note", zIndex: 10 });
+model.run("edge.set-z-index", { edgeId: "fetch-parse", zIndex: null });
+```
+
+<Framework name="react">
+
+```tsx
+<Flow.Root defaultNodes={nodes} defaultEdges={edges} elevateNodesOnSelect={false} elevateEdgesOnSelect>
+    …
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Flow.Root :default-nodes="nodes" :default-edges="edges" :elevate-nodes-on-select="false" elevate-edges-on-select>
+    …
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte
+<Flow.Root defaultNodes={nodes} defaultEdges={edges} elevateNodesOnSelect={false} elevateEdgesOnSelect>
+    …
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div flowRoot [defaultNodes]="nodes" [defaultEdges]="edges" [elevateNodesOnSelect]="false" elevateEdgesOnSelect>
+    …
+</div>
+```
+
+</Framework>
+
+The order holds within each layer: edges are always drawn below every node, whatever their
+`zIndex` ([Limitations](/docs/limitations)). The adapters put a node's order in its structural
+`z-index` (a selected node's is raised by 10 000), so a `z-index` of yours on a node is
+overridden; the first render, before the engine is attached, has none.
 
 ## The rules the model keeps
 

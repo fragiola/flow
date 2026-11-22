@@ -16,16 +16,129 @@ The core's viewport needs no feature. On the root:
 
 | gesture | does | root prop (default) |
 | --- | --- | --- |
-| drag on the pane | pans | `panOnDrag` (`true`) |
+| drag on the pane | pans | `panOnDrag` (`true`: the primary button, a finger, a pen) |
+| drag anywhere, nodes included, with Space held | pans | `panActivationKey` (`" "`) |
 | wheel | zooms around the pointer | `zoomOnScroll` (`true`) |
 | wheel, with `panOnScroll` | pans (Ctrl and the wheel zoom) | `panOnScroll` (`false`) |
 | two-finger pinch, trackpad pinch | zooms | `zoomOnPinch` (`true`) |
 | double click on the pane | doubles the zoom around the pointer | `zoomOnDoubleClick` (`true`) |
+| a drag held near the root's edge | pans towards that edge | `autoPan` (`true`) |
 
 The zoom stays within `minZoom` (0.5) and `maxZoom` (2); `zoomStep` (1.2) is the factor of one
 step; `translateExtent`, a flow rectangle, keeps the view inside it. Every one of these props
 applies at once when it changes. With `selection({ boxOnDrag: true })`, a drag on the pane draws
 a selection box instead of panning.
+
+## Pan buttons and keys
+
+`panOnDrag` also takes the mouse buttons that pan, `0` (primary), `1` (middle) and `2` (right):
+`[1, 2]` leaves the primary button to a selection box (with `selection({ boxOnDrag: true })`)
+and pans with the other two, as a design tool does. A middle or right press pans only from the
+pane and never selects; with `2` in the list, a right click on the pane opens no context menu on
+macOS and Linux.
+
+`panActivationKey` is the key that, held, makes a primary drag pan from anywhere, a node or a
+handle included, and start nothing else (Space by default, `null` for none). It is read from the
+root's document, so it works without focusing the flow, and never while the focus is in a field.
+
+With `panOnScroll`, the wheel pans: `panOnScrollMode` keeps it to one axis (`"horizontal"`,
+`"vertical"`, or `"free"`), `panOnScrollSpeed` scales it (default `1`), Shift turns a vertical
+wheel sideways (but in `"vertical"` mode), and the wheel zooms while `zoomActivationKey` is held
+(`Meta` on Apple platforms, `Control` elsewhere; `null` for none).
+
+<Framework name="react">
+
+```tsx title="design-canvas.tsx"
+<Flow.Root
+    features={[selection({ boxOnDrag: true }), drag()]}
+    defaultNodes={nodes}
+    panOnDrag={[1, 2]}
+    panOnScroll
+    panOnScrollMode="vertical"
+    panOnScrollSpeed={0.8}
+    zoomActivationKey="Alt"
+    className="h-96"
+>
+    …
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="design-canvas.vue"
+<template>
+    <Flow.Root
+        :features="features"
+        :default-nodes="nodes"
+        :pan-on-drag="[1, 2]"
+        pan-on-scroll
+        pan-on-scroll-mode="vertical"
+        :pan-on-scroll-speed="0.8"
+        zoom-activation-key="Alt"
+        class="h-96"
+    >
+        …
+    </Flow.Root>
+</template>
+```
+
+In Vue, a number or an array is bound (`:pan-on-drag`, `:pan-on-scroll-speed`); a key is a plain
+attribute, and "none" is `:pan-activation-key="null"`.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="design-canvas.svelte"
+<Flow.Root
+    {features}
+    defaultNodes={nodes}
+    panOnDrag={[1, 2]}
+    panOnScroll
+    panOnScrollMode="vertical"
+    panOnScrollSpeed={0.8}
+    zoomActivationKey="Alt"
+    class="h-96"
+>
+    …
+</Flow.Root>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html title="design-canvas.html"
+<div
+    flowRoot
+    [features]="features"
+    [defaultNodes]="nodes"
+    [panOnDrag]="[1, 2]"
+    panOnScroll
+    panOnScrollMode="vertical"
+    [panOnScrollSpeed]="0.8"
+    zoomActivationKey="Alt"
+    class="h-96"
+>
+    …
+</div>
+```
+
+In Angular, "none" for a key is `[panActivationKey]="null"`.
+
+</Framework>
+
+## Auto-pan
+
+While a node is dragged, a connection or a reconnection drawn, a selection box drawn or a node
+resized, holding the pointer near the root's edge pans the view towards it, faster the nearer it
+is, and the gesture keeps following the pointer: a node can be dragged to a place off screen. The
+pan stops when the pointer leaves the edge, the gesture ends or the view reaches
+`translateExtent`. `autoPan={false}` turns it off; `autoPan={{ speed: 20, margin: 40 }}` pans 20
+pixels a frame at the edge and starts 40 pixels from it (defaults 10 and 30). A pan and a minimap
+drag never auto-pan.
 
 ## Actions
 
@@ -151,17 +264,129 @@ the view changes. `flowZoomIn`, `flowZoomOut` and `flowFitView` are (their `stat
 
 | action | payload |
 | --- | --- |
-| `set-viewport` | `{ x?, y?, zoom? }` |
+| `set-viewport` | `{ x?, y?, zoom?, duration? }` |
 | `pan-by` | `{ x, y }`, in pixels |
-| `zoom-in`, `zoom-out` | `{ step?, around? }`: refused at the limit |
-| `zoom-to` | `{ zoom, around? }` |
-| `fit-view` | `{ padding?, nodeIds?, minZoom?, maxZoom? }`: refused before a size is known |
-| `center-on` | `{ x, y, zoom? }`, a flow point |
+| `zoom-in`, `zoom-out` | `{ step?, around?, duration? }`: refused at the limit |
+| `zoom-to` | `{ zoom, around?, duration? }` |
+| `fit-view` | `{ padding?, nodeIds?, minZoom?, maxZoom?, duration? }`: refused before a size is known |
+| `center-on` | `{ x, y, zoom?, duration? }`, a flow point |
 | `focus-node` | `{ nodeId }` |
 
 `around` is a point relative to the root, in pixels (default its centre). `Flow.ZoomIn`,
 `Flow.ZoomOut` and `Flow.FitView` are these actions as buttons, disabled while `engine.can` says
 no ([Minimap and controls](/docs/guides/minimap-and-controls)).
+
+## Animated changes
+
+`duration`, in milliseconds, animates an action instead of jumping (default `0`: at once). The
+root's `easing` shapes every animation, a function of the share of time gone, from 0 to 1, to the
+share of the way (default a smooth ease in and out). Each frame is a `viewport-change` with
+`gesture: false`; a pan, the wheel, a pinch, another action or `cancel-gesture` stops the
+animation where it is. The controls take it as a prop
+([Minimap and controls](/docs/guides/minimap-and-controls#animated-buttons)).
+
+<Framework name="react">
+
+```tsx title="go-to-node.tsx"
+import { useFlow, type ViewportEasing } from "@fragiola/flow-react";
+
+const easeOut: ViewportEasing = (t) => 1 - (1 - t) ** 3;
+
+export function GoToNode({ nodeId }: { nodeId: string }) {
+    const { engine } = useFlow();
+    return (
+        <button
+            type="button"
+            data-flow-no-gesture=""
+            onClick={() => engine.run("fit-view", { nodeIds: [nodeId], maxZoom: 1.5, duration: 400 })}
+        >
+            Go to the node
+        </button>
+    );
+}
+
+// on the root: <Flow.Root easing={easeOut} …>
+```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="go-to-node.vue"
+<script setup lang="ts">
+import { useFlow } from "@fragiola/flow-vue";
+
+defineProps<{ nodeId: string }>();
+const { engine } = useFlow();
+</script>
+
+<template>
+    <button
+        type="button"
+        data-flow-no-gesture
+        @click="engine.run('fit-view', { nodeIds: [nodeId], maxZoom: 1.5, duration: 400 })"
+    >
+        Go to the node
+    </button>
+</template>
+```
+
+On the root, `:easing="easeOut"` with `const easeOut: ViewportEasing = (t) => 1 - (1 - t) ** 3`.
+
+</Framework>
+
+<Framework name="svelte">
+
+```svelte title="go-to-node.svelte"
+<script lang="ts">
+    import { useFlow } from "@fragiola/flow-svelte";
+
+    let { nodeId }: { nodeId: string } = $props();
+    const flow = useFlow();
+</script>
+
+<button
+    type="button"
+    data-flow-no-gesture
+    onclick={() => flow.engine.run("fit-view", { nodeIds: [nodeId], maxZoom: 1.5, duration: 400 })}
+>
+    Go to the node
+</button>
+```
+
+On the root, `easing={easeOut}` with `const easeOut: ViewportEasing = (t) => 1 - (1 - t) ** 3`.
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="go-to-node.ts"
+import { Component, input } from "@angular/core";
+import { injectFlow } from "@fragiola/flow-angular";
+
+// rendered inside [flowRoot]
+@Component({
+    selector: "app-go-to-node",
+    template: `
+        <button
+            type="button"
+            data-flow-no-gesture
+            (click)="flow.engine.run('fit-view', { nodeIds: [nodeId()], maxZoom: 1.5, duration: 400 })"
+        >
+            Go to the node
+        </button>
+    `,
+})
+export class GoToNode {
+    readonly nodeId = input.required<string>();
+    protected readonly flow = injectFlow();
+}
+```
+
+On the root, `[easing]="easeOut"` with `readonly easeOut: ViewportEasing = (t) => 1 - (1 - t) ** 3`
+on your component.
+
+</Framework>
 
 ## Screen and flow coordinates
 

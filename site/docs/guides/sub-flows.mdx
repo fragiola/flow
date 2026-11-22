@@ -260,6 +260,9 @@ function renderNode(node: FlowNode<Types>) {
 
 Dragging the group drags its children with it; with `extent: "parent"`, a dragged child stops at
 its parent's edges (measured sizes during the drag, the document's sizes in the model).
+`extent` may also be a rectangle, `{ x, y, width, height }` relative to the parent's top-left
+corner, to keep a child in one part of its group
+([Nodes and edges](/docs/concepts/nodes-and-edges#where-a-node-may-go)).
 
 ## Grow the parent instead
 

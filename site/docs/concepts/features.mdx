@@ -144,7 +144,7 @@ naming both.
 | `connection()` | `/connection` | drawing an edge from a handle, the connection line | `radius: 20`, `mode: "strict"` |
 | `reconnection()` | `/reconnection` | moving an edge's end, `edge.reconnect` (requires `connection()`) | `radius: 10` |
 | `resize()` | `/resize` | the `NodeResizer` gestures | `minWidth: 10`, `minHeight: 10`, `maxWidth`, `maxHeight`, `keepAspectRatio: false` |
-| `subflows()` | `/subflows` | `parentId`, `extent: "parent"`, `expandParent`, `node.set-parent` | none |
+| `subflows()` | `/subflows` | `parentId`, `extent` (`"parent"` or a rectangle), `expandParent`, `node.set-parent` | none |
 | `keyboard()` | `/keyboard` | focus on nodes and edges, arrows, Delete, Enter, Escape | `step: 5`, `fastStep: 20` |
 | `minimap()` | `/minimap` | the `MiniMap` view, pan and zoom from it | `pannable: true`, `zoomable: true`, `padding: 0.1` |
 

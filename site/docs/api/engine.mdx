@@ -133,10 +133,9 @@ flow), each with its own viewport.
 | `elevateNodesOnSelect` | `boolean` | `true` | a selected node, and its descendants with it, is drawn above the other nodes (`node-z-index-by`) |
 | `elevateEdgesOnSelect` | `boolean` | `false` | a selected edge is drawn above the other edges (`drawn-edges`) |
 
-`panActivationKey`, `panOnScrollMode`, `panOnScrollSpeed`, `zoomActivationKey`, `autoPan`,
-`easing`, `nodeOrigin`, `nodeExtent`, `elevateNodesOnSelect`, `elevateEdgesOnSelect` and the
-buttons of `panOnDrag` are engine options today (`createFlowEngine`,
-`engine.adapter.setOptions`); the roots of the four adapters take them as props next.
+The roots of the four adapters take every option but `root` as a prop of the same name (Vue:
+kebab-case in a template; Angular: an input of `flowRoot`) and send a change through
+`engine.adapter.setOptions` ([Root](/docs/api/primitives/root#props)).
 
 ## The members
 
