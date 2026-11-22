@@ -3,7 +3,7 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { EdgeLabelLayerContext, useEdgeId, useFlowContext } from "../context";
 import { useFlowValue } from "../hooks/internal";
-import { useEdgePath } from "../hooks/use-edge";
+import { staticEdgeAttributes, useEdgePath } from "../hooks/use-edge";
 import { type DivPrimitiveProps, useRenderElement } from "../utils/use-render";
 
 export interface EdgeLabelState {
@@ -32,7 +32,12 @@ export function EdgeLabel(props: EdgeLabelProps) {
     const { model, engine } = useFlowContext("EdgeLabel");
     const path = useEdgePath(edgeId);
     const attributes = useFlowValue(model, engine, () =>
-        engine?.adapter.attributes("edge-label", { edgeId }),
+        engine
+            ? engine.adapter.attributes("edge-label", { edgeId })
+            : staticEdgeAttributes("edge-label", {
+                  id: edgeId,
+                  selected: model.get("edge-by", { id: edgeId })?.selected,
+              }),
     );
     if (!path || !attributes || !layer) return null;
     return createPortal(

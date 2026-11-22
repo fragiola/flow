@@ -51,7 +51,7 @@ interface NodeView {
     attributes: PartAttributes;
     x: number;
     y: number;
-    /** its structural `z-index` (`node-z-index-by`); none without an engine */
+    /** its structural `z-index` (`node-z-index-by`, or the static geometry's before the engine) */
     zIndex: number | undefined;
     focusable: boolean;
 }
@@ -63,19 +63,20 @@ interface NodeView {
 export function useNode<T extends FlowTypes = AnyTypes>(
     node: FlowNode<T>,
 ): UseNodeResult<T> {
-    const { model, engine } = useFlowContext("useNode");
+    const { model, engine, staticGeometry } = useFlowContext("useNode");
     const nodeId = node.id;
     const view = useFlowValue<NodeView>(model, engine, () => {
         if (!engine) {
-            const at = model.get("absolute-position-by", { nodeId });
+            // the static geometry (origin applied), as the engine places it before measuring
+            const rect = staticGeometry?.nodeRects[nodeId];
             return {
                 attributes: {
                     ...partAttributes("node", nodeId),
                     "data-selected": flag(node.selected === true),
                 },
-                x: at?.x ?? node.position.x,
-                y: at?.y ?? node.position.y,
-                zIndex: undefined,
+                x: rect?.x ?? node.position.x,
+                y: rect?.y ?? node.position.y,
+                zIndex: staticGeometry?.nodeZIndexes[nodeId],
                 focusable: false,
             };
         }

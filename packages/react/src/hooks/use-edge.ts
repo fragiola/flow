@@ -3,6 +3,7 @@ import {
     type EdgePath,
     type FlowEdge,
     type FlowTypes,
+    flag,
     type PartAttributes,
     partAttributes,
 } from "@fragiola/flow";
@@ -67,7 +68,7 @@ interface EdgeView {
 export function useEdge<T extends FlowTypes = AnyTypes>(
     edge: FlowEdge<T>,
 ): UseEdgeResult<T> {
-    const { model, engine } = useFlowContext("useEdge");
+    const { model, engine, staticGeometry } = useFlowContext("useEdge");
     const edgeId = edge.id;
     const view = useFlowValue<EdgeView>(
         model,
@@ -81,8 +82,8 @@ export function useEdge<T extends FlowTypes = AnyTypes>(
                       focusable: engine.is("edge-focusable", { edgeId }),
                   }
                 : {
-                      attributes: partAttributes("edge", edgeId),
-                      path: undefined,
+                      attributes: staticEdgeAttributes("edge", edge),
+                      path: staticGeometry?.edgePaths[edgeId],
                       reconnecting: false,
                       focusable: false,
                   },
@@ -110,13 +111,33 @@ export function useEdge<T extends FlowTypes = AnyTypes>(
     };
 }
 
-/** @internal an edge's path, re-rendering when it changes (`Flow.EdgePath`, `Flow.EdgeLabel`) */
+/**
+ * @internal an edge part's attributes before the engine (the server render, the first client
+ * render): its part, its id and `data-selected` from the document, as a node's
+ */
+export function staticEdgeAttributes(
+    part: string,
+    edge: { readonly id: string; readonly selected?: boolean | undefined },
+): PartAttributes {
+    return {
+        ...partAttributes(part, edge.id),
+        "data-selected": flag(edge.selected === true),
+    };
+}
+
+/**
+ * @internal an edge's path, re-rendering when it changes (`Flow.EdgePath`, `Flow.EdgeLabel`): the
+ * engine's, or the static geometry's before the engine
+ */
 export function useEdgePath(edgeId: string): EdgePath | undefined {
-    const { model, engine } = useFlowContext("EdgePath");
+    const { model, engine, staticGeometry } = useFlowContext("EdgePath");
     return useFlowValue(
         model,
         engine,
-        () => engine?.get("edge-path-by", { edgeId }),
+        () =>
+            engine
+                ? engine.get("edge-path-by", { edgeId })
+                : staticGeometry?.edgePaths[edgeId],
         sameEdgePath,
     );
 }

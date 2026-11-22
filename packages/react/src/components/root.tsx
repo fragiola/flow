@@ -18,6 +18,9 @@ import {
     type FlowNodeInput,
     type FlowTypes,
     partAttributes,
+    type StaticGeometry,
+    type StaticGeometryOptions,
+    staticGeometry,
     type Viewport,
 } from "@fragiola/flow";
 import * as React from "react";
@@ -527,6 +530,45 @@ export function Root<
         [live],
     );
 
+    // before the engine (the server render, the first client render): the geometry of the
+    // document with the options the engine gets, worked out once per document or options change,
+    // so that the server's output and the first client render are the same
+    const staticOptions: StaticGeometryOptions = {
+        nodeOrigin,
+        pathOptions,
+        zIndexMode,
+        elevateNodesOnSelect,
+        elevateEdgesOnSelect,
+    };
+    const staticKey = JSON.stringify(staticOptions);
+    const staticCache = React.useRef<
+        | {
+              nodes: unknown;
+              edges: unknown;
+              key: string;
+              geometry: StaticGeometry;
+          }
+        | undefined
+    >(undefined);
+    const geometry = useFlowValue(model, live, () => {
+        if (live) return null;
+        const flow = {
+            nodes: model.get("all-nodes"),
+            edges: model.get("all-edges"),
+        };
+        const cached = staticCache.current;
+        if (
+            cached?.nodes === flow.nodes &&
+            cached.edges === flow.edges &&
+            cached.key === staticKey
+        ) {
+            return cached.geometry;
+        }
+        const computed = staticGeometry(flow, staticOptions);
+        staticCache.current = { ...flow, key: staticKey, geometry: computed };
+        return computed;
+    });
+
     const attributes = useFlowValue(model, live, () =>
         live ? live.adapter.attributes("root") : partAttributes("root"),
     );
@@ -543,8 +585,9 @@ export function Root<
             engine: live,
             publicEngine: facade.engine as unknown as AnyFlowEngine,
             rootElement,
+            staticGeometry: geometry,
         }),
-        [model, live, facade, rootElement],
+        [model, live, facade, rootElement, geometry],
     );
     const element = useRenderElement("div", rest, {
         state,
