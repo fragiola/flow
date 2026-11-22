@@ -82,6 +82,10 @@
             bind:ref={refs["connection-line"]}
             {...at("connection-line")}
         />
+        <Flow.NodesSelection
+            bind:ref={refs["nodes-selection"]}
+            {...at("nodes-selection")}
+        />
     </Flow.Viewport>
     <Flow.SelectionBox bind:ref={refs["selection-box"]} {...at("selection-box")} />
     <Flow.Controls bind:ref={refs.controls} {...at("controls")}>

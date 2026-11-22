@@ -3,6 +3,7 @@
 // children }`, `bind:ref` and the consumer's attachments on the primitive's element, the
 // consumer's handlers after the internal ones, `class` and `style` as a value or a function of the
 // state, structural style that wins, and no text or name of its own.
+import { fireEvent } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
 import { createAttachmentKey } from "svelte/attachments";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -31,6 +32,11 @@ interface Case {
     structural?: [string, string, string];
     /** the place in the flow given the props, when not its part's (the edge's toolbar) */
     slot?: string;
+    /**
+     * the DOM handler the consumer's handler test gives it; default `onclick` (the minimap's
+     * `onclick` is its tap's callback, with the flow point)
+     */
+    handler?: "onclick" | "ondblclick";
 }
 
 const RENDER = {
@@ -65,6 +71,25 @@ async function startBox(container: HTMLElement) {
     await pointer(part(container, "root"), "pointermove", {
         clientX: 500,
         clientY: 500,
+        shiftKey: true,
+    });
+}
+
+/** A box selection of both nodes, done: the rectangle around them shows. */
+async function selectBoth(container: HTMLElement) {
+    await pointer(part(container, "viewport"), "pointerdown", {
+        clientX: -10,
+        clientY: -10,
+        shiftKey: true,
+    });
+    await pointer(part(container, "root"), "pointermove", {
+        clientX: 300,
+        clientY: 300,
+        shiftKey: true,
+    });
+    await pointer(part(container, "root"), "pointerup", {
+        clientX: 300,
+        clientY: 300,
         shiftKey: true,
     });
 }
@@ -121,6 +146,12 @@ const CASES: Case[] = [
         structural: ["position", "static", "absolute"],
     },
     {
+        part: "nodes-selection",
+        tag: "div",
+        setup: selectBoth,
+        structural: ["position", "static", "absolute"],
+    },
+    {
         part: "background",
         tag: "svg",
         structural: ["position", "static", "absolute"],
@@ -142,7 +173,7 @@ const CASES: Case[] = [
         tag: "div",
         structural: ["position", "static", "absolute"],
     },
-    { part: "minimap", tag: "svg" },
+    { part: "minimap", tag: "svg", handler: "ondblclick" },
     { part: "minimap-node", tag: "rect" },
     { part: "minimap-mask", tag: "path" },
     {
@@ -232,13 +263,18 @@ describe.each(CASES)("the $part primitive", (c) => {
     });
 
     it("runs the consumer's handlers", async () => {
-        const onclick = vi.fn();
+        const handler = vi.fn();
+        const name = c.handler ?? "onclick";
         const { container } = await mount(c, {
-            onclick,
+            [name]: handler,
             "data-testid": "case",
         });
-        await click(find(container));
-        expect(onclick).toHaveBeenCalledTimes(1);
+        if (name === "onclick") await click(find(container));
+        else {
+            await fireEvent.dblClick(find(container));
+            await settle();
+        }
+        expect(handler).toHaveBeenCalledTimes(1);
     });
 
     it("takes class and style as values, any of Svelte's forms", async () => {
