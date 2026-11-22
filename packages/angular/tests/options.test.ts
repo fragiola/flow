@@ -2,11 +2,12 @@
 // the node and edges parts apply from the core (z-order, node origin): React's
 // `tests/options.test.tsx`. The engine is wrapped so the tests see what reaches it: its creation
 // options, `adapter.setOptions` and `run`.
+import { Component, input } from "@angular/core";
 import type { FlowEngine, FlowEngineOptions, FlowModel } from "@fragiola/flow";
 import { selection } from "@fragiola/flow/selection";
 import { subflows } from "@fragiola/flow/subflows";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DRAG_HANDLE_ATTRIBUTE } from "../src/public-api";
+import { DRAG_HANDLE_ATTRIBUTE, FLOW, type FlowNode } from "../src/public-api";
 import { ProbeFlow, TestFlow } from "./fixtures";
 import { click, installLayout, part, render, task } from "./flow";
 
@@ -77,6 +78,40 @@ const last = () => {
     if (!engine) throw new Error("no engine");
     return engine;
 };
+
+/** The options of #33 as attribute text, and the tap distances bound. */
+@Component({
+    selector: "test-interaction-options",
+    imports: [FLOW],
+    template: `
+        @if (bound()) {
+            <div
+                flowRoot
+                [defaultNodes]="nodes"
+                [paneClickDistance]="pane()"
+                [nodeClickDistance]="node()"
+                [nodesFocusable]="nodesFocusable()"
+            ></div>
+        } @else {
+            <div
+                flowRoot
+                [defaultNodes]="nodes"
+                paneClickDistance="30"
+                nodeClickDistance="5"
+                preventScrolling
+                nodesFocusable="false"
+                edgesFocusable
+            ></div>
+        }
+    `,
+})
+class InteractionOptions {
+    readonly bound = input(false);
+    readonly pane = input<number | undefined>();
+    readonly node = input<number | undefined>();
+    readonly nodesFocusable = input<boolean | undefined>();
+    readonly nodes: FlowNode[] = [task("a")];
+}
 
 const byTestId = (container: HTMLElement, id: string) =>
     container.querySelector(`[data-testid="${id}"]`) as HTMLElement;
@@ -202,5 +237,31 @@ describe("the viewport and gesture options (#25)", () => {
 
     it("re-exports the drag handle attribute", () => {
         expect(DRAG_HANDLE_ATTRIBUTE).toBe("data-flow-drag-handle");
+    });
+});
+
+describe("the interaction options (#33)", () => {
+    it("take their attributes' text: numbers, and bare or false booleans", async () => {
+        await render(InteractionOptions);
+        expect(last().options).toMatchObject({
+            paneClickDistance: 30,
+            nodeClickDistance: 5,
+            preventScrolling: true,
+            nodesFocusable: false,
+            edgesFocusable: true,
+        });
+    });
+
+    it("send the ones that change, absent ones undefined", async () => {
+        const { set } = await render(InteractionOptions, { bound: true });
+        expect(last().options.paneClickDistance).toBeUndefined();
+        expect(last().options.preventScrolling).toBeUndefined();
+        const { setOptions } = last();
+        await set({ pane: 12 });
+        expect(setOptions).toHaveBeenLastCalledWith({ paneClickDistance: 12 });
+        await set({ node: 3 });
+        expect(setOptions).toHaveBeenLastCalledWith({ nodeClickDistance: 3 });
+        await set({ nodesFocusable: false });
+        expect(setOptions).toHaveBeenLastCalledWith({ nodesFocusable: false });
     });
 });

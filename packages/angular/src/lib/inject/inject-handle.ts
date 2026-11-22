@@ -39,6 +39,10 @@ export interface InjectHandleOptions {
     handleId?: string | undefined;
     /** whether a connection may start or end here; default true */
     connectable?: boolean | undefined;
+    /** whether a connection may start here (a drag, a tap, a key); default true */
+    connectableStart?: boolean | undefined;
+    /** whether a connection may end here (be its target); default true */
+    connectableEnd?: boolean | undefined;
     /** its node; default the enclosing `[flowNode]`'s */
     nodeId?: string | undefined;
 }
@@ -51,6 +55,10 @@ export interface HandleState {
     readonly side: HandleSide;
     /** a connection may start or end here (its flag and its node's): `data-connectable` */
     readonly connectable: boolean;
+    /** a connection may start here: `data-connectable-start` */
+    readonly connectableStart: boolean;
+    /** a connection may end here: `data-connectable-end` */
+    readonly connectableEnd: boolean;
     /** the connection under way starts here (`connection()`): `data-connecting` */
     readonly connecting: boolean;
     /** the connection under way would end here and be accepted: `data-valid` */
@@ -86,7 +94,9 @@ function sameRegistration(
             a.handleId === b.handleId &&
             a.type === b.type &&
             a.side === b.side &&
-            a.connectable === b.connectable)
+            a.connectable === b.connectable &&
+            a.connectableStart === b.connectableStart &&
+            a.connectableEnd === b.connectableEnd)
     );
 }
 
@@ -130,6 +140,8 @@ export function bindHandle(
                 type: given.type,
                 side: given.side,
                 connectable: given.connectable,
+                connectableStart: given.connectableStart,
+                connectableEnd: given.connectableEnd,
             };
         },
         { equal: sameRegistration },
@@ -156,6 +168,8 @@ export function bindHandle(
             type: handle.type,
             side: handle.side,
             connectable: current["data-connectable"] !== undefined,
+            connectableStart: current["data-connectable-start"] !== undefined,
+            connectableEnd: current["data-connectable-end"] !== undefined,
             connecting: current["data-connecting"] !== undefined,
             valid: current["data-valid"] !== undefined,
             invalid: current["data-invalid"] !== undefined,
