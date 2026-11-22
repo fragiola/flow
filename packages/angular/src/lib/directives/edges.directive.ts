@@ -82,11 +82,13 @@ interface LevelLayer {
     providers: [
         {
             provide: FLOW_EDGE_LABEL_LAYER,
+            // the directive is the labels' layers by its `of` (internal, so out of the published
+            // types: an `implements` there would name a member the .d.ts does not have)
             useFactory: (): EdgeLabelLayers => inject(FlowEdgesDirective),
         },
     ],
 })
-export class FlowEdgesDirective implements EdgeLabelLayers {
+export class FlowEdgesDirective {
     private readonly context = injectFlowContext("[flowEdges]");
     /** @internal the HTML layer: the app's element */
     readonly host = injectHost();
