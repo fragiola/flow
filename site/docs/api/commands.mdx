@@ -95,7 +95,7 @@ model.run("node.remove", {
 
 ### `node.move`
 
-Moves a node to a position (relative to its parent with sub-flows), kept to its extent. Refused when the node is not draggable. A drag runs it as transient steps, then once more for the drop.
+Moves a node to a position (relative to its parent with sub-flows), kept inside its parent with `extent: "parent"` (a rectangle extent is kept by the gestures, not here). Refused when the node is not draggable. A drag runs it as transient steps, then once more for the drop.
 
 It may run as a step of a continuous gesture: `model.run(…, { transient: true })`.
 
@@ -111,7 +111,7 @@ It may run as a step of a continuous gesture: `model.run(…, { transient: true 
 | field | type | required | description |
 | --- | --- | --- | --- |
 | `nodeId` | `string` | yes | the node's id |
-| `position` | `object` | yes | the position it got, kept to its extent |
+| `position` | `object` | yes | the position it got, kept inside its parent with `extent: "parent"` |
 
 **Errors**: `not_found`, `refused`, besides those every command can return.
 
@@ -131,7 +131,7 @@ model.run("node.move", {
 
 ### `node.resize`
 
-Sets a node's width and height, and optionally its position (a resize from a top or left edge moves it), kept to its extent. A resize gesture runs it as transient steps, then once more at the end.
+Sets a node's width and height, and optionally its position (a resize from a top or left edge moves it), kept inside its parent with `extent: "parent"` (a rectangle extent is kept by the gestures, not here). A resize gesture runs it as transient steps, then once more at the end.
 
 It may run as a step of a continuous gesture: `model.run(…, { transient: true })`.
 
@@ -151,7 +151,7 @@ It may run as a step of a continuous gesture: `model.run(…, { transient: true 
 | `nodeId` | `string` | yes | the node's id |
 | `width` | `number` | yes | its width |
 | `height` | `number` | yes | its height |
-| `position` | `object` | yes | the position it got, kept to its extent |
+| `position` | `object` | yes | the position it got, kept inside its parent with `extent: "parent"` |
 
 **Errors**: `not_found`, besides those every command can return.
 

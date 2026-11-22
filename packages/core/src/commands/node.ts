@@ -114,7 +114,7 @@ export const nodeRemove = defineCommand({
 export const nodeMove = defineCommand({
     name: "node.move",
     description:
-        "Moves a node to a position (relative to its parent with sub-flows), kept to its extent. Refused when the node is not draggable. A drag runs it as transient steps, then once more for the drop.",
+        'Moves a node to a position (relative to its parent with sub-flows), kept inside its parent with `extent: "parent"` (a rectangle extent is kept by the gestures, not here). Refused when the node is not draggable. A drag runs it as transient steps, then once more for the drop.',
     payloadSchema: {
         type: "object",
         properties: {
@@ -134,7 +134,8 @@ export const nodeMove = defineCommand({
             nodeId,
             position: {
                 ...xySchema,
-                description: "the position it got, kept to its extent",
+                description:
+                    'the position it got, kept inside its parent with `extent: "parent"`',
             },
         },
         required: ["nodeId", "position"],
@@ -167,7 +168,7 @@ export const nodeMove = defineCommand({
 export const nodeResize = defineCommand({
     name: "node.resize",
     description:
-        "Sets a node's width and height, and optionally its position (a resize from a top or left edge moves it), kept to its extent. A resize gesture runs it as transient steps, then once more at the end.",
+        'Sets a node\'s width and height, and optionally its position (a resize from a top or left edge moves it), kept inside its parent with `extent: "parent"` (a rectangle extent is kept by the gestures, not here). A resize gesture runs it as transient steps, then once more at the end.',
     payloadSchema: {
         type: "object",
         properties: {
@@ -194,7 +195,8 @@ export const nodeResize = defineCommand({
             height: { type: "number", description: "its height" },
             position: {
                 ...xySchema,
-                description: "the position it got, kept to its extent",
+                description:
+                    'the position it got, kept inside its parent with `extent: "parent"`',
             },
         },
         required: ["nodeId", "width", "height", "position"],
