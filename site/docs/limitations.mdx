@@ -34,6 +34,11 @@ is no "not yet" list. Found something missing from this page? [Open an issue](ht
   Vue and Svelte draw them on the server ([Server rendering](/docs/guides/server-rendering)).
 - **Edge labels are not in the server HTML**: a `Flow.EdgeLabel` portals into its layer once
   mounted, so labels appear after hydration, while the paths are already there.
+- **The server HTML is drawn at the identity viewport** (`{ x: 0, y: 0, zoom: 1 }`): only the
+  engine writes the viewport's transform, so `defaultViewport` and `fitView` apply once it is
+  attached after mount, and pan or zoom the whole flow then. For a server-rendered flow without
+  that move, keep the identity viewport and place the nodes to fit at zoom 1
+  ([Server rendering](/docs/guides/server-rendering)).
 - **`fitView` on init runs once, on the sizes known then**: a node's `initialWidth` /
   `initialHeight` count until it is measured, and the view is not fitted again when the measured
   sizes differ. Declare sizes close to the rendered ones, or run `fit-view` after `onInit`.
