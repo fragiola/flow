@@ -174,23 +174,51 @@ describe("the viewport and gesture options (#25)", () => {
         expect(node.style.zIndex).toBe("2");
     });
 
-    it("draws the edges in the core's order (drawn-edges: by zIndex, a selected one raised with elevateEdgesOnSelect)", async () => {
+    const ordered = {
+        features,
+        defaultNodes: [task("a"), task("b", 0, 200), task("c", 200, 200)],
+        defaultEdges: [
+            { id: "e1", source: "a", target: "b", zIndex: 2 },
+            { id: "e2", source: "a", target: "c", selected: true },
+            { id: "e3", source: "b", target: "c", zIndex: 1 },
+        ],
+    };
+    const edgeOrder = (container: HTMLElement) =>
+        [...container.querySelectorAll('[data-flow-part="edge"]')].map((edge) =>
+            edge.getAttribute("data-flow-id"),
+        );
+
+    it("draws the edges in the core's order (drawn-edges: by zIndex, a selected one raised with elevateEdgesOnSelect, zIndexMode basic)", async () => {
         const { container, rerender } = await render(TestFlow, {
-            features,
-            defaultNodes: [task("a"), task("b", 0, 200), task("c", 200, 200)],
-            defaultEdges: [
-                { id: "e1", source: "a", target: "b", zIndex: 2 },
-                { id: "e2", source: "a", target: "c", selected: true },
-                { id: "e3", source: "b", target: "c", zIndex: 1 },
-            ],
+            ...ordered,
+            zIndexMode: "basic",
         });
-        const order = () =>
-            [...container.querySelectorAll('[data-flow-part="edge"]')].map(
-                (edge) => edge.getAttribute("data-flow-id"),
-            );
-        expect(order()).toEqual(["e2", "e3", "e1"]);
+        expect(edgeOrder(container)).toEqual(["e2", "e3", "e1"]);
         await rerender({ elevateEdgesOnSelect: true });
-        expect(order()).toEqual(["e3", "e1", "e2"]);
+        expect(edgeOrder(container)).toEqual(["e3", "e1", "e2"]);
+    });
+
+    it("raises a selected edge by default (zIndexMode auto), above the nodes in its own level", async () => {
+        const { container } = await render(TestFlow, ordered);
+        expect(edgeOrder(container)).toEqual(["e3", "e1", "e2"]);
+        const e2 = part(container, "edge", "e2");
+        expect(
+            e2
+                .closest('[data-flow-part="edges-layer"]')
+                ?.getAttribute("data-level"),
+        ).toBe("3");
+    });
+
+    it("forwards zIndexMode to the engine it creates, and a change to setOptions", async () => {
+        const { rerender } = await render(TestFlow, {
+            defaultNodes: [task("a")],
+            zIndexMode: "manual",
+        });
+        expect(last().options.zIndexMode).toBe("manual");
+        await rerender({ zIndexMode: "basic" });
+        expect(last().setOptions).toHaveBeenLastCalledWith({
+            zIndexMode: "basic",
+        });
     });
 
     it("keeps the nodes' z-index inside their layer (isolation), so a raised node never covers the connection line", async () => {
