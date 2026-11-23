@@ -810,8 +810,15 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         return next;
     }
 
-    /** Sets the viewport: writes its transform, tells the adapters and the app. */
-    private setViewport(viewport: Viewport, gesture: boolean): Viewport {
+    /**
+     * Sets the viewport: writes its transform, tells the adapters (`change`: what else changed with
+     * it, told in the same notification) and the app.
+     */
+    private setViewport(
+        viewport: Viewport,
+        gesture: boolean,
+        change: Partial<ViewChange> = {},
+    ): Viewport {
         // a gesture (a pan, the wheel, a pinch, the minimap, auto-pan) takes the viewport over
         if (gesture) this.stopViewportAnimation();
         const next = this.kept(viewport);
@@ -828,7 +835,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         if (this.viewportElement) {
             writeViewportTransform(this.viewportElement, this.current);
         }
-        this.notify({ viewport: true });
+        this.notify({ ...change, viewport: true });
         this.emit({ type: "viewport-change", viewport: this.current, gesture });
         this.settle();
         return this.current;
@@ -1921,6 +1928,9 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             move: (event) => {
                 const first = !moved;
                 moved = true;
+                const before = this.current;
+                // the panning state changed once, on the first move: told with the viewport's
+                // change, in one notification
                 this.setViewport(
                     {
                         x: origin.x + event.clientX - start.x,
@@ -1928,9 +1938,11 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                         zoom: origin.zoom,
                     },
                     true,
+                    first ? { gesture: true } : {},
                 );
-                // the panning state changed once, on the first move
-                if (first) this.notify({ gesture: true });
+                if (first && this.current === before) {
+                    this.notify({ gesture: true });
+                }
             },
             end: () => {
                 if (moved) this.notify({ gesture: true });
