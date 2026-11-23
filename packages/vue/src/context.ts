@@ -47,11 +47,6 @@ export interface FlowContextValue {
      */
     readonly onlyRenderVisible: ComputedRef<boolean>;
     /**
-     * reads the root's box once until the current patch ends (`utils/root-box.ts`): the nodes
-     * layer holds it while it patches, so its new nodes' reads lay the page out once
-     */
-    readonly holdRootBox: () => void;
-    /**
      * the flow's geometry from its document alone (`staticGeometry`, with the root's options)
      * while there is no engine (a server render, the first client render), null once it exists:
      * the parts draw from it, so the server's HTML and the first client render are the same

@@ -4,13 +4,7 @@ import {
     type FlowTypes,
     partAttributes,
 } from "@fragiola/flow";
-import {
-    defineComponent,
-    h,
-    onBeforeUpdate,
-    type PropType,
-    type Slot,
-} from "vue";
+import { defineComponent, h, type PropType, type Slot } from "vue";
 import { useDrawnLayers, useFlowValue } from "../composables/internal";
 import { useFlowContext } from "../context";
 import {
@@ -106,9 +100,6 @@ export const Nodes: FlowComponent<NodesProps, NodesSlots> = definePrimitive<
             : shownNodes(model.get("all-nodes"));
     });
     const layers = useDrawnLayers(context);
-    // its new nodes read the view right after the ones before them are inserted: the root's box
-    // is read once for the whole patch
-    onBeforeUpdate(context.holdRootBox);
     return () => {
         const nodes = list.value;
         const layered = layers.value.length > 1;

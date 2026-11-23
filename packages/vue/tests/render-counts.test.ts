@@ -2,6 +2,7 @@
 // reads again. A viewport step re-renders no node or edge whose visibility did not change, and
 // reads none of their views again (`entity` readers skip it); dragging one node re-renders that
 // node and its edges only; a culled flow renders no node or edge before the engine knows the view.
+// A step that mounts many nodes reads the root's box a few times, not once per node (#51).
 import type {
     FlowEdge,
     FlowEngine,
@@ -356,5 +357,32 @@ describe("render counts", () => {
         ]);
         app.unmount();
         host.remove();
+    });
+
+    it("a viewport step that mounts many nodes reads the root's box once per turn, not per node", async () => {
+        // 40 nodes right of the view, in view once zoomed out to 0.5
+        const many = Array.from({ length: 40 }, (_, i) =>
+            task(`m${i}`, 900 + (i % 8) * 80, Math.floor(i / 8) * 80),
+        );
+        const renders = counter();
+        const { container } = await render(
+            countedFlow(renders, {
+                onlyRenderVisible: true,
+                defaultNodes: [...nodes, ...many],
+            }),
+        );
+        const root = part(container, "root");
+        const box = vi.mocked(Element.prototype.getBoundingClientRect);
+        const rootReads = () =>
+            box.mock.contexts.filter((element) => element === root).length;
+        let most = 0;
+        for (let i = 0; i < 12; i++) {
+            const before = rootReads();
+            await wheel(root, 100);
+            most = Math.max(most, rootReads() - before);
+        }
+        expect(renders.ids()).toContain("node m39");
+        // a few turns a step (the wheel, the patch, the measurements; 4 here), 45 if read per read
+        expect(most).toBeLessThan(8);
     });
 });

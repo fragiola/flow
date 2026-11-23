@@ -64,7 +64,6 @@ import {
     type RenderSlot,
     renderElement,
 } from "../utils/render";
-import { holdRootBox, type RootBoxHold } from "../utils/root-box";
 
 export interface RootState {
     /** the gestures and keys may change the flow (`set-interactive`, `data-interactive`) */
@@ -664,8 +663,6 @@ const RootFlow = definePrimitive<AnyRootProps, RootSlots, RootEmits<AnyTypes>>(
             return value;
         });
 
-        // the root's box hold, while its element is there (`holdRootBox`)
-        let rootBox: RootBoxHold | undefined;
         const context: FlowContextValue = {
             model,
             engine,
@@ -674,7 +671,6 @@ const RootFlow = definePrimitive<AnyRootProps, RootSlots, RootEmits<AnyTypes>>(
             revision,
             store,
             onlyRenderVisible: computed(() => props.onlyRenderVisible === true),
-            holdRootBox: () => rootBox?.hold(),
             geometry,
         };
         provide(FlowKey, context);
@@ -684,12 +680,8 @@ const RootFlow = definePrimitive<AnyRootProps, RootSlots, RootEmits<AnyTypes>>(
                 rootElement.value = element as HTMLElement;
                 const live = engine.value;
                 if (live) live.adapter.attachRoot(element as HTMLElement);
-                const box = holdRootBox(element as HTMLElement);
-                rootBox = box;
                 return () => {
                     if (live) live.adapter.detachRoot();
-                    box.release();
-                    if (rootBox === box) rootBox = undefined;
                     rootElement.value = null;
                 };
             },
