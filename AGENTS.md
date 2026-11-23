@@ -203,9 +203,9 @@ in one PR. `main` has no required checks: a skipped job blocks nothing.
 
 **Shards: none.** Shard a suite only when its test step alone passes about 3 minutes. Measured
 locally (4 workers; CI runs 2): the playground's 214 tests (107 per browser) in ~80 s, each examples
-app in ~22 to ~72 s, its embed build included: React's 302 tests (145 smoke runs: 29 examples ×
-5 themes), Vue's, Svelte's and Angular's 260 with the 34 `PENDING` ones skipped (counts and times
-measured after #45; Angular and React the slower).
+app in ~22 to ~90 s, its embed build included: React's 369 tests (175 smoke runs: 35 examples ×
+5 themes), Vue's, Svelte's and Angular's 291 with the 65 `PENDING` ones skipped (counts and times
+measured after #46; Angular and React the slower).
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
@@ -1260,8 +1260,9 @@ the per-framework skip of what a later Epic ports: whole examples (`<slug>`) and
 case; `openExample` for an example). React never has any; the Epic that ports an entry to a
 framework deletes it there. Today Vue, Svelte and Angular wait for `edge-reconnect#delete-on-drop`,
 `sub-flows#selection-grouping` and the new examples of #45 (`shapes`, `easy-connect`,
-`proximity-connect`, `delete-middle-node`, `intersections`, `contextual-zoom`, `connection-line`):
-Epic #49 writes them in React, the ports' Epics follow. A pending whole example has nothing in the
+`proximity-connect`, `delete-middle-node`, `intersections`, `contextual-zoom`, `connection-line`)
+and of #46 (`edge-markers`, `animating-edges`, `floating-edges`, `editable-edge`,
+`gradient-styling`, `whiteboard`): Epic #49 writes them in React, the ports' Epics follow. A pending whole example has nothing in the
 port's app yet: its `tests/examples.test.ts` leaves it out of React's ids and `tests/vendored.test.ts`
 expects no copy of its `styles.ts` and siblings.
 Alternative: a capability attribute the example renders, checked by the spec; refused: it would
@@ -1306,6 +1307,28 @@ handles remounted per angle as the engine has no public re-measure), `easy-conne
 `contextual-zoom` (`data-detail` low/medium/high at zoom 0.75 / 1.35, edge labels from 1) and
 `connection-line` (`Flow.ConnectionLine` children, the selection's extra lines and a second `batch`
 on `connect`). Their pure helpers are unit-tested in `examples/react/tests/<id>.test.ts`.
+#46 (React only, likewise `PENDING`): `edge-markers` (no marker is built in: its own `<marker>`s from
+`markers.ts` in an `aria-hidden` svg, one per shape and tone, as a marker is coloured where it is
+defined, and one per shape for the selected state, swapped by `data-selected:[marker-*:var(…)]`;
+ids from `useId`; `limitations.mdx` links it), `animating-edges` (a dot on `<animateMotion>` over
+`useEdge(edge).state.path.path`, a SMIL `stroke-dashoffset` dash flow, a one-run `data-pulsing`
+cleared on `animationend`; under `prefers-reduced-motion`, followed live, the dot and dashes go and
+the edges carry `data-reduced-motion`), `floating-edges` (no handles: `useInternalNode(id).rect`
+per end, the border point of a box or an ellipse from `border-intersection.ts`, its own copy of
+easy-connect's idea; an "Edge path" radio group: straight, bezier, simple = nearest sides' middles;
+`data-variant`), `editable-edge` (`data.points` through `edge.set-data`; points are named SVG
+`role="button"` circles with `data-flow-no-gesture`, dragged with `screen-to-flow`, arrows move,
+Delete removes, a double click inserts; "Route" stores `routing.ts`'s A* way around the inflated
+node boxes, a plain step and a status when none exists), `gradient-styling` (palette accents caught
+in custom properties, a gradient frame as the node's border, a selected glow, one `userSpaceOnUse`
+`<linearGradient>` per edge between its ends; blue, green, orange and purple only, as the five
+themes do not declare rose) and `whiteboard` (a "Whiteboard tools" toolbar, `data-tool`; a drawing
+tool lays a `data-flow-no-gesture` overlay and `panOnDrag={tool === "select"}`; rectangle,
+Chaikin-smoothed freehand strokes as nodes (`stroke.ts`), an eraser removing in one `batch`, edges
+first (`eraser.ts`), a lasso selecting whole boxes (`lasso.ts`, `selection.set`)).
+Follow-ups (no package change here): the core's `roundedPath`, `halfwayAlong` and `sidePoint` are
+not exported (the examples keep their own copies), and an app edge with its own path has no way to
+give its label / `EdgeToolbar` a point (they sit at the default midpoint).
 The Vue, Svelte and Angular apps have every one of these (their own sections below), with no
 parity filter left.
 
