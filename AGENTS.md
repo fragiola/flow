@@ -1252,7 +1252,16 @@ Flow decided on top of it:
 
 `COMPLETE_FRAMEWORKS` is `["react", "vue", "svelte", "angular"]` (#16): every framework ships every
 example, so a missing one fails its spec; a framework of a later adapter Epic is skipped there
-while its app is written (the test uses a fake one).
+while its app is written (the test uses a fake one). **`PENDING`** (`e2e/available.ts`, #44) is
+the per-framework skip of what a later Epic ports: whole examples (`<slug>`) and cases of a spec
+(`<slug>#<case>`, `pendingCase`); a spec that needs one is skipped in that framework with a
+"(PENDING)" reason instead of failing (`requireCase(slug, case)` as a test's first line for a
+case; `openExample` for an example). React never has any; the Epic that ports an entry to a
+framework deletes it there. Today Vue, Svelte and Angular wait for `edge-reconnect#delete-on-drop`
+and `sub-flows#selection-grouping` (Epic #49 writes them in React; the ports' Epics follow).
+Alternative: a capability attribute the example renders, checked by the spec; refused: it would
+put test plumbing in copyable example code, and a forgotten port would skip silently instead of
+being listed in one place.
 
 **The examples** (`examples/react/src/examples/<id>/index.tsx` + `styles.ts`; the README there is
 the authoring guide), by topic since #44 (Epic #49's gallery table; the orders keep gaps where its

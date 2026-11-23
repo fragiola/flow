@@ -5,7 +5,9 @@
 // One suite for every framework: each app's playwright.config.ts (`examplesE2eConfig`) sets
 // `EXAMPLES_FRAMEWORK`, and a spec that opens an example the framework does not have is skipped,
 // not failed: a framework may ship a subset of the examples (contract §5) while it is being
-// written. A framework of `COMPLETE_FRAMEWORKS` ships every example: a missing one fails.
+// written. A framework of `COMPLETE_FRAMEWORKS` ships every example: a missing one fails, unless
+// `PENDING` names it for that framework (an example, or one case of a spec, that a later Epic
+// brings to it).
 
 import { FRAMEWORKS, type Framework, isFramework } from "../src/framework.ts";
 
@@ -20,6 +22,35 @@ export const COMPLETE_FRAMEWORKS: readonly Framework[] = [
     "svelte",
     "angular",
 ];
+
+/** The pending case of an example's spec: `<slug>#<case>` (a whole example is its `<slug>`). */
+export function pendingCase(slug: string, name: string): string {
+    return `${slug}#${name}`;
+}
+
+/**
+ * What a framework's app does not have yet, because a later Epic brings it there: whole examples
+ * (`<slug>`) and cases of an example's spec (`<slug>#<case>`, `pendingCase`). A spec that needs
+ * one is skipped in that framework instead of failing, with a reason that says it is pending. The
+ * Epic that ports it to a framework removes it from that framework's list; React, where every
+ * example is written first, never has any (`tests/e2e-available.test.ts`).
+ */
+export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
+    react: [],
+    // Epic #49 (#44): the extensions of edge-reconnect and sub-flows, React first
+    vue: [
+        pendingCase("edge-reconnect", "delete-on-drop"),
+        pendingCase("sub-flows", "selection-grouping"),
+    ],
+    svelte: [
+        pendingCase("edge-reconnect", "delete-on-drop"),
+        pendingCase("sub-flows", "selection-grouping"),
+    ],
+    angular: [
+        pendingCase("edge-reconnect", "delete-on-drop"),
+        pendingCase("sub-flows", "selection-grouping"),
+    ],
+};
 
 /** The framework of `EXAMPLES_FRAMEWORK`; anything else throws (a config that forgot to set it). */
 export function frameworkOf(value: string | undefined): Framework {
@@ -59,12 +90,32 @@ export function skipOrFail(
     framework: Framework,
     available: readonly string[],
     slugs: readonly string[],
+    pending: readonly string[] = PENDING[framework] ?? [],
 ): string | undefined {
     const reason = skipReason(framework, available, slugs);
-    if (reason !== undefined && COMPLETE_FRAMEWORKS.includes(framework)) {
-        throw new Error(
-            `${reason}, but every ${framework} example is required (COMPLETE_FRAMEWORKS)`,
-        );
+    if (reason === undefined || !COMPLETE_FRAMEWORKS.includes(framework)) {
+        return reason;
     }
-    return reason;
+    const missing = slugs.filter((slug) => !available.includes(slug));
+    if (missing.every((slug) => pending.includes(slug))) {
+        return `${reason} yet (PENDING)`;
+    }
+    throw new Error(
+        `${reason}, but every ${framework} example is required (COMPLETE_FRAMEWORKS)`,
+    );
+}
+
+/**
+ * Why one case of an example's spec is skipped in `framework` (`PENDING` names it there), or
+ * nothing when it runs.
+ */
+export function caseSkipReason(
+    framework: Framework,
+    slug: string,
+    name: string,
+    pending: readonly string[] = PENDING[framework] ?? [],
+): string | undefined {
+    return pending.includes(pendingCase(slug, name))
+        ? `${framework} has no ${pendingCase(slug, name)} yet (PENDING)`
+        : undefined;
 }

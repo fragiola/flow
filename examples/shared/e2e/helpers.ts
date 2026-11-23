@@ -2,7 +2,12 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { examplesApp, listExampleSlugs } from "../scripts/examples-lib.ts";
 import { THEMES, type ThemeName } from "../src/themes/themes.ts";
-import { embedBase, frameworkOf, skipOrFail } from "./available.ts";
+import {
+    caseSkipReason,
+    embedBase,
+    frameworkOf,
+    skipOrFail,
+} from "./available.ts";
 
 // The examples run in a framework's embed app, addressed by its directory URL (`…/?id=`, §5.1 of
 // the site export contract), alone on the page: the stage is the page's own `data-testid="stage"`,
@@ -28,6 +33,16 @@ export { THEMES };
  */
 export function requireExamples(...slugs: string[]) {
     const reason = skipOrFail(FRAMEWORK, AVAILABLE, slugs);
+    test.skip(reason !== undefined, reason);
+}
+
+/**
+ * Skips the running test when its case of an example is still pending in the framework
+ * (`PENDING` in available.ts: a later Epic brings it there), e.g. `requireCase("sub-flows",
+ * "selection-grouping")` as a test's first line.
+ */
+export function requireCase(slug: string, name: string) {
+    const reason = caseSkipReason(FRAMEWORK, slug, name);
     test.skip(reason !== undefined, reason);
 }
 
