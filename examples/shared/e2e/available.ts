@@ -39,7 +39,6 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
     react: [],
     vue: [
         // Epic #49 (#47): new React examples, ported by a later Epic
-        "export-image",
         "stress-test",
         // Epic #49 (#48): new React examples, ported by a later Epic
         "dagre-layout",
