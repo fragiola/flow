@@ -39,7 +39,6 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
     react: [],
     vue: [
         // Epic #49 (#48): new React examples, ported by a later Epic
-        "auto-layout",
         "force-layout",
     ],
     svelte: [
