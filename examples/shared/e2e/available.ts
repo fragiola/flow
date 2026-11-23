@@ -56,6 +56,8 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "editable-edge",
         "gradient-styling",
         "whiteboard",
+        // Epic #49 (#47): new React examples, ported by a later Epic
+        "helper-lines",
     ],
     svelte: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -75,6 +77,8 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "editable-edge",
         "gradient-styling",
         "whiteboard",
+        // Epic #49 (#47): new React examples, ported by a later Epic
+        "helper-lines",
     ],
     angular: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -94,6 +98,8 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "editable-edge",
         "gradient-styling",
         "whiteboard",
+        // Epic #49 (#47): new React examples, ported by a later Epic
+        "helper-lines",
     ],
 };
 
