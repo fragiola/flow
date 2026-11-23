@@ -28,7 +28,8 @@
         "dev": "pnpm --filter playground dev",
         "check:package": "pnpm --filter \"./packages/*\" build && node scripts/check-package.ts",
         "site:export": "node site/export.ts",
-        "site:dev": "node site/dev.ts"
+        "site:dev": "node site/dev.ts",
+        "perf": "node scripts/perf.ts"
     },
     "devDependencies": {
         "@arethetypeswrong/cli": "0.18.5",
