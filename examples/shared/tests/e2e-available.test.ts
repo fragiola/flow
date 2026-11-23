@@ -1,4 +1,5 @@
 // From Splitter (fragiola/splitter, examples/shared/tests/e2e-available.test.ts), same author and licence.
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
     COMPLETE_FRAMEWORKS,
@@ -132,6 +133,31 @@ describe("what is pending in a complete framework", () => {
             for (const entry of entries) {
                 const slug = entry.split("#")[0] ?? "";
                 expect(slugs.has(slug), `${framework}: ${entry}`).toBe(true);
+            }
+        }
+    });
+
+    it("names only cases a spec asks for, with requireCase", () => {
+        for (const [framework, entries] of Object.entries(PENDING)) {
+            for (const entry of entries) {
+                const [slug = "", name] = entry.split("#");
+                if (name === undefined) continue;
+                const spec = new URL(
+                    `../e2e/examples/${slug}.spec.ts`,
+                    import.meta.url,
+                );
+                expect(existsSync(spec), `${framework}: ${entry}'s spec`).toBe(
+                    true,
+                );
+                const source = existsSync(spec)
+                    ? readFileSync(spec, "utf8")
+                    : "";
+                const asked = [
+                    ...source.matchAll(
+                        /requireCase\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)/g,
+                    ),
+                ].map((match) => pendingCase(match[1] ?? "", match[2] ?? ""));
+                expect(asked, `${framework}: ${entry}`).toContain(entry);
             }
         }
     });
