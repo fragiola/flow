@@ -2726,13 +2726,13 @@ Decisions of large flows (Epic #61: #59, the core; #60, the harness and the numb
 
   | nodes | gesture | Epic baseline | after #59 | after #60 |
   | --- | --- | --- | --- | --- |
-  | 1 000 | pan / zoom / drag | 16.7/22–33, 16.8/43–47, 16.7/22–31 | 16.7/18–20, 16.8/34, 16.7/18–19 | 16.7/19, 16.8/32, 16.7/19 |
-  | 10 000 | pan | 34–36 / 67 | 16.6 / 20 | 16.7 / 18 |
-  | 10 000 | zoom | 17 / 102–106 | 16.8 / 40–48 | 16.8 / 34 |
-  | 10 000 | drag | 66.5 / 69–83 | 16.7 / 19–22 | 16.7 / 22 |
-  | 10 000 | open | 2.5–2.8 s (10 000 mounted) | ~700 ms (10 000 mounted) | 175 ms (51 mounted) |
-  | 20 000 | pan / zoom / drag (median) | 66 / 17 / 117 | 16.7 / 16.7 / 16.7 | 16.6 / 16.7 / 16.7 |
-  | 20 000 | open | | ~1.3 s | 353 ms (50 mounted) |
+  | 1 000 | pan / zoom / drag | 16.7/22–33, 16.8/43–47, 16.7/22–31 | 16.7/18–20, 16.8/34, 16.7/18–19 | 16.7/19, 16.9/33, 16.7/18 |
+  | 10 000 | pan | 34–36 / 67 | 16.6 / 20 | 16.7 / 19 |
+  | 10 000 | zoom | 17 / 102–106 | 16.8 / 40–48 | 16.7 / 33–36 |
+  | 10 000 | drag | 66.5 / 69–83 | 16.7 / 19–22 | 16.7 / 18–22 |
+  | 10 000 | open | 2.5–2.8 s (10 000 mounted) | ~700 ms (10 000 mounted) | 172–203 ms (51 mounted) |
+  | 20 000 | pan / zoom / drag (median) | 66 / 17 / 117 | 16.7 / 16.7 / 16.7 | 16.7 / 16.7 / 16.7 |
+  | 20 000 | open | | ~1.3 s | 340–353 ms (50 mounted) |
 
 - **What is left: the far zoom out** (the Epic's stop condition, recorded rather than widened to
   canvas rendering). At 10 000 nodes the zoom's p95 is 33–36 ms against a 33 ms target: the
