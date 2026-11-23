@@ -65,6 +65,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         // Epic #49 (#48): new React examples, ported by a later Epic
         "dagre-layout",
         "elk-layout",
+        "auto-layout",
     ],
     svelte: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -93,6 +94,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         // Epic #49 (#48): new React examples, ported by a later Epic
         "dagre-layout",
         "elk-layout",
+        "auto-layout",
     ],
     angular: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -121,6 +123,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         // Epic #49 (#48): new React examples, ported by a later Epic
         "dagre-layout",
         "elk-layout",
+        "auto-layout",
     ],
 };
 
