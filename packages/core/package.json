@@ -142,6 +142,7 @@
         "build": "tsdown",
         "typecheck": "tsc --noEmit",
         "test": "vitest run",
+        "bench": "vitest run --config vitest.bench.config.ts",
         "generate:commands": "tsdown && node scripts/generate-command-docs.ts"
     },
     "devDependencies": {
