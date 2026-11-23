@@ -42,8 +42,9 @@ const stores = new WeakMap<object, FlowStore>();
 
 /**
  * @internal the store of a model and its engine (the model alone before the engine), made once
- * and shared by every reader of the root. It listens from its creation on, for as long as the
- * model (the engine) lives, so its versions are never stale.
+ * and shared by every reader of the root. It listens to the engine from its creation on, and to
+ * the model while it has a reader (catching up on the lists when it starts again, or when read
+ * without one), so its versions are never stale and an unmounted root is not kept by its model.
  */
 export function flowStoreOf(
     model: AnyFlowModel,
@@ -135,17 +136,46 @@ function createFlowStore(
         for (const record of changed) call(record.listeners);
     };
 
-    // a commit that keeps both lists changes nothing a reader reads
+    // a commit that keeps both lists changes nothing a reader reads. The store listens to the
+    // model only while it has a reader, so that an unmounted root (its engine destroyed, an
+    // app-owned model living on) is not kept alive by the model; when it listens again, a change
+    // of the lists in between counts as a change, and so it does for a read in between.
     let nodes = model.get("all-nodes");
     let edges = model.get("all-edges");
-    model.subscribe(() => {
+    /** whether the lists changed since last seen, now seen */
+    const listsChanged = () => {
         const nextNodes = model.get("all-nodes");
         const nextEdges = model.get("all-edges");
-        if (nextNodes === nodes && nextEdges === edges) return;
+        if (nextNodes === nodes && nextEdges === edges) return false;
         nodes = nextNodes;
         edges = nextEdges;
-        tell("entity");
-    });
+        return true;
+    };
+    /** the model's listener's remover, while there is a reader */
+    let stopModel: (() => void) | undefined;
+    let readers = 0;
+    /** a change of the lists seen with no one to tell: only the versions move */
+    const catchUp = () => {
+        if (!listsChanged()) return;
+        stamp += 1;
+        viewStamp = stamp;
+        entityStamp = stamp;
+        for (const record of records.values()) record.token = undefined;
+    };
+    const join = () => {
+        readers += 1;
+        if (stopModel) return;
+        catchUp();
+        stopModel = model.subscribe(() => {
+            if (listsChanged()) tell("entity");
+        });
+    };
+    const leave = () => {
+        readers -= 1;
+        if (readers > 0 || !stopModel) return;
+        stopModel();
+        stopModel = undefined;
+    };
 
     if (engine) {
         // several render levels give the nodes ranks that follow the drawn edges, so the view
@@ -164,15 +194,19 @@ function createFlowStore(
 
     return {
         version: (scope, entity) => {
+            if (!stopModel) catchUp();
             if (scope === "view") return viewStamp;
             const record = entity ? records.get(keyOf(entity)) : undefined;
             return Math.max(entityStamp, record ? record.stamp : measureStamp);
         },
         subscribe: (scope, listener, entity) => {
             if (scope === "view" || !entity) {
-                listeners[scope].add(listener);
+                const set = listeners[scope];
+                if (set.has(listener)) return () => {};
+                set.add(listener);
+                join();
                 return () => {
-                    listeners[scope].delete(listener);
+                    if (set.delete(listener)) leave();
                 };
             }
             const key = keyOf(entity);
@@ -189,12 +223,15 @@ function createFlowStore(
                 records.set(key, record);
             }
             const own = record;
+            if (own.listeners.has(listener)) return () => {};
             own.listeners.add(listener);
+            join();
             return () => {
-                own.listeners.delete(listener);
+                if (!own.listeners.delete(listener)) return;
                 if (own.listeners.size === 0 && records.get(key) === own) {
                     records.delete(key);
                 }
+                leave();
             };
         },
     };
