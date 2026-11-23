@@ -203,9 +203,9 @@ in one PR. `main` has no required checks: a skipped job blocks nothing.
 
 **Shards: none.** Shard a suite only when its test step alone passes about 3 minutes. Measured
 locally (4 workers; CI runs 2): the playground's 214 tests (107 per browser) in ~80 s, each examples
-app in ~22 to ~90 s, its embed build included: React's 369 tests (175 smoke runs: 35 examples ×
-5 themes), Vue's, Svelte's and Angular's 291 with the 65 `PENDING` ones skipped (counts and times
-measured after #46; Angular and React the slower).
+app in ~22 to ~100 s, its embed build included: React's 420 tests (200 smoke runs: 40 examples ×
+5 themes), Vue's, Svelte's and Angular's 312 with the 86 `PENDING` ones skipped (counts and times
+measured after #47; Angular and React the slower).
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
@@ -1262,7 +1262,8 @@ framework deletes it there. Today Vue, Svelte and Angular wait for `edge-reconne
 `sub-flows#selection-grouping` and the new examples of #45 (`shapes`, `easy-connect`,
 `proximity-connect`, `delete-middle-node`, `intersections`, `contextual-zoom`, `connection-line`)
 and of #46 (`edge-markers`, `animating-edges`, `floating-edges`, `editable-edge`,
-`gradient-styling`, `whiteboard`): Epic #49 writes them in React, the ports' Epics follow. A pending whole example has nothing in the
+`gradient-styling`, `whiteboard`) and of #47 (`helper-lines`, `copy-paste`, `collaborative`,
+`export-image`, `stress-test`): Epic #49 writes them in React, the ports' Epics follow. A pending whole example has nothing in the
 port's app yet: its `tests/examples.test.ts` leaves it out of React's ids and `tests/vendored.test.ts`
 expects no copy of its `styles.ts` and siblings.
 Alternative: a capability attribute the example renders, checked by the spec; refused: it would
@@ -1329,6 +1330,45 @@ first (`eraser.ts`), a lasso selecting whole boxes (`lasso.ts`, `selection.set`)
 Follow-ups (no package change here): the core's `roundedPath`, `halfwayAlong` and `sidePoint` are
 not exported (the examples keep their own copies), and an app edge with its own path has no way to
 give its label / `EdgeToolbar` a point (they sit at the default midpoint).
+#47 (React only, likewise `PENDING`): `helper-lines` (a node dragged alone shows guides,
+`data-testid="guide"` with `data-axis` (x is a vertical line) and `data-at`, where its edges or
+centre line up with another node's, drawn in flow coordinates inside `Flow.Viewport` from a store
+over `dragging-node-ids`, `alignment.ts`; the snap is a middleware, `snapping.ts` on `model.use`,
+rewriting the drag's transient `node.move` steps and the drop within 8 flow units, leaving key and
+code moves, the cancel's restore and batches alone), `copy-paste` (Ctrl/⌘ + C, X, V through
+`useKeyPress`, one action per press, skipped while typing, and a "Clipboard" toolbar; a copy is the
+selected nodes and only the edges between them; a paste is one `batch` with new ids, the stem plus
+the lowest free number, under the pointer (`screen-to-flow`) or one 24-unit step on, one more per
+paste at the same place; a marked JSON payload, `clipboard.ts`, on `navigator.clipboard` when allowed,
+else in memory, checked with `validateFlow`; the e2e runs on the in-memory copy), `collaborative`
+(Alice and Bob, a model each, joined by `transport.ts`: an in-memory hub and a `BroadcastChannel`
+bridge to other tabs, hello/snapshot, no echo; `sync.ts` sends the entities each local command put
+or removed, from `model.subscribe`'s before/after, selection left out, and the other side applies
+them as one `batch` of `commands-to` marked `meta.remote`, never sent back, last write wins, drags
+streamed as transient batches; cursors in flow coordinates, `data-testid="cursor"` and `data-peer`,
+and remote selections, `data-remote-selected` and a dashed frame; Alice orange, Bob blue),
+`export-image` (`flow-svg.ts` builds a standalone SVG string from the document with
+`staticGeometry`, no DOM, so a server makes the same file, as its node unit test does: a path per
+edge, a rect and label per sized node, a viewBox fitted to the nodes and the edges' points, every
+text escaped; `download.ts` reads the theme's look off the drawn parts at click time, a server keeps
+`DEFAULT_LOOK`; the PNG is that SVG on a canvas, `canvas.toBlob`; downloads through an anchor and an
+object URL) and `stress-test` (`generate.ts`: a seeded grid joined into one tree, `count - 1` edges,
+1 000 nodes by default, 5 000, 10 000 or 20 000 on a "Size" select; the nodes declare size and
+handles so `onlyRenderVisible` culls never-drawn nodes; `Flow.Root` keyed by size; the layers wait
+for `engine.is("ready")`, as `visible-nodes` is every node before the root is sized (2.5 s instead of
+0.3 s to open 10 000); "Shuffle" is one `batch` of `node.move`; the readout, `data-testid="readout"`
+with `data-dom-nodes`, `data-frame-ms` and the like, a rAF median from `frames.ts`).
+Follow-ups (no package change here): at 10 000 nodes a pan frame takes ~34 ms and a node drag ~67 ms
+(20 000: ~66 and ~117 ms; zoom's median ~17 ms, p95 ~100 ms), against a 16 ms target. The engine's
+layering (`create-flow-engine.ts`: `visibleEdges` → `edgePath` for every edge, its SVG string
+included, on every change, as the layering cache is keyed on `revision`, which each `notify`
+bumps; a drag notifies twice per step) took ~72 % of the busy time in a profile; `node-by` through
+the query bus (`readerOf` allocating per call), `visibleNodes` and `flushMeasured` are O(N) per
+change; and `visibleNodes` returns every node while the root size is unknown. Also: a `Middleware`
+written for any registry needs a cast on the `node.move` payload, `FlowModel<T>` whose `T` has no
+`edges` is not assignable to `FlowModel`, nothing tells whether a batch may run transient,
+`useKeyPress` reports held keys only (no one-shot shortcut, no `preventDefault`), and the core has
+no bounds of an edge path or of the content (`export-image` parses its paths' points).
 The Vue, Svelte and Angular apps have every one of these (their own sections below), with no
 parity filter left.
 
