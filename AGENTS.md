@@ -158,6 +158,7 @@ examples show them as copyable code.
 | `pnpm --filter examples-angular dev` | the Angular embed alone, port 5188 (`PORT` moves it; `?id=<id>&theme=<name>`) |
 | `pnpm --filter examples-react vendor` | vendors Fragiola UI (`scripts/vendor-fragiola.ts`; `FRAGIOLA_REGISTRY` points it elsewhere) |
 | `pnpm site:export --base /flow --out <dir>` | the site export (contract v1.7): builds the packages and each framework's embed, writes the pages, `examples.json`, `project.json` and the manifests, then validates the output and exits non-zero on any violation ([The site export](#the-site-export-issue-7)) |
+| `pnpm perf` | the large-flow frame times (Epic #61, `scripts/perf.ts`, not in CI): builds the core, the React package and the React embed (into a temporary directory), serves it (`examples/shared/e2e/serve.ts`, its own process group, stopped on exit) and drives `stress-test` in Chromium with Playwright: per size, the open time and the nodes mounted meanwhile, then a pan, a zoom out and back and a node drag of 120 steps at 60 Hz; prints median / p95 / max frame times per size and gesture, the median of the runs. `--sizes 1000,10000,20000`, `--runs 3`, `--steps 120`, `--no-build` (the packages' last `dist`), `--dist <dir>` (an embed built before with `EMBED_BASE=/`), `--profile <dir>` (CPU profiles of each size's first open and gestures), `--json <file>`, `--headed`, `--verbose`. About a minute for the defaults |
 | `pnpm site:dev --base /flow --port 5185` | every framework's embed with hot reload behind one port (`site/dev-proxy.ts`), for `www`'s dev mode |
 
 There is no `changeset` or `release:version` script (D15).
@@ -559,7 +560,7 @@ code in every package).
 | --- | --- |
 | `src/components/` | one primitive per file |
 | `src/hooks/` | the public hooks, `create-flow-ref.ts`, `internal.ts` (`useFlowValue`: a value read from the model and the engine, kept while equal) |
-| `src/utils/` | `merge-props.ts`, `use-render.ts` (`render`, refs, `className` / `style` functions, structural style), `shallow-equal.ts`, `engine-facade.ts` |
+| `src/utils/` | `merge-props.ts`, `use-render.ts` (`render`, refs, `className` / `style` functions, structural style), `shallow-equal.ts`, `engine-facade.ts`, `flow-store.ts` (#60: the one subscription per model and engine every `useFlowValue` reads) |
 | `src/<feature>/` | a feature's entry, and its primitives (`minimap/`, `resize/`) |
 
 **Primitives** (`Flow.*`; every element carries `data-flow-part`, entities `data-flow-id`, the
@@ -642,10 +643,12 @@ Decisions of the adapter (#5):
   StrictMode double mount creates two and keeps the second (starting at the first one's viewport);
   the first render and a server render have no engine: #39, they draw the static geometry (see
   the SSR rule under the engine).
-- **Re-rendering:** `useFlowValue` reads a value again on every model commit and every
-  `adapter.subscribe` notification, and keeps the last object while equal (records by their
+- **Re-rendering:** `useFlowValue` reads a value again on every change of the model's lists and
+  every `adapter.subscribe` notification, and keeps the last object while equal (records by their
   entries, edge paths by value), so a pan re-renders only what shows the viewport (the
-  background, the minimap, toolbars, the zoom buttons). `Nodes` and `Edges` memo each entity's
+  background, the minimap, toolbars, the zoom buttons). #60: through one store per root and an
+  `entity` scope for a node's or an edge's own parts, which a viewport step does not read again
+  (see the large-flow decisions in React). `Nodes` and `Edges` memo each entity's
   render on the entity and the children function: a drag step re-renders the moved nodes and
   their edges only. A new children function re-renders every node: in a controlled flow, keep it
   stable (`useCallback`, a module function).
@@ -735,6 +738,38 @@ Decisions of #39 in React (Vue, Svelte, Angular follow):
   `"basic"` keeps the old order).
 - **An edge that changes level remounts** (its `EdgeSlot` is under another level's `svg`): its
   focus comes back through `refocus`; a node never moves.
+
+Decisions of large flows in React (Epic #61, #60; the other adapters take them up in their
+stress-test port Epics):
+
+- **One store per model and engine** (`utils/flow-store.ts`, a `WeakMap` by engine, or by model
+  before it): it subscribes once, from its creation, to the model (a commit counts only when
+  `all-nodes` or `all-edges` changed identity, as the old per-reader cache did) and to the engine,
+  and every `useFlowValue` reads its version instead of subscribing to both and reading the lists
+  itself. Alternative: a subscription per reader (as before); refused: at 2 600 mounted nodes each
+  notification called ~8 000 snapshots.
+- **Two scopes.** `view` (the default): every change. `entity` (`useNode`, `useEdge`,
+  `useEdgePath`, `EdgePath`, `EdgeLabel`, `ReconnectAnchor`, `useHandle`, `MiniMapNode`,
+  `NodeResizer`, `ResizeHandle`): not told a viewport-only notification, since a node's or an
+  edge's own view (place, path, attributes, `z-index`, focusability) does not follow the viewport;
+  except while there are several render levels (now or at the last notification: the store reads
+  `render-layers` on each one), where `node-z-index-by` follows the drawn edges.
+- **A measurement tells only what it changed.** A reader naming its node or edge (`useNode`, the
+  edge parts) is told a measured-only notification only when its node's `node-rect-by` or
+  `node-measured`, or its edge's `edge-path-by`, changed identity (the engine keeps them the same
+  objects until they change, #59); a reader without one hears every measurement. After any other
+  change the kept values are dropped, and the next measurement tells those readers again.
+  Alternative: the measured ids in `ViewChange`; refused: the adapter contract and its exact
+  tests would change, for the same result.
+- **A culled flow renders nothing before the engine** (`onlyRenderVisible`, the server render
+  and the first client render): `Nodes` renders no node and `Edges` no edge (its static levels
+  kept, empty), where they drew every node's static geometry for one render (10 000 mounted and
+  torn down: ~700 ms to open). A flow that is not culled keeps its first render; the static
+  geometry is still computed (hand-rendered nodes read it). On the limitations page.
+- **Render counts are tested** (`tests/render-counts.test.tsx`, with a wrapped engine counting the
+  entity reads): a pan and zoom steps re-render and read no node or edge; nodes brought into view
+  render alone and their measurement reads the others' boxes and paths only; a step that changes
+  the render levels places the nodes again; a drag step re-renders the node and its edge.
 
 For the playground and examples (#6, see [The playground and the examples](#the-playground-and-the-examples-issue-6)): wrap the flow in a sized element (the root fills it); put
 `Edges` before `Nodes` inside `Viewport`, and `Background`, `SelectionBox`, `Controls`, `MiniMap`
@@ -1393,11 +1428,12 @@ text escaped; `download.ts` reads the theme's look off the drawn parts at click 
 `DEFAULT_LOOK`; the PNG is that SVG on a canvas, `canvas.toBlob`; downloads through an anchor and an
 object URL) and `stress-test` (`generate.ts`: a seeded grid joined into one tree, `count - 1` edges,
 1 000 nodes by default, 5 000, 10 000 or 20 000 on a "Size" select; the nodes declare size and
-handles so `onlyRenderVisible` culls never-drawn nodes; `Flow.Root` keyed by size; the layers wait
-for `engine.is("ready")`, as `visible-nodes` is every node before the root is sized (2.5 s instead of
-0.3 s to open 10 000); "Shuffle" is one `batch` of `node.move`; the readout, `data-testid="readout"`
+handles so `onlyRenderVisible` culls never-drawn nodes; `Flow.Root` keyed by size; the layers waited
+for `engine.is("ready")`, as `visible-nodes` was every node before the root is sized (2.5 s instead of
+0.3 s to open 10 000; #60: no gate any more, a culled React flow renders nothing before the
+engine knows the view); "Shuffle" is one `batch` of `node.move`; the readout, `data-testid="readout"`
 with `data-dom-nodes`, `data-frame-ms` and the like, a rAF median from `frames.ts`).
-Follow-ups (no package change here): at 10 000 nodes a pan frame takes ~34 ms and a node drag ~67 ms
+Follow-ups (no package change here; Epic #61 took up the frame times, see the large-flow decisions): at 10 000 nodes a pan frame takes ~34 ms and a node drag ~67 ms
 (20 000: ~66 and ~117 ms; zoom's median ~17 ms, p95 ~100 ms), against a 16 ms target. The engine's
 layering (`create-flow-engine.ts`: `visibleEdges` → `edgePath` for every edge, its SVG string
 included, on every change, as the layering cache is keyed on `revision`, which each `notify`
@@ -2652,7 +2688,7 @@ Decisions of the React Flow examples (Epic #49: #44 to #48):
   renders (`data-animating`, `data-layouts`, `data-layout`, `data-simulation`), never timeouts;
   a layout's final move is one non-transient batch, so an undo history sees one step.
 
-Decisions of large flows (Epic #61: #59, the core; the recommended options of its Stop Conditions):
+Decisions of large flows (Epic #61: #59, the core; #60, the harness and the numbers, React's own under the React adapter; the recommended options of its Stop Conditions):
 
 - **The spatial index is a uniform grid** (`SpatialGrid`, cells of 256 flow units) rather than an
   R-tree: nodes and edges are mostly small and spread out, a grid is a few dozen lines, and a
@@ -2674,9 +2710,41 @@ Decisions of large flows (Epic #61: #59, the core; the recommended options of it
   and `visible-edges` (so `drawn-edges`) are empty until then, where every node and edge counted
   as visible and mounted. Edges follow the nodes' rule so that no edge mounts dangling before its
   nodes. Without culling, and for the server render (`staticGeometry`), the first render is as
-  before.
+  before; #60: a culled React flow renders no node or edge before the engine either (the other
+  adapters still draw the static geometry then).
 - **A drag step stays O(N) in the model only**: its commit copies the node list (the document is
   immutable and frozen, D3); the engine reads the replaced ids instead of comparing the list.
+- **`pnpm perf` measures the React embed's production build** (`scripts/perf.ts`): Playwright's
+  Chromium in its new headless mode, 1280 × 800, 120 pointer steps at 60 Hz, a frame the
+  interval between two `requestAnimationFrame` callbacks (one under 6 ms joins the one before:
+  Chromium runs a late frame's callbacks back to back), each size opened fresh, three runs, their
+  median reported; the open time is the example's (`onInit` to the next frame), and the inserted
+  node elements are counted (`appendChild` / `insertBefore` patched in the page) to show only the
+  visible ones mount. Not in CI: the numbers are the machine's.
+- **The numbers** (`stress-test`, Chromium 153, i7-10700F; median / p95 ms; open without any
+  `ready` gate):
+
+  | nodes | gesture | Epic baseline | after #59 | after #60 |
+  | --- | --- | --- | --- | --- |
+  | 1 000 | pan / zoom / drag | 16.7/22–33, 16.8/43–47, 16.7/22–31 | 16.7/18–20, 16.8/34, 16.7/18–19 | 16.7/19, 16.8/32, 16.7/19 |
+  | 10 000 | pan | 34–36 / 67 | 16.6 / 20 | 16.7 / 18 |
+  | 10 000 | zoom | 17 / 102–106 | 16.8 / 40–48 | 16.8 / 34 |
+  | 10 000 | drag | 66.5 / 69–83 | 16.7 / 19–22 | 16.7 / 22 |
+  | 10 000 | open | 2.5–2.8 s (10 000 mounted) | ~700 ms (10 000 mounted) | 175 ms (51 mounted) |
+  | 20 000 | pan / zoom / drag (median) | 66 / 17 / 117 | 16.7 / 16.7 / 16.7 | 16.6 / 16.7 / 16.7 |
+  | 20 000 | open | | ~1.3 s | 353 ms (50 mounted) |
+
+- **What is left: the far zoom out** (the Epic's stop condition, recorded rather than widened to
+  canvas rendering). At 10 000 nodes the zoom's p95 is 33–36 ms against a 33 ms target: the
+  frames past it are the last steps out, each mounting a few hundred nodes (2 655 in view at
+  `minZoom` 0.1). In #60's profile (`--profile`, unminified) such a frame (40–75 ms) is about a
+  third the first `offsetWidth` read of `Measurements.sizeOf` in the commit (the forced style and
+  layout of the new nodes, which the frame would do anyway), a quarter the browser's own style,
+  layout and paint, a fifth React's render of the new nodes, and under a tenth the reads (the
+  store and the measured wave, 15–20 ms a frame before the per-entity routing). CSS containment
+  on the example's nodes (`contain: layout style`, `strict`) changed nothing measurable. What
+  would remain: mounting fewer nodes per frame (spread over frames, which changes when a node
+  appears) or drawing far zooms otherwise (canvas, out of scope).
 - **The root's box is still read per read** (`getBoundingClientRect`, for the view): caching it
   needs a resize signal the engine does not have; it was ~4 % of the busy time of the 10 000-node
   gestures in the profile of #59 (99 ms of 2.4 s).
