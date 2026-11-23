@@ -38,8 +38,6 @@ export function pendingCase(slug: string, name: string): string {
 export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
     react: [],
     vue: [
-        // Epic #49 (#47): new React examples, ported by a later Epic
-        "stress-test",
         // Epic #49 (#48): new React examples, ported by a later Epic
         "dagre-layout",
         "elk-layout",
