@@ -43,18 +43,21 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         pendingCase("sub-flows", "selection-grouping"),
         // Epic #49 (#45): new React examples, ported by a later Epic
         "shapes",
+        "easy-connect",
     ],
     svelte: [
         pendingCase("edge-reconnect", "delete-on-drop"),
         pendingCase("sub-flows", "selection-grouping"),
         // Epic #49 (#45): new React examples, ported by a later Epic
         "shapes",
+        "easy-connect",
     ],
     angular: [
         pendingCase("edge-reconnect", "delete-on-drop"),
         pendingCase("sub-flows", "selection-grouping"),
         // Epic #49 (#45): new React examples, ported by a later Epic
         "shapes",
+        "easy-connect",
     ],
 };
 
