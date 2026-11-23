@@ -399,6 +399,13 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     /** the root was sized and every shown node measured (`ready`, once) */
     private ready = false;
     private rootElement: HTMLElement | undefined;
+    /**
+     * the root's client box, read once per turn: cleared on the root window's next microtask, on
+     * `setOptions`, and when the root attaches or detaches
+     */
+    private cachedRootBox: Rect | undefined;
+    /** a microtask that clears `cachedRootBox` is queued */
+    private rootBoxClearQueued = false;
     private viewportElement: HTMLElement | SVGElement | undefined;
     private removeRootListeners: (() => void) | undefined;
     private press: Press | undefined;
@@ -1158,12 +1165,34 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         }
     }
 
-    /** The root's client box (its position on the page and its size). */
+    /**
+     * The root's client box (its position on the page and its size), read once until the root
+     * window's next microtask: every read that needs the view asks for it, and a layout forced
+     * per read is what an adapter's render pays (Vue patches a node between two reads). Without a
+     * root window's microtask queue, read each time.
+     */
     private rootBox(): Rect {
-        const box = this.rootElement?.getBoundingClientRect();
-        return box
-            ? { x: box.left, y: box.top, width: box.width, height: box.height }
-            : { x: 0, y: 0, width: 0, height: 0 };
+        if (this.cachedRootBox) return this.cachedRootBox;
+        const element = this.rootElement;
+        if (!element) return { x: 0, y: 0, width: 0, height: 0 };
+        const box = element.getBoundingClientRect();
+        const rect = {
+            x: box.left,
+            y: box.top,
+            width: box.width,
+            height: box.height,
+        };
+        const view = viewOf(element);
+        if (!view || typeof view.queueMicrotask !== "function") return rect;
+        this.cachedRootBox = rect;
+        if (!this.rootBoxClearQueued) {
+            this.rootBoxClearQueued = true;
+            view.queueMicrotask(() => {
+                this.rootBoxClearQueued = false;
+                this.cachedRootBox = undefined;
+            });
+        }
+        return rect;
     }
 
     private rootSize(): Size {
@@ -1623,6 +1652,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         if (this.rootElement === element) return;
         this.detachRoot();
         this.rootElement = element;
+        this.cachedRootBox = undefined;
         // the browser must not take touches for its own scroll or zoom: they would cancel gestures
         writeRootTouchAction(element);
         const listeners: [string, EventListener, AddEventListenerOptions?][] = [
@@ -1702,6 +1732,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         this.removeRootListeners = undefined;
         clearRootTouchAction(this.rootElement);
         this.rootElement = undefined;
+        this.cachedRootBox = undefined;
         this.settle(true);
     }
 
@@ -2549,6 +2580,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                     fitView: _fit,
                     ...rest
                 } = options;
+                // new options may come with a new layout of the root (read it again)
+                this.cachedRootBox = undefined;
                 this.options = { ...this.options, ...rest };
                 this.minZoom = this.options.minZoom ?? 0.5;
                 this.maxZoom = Math.max(
