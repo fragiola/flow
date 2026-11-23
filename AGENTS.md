@@ -181,7 +181,7 @@ jobs:
   skips, never what it runs; an unknown path runs everything.
 - **E2E (playground)**: when `Changes` says so, `pnpm --filter playground run e2e` (Chromium and
   Firefox, the dev server: nothing built).
-- **E2E (examples \<framework\>)**: a matrix over `Changes`' `examples` output (every
+- **E2E (examples \<framework\>, \<shard\>)**: a matrix over `Changes`' `examples` output, two shards each, (every
   `examples/<framework>` with a `playwright.config.ts`: Angular, React, Svelte and Vue): builds the packages, then
   `pnpm --filter examples-<framework> run e2e`.
 - **Site export**: `pnpm site:export --base /flow --out "$RUNNER_TEMP/site-export"`, self-validated
@@ -201,13 +201,14 @@ the playground, `examples/shared` and `examples/react`), and **never runs `playw
 `site/tests/ci-workflow.test.ts` ties the tag to the version, so upgrading Playwright changes both
 in one PR. `main` has no required checks: a skipped job blocks nothing.
 
-**Shards: none.** Shard a suite only when its test step alone passes about 3 minutes. Measured
-locally after #48, at the end of Epic #49 (4 workers; CI runs 2): the playground's 214 tests (107
-per browser) in ~59 s; React's examples 460 tests (220 smoke runs: 44 examples × 5 themes) in
-~120 s (~123 s with its embed build), Vue's, Svelte's and Angular's 328 each, 226 run and the 102
-`PENDING` ones skipped, in ~27 to ~37 s. React's is the one near the line: at CI's 2 workers its
-step may pass 3 minutes, so check that job's time on the Epic's pull request and shard it
-(`--shard`, a matrix of two) when it does; the ports' suites grow to React's as their Epics land.
+**Shards: two per examples app.** Shard a suite when its test step alone passes about 3 minutes.
+On Epic #49's pull request (#62) the React examples' Playwright step took 3 min 53 s at CI's 2
+workers (460 tests: 220 smoke runs, 44 examples × 5 themes), so the `E2E (examples <framework>)`
+matrix runs every framework in two shards (`shard: ["1/2", "2/2"]`, `--shard`): the ports bring
+Vue's, Svelte's and Angular's suites to React's size. Each shard builds its own embed. The
+playground's suite (214 tests, ~3 min 26 s for the whole job) stays in one. Measured locally
+after #48 (4 workers): the playground in ~59 s; React's examples in ~120 s; Vue's, Svelte's and
+Angular's 328 each, 226 run and the 102 `PENDING` ones skipped, in ~27 to ~37 s.
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
