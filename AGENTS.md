@@ -203,9 +203,9 @@ in one PR. `main` has no required checks: a skipped job blocks nothing.
 
 **Shards: none.** Shard a suite only when its test step alone passes about 3 minutes. Measured
 locally (4 workers; CI runs 2): the playground's 214 tests (107 per browser) in ~80 s, each examples
-app's 229 tests (110 smoke runs: 22 examples × 5 themes; Vue, Svelte and Angular skip the 3
-`PENDING` cases) in ~24 to ~65 s, its embed build included (counts after #44, times measured
-after #44; Angular and React the slower).
+app in ~22 to ~72 s, its embed build included: React's 302 tests (145 smoke runs: 29 examples ×
+5 themes), Vue's, Svelte's and Angular's 260 with the 34 `PENDING` ones skipped (counts and times
+measured after #45; Angular and React the slower).
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
@@ -1258,8 +1258,12 @@ the per-framework skip of what a later Epic ports: whole examples (`<slug>`) and
 (`<slug>#<case>`, `pendingCase`); a spec that needs one is skipped in that framework with a
 "(PENDING)" reason instead of failing (`requireCase(slug, case)` as a test's first line for a
 case; `openExample` for an example). React never has any; the Epic that ports an entry to a
-framework deletes it there. Today Vue, Svelte and Angular wait for `edge-reconnect#delete-on-drop`
-and `sub-flows#selection-grouping` (Epic #49 writes them in React; the ports' Epics follow).
+framework deletes it there. Today Vue, Svelte and Angular wait for `edge-reconnect#delete-on-drop`,
+`sub-flows#selection-grouping` and the new examples of #45 (`shapes`, `easy-connect`,
+`proximity-connect`, `delete-middle-node`, `intersections`, `contextual-zoom`, `connection-line`):
+Epic #49 writes them in React, the ports' Epics follow. A pending whole example has nothing in the
+port's app yet: its `tests/examples.test.ts` leaves it out of React's ids and `tests/vendored.test.ts`
+expects no copy of its `styles.ts` and siblings.
 Alternative: a capability attribute the example renders, checked by the spec; refused: it would
 put test plumbing in copyable example code, and a forgotten port would skip silently instead of
 being listed in one place.
@@ -1291,6 +1295,17 @@ switch (a native `role="switch"` checkbox, off by default: `onReconnectCancel` w
 margin and a title band: one `batch` of `node.add`, `node.set-parent` per node and `selection.set`)
 and "Ungroup" (the selected groups' children back on the flow, then the groups removed: one
 `batch`), with a loose `logs` node beside `cache`. The ports already copy both `styles.ts`.
+#45 (React only, whole examples `PENDING` in the other apps): `shapes` (seven SVG shapes from
+`shape-path.ts`, a `role="slider"` rotation knob storing `data.angle`, applied to an inner wrapper,
+handles remounted per angle as the engine has no public re-measure), `easy-connect` (loose mode,
+`clickToConnect`, a radius of half the node, node-sized handles, its own floating edge path),
+`proximity-connect` (a temporary `aria-hidden` line from `node-rect-by`, never in the document),
+`delete-middle-node` (`keyboard({ beforeDelete })` runs one `batch` from `reconnect.ts` and answers
+`false`: a middleware's commands would commit as a second step), `intersections`
+(`intersecting-nodes`, `crossing.ts`, `collisions.ts` behind a "Resolve collisions" switch),
+`contextual-zoom` (`data-detail` low/medium/high at zoom 0.75 / 1.35, edge labels from 1) and
+`connection-line` (`Flow.ConnectionLine` children, the selection's extra lines and a second `batch`
+on `connect`). Their pure helpers are unit-tested in `examples/react/tests/<id>.test.ts`.
 The Vue, Svelte and Angular apps have every one of these (their own sections below), with no
 parity filter left.
 
