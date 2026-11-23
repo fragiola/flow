@@ -90,6 +90,7 @@ test("a selected edge switches to the selected markers, and back", async ({
     page,
 }) => {
     const before = await markersOf(page, "gateway-auth");
+    const otherBefore = await markersOf(page, "orders-cache");
     const point = await onStroke(page, "gateway-auth");
     await page.mouse.click(point.x, point.y);
     await expect(edge(page, "gateway-auth")).toHaveAttribute(
@@ -105,9 +106,9 @@ test("a selected edge switches to the selected markers, and back", async ({
         expect(id).not.toBeNull();
         expect(await defined(page, id ?? "")).toBe(true);
     }
-    // the other edges keep their own
-    const other = await markersOf(page, "orders-cache");
-    expect(other.end).not.toBe(selected.end);
+    // the other edges keep their own: the same markers as before the selection
+    expect(otherBefore.end).not.toBeNull();
+    expect(await markersOf(page, "orders-cache")).toEqual(otherBefore);
     // another edge selected: the first gets its tone's markers back
     const next = await onStroke(page, "orders-cache");
     await page.mouse.click(next.x, next.y);
