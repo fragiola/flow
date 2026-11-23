@@ -214,6 +214,42 @@ export class EngineGeometry {
         };
     }
 
+    /**
+     * Drops every cache (the engine's `destroy`): its maps, grids and lists. A later read builds
+     * them again from the document, as the first read does.
+     */
+    release(): void {
+        this.nodes = EMPTY;
+        this.edges = EMPTY;
+        this.nodeIndex.clear();
+        this.edgeIndex.clear();
+        this.nodeEntries.clear();
+        this.edgeEntries.clear();
+        this.children.clear();
+        this.edgesAt.clear();
+        this.nodeGrid.clear();
+        this.edgeGrid.clear();
+        this.unsized.clear();
+        this.nodeValues.clear();
+        this.edgeValues.clear();
+        this.shownCount = 0;
+        this.unsizedCount = 0;
+        this.unmeasuredCount = 0;
+        this.stale = true;
+        this.visibleNodesKey = "";
+        this.visibleEdgesKey = "";
+        this.shownMemo = undefined;
+        this.drawableMemo = undefined;
+        this.drawnMemo = undefined;
+        this.nodePartMemo = undefined;
+        this.levelsMemo = undefined;
+        this.layeringMemo = undefined;
+        this.boundsMemo = undefined;
+        this.lastVisibleNodes = EMPTY;
+        this.lastVisibleEdges = EMPTY;
+        this.lastDrawn = EMPTY;
+    }
+
     // ---------------------------------------------------------------------------------------------
     // reads
     // ---------------------------------------------------------------------------------------------

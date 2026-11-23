@@ -4,8 +4,9 @@
 // their array while their content is unchanged, and with `onlyRenderVisible` nothing is visible
 // before the root has a size. The random equivalence with a fresh engine is
 // geometry-equivalence.test.ts.
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FlowJson } from "../../src/document/types";
+import { EngineGeometry } from "../../src/engine/engine-geometry";
 import { subflows } from "../../src/subflows/subflows";
 import { flowOf, mount, unmountAll } from "./harness";
 
@@ -236,5 +237,44 @@ describe("the cached lists", () => {
         });
         expect(ids(shown.engine.get("visible-nodes"))).toEqual(["a", "b", "c"]);
         expect(ids(shown.engine.get("drawn-edges"))).toEqual(["ab", "bc"]);
+    });
+});
+
+describe("the cached geometry is released", () => {
+    it("by the engine's destroy: its maps and grids are emptied", () => {
+        type Caches = {
+            nodeEntries: Map<string, unknown>;
+            edgeEntries: Map<string, unknown>;
+            nodeGrid: { size: number };
+            edgeGrid: { size: number };
+        };
+        const sizesOf = (caches: Caches) => [
+            caches.nodeEntries.size,
+            caches.edgeEntries.size,
+            caches.nodeGrid.size,
+            caches.edgeGrid.size,
+        ];
+        const release = EngineGeometry.prototype.release;
+        let before: number[] = [];
+        let released: Caches | undefined;
+        const spy = vi
+            .spyOn(EngineGeometry.prototype, "release")
+            .mockImplementation(function (this: EngineGeometry) {
+                released = this as unknown as Caches;
+                before = sizesOf(released);
+                release.call(this);
+            });
+        try {
+            const { engine } = mount(json(), {
+                sizes,
+                engine: { onlyRenderVisible: true },
+            });
+            expect(ids(engine.get("visible-edges"))).toEqual(["ab", "bc"]);
+            engine.destroy();
+            expect(before).toEqual([3, 2, 3, 2]);
+            expect(released && sizesOf(released)).toEqual([0, 0, 0, 0]);
+        } finally {
+            spy.mockRestore();
+        }
     });
 });

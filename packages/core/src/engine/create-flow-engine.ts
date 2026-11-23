@@ -789,6 +789,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         this.viewportElement = undefined;
         this.stopPrune();
         this.measurements.destroy();
+        this.geometry.release();
         this.listeners.clear();
         this.adapterListeners.clear();
         this.shared.clear();
