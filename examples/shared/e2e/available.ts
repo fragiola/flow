@@ -44,6 +44,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         // Epic #49 (#45): new React examples, ported by a later Epic
         "shapes",
         "easy-connect",
+        "proximity-connect",
     ],
     svelte: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -51,6 +52,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         // Epic #49 (#45): new React examples, ported by a later Epic
         "shapes",
         "easy-connect",
+        "proximity-connect",
     ],
     angular: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -58,6 +60,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         // Epic #49 (#45): new React examples, ported by a later Epic
         "shapes",
         "easy-connect",
+        "proximity-connect",
     ],
 };
 
