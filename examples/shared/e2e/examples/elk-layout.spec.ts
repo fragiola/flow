@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { handle, node, openExample, part } from "../helpers";
-import { boxOf } from "./helpers";
+import { boxIn, boxOf, nodeBoxes } from "./helpers";
 
 // The elk-layout example: a data pipeline of 9 nodes ("Orders API" = `orders`, "Customers DB",
 // "Clickstream", "Join", "Sessionize", "Enrich", "Warehouse", "Quality report", "Dashboard") and
@@ -61,9 +61,8 @@ async function positions(page: Page) {
 
 /** Expects no two node boxes on screen to overlap. */
 async function expectApart(page: Page) {
-    const boxes = await Promise.all(
-        NODES.map(async (id) => ({ id, ...(await boxOf(node(page, id))) })),
-    );
+    const drawn = await nodeBoxes(page);
+    const boxes = NODES.map((id) => ({ id, ...boxIn(drawn, id) }));
     for (const [index, a] of boxes.entries()) {
         for (const b of boxes.slice(index + 1)) {
             const apart =
@@ -96,9 +95,10 @@ test("opens laid out by ELK, layered: apart, every edge going right", async ({
     await expect(part(page, "node")).toHaveCount(NODES.length);
     await expect(part(page, "edge")).toHaveCount(LINKS.length);
     await expectApart(page);
+    const boxes = await nodeBoxes(page);
     for (const [source, target] of LINKS) {
-        const from = await boxOf(node(page, source));
-        const to = await boxOf(node(page, target));
+        const from = boxIn(boxes, source);
+        const to = boxIn(boxes, target);
         expect(to.x, `${target} right of ${source}`).toBeGreaterThan(
             from.x + from.width,
         );
@@ -122,8 +122,9 @@ test("nodes have several named handles, inputs left and outputs right, in ELK's 
     }
     // the document lists Join's "customers" input above "orders"; the layout puts each input
     // level with the source that feeds it, so the higher source's input comes first
-    const orders = await boxOf(node(page, "orders"));
-    const customers = await boxOf(node(page, "customers"));
+    const boxes = await nodeBoxes(page);
+    const orders = boxIn(boxes, "orders");
+    const customers = boxIn(boxes, "customers");
     expect(await handleOrder(page, "join", "target")).toEqual(
         orders.y < customers.y
             ? ["orders", "customers"]

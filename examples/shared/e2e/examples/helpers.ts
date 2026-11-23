@@ -10,6 +10,42 @@ export async function boxOf(locator: Locator) {
     return box ?? { x: 0, y: 0, width: 0, height: 0 };
 }
 
+/**
+ * Every drawn node's box on screen by its id, read at one moment: the view may still be fitting
+ * itself (one transform for all), so boxes read one by one could come from two zooms.
+ */
+export async function nodeBoxes(page: Page) {
+    const rects = await page
+        .getByTestId("stage")
+        .locator('[data-flow-part="node"]')
+        .evaluateAll((elements) =>
+            elements.map((element) => {
+                const { x, y, width, height } = element.getBoundingClientRect();
+                return {
+                    id: element.getAttribute("data-flow-id") ?? "",
+                    x,
+                    y,
+                    width,
+                    height,
+                };
+            }),
+        );
+    return new Map(rects.map((rect) => [rect.id, rect]));
+}
+
+/** One node's box in `boxes` ({@link nodeBoxes}); the test fails when it is not drawn. */
+export function boxIn(
+    boxes: ReadonlyMap<
+        string,
+        { x: number; y: number; width: number; height: number }
+    >,
+    id: string,
+) {
+    const box = boxes.get(id);
+    expect(box, `${id} on screen`).toBeDefined();
+    return box ?? { x: 0, y: 0, width: 0, height: 0 };
+}
+
 /** The centre of an element on screen. */
 export async function middle(locator: Locator) {
     const box = await boxOf(locator);

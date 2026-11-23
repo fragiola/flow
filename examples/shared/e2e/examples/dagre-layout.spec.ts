@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { handle, node, openExample, part } from "../helpers";
-import { boxOf } from "./helpers";
+import { boxIn, nodeBoxes } from "./helpers";
 
 // The dagre-layout example: a tree of 11 nodes ("Idea" = `idea`, "Research", "Design", … down to
 // "Launch"), 12 edges (`<source>-<target>`; "Findings" and "Roadmap" join two branches) laid out
@@ -59,9 +59,10 @@ async function positions(page: Page) {
 
 /** Expects every child's box below its parent's (vertical) or to its right (horizontal). */
 async function expectArranged(page: Page, way: "vertical" | "horizontal") {
+    const boxes = await nodeBoxes(page);
     for (const [source, target] of LINKS) {
-        const parent = await boxOf(node(page, source));
-        const child = await boxOf(node(page, target));
+        const parent = boxIn(boxes, source);
+        const child = boxIn(boxes, target);
         if (way === "vertical") {
             expect(child.y, `${target} below ${source}`).toBeGreaterThan(
                 parent.y + parent.height,
