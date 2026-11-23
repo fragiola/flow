@@ -51,6 +51,11 @@ export class Measurements {
     private readonly retired = new Set<string>();
     private observer: Observer | undefined;
     private observerView: Window | undefined;
+    /**
+     * the nodes whose size or handles changed since the engine last took them (`takeTouched`):
+     * its geometry cache recomputes those and keeps the rest
+     */
+    private touched = new Set<string>();
 
     constructor(
         /** the current zoom: client rects are divided by it */
@@ -64,6 +69,14 @@ export class Measurements {
          */
         private readonly inFlow: (nodeId: string) => boolean = () => false,
     ) {}
+
+    /** Takes the nodes whose size or handles changed since the last call (none: nothing did). */
+    takeTouched(): ReadonlySet<string> | undefined {
+        if (this.touched.size === 0) return undefined;
+        const touched = this.touched;
+        this.touched = new Set();
+        return touched;
+    }
 
     /** A node's measured size, if it was measured. */
     size(nodeId: string): Size | undefined {
@@ -98,6 +111,7 @@ export class Measurements {
             if (this.handles.get(key)?.element === undefined) {
                 this.handles.delete(key);
                 this.handlesByNode.get(nodeId)?.delete(key);
+                this.touched.add(nodeId);
             }
         }
         this.nodes.set(nodeId, element);
@@ -133,11 +147,13 @@ export class Measurements {
             // its node's element went before it (React detaches a parent's ref first) and the node
             // stays in the flow: the handle keeps its last bounds, without an element
             this.handles.set(key, { ...previous, element: undefined });
+            this.touched.add(registration.nodeId);
             return;
         }
         if (previous) {
             this.handles.delete(key);
             this.handlesByNode.get(registration.nodeId)?.delete(key);
+            this.touched.add(registration.nodeId);
         }
         if (!element) {
             this.measured([registration.nodeId]);
@@ -149,6 +165,7 @@ export class Measurements {
             bounds: undefined,
         });
         this.handleOfElement.set(element, key);
+        this.touched.add(registration.nodeId);
         const own =
             this.handlesByNode.get(registration.nodeId) ?? new Set<string>();
         own.add(key);
@@ -200,6 +217,7 @@ export class Measurements {
     private forget(nodeId: string): void {
         this.retired.delete(nodeId);
         this.forgetHandles(nodeId);
+        this.touched.add(nodeId);
         if (this.sizes.delete(nodeId)) this.measured([nodeId]);
     }
 
@@ -262,7 +280,10 @@ export class Measurements {
                     touched = true;
                 }
             }
-            if (touched) changed.push(nodeId);
+            if (touched) {
+                changed.push(nodeId);
+                this.touched.add(nodeId);
+            }
         }
         if (changed.length > 0) this.measured(changed);
     }
@@ -295,6 +316,7 @@ export class Measurements {
         this.handleOfElement.clear();
         this.handlesByNode.clear();
         this.retired.clear();
+        this.touched.clear();
     }
 
     /** The observer of an element's window, made once (an element of another window gets none). */

@@ -41,24 +41,14 @@ import type {
     FeatureModel,
     FlowFeatures,
 } from "../features/types";
-import { edgeEnds, type PathOptions, pathOf } from "../geometry/edge-geometry";
+import { type PathOptions, pathOf } from "../geometry/edge-geometry";
 import {
-    declaredHandleOf,
-    matchHandle,
     type NodeLayout,
     nodeAbsolutePosition,
     nodeOriginOf,
-    nodeRectOf,
     nodeSize,
 } from "../geometry/node-layout";
-import {
-    boundsOf,
-    contains,
-    cornerInside,
-    intersectionOf,
-    overlaps,
-    sharesArea,
-} from "../geometry/rect";
+import { boundsOf, cornerInside, intersectionOf } from "../geometry/rect";
 import type { EdgePath, Rect, Viewport } from "../geometry/types";
 import {
     isFitPadding,
@@ -75,16 +65,9 @@ import {
     viewRect,
     zoomAround,
 } from "../geometry/viewport-math";
-import {
-    drawingOrder,
-    edgeStackValue,
-    type Layering,
-    nodeStackValue,
-    renderLayers,
-    type ZIndexMode,
-} from "../geometry/z-order";
+import type { Layering, ZIndexMode } from "../geometry/z-order";
 import type { FlowModel } from "../model/create-flow-model";
-import type { HandleType, QueryArgs } from "../state/queries";
+import type { QueryArgs } from "../state/queries";
 import type {
     FlowEngineAdapter,
     FlowHandle,
@@ -96,6 +79,7 @@ import { type AutoPanOptions, autoPanOffset, autoPans } from "./auto-pan";
 import { backgroundPattern } from "./background-pattern";
 import { asElement, pressTargetOf, viewOf } from "./dom";
 import { edgeToolbarPosition } from "./edge-toolbar";
+import { EngineGeometry } from "./engine-geometry";
 import type { FlowEngineEvent, FlowPointerInfo } from "./events";
 import {
     INTERACTION_KINDS,
@@ -388,6 +372,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     private minZoom: number;
     private maxZoom: number;
     private readonly measurements: Measurements;
+    /** the cached geometry: boxes, edge paths, the grids and the lists built from them */
+    private readonly geometry: EngineGeometry;
     private readonly features: ComposedFeatureEngine;
     private readonly shared = new Map<string, unknown>();
     private readonly partOptions = new Map<
@@ -461,12 +447,14 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                   : options.fitView;
         this.measurements = new Measurements(
             () => this.current.zoom,
-            () => {
-                this.geometryVersion += 1;
-                this.measured();
-            },
+            () => this.measured(),
             (nodeId) => this.model.get("node-by", { id: nodeId }) !== undefined,
         );
+        this.geometry = new EngineGeometry({
+            model: this.model,
+            measurements: this.measurements,
+            options: () => this.options,
+        });
         // a node removed while it was not rendered (culled, hidden) has its kept sizes forgotten
         this.stopPrune = this.model.subscribe(() => this.measurements.prune());
         this.features = featureEngine(featuresOf(model), this.host());
@@ -1268,7 +1256,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     /** A node's absolute box (`nodeBox`: its position at its origin), its size zero until known. */
     private boxOf(node: FlowNode): Rect {
-        return nodeRectOf(node, this.layoutNow());
+        return this.geometry.boxOf(node);
     }
 
     /** The top-left corner of a node's parent's box (0, 0 without one). */
@@ -1304,14 +1292,12 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     /** A node's absolute box, its size zero until known. */
     private nodeRect(nodeId: string): Rect | undefined {
-        const node = this.node(nodeId);
-        return node ? this.boxOf(node) : undefined;
+        return this.geometry.box(nodeId);
     }
 
     /** A node's absolute box, once its size is known. */
     private knownRect(nodeId: string): Rect | undefined {
-        const node = this.node(nodeId);
-        return node && this.sizeOf(node) ? this.boxOf(node) : undefined;
+        return this.geometry.knownRect(nodeId);
     }
 
     /**
@@ -1393,12 +1379,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     /** A node's stack value by the `zIndexMode` (`nodeStackValue`). */
     private nodeValue(node: FlowNode): number {
-        return nodeStackValue(node, (id) => this.node(id), this.options);
-    }
-
-    /** An edge's stack value by the `zIndexMode` (`edgeStackValue`). */
-    private edgeValue(edge: FlowEdge): number {
-        return edgeStackValue(edge, (id) => this.node(id), this.options);
+        return this.geometry.nodeValue(node);
     }
 
     /**
@@ -1411,68 +1392,24 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         return this.layering().zIndexes?.get(nodeId) ?? this.nodeValue(node);
     }
 
-    private layeringCache:
-        | {
-              readonly nodes: readonly FlowNode[];
-              readonly edges: readonly FlowEdge[];
-              readonly options: FlowEngineOptions;
-              readonly revision: number;
-              readonly geometry: number;
-              readonly layering: Layering;
-          }
-        | undefined;
-
-    /** The render layers (`render-layers`), worked out once per change of the flow or the view. */
+    /** The render layers (`render-layers`): recomputed when the flow, the options or what is drawn change. */
     private layering(): Layering {
-        const nodes = this.model.get("all-nodes");
-        const edges = this.model.get("all-edges");
-        const cache = this.layeringCache;
-        if (
-            cache &&
-            cache.nodes === nodes &&
-            cache.edges === edges &&
-            cache.options === this.options &&
-            // the view counts only when it culls the edges (`onlyRenderVisible`)
-            (cache.revision === this.revision ||
-                !(this.options.onlyRenderVisible ?? false)) &&
-            cache.geometry === this.geometryVersion
-        ) {
-            return cache.layering;
-        }
-        const layering = renderLayers(
-            nodes
-                .filter((node) => node.hidden !== true)
-                .map((node) => ({ id: node.id, value: this.nodeValue(node) })),
-            this.drawnEdges().map((edge) => ({
-                id: edge.id,
-                value: this.edgeValue(edge),
-            })),
-            this.options.zIndexMode ?? "auto",
-        );
-        this.layeringCache = {
-            nodes,
-            edges,
-            options: this.options,
-            revision: this.revision,
-            geometry: this.geometryVersion,
-            layering,
-        };
-        return layering;
+        return this.geometry.layering(this.view(), this.culled());
     }
 
-    /** bumped whenever something is measured (before the adapters hear it, a microtask later) */
-    private geometryVersion = 0;
+    /** Whether the adapters render only what is in view (`onlyRenderVisible`). */
+    private culled(): boolean {
+        return this.options.onlyRenderVisible ?? false;
+    }
 
     private boundsOf(
         nodeIds: readonly unknown[] | undefined,
         includeHidden = false,
     ): Rect | undefined {
-        const ids =
-            nodeIds?.filter((id): id is string => typeof id === "string") ??
-            this.model
-                .get("all-nodes")
-                .filter((node) => includeHidden || node.hidden !== true)
-                .map((node) => node.id);
+        if (!nodeIds) return this.geometry.bounds(includeHidden);
+        const ids = nodeIds.filter(
+            (id): id is string => typeof id === "string",
+        );
         return boundsOf(
             ids.flatMap((id) => {
                 const rect = this.knownRect(id);
@@ -1507,27 +1444,16 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                     }
                   : undefined;
         if (!area) return [];
-        const partial = record.partial !== false;
-        return this.model.get("all-nodes").filter((node) => {
-            if (node.id === nodeId || node.hidden === true) return false;
-            const box = this.knownRect(node.id);
-            if (!box) return false;
-            return partial ? sharesArea(box, area) : contains(area, box);
-        });
+        return this.geometry.intersecting(
+            area,
+            nodeId,
+            record.partial !== false,
+        );
     }
 
     /** A handle with its absolute centre (once it and its node are measured). */
     private placed(handle: FlowHandle): FlowHandle {
-        if (!handle.bounds) return handle;
-        const rect = this.nodeRect(handle.nodeId);
-        if (!rect) return handle;
-        return {
-            ...handle,
-            center: {
-                x: rect.x + handle.bounds.x + handle.bounds.width / 2,
-                y: rect.y + handle.bounds.y + handle.bounds.height / 2,
-            },
-        };
+        return this.geometry.placed(handle);
     }
 
     private handles(): FlowHandle[] {
@@ -1536,49 +1462,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             .map((handle) => this.placed(handle));
     }
 
-    /** A node's handle of a type and id (none: its first of that type); an id of the other type too. */
-    private handleOf(
-        nodeId: string,
-        type: HandleType,
-        handleId: string | undefined,
-    ): FlowHandle | undefined {
-        const found = matchHandle(
-            this.measurements.handlesOf(nodeId),
-            type,
-            handleId,
-        );
-        return found ? this.placed(found) : undefined;
-    }
-
     private edgePath(edgeId: string): EdgePath | undefined {
-        const edge = this.model.get("edge-by", { id: edgeId });
-        if (!edge) return undefined;
-        const ends = edgeEnds(edge, {
-            rect: (nodeId) => this.knownRect(nodeId),
-            // a measured handle, else one the node declares (used until it is measured)
-            handle: (nodeId, type, handleId) => {
-                const measured = this.handleOf(nodeId, type, handleId);
-                if (measured) return measured;
-                const node = this.node(nodeId);
-                const rect = this.knownRect(nodeId);
-                return node && rect
-                    ? declaredHandleOf(node, rect, type, handleId)
-                    : undefined;
-            },
-            side: (nodeId, type) => {
-                const node = this.node(nodeId);
-                return type === "source"
-                    ? node?.sourcePosition
-                    : node?.targetPosition;
-            },
-        });
-        // the edge's own path options over the engine's
-        return ends
-            ? pathOf(edge.type, ends, {
-                  ...this.options.pathOptions,
-                  ...edge.pathOptions,
-              })
-            : undefined;
+        return this.geometry.edgePath(edgeId);
     }
 
     private view(): Rect | undefined {
@@ -1588,31 +1473,14 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             : undefined;
     }
 
+    /** `visible-nodes`: the shown nodes in view and those of unknown size (none culled before the root has a size). */
     private visibleNodes(): readonly FlowNode[] {
-        const view = this.view();
-        return this.model.get("all-nodes").filter((node) => {
-            if (node.hidden === true) return false;
-            if (!view) return true;
-            const rect = this.knownRect(node.id);
-            return rect === undefined || overlaps(rect, view);
-        });
+        return this.geometry.visibleNodes(this.view(), this.culled());
     }
 
+    /** `visible-edges`: the drawn edges whose ends' box is in view. */
     private visibleEdges(): readonly FlowEdge[] {
-        const view = this.view();
-        return this.model.get("all-edges").filter((edge) => {
-            if (edge.hidden === true) return false;
-            if (this.node(edge.source)?.hidden === true) return false;
-            if (this.node(edge.target)?.hidden === true) return false;
-            const path = this.edgePath(edge.id);
-            if (!path) return false;
-            if (!view) return true;
-            const box = boundsOf([
-                { ...path.source, width: 0, height: 0 },
-                { ...path.target, width: 0, height: 0 },
-            ]) as Rect;
-            return overlaps(box, view);
-        });
+        return this.geometry.visibleEdges(this.view(), this.culled());
     }
 
     /**
@@ -1621,19 +1489,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
      * equals.
      */
     private drawnEdges(): readonly FlowEdge[] {
-        const shown =
-            (this.options.onlyRenderVisible ?? false)
-                ? this.visibleEdges()
-                : this.model
-                      .get("all-edges")
-                      .filter(
-                          (edge) =>
-                              edge.hidden !== true &&
-                              this.node(edge.source)?.hidden !== true &&
-                              this.node(edge.target)?.hidden !== true &&
-                              this.edgePath(edge.id) !== undefined,
-                      );
-        return drawingOrder(shown, (edge) => this.edgeValue(edge));
+        return this.geometry.drawnEdges(this.view(), this.culled());
     }
 
     /**
@@ -1662,14 +1518,10 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         if (this.destroyed) return;
         this.notify({ measured: true });
         if (!this.rootElement) return;
-        const nodes = this.model
-            .get("all-nodes")
-            .filter((node) => node.hidden !== true);
         // a fit on init counts initial sizes as known; `ready` waits for the measured ones
-        const all = nodes.every((node) => this.knownRect(node.id));
-        const measured = nodes.every((node) => this.isMeasured(node));
+        const { shown, sized: all, measured } = this.geometry.readiness();
         const fit = this.pendingFit;
-        if (fit && nodes.length > 0 && all && this.fitView(fit, false).ok) {
+        if (fit && shown > 0 && all && this.fitView(fit, false).ok) {
             this.pendingFit = undefined;
         }
         // ready once: a sized root, every shown node measured (and a pending fit done)
@@ -1679,7 +1531,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             measured &&
             size.width > 0 &&
             size.height > 0 &&
-            (this.pendingFit === undefined || nodes.length === 0)
+            (this.pendingFit === undefined || shown === 0)
         ) {
             this.ready = true;
             // a reactive read of `is("ready")` sees it
