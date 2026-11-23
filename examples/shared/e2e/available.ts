@@ -39,8 +39,6 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
     react: [],
     vue: [],
     svelte: [
-        // Epic #49 (#45): new React examples, ported by a later Epic
-        "connection-line",
         // Epic #49 (#46): new React examples, ported by a later Epic
         "edge-markers",
         "animating-edges",
