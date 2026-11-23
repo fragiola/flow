@@ -266,11 +266,18 @@ export default function ElkLayout() {
         const id = request.current;
         setAlgorithm(next);
         setRunning(true);
-        void layout(model, next).then((placements) => {
-            if (id !== request.current) return;
-            apply(model, engine, placements);
-            setRunning(false);
-        });
+        void layout(model, next)
+            .then((placements) => {
+                if (id !== request.current) return;
+                apply(model, engine, placements);
+                setRunning(false);
+            })
+            .catch((error: unknown) => {
+                // a failed layout leaves the nodes where they are, and the controls usable again
+                if (id !== request.current) return;
+                console.error("The ELK layout failed", error);
+                setRunning(false);
+            });
     }
 
     // the first layout, once mounted (the model is there); leaving drops a pending one
