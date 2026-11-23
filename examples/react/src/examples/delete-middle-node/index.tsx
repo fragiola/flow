@@ -111,7 +111,18 @@ function removeReconnecting(
         removedEdgeIds: loose,
         isTaken: (id) => model.get("edge-by", { id }) !== undefined,
     });
-    const removed = nodeIds.map(labelOf).join(", ");
+    // the nodes removed, or, with only edges asked for, those edges
+    const removed =
+        nodeIds.length > 0
+            ? nodeIds.map(labelOf).join(", ")
+            : loose
+                  .map((edgeId) => model.get("edge-by", { id: edgeId }))
+                  .filter((edge) => edge !== undefined)
+                  .map(
+                      (edge) =>
+                          `${labelOf(edge.source)} to ${labelOf(edge.target)}`,
+                  )
+                  .join(", ");
     const joinedNames = planned.map(
         (edge) => `${labelOf(edge.source)} to ${labelOf(edge.target)}`,
     );
