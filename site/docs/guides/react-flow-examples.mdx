@@ -1,0 +1,68 @@
+---
+title: Coming from xyflow's examples
+description: Every example of React Flow's catalogue and the gallery example that shows the same case, so a team moving from xyflow finds each one.
+---
+
+React Flow ([xyflow](https://github.com/xyflow/xyflow)) has a catalogue of examples, and a team
+moving from it looks for the same cases here. This page maps each of them to the gallery example
+that shows it. Some cases share an example, because one flow shows them together. A few are not an
+example: the five themes every example runs in cover them. Every example is our own code, data and
+look: React Flow was a reference for the behaviour only, and nothing was copied from it.
+
+The newest examples are written in React first, and Vue, Svelte and Angular follow. What the package leaves to the app (layout, undo, copy and
+paste, helper lines) is code in the example that you copy: see
+[Known limitations](/docs/limitations).
+
+## The map
+
+| React Flow example | Flow example |
+| --- | --- |
+| Custom Nodes, Updating Nodes, Drag Handle | [Custom nodes](/examples/custom-nodes) |
+| Node Resizer | [Node resizer](/examples/node-resizer) |
+| Node Toolbar | [Node toolbar](/examples/node-toolbar) |
+| Add Node On Edge Drop, Drag and Drop | [Add nodes](/examples/add-nodes) |
+| Connection Limit, Validation, Preventing Cycles | [Connection validation](/examples/connection-validation) |
+| Connection Events | [Announcements](/examples/announcements) |
+| Computing Flows | [Data from connections](/examples/connected-data) |
+| Context Menu | [Context menu](/examples/context-menu) |
+| Save and Restore | [Save and restore](/examples/save-and-restore) |
+| Undo and Redo | [Undo and redo](/examples/undo-redo) |
+| Edge Types, Custom Edges | [Edge types](/examples/edge-types) |
+| Edge Label Renderer, Edge Toolbar | [Edge labels](/examples/edge-labels) |
+| Reconnect Edge, Delete Edge on Drop | [Edge reconnect](/examples/edge-reconnect) (its "Delete on drop" switch removes an edge whose end is dropped nowhere) |
+| Sub Flow, Parent Child Relation, Selection Grouping | [Sub-flows](/examples/sub-flows) (its "Group selection" and "Ungroup" buttons) |
+| Base Style, Dark Mode, Tailwind | the five themes every example runs in: Tailwind classes in each example's `styles.ts`, and the `dark` theme (see [Theming](/docs/guides/theming)) |
+| Shapes, Rotatable Node | [Shapes](/examples/shapes) |
+| Easy Connect, Touch Device | [Easy connect](/examples/easy-connect) |
+| Proximity Connect, Temporary Edges | [Proximity connect](/examples/proximity-connect) |
+| Delete Middle Node | [Delete middle node](/examples/delete-middle-node) |
+| Intersections, Node Collisions, Edge Intersection | [Intersections](/examples/intersections) |
+| Contextual Zoom | [Contextual zoom](/examples/contextual-zoom) |
+| Custom Connection Line, Multi Connection Line | [Connection line](/examples/connection-line) |
+| Edge Markers | [Edge markers](/examples/edge-markers) |
+| Animating Edges | [Animating edges](/examples/animating-edges) |
+| Floating Edges, Simple Floating Edges | [Floating edges](/examples/floating-edges) |
+| Editable Edge, Edge Routing | [Editable edge](/examples/editable-edge) |
+| Turbo Flow | [Gradient styling](/examples/gradient-styling) (gradient borders and glowing edges, in its own look) |
+| Rectangle, Freehand Draw, Eraser Tool, Lasso Selection | [Whiteboard](/examples/whiteboard) |
+| Helper Lines | [Helper lines](/examples/helper-lines) |
+| Copy and Paste | [Copy and paste](/examples/copy-paste) |
+| Collaborative | [Collaborative](/examples/collaborative) |
+| Download Image, Server Side Image Creation | [Export image](/examples/export-image) |
+| Stress Test | [Stress test](/examples/stress-test) |
+| Dagre Tree, Horizontal Flow, Node Position Animation | [Dagre layout](/examples/dagre-layout) |
+| Elkjs Tree, Elkjs Multiple Handles | [ELK layout](/examples/elk-layout) |
+| Auto Layout, Dynamic Layouting, Expand and Collapse | [Auto layout](/examples/auto-layout) |
+| Force Layout | [Force layout](/examples/force-layout) |
+
+## What the examples bring
+
+Only the layout examples use a library of their own: `@dagrejs/dagre`, `elkjs` and `d3-force`,
+which you install with the example's code (its code panel lists them). The rest is
+built in the example from the package's API: the collaborative one syncs over a
+`BroadcastChannel`, the image export draws its SVG from the flow's geometry and turns it into a PNG
+on a canvas, and the whiteboard smooths its strokes itself.
+
+Every layout example moves the nodes the same way, whatever computes the positions: an animation
+is one `node.move` batch per frame run as a transient step, then one final batch the history keeps
+(see [Transient steps and batches](/docs/concepts/model-and-commands#transient-steps-and-batches)).
