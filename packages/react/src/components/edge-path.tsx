@@ -1,6 +1,6 @@
 import type { EdgePath as EdgePathValue } from "@fragiola/flow";
 import { useEdgeId, useFlowContext } from "../context";
-import { useFlowValue } from "../hooks/internal";
+import { sameValue, useFlowValue } from "../hooks/internal";
 import { staticEdgeAttributes, useEdgePath } from "../hooks/use-edge";
 import { type SvgPrimitiveProps, useRenderElement } from "../utils/use-render";
 
@@ -28,13 +28,19 @@ export function EdgePath(props: EdgePathProps) {
     const edgeId = useEdgeId("EdgePath", edgeIdProp);
     const { model, engine } = useFlowContext("EdgePath");
     const path = useEdgePath(edgeId);
-    const attributes = useFlowValue(model, engine, () =>
-        engine
-            ? engine.adapter.attributes("edge-path", { edgeId })
-            : staticEdgeAttributes(
-                  "edge-path",
-                  model.get("edge-by", { id: edgeId }) ?? { id: edgeId },
-              ),
+    const attributes = useFlowValue(
+        model,
+        engine,
+        () =>
+            engine
+                ? engine.adapter.attributes("edge-path", { edgeId })
+                : staticEdgeAttributes(
+                      "edge-path",
+                      model.get("edge-by", { id: edgeId }) ?? { id: edgeId },
+                  ),
+        sameValue,
+        "entity",
+        { kind: "edge", id: edgeId },
     );
     if (!path || !attributes) return null;
     return (

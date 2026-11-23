@@ -659,5 +659,7 @@ zooms with the viewport, but it does not know about the snap. Keep the two numbe
 ## Large flows
 
 `onlyRenderVisible` on the root renders only the nodes and edges in view (`visible-nodes`,
-`visible-edges`, plus the nodes not measured yet), for flows of hundreds of nodes. A node that
-leaves the view keeps its last size, so its edges are still drawn right.
+`visible-edges`, plus the nodes not measured yet), for flows of hundreds of nodes and more. A node
+that leaves the view keeps its last size, so its edges are still drawn right.
+[Large flows](/docs/guides/large-flows) has what else keeps a flow of thousands of nodes smooth,
+and the measured frame times.

@@ -160,45 +160,54 @@ export interface Layering {
 }
 
 /**
- * Splits the shown nodes and the drawn edges (in drawing order) into levels. In `"basic"`, or when
- * no edge stands above the lowest node, one level. Otherwise each distinct edge value above the
- * lowest node value starts a level: its edges are drawn above the nodes whose value is below it,
- * and below the others (an edge at a node's value stays below it). The structural `z-index` values
- * are then ranks, negative, so what the app draws after the layers stays above them.
+ * The node side of the render layers for a set of thresholds (`layerThresholds`): each level's
+ * shown nodes and its edges' layer `z-index`, and each node's structural `z-index` with several
+ * levels. It holds no edge: a change of the drawn edges that keeps the thresholds keeps it.
  */
-export function renderLayers(
-    nodes: readonly Stacked[],
+export interface NodeLevels {
+    /** the edge values that start a level, ascending (none: one level) */
+    readonly thresholds: readonly number[];
+    /** each level's shown nodes, in the document's order */
+    readonly nodeIds: readonly (readonly string[])[];
+    /** each level's edges layer `z-index` (none with a single level) */
+    readonly zIndex: readonly (number | undefined)[];
+    /** each node's structural `z-index`; none with a single level */
+    readonly zIndexes: ReadonlyMap<string, number> | undefined;
+}
+
+/** The distinct edge values above the lowest node value, ascending: each starts a level. */
+export function layerThresholds(
+    lowest: number,
     edges: readonly Stacked[],
-    mode: ZIndexMode = "auto",
-): Layering {
-    const single = (): Layering => ({
-        layers: Object.freeze([
-            Object.freeze({
-                level: 0,
-                zIndex: undefined,
-                nodeIds: Object.freeze(nodes.map((node) => node.id)),
-                edgeIds: Object.freeze(edges.map((edge) => edge.id)),
-            }),
-        ]),
-        zIndexes: undefined,
-    });
-    if (mode === "basic" || nodes.length === 0) return single();
-    const lowest = nodes.reduce(
-        (least, node) => Math.min(least, node.value),
-        Number.POSITIVE_INFINITY,
-    );
-    const thresholds = [
+): number[] {
+    return [
         ...new Set(
             edges.map((edge) => edge.value).filter((value) => value > lowest),
         ),
     ].sort((a, b) => a - b);
-    if (thresholds.length === 0) return single();
+}
+
+/**
+ * The nodes' levels for `thresholds`: a node's level is how many thresholds are at or below its
+ * value; the ranks run level 0's edges, level 0's nodes by value, level 1's edges, …, each rank r
+ * of M mapped to r - M (negative). No threshold: one level of every node.
+ */
+export function nodeLevels(
+    nodes: readonly Stacked[],
+    thresholds: readonly number[],
+): NodeLevels {
+    if (thresholds.length === 0) {
+        return {
+            thresholds,
+            nodeIds: [Object.freeze(nodes.map((node) => node.id))],
+            zIndex: [undefined],
+            zIndexes: undefined,
+        };
+    }
     const nodeLevel = (value: number) =>
         thresholds.filter((threshold) => threshold <= value).length;
-    const edgeLevel = (value: number) => thresholds.indexOf(value) + 1;
     const count = thresholds.length + 1;
     const nodeIds: string[][] = Array.from({ length: count }, () => []);
-    const edgeIds: string[][] = Array.from({ length: count }, () => []);
     const valuesOf: Set<number>[] = Array.from(
         { length: count },
         () => new Set<number>(),
@@ -208,7 +217,6 @@ export function renderLayers(
         nodeIds[level]?.push(node.id);
         valuesOf[level]?.add(node.value);
     }
-    for (const edge of edges) edgeIds[edgeLevel(edge.value)]?.push(edge.id);
     // the ranks: each level's edges, then its nodes by value
     const edgeRank: number[] = [];
     const nodeRank = new Map<string, number>();
@@ -225,16 +233,66 @@ export function renderLayers(
         zIndexes.set(node.id, (nodeRank.get(key) ?? 0) - total);
     }
     return {
+        thresholds,
+        nodeIds: Array.from({ length: count }, (_, level) =>
+            Object.freeze(nodeIds[level] ?? []),
+        ),
+        zIndex: Array.from(
+            { length: count },
+            (_, level) => (edgeRank[level] ?? 0) - total,
+        ),
+        zIndexes,
+    };
+}
+
+/**
+ * The render layers of the nodes' levels and the drawn edges (in drawing order): an edge of value
+ * T[j-1] is in level j, any other in level 0.
+ */
+export function layersOf(
+    levels: NodeLevels,
+    edges: readonly Stacked[],
+): Layering {
+    const count = levels.nodeIds.length;
+    const levelOf = new Map(
+        levels.thresholds.map((threshold, i) => [threshold, i + 1]),
+    );
+    const edgeIds: string[][] = Array.from({ length: count }, () => []);
+    for (const edge of edges)
+        edgeIds[levelOf.get(edge.value) ?? 0]?.push(edge.id);
+    return {
         layers: Object.freeze(
             Array.from({ length: count }, (_, level) =>
                 Object.freeze({
                     level,
-                    zIndex: (edgeRank[level] ?? 0) - total,
-                    nodeIds: Object.freeze(nodeIds[level] ?? []),
+                    zIndex: levels.zIndex[level],
+                    nodeIds: levels.nodeIds[level] ?? Object.freeze([]),
                     edgeIds: Object.freeze(edgeIds[level] ?? []),
                 }),
             ),
         ),
-        zIndexes,
+        zIndexes: levels.zIndexes,
     };
+}
+
+/**
+ * Splits the shown nodes and the drawn edges (in drawing order) into levels. In `"basic"`, or when
+ * no edge stands above the lowest node, one level. Otherwise each distinct edge value above the
+ * lowest node value starts a level: its edges are drawn above the nodes whose value is below it,
+ * and below the others (an edge at a node's value stays below it). The structural `z-index` values
+ * are then ranks, negative, so what the app draws after the layers stays above them.
+ */
+export function renderLayers(
+    nodes: readonly Stacked[],
+    edges: readonly Stacked[],
+    mode: ZIndexMode = "auto",
+): Layering {
+    if (mode === "basic" || nodes.length === 0) {
+        return layersOf(nodeLevels(nodes, []), edges);
+    }
+    const lowest = nodes.reduce(
+        (least, node) => Math.min(least, node.value),
+        Number.POSITIVE_INFINITY,
+    );
+    return layersOf(nodeLevels(nodes, layerThresholds(lowest, edges)), edges);
 }

@@ -1,6 +1,6 @@
 import type { EdgePath } from "@fragiola/flow";
 import { useEdgeId, useFlowContext } from "../context";
-import { useFlowValue } from "../hooks/internal";
+import { sameValue, useFlowValue } from "../hooks/internal";
 import { useEdgePath } from "../hooks/use-edge";
 import { type SvgPrimitiveProps, useRenderElement } from "../utils/use-render";
 
@@ -33,18 +33,27 @@ export function ReconnectAnchor(props: ReconnectAnchorProps) {
     const edgeId = useEdgeId("ReconnectAnchor", edgeIdProp);
     const { model, engine } = useFlowContext("ReconnectAnchor");
     const path = useEdgePath(edgeId);
-    const view = useFlowValue(model, engine, () =>
-        engine
-            ? {
-                  attributes: engine.adapter.attributes("reconnect-anchor", {
-                      edgeId,
-                      end,
-                  }),
-                  reconnecting: engine.is("edge-reconnecting", { edgeId }),
-                  // `reconnectable: "source"` (or `"target"`, or false): no anchor at the other end
-                  movable: model.is("edge-reconnectable", { edgeId, end }),
-              }
-            : undefined,
+    const view = useFlowValue(
+        model,
+        engine,
+        () =>
+            engine
+                ? {
+                      attributes: engine.adapter.attributes(
+                          "reconnect-anchor",
+                          {
+                              edgeId,
+                              end,
+                          },
+                      ),
+                      reconnecting: engine.is("edge-reconnecting", { edgeId }),
+                      // `reconnectable: "source"` (or `"target"`, or false): no anchor at the other end
+                      movable: model.is("edge-reconnectable", { edgeId, end }),
+                  }
+                : undefined,
+        sameValue,
+        "entity",
+        { kind: "edge", id: edgeId },
     );
     if (!path || !view?.movable) return null;
     return (

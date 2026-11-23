@@ -32,6 +32,11 @@ is no "not yet" list. Found something missing from this page? [Open an issue](ht
 - **Angular has no server render**: its directives write to their elements in the browser, so an
   Angular flow draws its declared edges in the browser's first render, not in server HTML. React,
   Vue and Svelte draw them on the server ([Server rendering](/docs/guides/server-rendering)).
+- **A culled flow's first render** (`onlyRenderVisible`, before the engine knows the view): React
+  renders no node and no edge, on the server too, then only the visible ones mount. Vue, Svelte
+  and Angular still render every node's static geometry for that first render (their own
+  stress-test ports take this up), so a large culled flow opens slower there
+  ([Large flows](/docs/guides/large-flows)).
 - **Edge labels are not in the server HTML**: a `Flow.EdgeLabel` portals into its layer once
   mounted, so labels appear after hydration, while the paths are already there.
 - **The server HTML is drawn at the identity viewport** (`{ x: 0, y: 0, zoom: 1 }`): only the

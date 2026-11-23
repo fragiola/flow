@@ -4,7 +4,6 @@ import {
     type FlowNode,
     type FlowTypes,
     useFlowRef,
-    useFlowStore,
 } from "@fragiola/flow-react";
 import { drag } from "@fragiola/flow-react/drag";
 import { selection } from "@fragiola/flow-react/selection";
@@ -18,12 +17,11 @@ import { styles } from "./styles";
 // one tree, the same every time), 1,000 by default and up to 20,000. `onlyRenderVisible` keeps in
 // the DOM only the nodes and edges in view, so the DOM stays small whatever the size; the readout
 // shows what each gesture costs. The nodes declare their size and handles, so a node never drawn
-// still has a box (it is culled rightly) and its edges have ends. The layers wait for the engine
-// to be `ready` (the root sized, so the view known): before that, `visible-nodes` is every node
-// and a first render would mount them all. "Shuffle" moves every node in one `batch`: one change,
-// one render. The readout counts the nodes and edges in the DOM and times the frames
-// (requestAnimationFrame, the median of the last 60, frames.ts), the last size switch and the
-// last shuffle (until the next frame).
+// still has a box (it is culled rightly) and its edges have ends. Until the root has a size (the
+// view known), a culled flow renders no node, so no more than the visible ones ever mount.
+// "Shuffle" moves every node in one `batch`: one change, one render. The readout counts the nodes
+// and edges in the DOM and times the frames (requestAnimationFrame, the median of the last 60,
+// frames.ts), the last size switch and the last shuffle (until the next frame).
 
 interface Types extends FlowTypes {
     readonly nodes: { cell: { label: string } };
@@ -61,23 +59,6 @@ function renderEdge(edge: FlowEdge<Types>) {
         >
             <Flow.EdgePath className={styles.edge} />
         </Flow.Edge>
-    );
-}
-
-/**
- * The edges and the nodes, once the engine knows the view (`ready`: the root has a size, and the
- * nodes declare theirs): until then every node counts as visible, and all of them would mount.
- */
-function Layers() {
-    const ready = useFlowStore<boolean, Types, typeof features>(({ engine }) =>
-        engine.is("ready"),
-    );
-    if (!ready) return null;
-    return (
-        <>
-            <Flow.Edges<Types>>{renderEdge}</Flow.Edges>
-            <Flow.Nodes<Types>>{renderNode}</Flow.Nodes>
-        </>
     );
 }
 
@@ -192,7 +173,8 @@ export default function StressTest() {
                 <Flow.Background variant="lines" className={styles.lines} />
                 <Flow.Background variant="cross" className={styles.cross} />
                 <Flow.Viewport>
-                    <Layers />
+                    <Flow.Edges<Types>>{renderEdge}</Flow.Edges>
+                    <Flow.Nodes<Types>>{renderNode}</Flow.Nodes>
                 </Flow.Viewport>
             </Flow.Root>
             <div data-flow-no-gesture="" className={styles.panel}>

@@ -1,6 +1,6 @@
 import { partAttributes } from "@fragiola/flow";
 import { useFlowContext } from "../context";
-import { useFlowValue } from "../hooks/internal";
+import { sameValue, useFlowValue } from "../hooks/internal";
 import { type SvgPrimitiveProps, useRenderElement } from "../utils/use-render";
 import { useMiniMapView } from "./mini-map-context";
 
@@ -24,10 +24,15 @@ export function MiniMapNode(props: MiniMapNodeProps) {
     const { nodeId, ...rest } = props;
     const view = useMiniMapView("MiniMapNode");
     const { model, engine } = useFlowContext("MiniMapNode");
-    const attributes = useFlowValue(model, engine, () =>
-        engine
-            ? engine.adapter.attributes("minimap-node", { nodeId })
-            : partAttributes("minimap-node", nodeId),
+    const attributes = useFlowValue(
+        model,
+        engine,
+        () =>
+            engine
+                ? engine.adapter.attributes("minimap-node", { nodeId })
+                : partAttributes("minimap-node", nodeId),
+        sameValue,
+        "entity",
     );
     const box = view.nodes.find((node) => node.nodeId === nodeId);
     const element = useRenderElement("rect", rest, {

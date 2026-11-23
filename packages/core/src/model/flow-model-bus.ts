@@ -126,6 +126,10 @@ export class FlowModelBus {
     private readonly queue: (() => void)[] = [];
     private readonly events: CommandEvent[] = [];
     private delivering = false;
+    /** the reads' context of the committed document, made once per commit (reads are hot) */
+    private reads:
+        | { readonly of: IndexedDocument; readonly context: QueryContext }
+        | undefined;
 
     constructor(
         committed: IndexedDocument,
@@ -168,12 +172,16 @@ export class FlowModelBus {
     // ---------------------------------------------------------------------------------------------
 
     private queryContext(): QueryContext {
-        return {
+        const reads = this.reads;
+        if (reads?.of === this.committed) return reads.context;
+        const context: QueryContext = {
             reader: readerOf(this.committed),
             features: this.features,
             commands: this.infos,
             defaultEdge: this.defaultEdge,
         };
+        this.reads = { of: this.committed, context };
+        return context;
     }
 
     get(key: string, payload?: unknown): unknown {
@@ -181,7 +189,10 @@ export class FlowModelBus {
         if (core) {
             return core(this.queryContext(), payload);
         }
-        return this.features.get.get(key)?.(readerOf(this.committed), payload);
+        return this.features.get.get(key)?.(
+            this.queryContext().reader,
+            payload,
+        );
     }
 
     is(key: string, payload?: unknown): boolean {
@@ -190,7 +201,7 @@ export class FlowModelBus {
             return core(this.queryContext(), payload);
         }
         return (
-            this.features.is.get(key)?.(readerOf(this.committed), payload) ??
+            this.features.is.get(key)?.(this.queryContext().reader, payload) ??
             false
         );
     }

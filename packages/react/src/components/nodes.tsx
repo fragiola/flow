@@ -41,6 +41,11 @@ const LAYERED_NODES_STYLE: React.CSSProperties = {
     left: 0,
 };
 
+const NO_NODES: readonly FlowNode[] = Object.freeze([]);
+
+const shownNodes = (nodes: readonly FlowNode[]) =>
+    nodes.filter((node) => node.hidden !== true);
+
 interface NodeSlotProps {
     node: FlowNode;
     render: (node: FlowNode) => React.ReactNode;
@@ -57,15 +62,22 @@ const NodeSlot = React.memo(function NodeSlot({ node, render }: NodeSlotProps) {
  * each node that is not hidden (with `onlyRenderVisible`, each one in view, `visible-nodes`), in
  * drawing order, keyed by its id (a node keeps its element when it moves, and never leaves this
  * layer: with several render levels its `z-index` places it among the edge levels). You render each
- * node.
+ * node. With `onlyRenderVisible`, the server render and the first client render (before the
+ * engine knows the view) render none.
  */
 export function Nodes<T extends FlowTypes = AnyTypes>(props: NodesProps<T>) {
     const { children, ...rest } = props;
-    const { model, engine, staticGeometry } = useFlowContext("Nodes");
+    const { model, engine, staticGeometry, onlyRenderVisible } =
+        useFlowContext("Nodes");
     const list = useFlowValue(model, engine, () =>
-        engine?.adapter.settings.onlyRenderVisible
-            ? engine.get("visible-nodes")
-            : model.get("all-nodes").filter((node) => node.hidden !== true),
+        engine
+            ? engine.adapter.settings.onlyRenderVisible
+                ? engine.get("visible-nodes")
+                : shownNodes(model.get("all-nodes"))
+            : // before the engine, a culled flow renders none: the view is not known yet
+              onlyRenderVisible
+              ? NO_NODES
+              : shownNodes(model.get("all-nodes")),
     );
     const layered = useFlowValue(
         model,

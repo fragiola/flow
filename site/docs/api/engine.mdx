@@ -234,8 +234,8 @@ feature at the moment it would act: no feature is installed again.
 | `"viewport-for-bounds"` | `ViewportForBoundsPayload` | the viewport that frames a flow rectangle in the root, as `fit-view` would set it (padding, zoom limits and translate extent kept); undefined while the root has no size |
 | `"screen-to-flow"` | `XY` | a client point as a flow point (a drop's position) |
 | `"flow-to-screen"` | `XY` | a flow point as a client point |
-| `"visible-nodes"` | none | the nodes in view, plus those not measured yet |
-| `"visible-edges"` | none | the edges whose ends' box is in view |
+| `"visible-nodes"` | none | the nodes in view, plus those of unknown size; with `onlyRenderVisible`, none while the root has no size (nothing mounts before the view is known). The same array while its content is unchanged |
+| `"visible-edges"` | none | the edges whose ends' box is in view; with `onlyRenderVisible`, none while the root has no size. The same array while its content is unchanged |
 | `"drawn-edges"` | none | the edges to draw, in drawing order: those shown whose nodes have a size (with `onlyRenderVisible`, those in view), by their stack value (`zIndexMode`: `zIndex`, a selected one raised with `elevateEdgesOnSelect`, in `"auto"` at least its ends' when one is a child), the document's order among equals |
 | `"render-layers"` | none | the levels to draw, lowest first (`RenderLayer[]`, below): one level, the edges below the nodes, unless an edge's stack value is above the lowest shown node's; then each level's edges go in their own layer at its `zIndex`, between the nodes below and above them |
 | `"node-z-index-by"` | `{ nodeId }` | a node's structural `z-index`: with one render level, its stack value (its `zIndex`, a selected node and its descendants raised with `elevateNodesOnSelect`, always above its parent's; `"manual"`: its `zIndex`); with several, its rank among the layers (a negative number), so what the app renders after the layers (the connection line, the selection box, the selection's rectangle) stays above |

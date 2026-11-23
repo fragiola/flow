@@ -9,7 +9,7 @@ import {
 import * as React from "react";
 import { useFlowContext } from "../context";
 import type { DataAttributes } from "../utils/use-render";
-import { useFlowValue } from "./internal";
+import { sameValue, useFlowValue } from "./internal";
 
 /** What a node shows: its state on screen. */
 export interface NodeState<T extends FlowTypes = AnyTypes> {
@@ -65,34 +65,41 @@ export function useNode<T extends FlowTypes = AnyTypes>(
 ): UseNodeResult<T> {
     const { model, engine, staticGeometry } = useFlowContext("useNode");
     const nodeId = node.id;
-    const view = useFlowValue<NodeView>(model, engine, () => {
-        if (!engine) {
-            // the static geometry (origin applied), as the engine places it before measuring
-            const rect = staticGeometry?.nodeRects[nodeId];
-            // no rect (no static geometry): its absolute position, its parents' added
-            const at = rect
-                ? undefined
-                : model.get("absolute-position-by", { nodeId });
+    const view = useFlowValue<NodeView>(
+        model,
+        engine,
+        () => {
+            if (!engine) {
+                // the static geometry (origin applied), as the engine places it before measuring
+                const rect = staticGeometry?.nodeRects[nodeId];
+                // no rect (no static geometry): its absolute position, its parents' added
+                const at = rect
+                    ? undefined
+                    : model.get("absolute-position-by", { nodeId });
+                return {
+                    attributes: {
+                        ...partAttributes("node", nodeId),
+                        "data-selected": flag(node.selected === true),
+                    },
+                    x: rect?.x ?? at?.x ?? node.position.x,
+                    y: rect?.y ?? at?.y ?? node.position.y,
+                    zIndex: staticGeometry?.nodeZIndexes[nodeId],
+                    focusable: false,
+                };
+            }
+            const rect = engine.get("node-rect-by", { nodeId });
             return {
-                attributes: {
-                    ...partAttributes("node", nodeId),
-                    "data-selected": flag(node.selected === true),
-                },
-                x: rect?.x ?? at?.x ?? node.position.x,
-                y: rect?.y ?? at?.y ?? node.position.y,
-                zIndex: staticGeometry?.nodeZIndexes[nodeId],
-                focusable: false,
+                attributes: engine.adapter.attributes("node", { nodeId }),
+                x: rect?.x ?? node.position.x,
+                y: rect?.y ?? node.position.y,
+                zIndex: engine.get("node-z-index-by", { nodeId }),
+                focusable: engine.is("node-focusable", { nodeId }),
             };
-        }
-        const rect = engine.get("node-rect-by", { nodeId });
-        return {
-            attributes: engine.adapter.attributes("node", { nodeId }),
-            x: rect?.x ?? node.position.x,
-            y: rect?.y ?? node.position.y,
-            zIndex: engine.get("node-z-index-by", { nodeId }),
-            focusable: engine.is("node-focusable", { nodeId }),
-        };
-    });
+        },
+        sameValue,
+        "entity",
+        { kind: "node", id: nodeId },
+    );
     const ref = React.useCallback(
         (element: HTMLElement | null) => {
             if (!engine || !element) return;

@@ -10,6 +10,10 @@ place, and every edge whose two nodes have a size the document gives, ending at 
 document declares. Declare them, and the edges are in the server HTML (React, Vue, Svelte) and in
 the browser's first paint (all four), before anything is measured.
 
+With the root's `onlyRenderVisible`, React renders no node and no edge before the engine knows
+the view, on the server too: a culled flow's server HTML is its root, viewport and layers, empty
+([Large flows](/docs/guides/large-flows)).
+
 What stays yours: the server setup of your framework (Next.js, Nuxt, SvelteKit, your own
 `renderToString`), and keeping the declared sizes and handles equal to what you render.
 

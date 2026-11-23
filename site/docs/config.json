@@ -112,6 +112,10 @@
                     "path": "guides/minimap-and-controls"
                 },
                 {
+                    "label": "Large flows",
+                    "path": "guides/large-flows"
+                },
+                {
                     "label": "Styling with plain CSS",
                     "path": "guides/styling-css"
                 },

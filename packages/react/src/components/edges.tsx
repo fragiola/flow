@@ -41,6 +41,8 @@ const LAYER_STYLE: React.CSSProperties = {
     pointerEvents: "none",
 };
 
+const NO_EDGES: readonly FlowEdge[] = Object.freeze([]);
+
 interface EdgeSlotProps {
     edge: FlowEdge;
     render: (edge: FlowEdge) => React.ReactNode;
@@ -126,11 +128,13 @@ function LevelLayer({ level, render }: LevelLayerProps) {
  * `zIndexMode` `"auto"`, a high `zIndex`), each render level gets a wrapper of its own
  * (`data-flow-part="edges-layer"`, `data-level`, the level's `z-index`) holding its SVG and its
  * labels. Before the engine (the server render, the first client render) it draws the document's
- * static geometry. It lets presses through to the pane; the edges' own parts take them.
+ * static geometry (with `onlyRenderVisible`, no edge: the view is not known yet). It lets presses
+ * through to the pane; the edges' own parts take them.
  */
 export function Edges<T extends FlowTypes = AnyTypes>(props: EdgesProps<T>) {
     const { children, ...rest } = props;
-    const { model, engine, staticGeometry } = useFlowContext("Edges");
+    const { model, engine, staticGeometry, onlyRenderVisible } =
+        useFlowContext("Edges");
     // the core's levels and drawing order: shown, measured, in view with `onlyRenderVisible`, by
     // z-order; the static geometry's before the engine
     const levels = useFlowValue<readonly EdgeLevel[]>(
@@ -141,6 +145,8 @@ export function Edges<T extends FlowTypes = AnyTypes>(props: EdgesProps<T>) {
                 ? engine.get("render-layers")
                 : (staticGeometry?.layers ?? []);
             const layered = layers.length > 1;
+            // before the engine, a culled flow draws none: the view is not known yet
+            const none = !engine && onlyRenderVisible;
             return layers.map((layer) => ({
                 level: layer.level,
                 zIndex: layer.zIndex,
@@ -151,10 +157,12 @@ export function Edges<T extends FlowTypes = AnyTypes>(props: EdgesProps<T>) {
                             level: layer.level,
                         })
                       : edgesLayerAttributes(layer.level),
-                edges: layer.edgeIds.flatMap((id) => {
-                    const edge = model.get("edge-by", { id });
-                    return edge ? [edge] : [];
-                }),
+                edges: none
+                    ? NO_EDGES
+                    : layer.edgeIds.flatMap((id) => {
+                          const edge = model.get("edge-by", { id });
+                          return edge ? [edge] : [];
+                      }),
             }));
         },
         sameLevels,
