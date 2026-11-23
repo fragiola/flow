@@ -210,6 +210,16 @@ interface Running {
     readonly bodies: ReadonlyMap<string, ForceNode>;
 }
 
+// module functions: the same children on every render, so a tick never re-renders every part for a
+// new function
+function renderEdge(edge: FlowEdge<Types>) {
+    return <CentreEdge edge={edge} />;
+}
+
+function renderNode(node: FlowNode<Types>) {
+    return <ServiceNode node={node} />;
+}
+
 export default function ForceLayout() {
     const flow = useFlowRef<Types, typeof features>();
     const running = useRef<Running | undefined>(undefined);
@@ -350,12 +360,8 @@ export default function ForceLayout() {
                 <Flow.Background variant="lines" className={styles.lines} />
                 <Flow.Background variant="cross" className={styles.cross} />
                 <Flow.Viewport>
-                    <Flow.Edges<Types>>
-                        {(edge) => <CentreEdge edge={edge} />}
-                    </Flow.Edges>
-                    <Flow.Nodes<Types>>
-                        {(node) => <ServiceNode node={node} />}
-                    </Flow.Nodes>
+                    <Flow.Edges<Types>>{renderEdge}</Flow.Edges>
+                    <Flow.Nodes<Types>>{renderNode}</Flow.Nodes>
                 </Flow.Viewport>
                 <div className={styles.panel}>
                     <span role="status" className={styles.status}>
