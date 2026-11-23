@@ -148,6 +148,8 @@ export default function ExportImage() {
             defaultNodes={nodes}
             defaultEdges={edges}
             fitView
+            role="group"
+            aria-label="Export image"
             className={styles.root}
         >
             <Flow.Background variant="dots" size={2} className={styles.dots} />

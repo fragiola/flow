@@ -77,6 +77,9 @@ test("every node, edge and control is named", async ({ page }) => {
     for (const name of ["Download SVG", "Download PNG"])
         await expect(button(page, name)).toHaveCount(1);
     await expect(stage(page).getByRole("status")).toHaveCount(1);
+    await expect(
+        page.getByRole("group", { name: "Export image", exact: true }),
+    ).toHaveCount(1);
     const nodes = part(page, "node");
     await expect(nodes).toHaveCount(5);
     for (const element of await nodes.all()) {
