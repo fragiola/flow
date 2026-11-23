@@ -448,7 +448,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         this.measurements = new Measurements(
             () => this.current.zoom,
             () => this.measured(),
-            (nodeId) => this.model.get("node-by", { id: nodeId }) !== undefined,
+            (nodeId) => this.geometry.node(nodeId) !== undefined,
         );
         this.geometry = new EngineGeometry({
             model: this.model,
@@ -1210,8 +1210,9 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     // nodes, handles and edges on screen
     // ---------------------------------------------------------------------------------------------
 
+    /** A node of the document by id (the geometry's index: no payload or reader per call). */
     private node(nodeId: string): FlowNode | undefined {
-        return this.model.get("node-by", { id: nodeId });
+        return this.geometry.node(nodeId);
     }
 
     /**
@@ -2480,7 +2481,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 const edge =
                     edgeId === undefined
                         ? undefined
-                        : this.model.get("edge-by", { id: edgeId });
+                        : this.geometry.edge(edgeId);
                 into[ID_ATTRIBUTE] = edgeId;
                 into["data-selected"] = flag(edge?.selected === true);
                 into["data-animated"] = flag(edge?.animated === true);

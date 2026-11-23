@@ -224,6 +224,13 @@ export class EngineGeometry {
         return this.nodeById(nodeId);
     }
 
+    /** An edge of the document by id (the synced document's). */
+    edge(edgeId: string): FlowEdge | undefined {
+        this.sync();
+        const at = this.edgeIndex.get(edgeId);
+        return at === undefined ? undefined : this.edges[at];
+    }
+
     /** A node's absolute box, its size zero until known (`node-rect-by`). */
     box(nodeId: string): Rect | undefined {
         this.sync();
