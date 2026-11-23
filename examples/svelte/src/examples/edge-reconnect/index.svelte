@@ -1,6 +1,7 @@
 <script module lang="ts">
     import type {
         FlowEdgeInput,
+        FlowEngineEventOf,
         FlowNodeInput,
         FlowTypes,
     } from "@fragiola/flow-svelte";
@@ -13,6 +14,9 @@
     // (drawn here as a ring at each end) or the stroke near an end, and drop it on another handle. The
     // edge keeps its id (`edge.reconnect`); dropped nowhere or on a refused handle, it goes back. The
     // "locked" edge is not reconnectable (`reconnectable: false`).
+    //
+    // "Delete on drop" is app policy over the `reconnect-cancel` event (`onreconnectcancel`): an end
+    // released over no handle (`dropped`, no `to`, not `refused`) removes its edge with `edge.remove`.
 
     interface Types extends FlowTypes {
         readonly nodes: { device: { label: string } };
@@ -54,10 +58,20 @@
 </script>
 
 <script lang="ts">
-    import { typedFlow } from "@fragiola/flow-svelte";
+    import { typedFlow, useFlowRef } from "@fragiola/flow-svelte";
     import { styles } from "./styles";
 
     const Flow = typedFlow<Types, typeof features>();
+    const flow = useFlowRef<Types, typeof features>();
+    let deleteOnDrop = $state(false);
+
+    /** An end dropped on the pane, with "Delete on drop" on: the edge goes. */
+    function onReconnectCancel(event: FlowEngineEventOf<"reconnect-cancel">) {
+        if (!deleteOnDrop || !event.dropped || event.to || event.refused) {
+            return;
+        }
+        flow.current?.model.run("edge.remove", { edgeId: event.edgeId });
+    }
 </script>
 
 <Flow.Root
@@ -65,6 +79,8 @@
     defaultNodes={nodes}
     defaultEdges={edges}
     fitView={{ padding: 0.2, maxZoom: 1 }}
+    flowRef={flow}
+    onreconnectcancel={onReconnectCancel}
     class={styles.root}
 >
     <Flow.Background variant="dots" size={2} class={styles.dots} />
@@ -95,4 +111,14 @@
         </Flow.Nodes>
         <Flow.ConnectionLine class={styles.connection} />
     </Flow.Viewport>
+    <label data-flow-no-gesture class={styles.option}>
+        <input
+            type="checkbox"
+            role="switch"
+            bind:checked={deleteOnDrop}
+            aria-checked={deleteOnDrop}
+            class={styles.switch}
+        />
+        Delete on drop
+    </label>
 </Flow.Root>
