@@ -49,6 +49,8 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "intersections",
         "contextual-zoom",
         "connection-line",
+        // Epic #49 (#46): new React examples, ported by a later Epic
+        "edge-markers",
     ],
     svelte: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -61,6 +63,8 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "intersections",
         "contextual-zoom",
         "connection-line",
+        // Epic #49 (#46): new React examples, ported by a later Epic
+        "edge-markers",
     ],
     angular: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -73,6 +77,8 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "intersections",
         "contextual-zoom",
         "connection-line",
+        // Epic #49 (#46): new React examples, ported by a later Epic
+        "edge-markers",
     ],
 };
 
