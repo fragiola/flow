@@ -58,6 +58,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "whiteboard",
         // Epic #49 (#47): new React examples, ported by a later Epic
         "helper-lines",
+        "copy-paste",
     ],
     svelte: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -79,6 +80,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "whiteboard",
         // Epic #49 (#47): new React examples, ported by a later Epic
         "helper-lines",
+        "copy-paste",
     ],
     angular: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -100,6 +102,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "whiteboard",
         // Epic #49 (#47): new React examples, ported by a later Epic
         "helper-lines",
+        "copy-paste",
     ],
 };
 
