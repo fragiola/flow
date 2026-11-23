@@ -354,8 +354,10 @@ take and give **client** points (a pointer's `clientX`/`clientY`, a drop's).
 **Reads** (`engine.get`): `viewport`, `root-size`, `edge-path-by { edgeId }` (`{ path, label,
 source, sourceSide, target, targetSide }`, undefined until both nodes have a size; an app type gets
 the bezier), `node-rect-by { nodeId }` (absolute, size 0 until known), `nodes-bounds { nodeIds? }`,
-`screen-to-flow`, `flow-to-screen`, `visible-nodes` (in view, plus the unmeasured),
-`visible-edges`, `drawn-edges` (#24: the edges to draw in drawing order, shown and with measured
+`screen-to-flow`, `flow-to-screen`, `visible-nodes` (in view, plus the unmeasured; #59: with
+`onlyRenderVisible`, none before the root has a size, `visible-edges` and `drawn-edges` neither),
+`visible-edges`, `drawn-edges` (#59: these three keep their frozen array while their content is
+unchanged; a node rect and an edge path are frozen, the same object until they change) (#24: the edges to draw in drawing order, shown and with measured
 nodes, in view with `onlyRenderVisible`, by z-order; #38: by the `zIndexMode`'s edge value, document
 order among equals), `node-z-index-by { nodeId }` (#24: the node's structural `z-index`; #38: its
 rank, negative, while there are several render levels), `render-layers` (#38: `RenderLayer[]`
@@ -514,6 +516,33 @@ level's `svg` `edges` and its edges' labels; `Flow.Nodes` drops its `isolation: 
 there are several levels, so the node ranks interleave with the edge layers in the viewport's
 stacking context. App CSS must not make the nodes or edges layer a stacking context (opacity,
 transform, filter, isolation, z-index), or the layering breaks (`concepts/nodes-and-edges.mdx`).
+
+**Large flows (Epic #61, #59): the cached geometry.** `EngineGeometry`
+(`src/engine/engine-geometry.ts`) holds what the reads are built from; every read syncs it first
+and it recomputes only what changed, so a viewport step costs grid queries and a drag step the
+moved nodes and their edges. Its caches and what invalidates each:
+
+| cache | holds | recomputed when |
+| --- | --- | --- |
+| node entry | the absolute box (`node-rect-by`, `knownRect`), size known, measured (`node-measured`), shown | the node's document entry changes (identity), an ancestor's does (a child stands in its parent: the parent → children map), its measurement changes (`Measurements.takeTouched()`: size or handles), `nodeOrigin` changes (all) |
+| edge entry | the ends, drawable (not hidden, its nodes shown and sized), the path (`edge-path-by`, built on first read) | the edge changes, a node at either end is recomputed (the node → edges map); the path alone when `pathOptions` change (compared by value) |
+| node grid, edge grid | `SpatialGrid` (`src/geometry/spatial-grid.ts`, cells of 256 flow units, a rectangle over 64 cells or out of reach in a list every query checks, a query wider than the grid scans): shown nodes of known size by box, drawable edges by their ends' box | with their entry |
+| `visible-nodes`, `visible-edges` | a grid query (plus the shown nodes of unknown size), in document order | the view rect, or any node (edge) entry, changes |
+| `drawn-edges` | `drawingOrder` of the drawable edges (in view with `onlyRenderVisible`) | the edges shown, or the order version, change |
+| stack values, layering | `nodeStackValue` / `edgeStackValue` per id; the node part (shown nodes and values), its `nodeLevels` per thresholds, `layersOf` | the order version: a node's `hidden`, `zIndex`, `selected` or `parentId`, a node's size known or not, an edge's drawable, any edge change, an addition or removal, the z options; the node levels only when the thresholds change; the layers when the drawn edges change |
+| bounds, readiness | the shown nodes' bounds; counts of shown, unsized and unmeasured nodes (`ready`, the fit on init) | any node entry |
+
+How the sync knows what changed: the node and edge lists by identity; a commit that only replaced
+items in place records the list it copied and the ids (`src/state/replaced-items.ts`, a WeakMap,
+internal; up to 32 commits back), so a drag step reads one id instead of comparing the list; else
+the lists are compared item by item (same length and ids), else rebuilt (an addition, a removal,
+a reorder). The model's reads share one reader and query context per commit, and a draft that
+replaces a node in place keeps the base's id index (no copy per move). One adapter notification
+per gesture step (a pan's first step included: `tests/engine/gesture-notifications.test.ts`).
+`tests/engine/geometry-equivalence.test.ts` compares every geometry read with a fresh engine's
+through random flows and steps; `engine-geometry.test.ts` covers each invalidation;
+`pnpm --filter @fragiola/flow bench` (`vitest.bench.config.ts`, not in `pnpm test`) prints the
+large-flow micro-benchmark.
 
 ## The React adapter (Issue #5)
 
@@ -2622,3 +2651,32 @@ Decisions of the React Flow examples (Epic #49: #44 to #48):
 - **Animations, async layouts and simulations are awaited through attributes** the example
   renders (`data-animating`, `data-layouts`, `data-layout`, `data-simulation`), never timeouts;
   a layout's final move is one non-transient batch, so an undo history sees one step.
+
+Decisions of large flows (Epic #61: #59, the core; the recommended options of its Stop Conditions):
+
+- **The spatial index is a uniform grid** (`SpatialGrid`, cells of 256 flow units) rather than an
+  R-tree: nodes and edges are mostly small and spread out, a grid is a few dozen lines, and a
+  query costs the cells of the view. A rectangle over 64 cells (a large group, a long edge) or out
+  of the keys' reach goes to a list every query checks; a query wider than the grid (a far zoom
+  out) scans the rectangles.
+- **Edges are culled by their ends' box** (`visible-edges`' rule, unchanged), filed in their own
+  grid; their path strings are built only when read (`edge-path-by`), so a culled edge never
+  builds one.
+- **The caches sync on read**, by identity, rather than listening to the model: a read during a
+  command's middleware or right after a commit sees the committed document, as before, and an
+  engine nobody reads does nothing. What a commit replaced in place is recorded internally
+  (`replaced-items.ts`), not in `CommandEvent`: the public events are unchanged.
+- **Same content, same array** for `visible-nodes`, `visible-edges` and `drawn-edges` (frozen), and
+  the same frozen object for a node's rect and an edge's path until they change (the Epic's
+  decision: identity may change, values never do). `render-layers` is the same object while the
+  nodes' stack values and the drawn edges are.
+- **With `onlyRenderVisible`, nothing is visible before the root has a size**: `visible-nodes`
+  and `visible-edges` (so `drawn-edges`) are empty until then, where every node and edge counted
+  as visible and mounted. Edges follow the nodes' rule so that no edge mounts dangling before its
+  nodes. Without culling, and for the server render (`staticGeometry`), the first render is as
+  before.
+- **A drag step stays O(N) in the model only**: its commit copies the node list (the document is
+  immutable and frozen, D3); the engine reads the replaced ids instead of comparing the list.
+- **The root's box is still read per read** (`getBoundingClientRect`, for the view): caching it
+  needs a resize signal the engine does not have; it was ~4 % of the busy time of the 10 000-node
+  gestures in the profile of #59 (99 ms of 2.4 s).
