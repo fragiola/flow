@@ -113,6 +113,23 @@ describe("cascade", () => {
         // no pointer: one step from the copy's place
         expect(cascade(second.next, undefined).step).toBe(1);
     });
+
+    it("counts the pastes at the copy's place and at the pointer apart", () => {
+        const at = { x: 10, y: 20 };
+        const copy1 = cascade(afterCopy, undefined);
+        const copy2 = cascade(copy1.next, undefined);
+        expect(copy2.step).toBe(2);
+        // pastes under the pointer in between
+        const pointer1 = cascade(copy2.next, at);
+        expect(pointer1.step).toBe(0);
+        const pointer2 = cascade(pointer1.next, at);
+        expect(pointer2.step).toBe(1);
+        // the copy's place goes on where it was, never back onto the first pastes there
+        const copy3 = cascade(pointer2.next, undefined);
+        expect(copy3.step).toBe(3);
+        // and the pointer goes on too, after a paste at the copy's place
+        expect(cascade(copy3.next, { ...at }).step).toBe(2);
+    });
 });
 
 describe("cornerOf and shiftFor", () => {

@@ -120,39 +120,39 @@ export function cornerOf<T extends FlowTypes>(payload: Payload<T>): XY {
 }
 
 /**
- * Where the pastes stand: the next paste's step (how many `OFFSET`s it moves), and the pointer
- * the last paste went to, when it went to one.
+ * Where the pastes stand, counted apart at the copy's place and at the pointer, so one never
+ * restarts the other: the next paste's step (how many `OFFSET`s it moves) at the copy's place,
+ * and at `pointer`, the pointer the last paste under the pointer went to.
  */
 export interface Cascade {
-    readonly step: number;
+    readonly atCopy: number;
+    readonly atPointer: number;
     readonly pointer?: XY | undefined;
 }
 
 /** After a copy the first paste is one step away; after a cut it goes back where the nodes were. */
-export const afterCopy: Cascade = { step: 1 };
-export const afterCut: Cascade = { step: 0 };
+export const afterCopy: Cascade = { atCopy: 1, atPointer: 0 };
+export const afterCut: Cascade = { atCopy: 0, atPointer: 0 };
 
 const samePoint = (a: XY | undefined, b: XY | undefined) =>
     a !== undefined && b !== undefined && a.x === b.x && a.y === b.y;
 
 /**
  * The step of a paste at `pointer` (flow coordinates; none: not over the flow), and the cascade
- * after it. A paste where the last one went moves one step further; a paste at a new pointer
- * starts again on it; a paste at no pointer goes on from the copy's place.
+ * after it. A paste at no pointer moves one step further from the copy's place than the last one
+ * there; a paste where the last paste under the pointer went moves one step further than it; a
+ * paste at a new pointer starts again on it.
  */
 export function cascade(
     current: Cascade,
     pointer: XY | undefined,
 ): { step: number; next: Cascade } {
-    const step =
-        pointer === undefined
-            ? current.pointer === undefined
-                ? current.step
-                : 1
-            : samePoint(pointer, current.pointer)
-              ? current.step
-              : 0;
-    return { step, next: { step: step + 1, pointer } };
+    if (pointer === undefined) {
+        const step = current.atCopy;
+        return { step, next: { ...current, atCopy: step + 1 } };
+    }
+    const step = samePoint(pointer, current.pointer) ? current.atPointer : 0;
+    return { step, next: { ...current, atPointer: step + 1, pointer } };
 }
 
 /**
