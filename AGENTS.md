@@ -2862,6 +2862,10 @@ Decisions of large flows (Epic #61: #59, the core; #60, the harness and the numb
   varies by ±20 ms between runs). React's 10 000 with and without the core's box, five runs each,
   three times: open 185–202 against 176–201 ms, pan 16.7/18.3–18.8, zoom 16.7–16.8/34–36,
   drag 16.7/19–20 either way: no measurable React change (React reads before its commit's DOM
-  changes, so a repeated read cost no layout, only the call). What is left (zoom p95 ~39
+  changes, so a repeated read cost no layout, only the call). The review fixes of #51 (the
+  registrations as a post-flush job, the view verbs reading the box again, the promise clear),
+  10 000 nodes, three runs, twice: open 215/191 ms, pan 16.6–16.7/18.6–19.0, zoom
+  16.7–16.8/40–42, drag 16.7/18.5–19.7, against the code before them the same hour: 193 ms,
+  16.7/18.1, 16.7/43.3, 16.7/19.1 (no change beyond the runs' spread). What is left (zoom p95 ~39
   against React's ~35) is Vue's render and patch of the nodes a far zoom out mounts; the profile
   showed no other adapter hot spot.
