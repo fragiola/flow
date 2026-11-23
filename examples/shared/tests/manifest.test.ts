@@ -40,6 +40,26 @@ describe("the manifest", () => {
         expect(manifest.files["basic/index.vue"]?.lang).toBe("vue");
     });
 
+    it("lists a layout engine an example imports, by package name", async () => {
+        const fake = fakeApp("react", {
+            "basic/index.tsx": [
+                'import { Flow } from "@fragiola/flow-react";',
+                'import ELK from "elkjs/lib/elk.bundled.js";',
+                'import dagre from "@dagrejs/dagre";',
+                'import { forceSimulation } from "d3-force";',
+                "",
+            ].join("\n"),
+        });
+        remove = fake.remove;
+        const manifest = await buildManifest(fake.app);
+        expect(manifest.examples[0]?.packages).toEqual([
+            "@fragiola/flow-react",
+            "@dagrejs/dagre",
+            "d3-force",
+            "elkjs",
+        ]);
+    });
+
     it("lists the React package for every React example", async () => {
         const manifest = await buildManifest(examplesApp("react"));
         expect(manifest.examples.length).toBeGreaterThan(0);
