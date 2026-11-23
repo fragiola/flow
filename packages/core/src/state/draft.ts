@@ -92,29 +92,31 @@ export class Draft implements FlowReader {
     /** Appends a node (its id unused) or replaces the node of its id, in place. */
     putNode(node: FlowNode): void {
         const list = this.ownNodes();
+        const at = (this.nodeIds ?? this.base.nodeIndex).get(node.id);
+        if (at !== undefined) {
+            // replaced in place: the index stays the base's (no copy of it per move)
+            list[at] = node;
+            return;
+        }
         const ids = this.nodeIds ?? new Map(this.base.nodeIndex);
         this.nodeIds = ids;
-        const at = ids.get(node.id);
-        if (at === undefined) {
-            ids.set(node.id, list.length);
-            list.push(node);
-        } else {
-            list[at] = node;
-        }
+        ids.set(node.id, list.length);
+        list.push(node);
     }
 
     /** Appends an edge (its id unused) or replaces the edge of its id, in place. */
     putEdge(edge: FlowEdge): void {
         const list = this.ownEdges();
+        const at = (this.edgeIds ?? this.base.edgeIndex).get(edge.id);
+        if (at !== undefined) {
+            // replaced in place: the index stays the base's (no copy of it per move)
+            list[at] = edge;
+            return;
+        }
         const ids = this.edgeIds ?? new Map(this.base.edgeIndex);
         this.edgeIds = ids;
-        const at = ids.get(edge.id);
-        if (at === undefined) {
-            ids.set(edge.id, list.length);
-            list.push(edge);
-        } else {
-            list[at] = edge;
-        }
+        ids.set(edge.id, list.length);
+        list.push(edge);
     }
 
     /** Removes the nodes of these ids (their edges are the caller's to remove). */
