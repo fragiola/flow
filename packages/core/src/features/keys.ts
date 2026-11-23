@@ -104,17 +104,21 @@ export type OwnedBy<
     N extends FeatureName = FeatureName,
 > = N extends FeatureName ? (typeof FEATURE_KEYS)[N][K][number] : never;
 
-const owners = new Map<string, FeatureName>();
+/** Each kind's names, by the feature that owns them (a lookup per field of every loaded node). */
+const owners = new Map<string, Map<string, FeatureName>>();
 for (const [name, keys] of Object.entries(FEATURE_KEYS) as [
     FeatureName,
     (typeof FEATURE_KEYS)[FeatureName],
 ][]) {
     for (const [kind, list] of Object.entries(keys)) {
+        let names = owners.get(kind);
+        if (!names) {
+            names = new Map();
+            owners.set(kind, names);
+        }
         for (const key of list as readonly string[]) {
             // a name two features owned would name the first one in a message
-            if (!owners.has(`${kind}:${key}`)) {
-                owners.set(`${kind}:${key}`, name);
-            }
+            if (!names.has(key)) names.set(key, name);
         }
     }
 }
@@ -124,7 +128,7 @@ export function ownerOf(
     kind: FeatureKeyKind,
     key: string,
 ): FeatureName | undefined {
-    return owners.get(`${kind}:${key}`);
+    return owners.get(kind)?.get(key);
 }
 
 /** The message of a key or a field whose feature is not installed. */

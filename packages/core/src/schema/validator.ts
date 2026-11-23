@@ -3,7 +3,10 @@ import type { JsonSchema, ValidationIssue } from "./types";
 
 /** Escapes a key for a JSON pointer (RFC 6901). */
 export function pointerSegment(key: string | number): string {
-    return String(key).replace(/~/g, "~0").replace(/\//g, "~1");
+    if (typeof key === "number") return String(key);
+    // most keys need no escape: no regular expression for them (a document's every field)
+    if (!key.includes("~") && !key.includes("/")) return key;
+    return key.replace(/~/g, "~0").replace(/\//g, "~1");
 }
 
 /** Appends a key to a JSON pointer. */
