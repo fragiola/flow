@@ -51,6 +51,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "connection-line",
         // Epic #49 (#46): new React examples, ported by a later Epic
         "edge-markers",
+        "animating-edges",
     ],
     svelte: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -65,6 +66,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "connection-line",
         // Epic #49 (#46): new React examples, ported by a later Epic
         "edge-markers",
+        "animating-edges",
     ],
     angular: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -79,6 +81,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "connection-line",
         // Epic #49 (#46): new React examples, ported by a later Epic
         "edge-markers",
+        "animating-edges",
     ],
 };
 
