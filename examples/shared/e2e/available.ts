@@ -37,10 +37,7 @@ export function pendingCase(slug: string, name: string): string {
  */
 export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
     react: [],
-    vue: [
-        // Epic #49 (#48): new React examples, ported by a later Epic
-        "force-layout",
-    ],
+    vue: [],
     svelte: [
         // Epic #49 (#44): the extensions of edge-reconnect and sub-flows, React first
         pendingCase("edge-reconnect", "delete-on-drop"),
