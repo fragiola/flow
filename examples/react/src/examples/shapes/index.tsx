@@ -186,6 +186,10 @@ function Label({
     const { model } = useFlow<Types, typeof features>();
     // Escape drops the edit: the blur that follows must not keep it
     const dropped = React.useRef(false);
+    // each edit starts undropped: the field may go without a blur, leaving the flag set
+    React.useEffect(() => {
+        if (editing) dropped.current = false;
+    }, [editing]);
     if (!editing) {
         return <span className={styles.label}>{node.data.label}</span>;
     }
