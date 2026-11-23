@@ -3,7 +3,7 @@ import {
     type ResizeHandleVariant,
     resizeHandleAttributes,
 } from "@fragiola/flow";
-import { useFlowValue } from "../composables/internal";
+import { sameValue, useFlowValue } from "../composables/internal";
 import { useFlowContext, usePartNodeId } from "../context";
 import {
     definePrimitive,
@@ -133,18 +133,26 @@ export const ResizeHandle: FlowComponent<ResizeHandleProps, ResizeHandleSlots> =
             const context = useFlowContext("ResizeHandle");
             // the engine's record: `data-position`, `data-variant`, `data-direction`, and
             // `tabindex` with `keyboard()` (arrows resize)
-            const attributes = useFlowValue(context, () => {
-                const engine = context.engine.value;
-                const { position, direction, variant } = props;
-                return engine
-                    ? engine.adapter.attributes("resize-handle", {
-                          nodeId: nodeId(),
-                          position,
-                          direction,
-                          variant,
-                      })
-                    : resizeHandleAttributes(position, { direction, variant });
-            });
+            const attributes = useFlowValue(
+                context,
+                () => {
+                    const engine = context.engine.value;
+                    const { position, direction, variant } = props;
+                    return engine
+                        ? engine.adapter.attributes("resize-handle", {
+                              nodeId: nodeId(),
+                              position,
+                              direction,
+                              variant,
+                          })
+                        : resizeHandleAttributes(position, {
+                              direction,
+                              variant,
+                          });
+                },
+                sameValue,
+                "entity",
+            );
             return () => {
                 const own = attributes.value;
                 const state: ResizeHandleState = {

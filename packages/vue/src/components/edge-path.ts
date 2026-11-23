@@ -1,5 +1,5 @@
 import type { EdgePath as EdgePathValue } from "@fragiola/flow";
-import { useFlowValue } from "../composables/internal";
+import { sameValue, useFlowValue } from "../composables/internal";
 import { edgeAttributes, useEdgePath } from "../composables/use-edge";
 import { useEdgeId, useFlowContext } from "../context";
 import {
@@ -42,8 +42,12 @@ export const EdgePath: FlowComponent<EdgePathProps, EdgePathSlots> =
             const context = useFlowContext("EdgePath");
             const edgeId = useEdgeId("EdgePath", () => props.edgeId);
             const path = useEdgePath(context, edgeId);
-            const attributes = useFlowValue(context, () =>
-                edgeAttributes(context, "edge-path", edgeId()),
+            const attributes = useFlowValue(
+                context,
+                () => edgeAttributes(context, "edge-path", edgeId()),
+                sameValue,
+                "entity",
+                () => ({ kind: "edge", id: edgeId() }),
             );
             return () => {
                 const current = path.value;

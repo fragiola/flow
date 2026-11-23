@@ -92,7 +92,7 @@ const EdgeLabelOutlet = defineComponent({
  * The layer of the edges (`data-flow-part="edges"`), inside `Flow.Viewport`, before `Flow.Nodes`:
  * an SVG (`data-flow-part="edges"` too) where the default slot draws each edge, once both its
  * nodes have a size (before the engine exists, from the document's sizes: a server render draws
- * them), in the engine's drawing order (`drawn-edges`: by stack value), and the HTML layer edge
+ * them; with `onlyRenderVisible`, none: the view is not known yet), in the engine's drawing order (`drawn-edges`: by stack value), and the HTML layer edge
  * labels render in. When some edges stand above nodes (`render-layers`, `zIndexMode`), each level
  * gets its own layer (`data-flow-part="edges-layer"`, `data-level`, at the level's `z-index`) with
  * its SVG and its labels, between the nodes below and above it. It lets presses through to the

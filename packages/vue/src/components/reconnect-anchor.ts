@@ -1,5 +1,5 @@
 import type { EdgePath } from "@fragiola/flow";
-import { useFlowValue } from "../composables/internal";
+import { sameValue, useFlowValue } from "../composables/internal";
 import { useEdgePath } from "../composables/use-edge";
 import { useEdgeId, useFlowContext } from "../context";
 import {
@@ -45,33 +45,39 @@ export const ReconnectAnchor: FlowComponent<
         const context = useFlowContext("ReconnectAnchor");
         const edgeId = useEdgeId("ReconnectAnchor", () => props.edgeId);
         const path = useEdgePath(context, edgeId);
-        const view = useFlowValue(context, () => {
-            const engine = context.engine.value;
-            const id = edgeId();
-            // `reconnectable: "source"` (or `"target"`, or false): no anchor at the other end
-            if (
-                !context.model.is("edge-reconnectable", {
-                    edgeId: id,
-                    end: props.end,
-                })
-            ) {
-                return undefined;
-            }
-            return engine
-                ? {
-                      attributes: engine.adapter.attributes(
-                          "reconnect-anchor",
-                          {
+        const view = useFlowValue(
+            context,
+            () => {
+                const engine = context.engine.value;
+                const id = edgeId();
+                // `reconnectable: "source"` (or `"target"`, or false): no anchor at the other end
+                if (
+                    !context.model.is("edge-reconnectable", {
+                        edgeId: id,
+                        end: props.end,
+                    })
+                ) {
+                    return undefined;
+                }
+                return engine
+                    ? {
+                          attributes: engine.adapter.attributes(
+                              "reconnect-anchor",
+                              {
+                                  edgeId: id,
+                                  end: props.end,
+                              },
+                          ),
+                          reconnecting: engine.is("edge-reconnecting", {
                               edgeId: id,
-                              end: props.end,
-                          },
-                      ),
-                      reconnecting: engine.is("edge-reconnecting", {
-                          edgeId: id,
-                      }),
-                  }
-                : undefined;
-        });
+                          }),
+                      }
+                    : undefined;
+            },
+            sameValue,
+            "entity",
+            () => ({ kind: "edge", id: edgeId() }),
+        );
         return () => {
             const current = path.value;
             const own = view.value;

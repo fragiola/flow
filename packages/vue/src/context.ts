@@ -2,8 +2,8 @@
 // registry erased (`AnyTypes`, any features): a child cannot infer the root's `T` through
 // injection, so the typed surface is each part's props, `useFlow<Types, typeof features>()` and
 // `typedFlow<Types, typeof features>()`. The model's state never becomes reactive: the parts read
-// it through `revision` (a counter the root bumps on every commit and every view change) into
-// computed values that keep their last object while equal.
+// it through the root's store (counters the root bumps on each commit and view change, by the
+// readers they concern) into computed values that keep their last object while equal.
 import type {
     AnyTypes,
     FlowEngine,
@@ -20,6 +20,7 @@ import {
     type ShallowRef,
     type VNodeChild,
 } from "vue";
+import type { FlowStore } from "./utils/flow-store";
 
 /** The model as the primitives see it: any registry, any features. */
 export type AnyFlowModel = FlowModel<AnyTypes, FlowFeatures>;
@@ -36,8 +37,20 @@ export interface FlowContextValue {
     readonly publicEngine: AnyFlowEngine;
     /** the root's element, once mounted: what renders outside the zoom teleports into it */
     readonly rootElement: Readonly<ShallowRef<HTMLElement | null>>;
-    /** bumped on every commit of the model and every view change of the engine */
+    /** bumped on every commit of the model and every view change of the engine (`store.view`) */
     readonly revision: Readonly<ShallowRef<number>>;
+    /** what the readers hear, by scope (`useFlowValue`): the root's counters */
+    readonly store: FlowStore;
+    /**
+     * the root renders only what is in view (`onlyRenderVisible`): before the engine (which knows
+     * the view) no node and no edge is rendered, rather than all of them for one render
+     */
+    readonly onlyRenderVisible: ComputedRef<boolean>;
+    /**
+     * reads the root's box once until the current patch ends (`utils/root-box.ts`): the nodes
+     * layer holds it while it patches, so its new nodes' reads lay the page out once
+     */
+    readonly holdRootBox: () => void;
     /**
      * the flow's geometry from its document alone (`staticGeometry`, with the root's options)
      * while there is no engine (a server render, the first client render), null once it exists:

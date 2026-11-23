@@ -4,7 +4,13 @@ import {
     type FlowTypes,
     partAttributes,
 } from "@fragiola/flow";
-import { defineComponent, h, type PropType, type Slot } from "vue";
+import {
+    defineComponent,
+    h,
+    onBeforeUpdate,
+    type PropType,
+    type Slot,
+} from "vue";
 import { useDrawnLayers, useFlowValue } from "../composables/internal";
 import { useFlowContext } from "../context";
 import {
@@ -62,10 +68,17 @@ const NodeSlot = defineComponent({
     },
 });
 
+const NO_NODES: readonly FlowNode[] = Object.freeze([]);
+
+function shownNodes(nodes: readonly FlowNode[]): readonly FlowNode[] {
+    return nodes.filter((node) => node.hidden !== true);
+}
+
 /**
  * The layer of the nodes (`data-flow-part="nodes"`), inside `Flow.Viewport`: renders its default
  * slot for each node that is not hidden (with `onlyRenderVisible`, each one in view,
- * `visible-nodes`), in drawing order, keyed by its id (a node keeps its element when it moves).
+ * `visible-nodes`; with it, none before the engine knows the view: the server render and the
+ * first client render), in drawing order, keyed by its id (a node keeps its element when it moves).
  * You render each node. It is its own stacking context (`isolation`), but while some edges stand
  * above nodes (several `render-layers`), when the nodes' z-indexes interleave with the edges'
  * layers.
@@ -82,11 +95,20 @@ export const Nodes: FlowComponent<NodesProps, NodesSlots> = definePrimitive<
     const { model } = context;
     const list = useFlowValue(context, () => {
         const engine = context.engine.value;
-        return engine?.adapter.settings.onlyRenderVisible
+        if (!engine) {
+            // before the engine, a culled flow renders none: the view is not known yet
+            return context.onlyRenderVisible.value
+                ? NO_NODES
+                : shownNodes(model.get("all-nodes"));
+        }
+        return engine.adapter.settings.onlyRenderVisible
             ? engine.get("visible-nodes")
-            : model.get("all-nodes").filter((node) => node.hidden !== true);
+            : shownNodes(model.get("all-nodes"));
     });
     const layers = useDrawnLayers(context);
+    // its new nodes read the view right after the ones before them are inserted: the root's box
+    // is read once for the whole patch
+    onBeforeUpdate(context.holdRootBox);
     return () => {
         const nodes = list.value;
         const layered = layers.value.length > 1;
