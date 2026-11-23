@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { edge, handle, openExample, part } from "../helpers";
+import { edge, handle, openExample, part, requireCase } from "../helpers";
 import { dragFrom, middle } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
@@ -60,4 +60,24 @@ test("a locked edge has no anchors", async ({ page }) => {
     await expect(
         edge(page, "router-tv").locator('[data-flow-part="reconnect-anchor"]'),
     ).toHaveCount(0);
+});
+
+test("with Delete on drop, an end dropped on the pane removes its edge", async ({
+    page,
+}) => {
+    requireCase("edge-reconnect", "delete-on-drop");
+    const option = page.getByRole("switch", { name: "Delete on drop" });
+    await expect(option).not.toBeChecked();
+    await option.check();
+    await expect(option).toBeChecked();
+    const anchorPoint = await middle(anchor(page, "router-laptop", "target"));
+    const from = { x: anchorPoint.x - 8, y: anchorPoint.y };
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(from.x - 120, from.y + 150, { steps: 8 });
+    await expect(part(page, "connection-line")).toBeVisible();
+    await page.mouse.up();
+    await expect(edge(page, "router-laptop")).toHaveCount(0);
+    // the locked edge stays
+    await expect(part(page, "edge")).toHaveCount(1);
 });
