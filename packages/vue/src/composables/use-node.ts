@@ -7,10 +7,14 @@ import {
     partAttributes,
 } from "@fragiola/flow";
 import {
+    type ComponentInternalInstance,
     type ComputedRef,
     computed,
+    ErrorCodes,
+    getCurrentInstance,
+    handleError,
     type MaybeRefOrGetter,
-    nextTick,
+    queuePostFlushCb,
     toValue,
 } from "vue";
 import { useFlowContext } from "../context";
@@ -66,29 +70,53 @@ interface NodeView {
     focusable: boolean;
 }
 
+/** a node registration of the current patch, and the component whose element it is */
+interface PendingRegistration {
+    readonly register: () => void;
+    readonly instance: ComponentInternalInstance | null;
+}
+
 /** the node registrations of the current patch, made once it is done (`registerLater`) */
-let pending = new Set<() => void>();
+let pending = new Set<PendingRegistration>();
 let scheduled = false;
+
+/** Makes the patch's pending registrations; one that throws goes to Vue's error handling. */
+function registerPending(): void {
+    scheduled = false;
+    const batch = pending;
+    pending = new Set();
+    const failures: [unknown, PendingRegistration][] = [];
+    for (const entry of batch) {
+        try {
+            entry.register();
+        } catch (error) {
+            failures.push([error, entry]);
+        }
+    }
+    for (const [error, entry] of failures) {
+        handleError(error, entry.instance, ErrorCodes.FUNCTION_REF);
+    }
+}
 
 /**
  * Registers a node's element once Vue's patch is done, all the patch's nodes at once. Vue calls an
  * element's function ref as soon as the element is inserted, and the engine measures a node when
  * it is registered (`offsetWidth`): registered there, each node mounted in a patch (hundreds, on a
  * zoom out) would force a layout of its own between the insertions, where React's refs (and these)
- * come after every insertion, so the first measurement lays the page out once. Returns whether it
- * was still pending (then it is cancelled).
+ * come after every insertion, so the first measurement lays the page out once. The batch is a
+ * post-flush job with Vue's template-ref id (-1): it runs after the patch, before the mounted
+ * hooks and `flush: "post"` watchers, and before the patch's `nextTick` resolves, as a ref set
+ * during the patch would. Returns whether it was still pending (then it is cancelled).
  */
-function registerLater(register: () => void): () => boolean {
-    const entry = () => register();
+function registerLater(
+    register: () => void,
+    instance: ComponentInternalInstance | null,
+): () => boolean {
+    const entry: PendingRegistration = { register, instance };
     pending.add(entry);
     if (!scheduled) {
         scheduled = true;
-        void nextTick(() => {
-            scheduled = false;
-            const batch = pending;
-            pending = new Set();
-            for (const run of batch) run();
-        });
+        queuePostFlushCb(Object.assign(() => registerPending(), { id: -1 }));
     }
     return () => pending.delete(entry);
 }
@@ -103,6 +131,7 @@ export function useNode<T extends FlowTypes = AnyTypes>(
 ): UseNodeResult<T> {
     const context = useFlowContext("useNode");
     const { model } = context;
+    const instance = getCurrentInstance();
     const current = () => toValue(node);
     const view = useFlowValue<NodeView>(
         context,
@@ -147,8 +176,10 @@ export function useNode<T extends FlowTypes = AnyTypes>(
             const engine = context.engine.value;
             if (!engine) return undefined;
             const nodeId = current().id;
-            const cancel = registerLater(() =>
-                engine.adapter.registerNode(nodeId, element as HTMLElement),
+            const cancel = registerLater(
+                () =>
+                    engine.adapter.registerNode(nodeId, element as HTMLElement),
+                instance,
             );
             return () => {
                 if (!cancel()) engine.adapter.registerNode(nodeId, null);
