@@ -31,6 +31,11 @@ export interface FlowContextValue {
      * first client render: `staticGeometry` with the root's options), null once the engine exists
      */
     readonly staticGeometry: StaticGeometry | null;
+    /**
+     * the root renders only what is in view (`onlyRenderVisible`): before the engine (which knows
+     * the view) no node and no edge is rendered, rather than all of them for one render
+     */
+    readonly onlyRenderVisible: boolean;
 }
 
 export const FlowContext = React.createContext<FlowContextValue | null>(null);

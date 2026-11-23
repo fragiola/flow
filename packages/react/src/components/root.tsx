@@ -586,8 +586,9 @@ export function Root<
             publicEngine: facade.engine as unknown as AnyFlowEngine,
             rootElement,
             staticGeometry: geometry,
+            onlyRenderVisible: onlyRenderVisible === true,
         }),
-        [model, live, facade, rootElement, geometry],
+        [model, live, facade, rootElement, geometry, onlyRenderVisible],
     );
     const element = useRenderElement("div", rest, {
         state,
