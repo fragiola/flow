@@ -138,6 +138,10 @@
                 {
                     "label": "AI and automation",
                     "path": "guides/ai-and-automation"
+                },
+                {
+                    "label": "Coming from xyflow's examples",
+                    "path": "guides/react-flow-examples"
                 }
             ]
         },

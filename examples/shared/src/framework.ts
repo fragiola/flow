@@ -36,6 +36,25 @@ export const ICON_PACKAGES: Record<Framework, string> = {
     angular: "@lucide/angular",
 };
 
+/**
+ * The npm packages, besides the icons, an example of any framework may import and its reader
+ * installs: the layout engines of the layout examples (Epic #49). An example's manifest entry lists
+ * the ones it imports, by package name (`elkjs` for `elkjs/lib/elk.bundled.js`).
+ */
+export const EXAMPLE_PACKAGES: readonly string[] = [
+    "@dagrejs/dagre",
+    "elkjs",
+    "d3-force",
+];
+
+/** The package a bare import specifier names: `@scope/name` or `name`, without a subpath. */
+export function packageOf(specifier: string): string {
+    const parts = specifier.split("/");
+    return (
+        specifier.startsWith("@") ? parts.slice(0, 2) : parts.slice(0, 1)
+    ).join("/");
+}
+
 export function isFramework(value: unknown): value is Framework {
     return FRAMEWORKS.includes(value as Framework);
 }

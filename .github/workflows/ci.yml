@@ -22,7 +22,8 @@
 #                     scenarios (500 nodes) and the shell, against its dev server (sources).
 #   E2E (examples)    a matrix over those frameworks, from the Changes outputs: the shared specs
 #                     (examples/shared/e2e) against a production build of that framework's embed,
-#                     served under /flow/embed/<framework>/ with a host page that frames it.
+#                     served under /flow/embed/<framework>/ with a host page that frames it, in
+#                     two shards per framework.
 #   Site export       fragiola.com builds /flow from `pnpm site:export` (contract v1.7,
 #                     fragiola/www CONTRACT.md), built and validated the way www's deploy runs it:
 #                     it fails on anything www would reject.
@@ -159,7 +160,7 @@ jobs:
           retention-days: 14
 
   e2e-examples:
-    name: E2E (examples ${{ matrix.framework }})
+    name: E2E (examples ${{ matrix.framework }}, ${{ matrix.shard }})
     needs: changes
     if: needs.changes.outputs.examples != '[]' && needs.changes.outputs.examples != ''
     runs-on: ubuntu-latest
@@ -172,6 +173,9 @@ jobs:
       fail-fast: false
       matrix:
         framework: ${{ fromJson(needs.changes.outputs.examples) }}
+        # two shards: the React suite's test step passed 3 minutes after Epic #49 (44 examples ×
+        # 5 themes), and the ports bring every app to the same size
+        shard: ["1/2", "2/2"]
     steps:
       - uses: actions/checkout@v4
 
@@ -189,13 +193,13 @@ jobs:
         run: pnpm --filter "./packages/*" build
 
       - name: Run Playwright
-        run: pnpm --filter examples-${{ matrix.framework }} run e2e
+        run: pnpm --filter examples-${{ matrix.framework }} run e2e --shard=${{ matrix.shard }}
 
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-examples-${{ matrix.framework }}
+          name: playwright-report-examples-${{ matrix.framework }}-${{ strategy.job-index }}
           path: examples/${{ matrix.framework }}/playwright-report/
           retention-days: 14
 

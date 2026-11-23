@@ -4,8 +4,8 @@ export default {
     title: "Node resizer",
     description:
         "Resize nodes from their corners and sides, by drag or by the arrows, with a minimum size, a maximum size, one node that keeps its ratio and one that resizes across only.",
-    level: "building-blocks",
-    order: 2,
+    level: "nodes",
+    order: 3,
     features: [
         "resize()",
         "NodeResizer",

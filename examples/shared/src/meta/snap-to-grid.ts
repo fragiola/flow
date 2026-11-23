@@ -5,7 +5,7 @@ export default {
     description:
         "Nodes snap to a grid while they are dragged; choose the grid size and see the background follow it.",
     level: "interaction",
-    order: 4,
+    order: 2,
     features: ["drag({ snapGrid })", "Flow.Background gap"],
     docs: "/docs/concepts/viewport",
 } satisfies ExampleMeta;

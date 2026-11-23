@@ -1,6 +1,7 @@
 // examples/svelte/tests/vendored.test.ts for the Angular app.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { PENDING } from "examples-shared/e2e/available";
 import { describe, expect, it } from "vitest";
 
 // The Fragiola UI theme (the palettes, the base stylesheet), `cn` and the style families the Angular
@@ -55,7 +56,9 @@ const DIFFERENT: Record<string, string> = {
 const SAME = listFiles(join(react, "src/examples"))
     .filter((file) => file.endsWith(".ts") && !file.endsWith(".generated.ts"))
     .map((file) => relative(react, file))
-    .filter((file) => !(file in DIFFERENT));
+    .filter((file) => !(file in DIFFERENT))
+    // an example a later Epic brings to this app (`PENDING`) has nothing here yet
+    .filter((file) => !PENDING.angular.includes(file.split("/")[2] ?? ""));
 
 const body = (source: string) => source.slice(source.indexOf("\n") + 1);
 

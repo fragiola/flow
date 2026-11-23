@@ -10,7 +10,7 @@ import {
     validateMeta,
 } from "../scripts/examples-lib.ts";
 import type { ExampleMeta } from "../src/meta-types.ts";
-import { LEVELS } from "../src/meta-types.ts";
+import { DEFAULT_HEIGHT, LEVEL_TITLES, LEVELS } from "../src/meta-types.ts";
 import { fakeApp } from "./fake-app.ts";
 
 // Every example's metadata lives once, in src/meta/<slug>.ts, and every framework's app finds its
@@ -31,6 +31,27 @@ beforeAll(async () => {
 describe("the metadata", () => {
     it("is valid for every example", () => {
         expect(metas.length).toBeGreaterThan(0);
+    });
+
+    it("groups the gallery by topic: nine levels, in sidebar order", () => {
+        expect([...LEVELS]).toEqual([
+            "basics",
+            "nodes",
+            "edges",
+            "connections",
+            "interaction",
+            "layout",
+            "data",
+            "styling",
+            "apps",
+        ]);
+        for (const level of LEVELS) {
+            expect(LEVEL_TITLES[level], level).toBeTruthy();
+            expect(DEFAULT_HEIGHT[level], level).toBe(
+                level === "apps" || level === "layout" ? 600 : 460,
+            );
+        }
+        expect(LEVEL_TITLES.data).toBe("Data and state");
     });
 
     it("belongs to a level, and a meta with an unknown one is rejected", () => {

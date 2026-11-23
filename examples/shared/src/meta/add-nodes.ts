@@ -4,7 +4,7 @@ export default {
     title: "Add nodes",
     description:
         "Drag a node type from a palette onto the canvas, or click it to add one at the centre: screen-to-flow places it under the pointer. A connection dropped on the canvas adds a task there.",
-    level: "building-blocks",
+    level: "interaction",
     order: 4,
     features: [
         "useFlowRef",

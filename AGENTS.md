@@ -181,7 +181,7 @@ jobs:
   skips, never what it runs; an unknown path runs everything.
 - **E2E (playground)**: when `Changes` says so, `pnpm --filter playground run e2e` (Chromium and
   Firefox, the dev server: nothing built).
-- **E2E (examples \<framework\>)**: a matrix over `Changes`' `examples` output (every
+- **E2E (examples \<framework\>, \<shard\>)**: a matrix over `Changes`' `examples` output, two shards each, (every
   `examples/<framework>` with a `playwright.config.ts`: Angular, React, Svelte and Vue): builds the packages, then
   `pnpm --filter examples-<framework> run e2e`.
 - **Site export**: `pnpm site:export --base /flow --out "$RUNNER_TEMP/site-export"`, self-validated
@@ -201,10 +201,14 @@ the playground, `examples/shared` and `examples/react`), and **never runs `playw
 `site/tests/ci-workflow.test.ts` ties the tag to the version, so upgrading Playwright changes both
 in one PR. `main` has no required checks: a skipped job blocks nothing.
 
-**Shards: none.** Shard a suite only when its test step alone passes about 3 minutes. Measured
-locally (4 workers; CI runs 2): the playground's 214 tests (107 per browser) in ~80 s, each examples
-app's 226 tests (110 smoke runs: 22 examples × 5 themes) in ~24 to ~55 s, its embed build
-included (counts after #40, times measured after #36; Angular and React the slower).
+**Shards: two per examples app.** Shard a suite when its test step alone passes about 3 minutes.
+On Epic #49's pull request (#62) the React examples' Playwright step took 3 min 53 s at CI's 2
+workers (460 tests: 220 smoke runs, 44 examples × 5 themes), so the `E2E (examples <framework>)`
+matrix runs every framework in two shards (`shard: ["1/2", "2/2"]`, `--shard`): the ports bring
+Vue's, Svelte's and Angular's suites to React's size. Each shard builds its own embed. The
+playground's suite (214 tests, ~3 min 26 s for the whole job) stays in one. Measured locally
+after #48 (4 workers): the playground in ~59 s; React's examples in ~120 s; Vue's, Svelte's and
+Angular's 328 each, 226 run and the 102 `PENDING` ones skipped, in ~27 to ~37 s.
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
@@ -1243,7 +1247,7 @@ Flow decided on top of it:
 | path | holds |
 | --- | --- |
 | `src/meta/<id>.ts` | one file per example: title, description, `level`, order, features, docs link, layout, height |
-| `src/meta-types.ts` | `LEVELS` (`basics`, `interaction`, `building-blocks`, `apps`, titled Basics, Interaction, Building blocks, Apps: `examples.json`'s `levels`), `DEFAULT_HEIGHT` |
+| `src/meta-types.ts` | `LEVELS` (#44: `basics`, `nodes`, `edges`, `connections`, `interaction`, `layout`, `data`, `styling`, `apps`, titled Basics, Nodes, Edges, Connections, Interaction, Layout, Data and state, Styling, Apps: `examples.json`'s `levels`), `DEFAULT_HEIGHT` (460, 600 for `layout` and `apps`) |
 | `src/framework.ts` | `FRAMEWORKS` (react, vue, svelte, angular), entry files, adapter and icon packages |
 | `src/themes/` | `light`, `dark`, `ide`, `paper`, `terminal` (one CSS file of values each, `themes.ts`: name, title, description, scheme, swatch) |
 | `src/embed/messages.ts` | `fragiola:example:ready` / `resize` / `theme` |
@@ -1252,15 +1256,38 @@ Flow decided on top of it:
 
 `COMPLETE_FRAMEWORKS` is `["react", "vue", "svelte", "angular"]` (#16): every framework ships every
 example, so a missing one fails its spec; a framework of a later adapter Epic is skipped there
-while its app is written (the test uses a fake one).
+while its app is written (the test uses a fake one). **`PENDING`** (`e2e/available.ts`, #44) is
+the per-framework skip of what a later Epic ports: whole examples (`<slug>`) and cases of a spec
+(`<slug>#<case>`, `pendingCase`); a spec that needs one is skipped in that framework with a
+"(PENDING)" reason instead of failing (`requireCase(slug, case)` as a test's first line for a
+case; `openExample` for an example). React never has any; the Epic that ports an entry to a
+framework deletes it there. Today Vue, Svelte and Angular wait for `edge-reconnect#delete-on-drop`,
+`sub-flows#selection-grouping` and the new examples of #45 (`shapes`, `easy-connect`,
+`proximity-connect`, `delete-middle-node`, `intersections`, `contextual-zoom`, `connection-line`)
+and of #46 (`edge-markers`, `animating-edges`, `floating-edges`, `editable-edge`,
+`gradient-styling`, `whiteboard`) and of #47 (`helper-lines`, `copy-paste`, `collaborative`,
+`export-image`, `stress-test`) and of #48 (`dagre-layout`, `elk-layout`, `auto-layout`,
+`force-layout`): Epic #49 writes them in React, the ports' Epics follow. A pending whole example has nothing in the
+port's app yet: its `tests/examples.test.ts` leaves it out of React's ids and `tests/vendored.test.ts`
+expects no copy of its `styles.ts` and siblings.
+Alternative: a capability attribute the example renders, checked by the spec; refused: it would
+put test plumbing in copyable example code, and a forgotten port would skip silently instead of
+being listed in one place.
 
 **The examples** (`examples/react/src/examples/<id>/index.tsx` + `styles.ts`; the README there is
-the authoring guide): Basics `basic`, `custom-nodes`, `edge-types`, `edge-labels`, `backgrounds`,
-`read-only`; Interaction `selection-and-keyboard`, `connection-validation`, `edge-reconnect`,
-`snap-to-grid`, `minimap-and-controls`; Building blocks `sub-flows`, `node-resizer`,
-`node-toolbar`, `add-nodes`, `save-and-restore`, `undo-redo`, `announcements`, `context-menu` (#33),
-`connected-data` (#36); Apps
-`workflow-builder` (the landing's showcase). `_kit/persistence.ts` and `_kit/undo.ts` are the
+the authoring guide), 44 since Epic #49, by topic in nine levels (#44; in sidebar order, each
+level's examples by `order`): Basics `basic`, `read-only`, `server-rendering`,
+`minimap-and-controls`, `stress-test`; Nodes `custom-nodes`, `shapes`, `node-resizer`,
+`node-toolbar`, `contextual-zoom`, `intersections`, `delete-middle-node`, `sub-flows`; Edges
+`edge-types`, `edge-labels`, `edge-markers`, `animating-edges`, `floating-edges`, `editable-edge`,
+`edge-reconnect`; Connections `connection-validation`, `easy-connect`, `proximity-connect`,
+`connection-line`, `announcements`; Interaction `selection-and-keyboard`, `snap-to-grid`,
+`helper-lines`, `add-nodes`, `context-menu` (#33), `copy-paste`; Layout `dagre-layout`,
+`elk-layout`, `auto-layout`, `force-layout`; Data and state `connected-data` (#36),
+`save-and-restore`, `undo-redo`, `collaborative`, `export-image`; Styling `backgrounds`,
+`gradient-styling`; Apps `workflow-builder` (the landing's showcase), `whiteboard`. Every case of
+React Flow's example catalogue maps to one of them (Epic #49's coverage map, the docs page
+`guides/react-flow-examples.mdx`, "Coming from xyflow's examples"). `_kit/persistence.ts` and `_kit/undo.ts` are the
 copyable app policy. Epic #26's options where they are natural (#25): `custom-nodes`' preview drags
 only by its title bar (`data-flow-drag-handle`, `styles.dragHandle` and `styles.grip` from the
 theme tokens), `minimap-and-controls`' zoom and fit-view buttons animate for 200 ms (`duration`),
@@ -1273,8 +1300,137 @@ the same in the four apps; the shared specs cover both. #28: `edge-types` draws 
 `edge-types` gives `smoothstep` `animated` + `pathOptions.borderRadius` and `step`
 `pathOptions.stepPosition: 0.25`; `connected-data` (new) sums its inputs with
 `useNodeConnections` + `useNodesData` (test ids `sum-total`, `sum-sources`, `value-<id>`).
-The Vue, Svelte and Angular apps have every one of these (their own sections below), with no
-parity filter left.
+#44 (React only so far, `PENDING` in the other apps): `edge-reconnect` has a "Delete on drop"
+switch (a native `role="switch"` checkbox, off by default: `onReconnectCancel` with `dropped`, no
+`to`, not `refused` runs `edge.remove`), and `sub-flows` a "Grouping" toolbar, "Group selection"
+(two or more selected top-level nodes into a new `group-<n>` sized to their `nodes-bounds` plus a
+margin and a title band: one `batch` of `node.add`, `node.set-parent` per node and `selection.set`)
+and "Ungroup" (the selected groups' children back on the flow, then the groups removed: one
+`batch`), with a loose `logs` node beside `cache`. The ports already copy both `styles.ts`.
+#45 (React only, whole examples `PENDING` in the other apps): `shapes` (seven SVG shapes from
+`shape-path.ts`, a `role="slider"` rotation knob storing `data.angle`, applied to an inner wrapper,
+handles remounted per angle as the engine has no public re-measure), `easy-connect` (loose mode,
+`clickToConnect`, a radius of half the node, node-sized handles, its own floating edge path),
+`proximity-connect` (a temporary `aria-hidden` line from `node-rect-by`, never in the document),
+`delete-middle-node` (`keyboard({ beforeDelete })` runs one `batch` from `reconnect.ts` and answers
+`false`: a middleware's commands would commit as a second step), `intersections`
+(`intersecting-nodes`, `crossing.ts`, `collisions.ts` behind a "Resolve collisions" switch),
+`contextual-zoom` (`data-detail` low/medium/high at zoom 0.75 / 1.35, edge labels from 1) and
+`connection-line` (`Flow.ConnectionLine` children, the selection's extra lines and a second `batch`
+on `connect`). Their pure helpers are unit-tested in `examples/react/tests/<id>.test.ts`.
+#46 (React only, likewise `PENDING`): `edge-markers` (no marker is built in: its own `<marker>`s from
+`markers.ts` in an `aria-hidden` svg, one per shape and tone, as a marker is coloured where it is
+defined, and one per shape for the selected state, swapped by `data-selected:[marker-*:var(…)]`;
+ids from `useId`; `limitations.mdx` links it), `animating-edges` (a dot on `<animateMotion>` over
+`useEdge(edge).state.path.path`, a SMIL `stroke-dashoffset` dash flow, a one-run `data-pulsing`
+cleared on `animationend`; under `prefers-reduced-motion`, followed live, the dot and dashes go and
+the edges carry `data-reduced-motion`), `floating-edges` (no handles: `useInternalNode(id).rect`
+per end, the border point of a box or an ellipse from `border-intersection.ts`, its own copy of
+easy-connect's idea; an "Edge path" radio group: straight, bezier, simple = nearest sides' middles;
+`data-variant`), `editable-edge` (`data.points` through `edge.set-data`; points are named SVG
+`role="button"` circles with `data-flow-no-gesture`, dragged with `screen-to-flow`, arrows move,
+Delete removes, a double click inserts; "Route" stores `routing.ts`'s A* way around the inflated
+node boxes, a plain step and a status when none exists), `gradient-styling` (palette accents caught
+in custom properties, a gradient frame as the node's border, a selected glow, one `userSpaceOnUse`
+`<linearGradient>` per edge between its ends; blue, green, orange and purple only, as the five
+themes do not declare rose) and `whiteboard` (a "Whiteboard tools" toolbar, `data-tool`; a drawing
+tool lays a `data-flow-no-gesture` overlay and `panOnDrag={tool === "select"}`; rectangle,
+Chaikin-smoothed freehand strokes as nodes (`stroke.ts`), an eraser removing in one `batch`, edges
+first (`eraser.ts`), a lasso selecting whole boxes (`lasso.ts`, `selection.set`)).
+Follow-ups (no package change here): the core's `roundedPath`, `halfwayAlong` and `sidePoint` are
+not exported (the examples keep their own copies), and an app edge with its own path has no way to
+give its label / `EdgeToolbar` a point (they sit at the default midpoint).
+#47 (React only, likewise `PENDING`): `helper-lines` (a node dragged alone shows guides,
+`data-testid="guide"` with `data-axis` (x is a vertical line) and `data-at`, where its edges or
+centre line up with another node's, drawn in flow coordinates inside `Flow.Viewport` from a store
+over `dragging-node-ids`, `alignment.ts`; the snap is a middleware, `snapping.ts` on `model.use`,
+rewriting the drag's transient `node.move` steps and the drop within 8 flow units, leaving key and
+code moves, the cancel's restore and batches alone), `copy-paste` (Ctrl/⌘ + C, X, V through
+`useKeyPress`, one action per press, skipped while typing, and a "Clipboard" toolbar; a copy is the
+selected nodes and only the edges between them; a paste is one `batch` with new ids, the stem plus
+the lowest free number, under the pointer (`screen-to-flow`) or one 24-unit step on, one more per
+paste at the same place; a marked JSON payload, `clipboard.ts`, on `navigator.clipboard` when allowed,
+else in memory, checked with `validateFlow`; the e2e runs on the in-memory copy), `collaborative`
+(Alice and Bob, a model each, joined by `transport.ts`: an in-memory hub and a `BroadcastChannel`
+bridge to other tabs, hello/snapshot, no echo; `sync.ts` sends the entities each local command put
+or removed, from `model.subscribe`'s before/after, selection left out, and the other side applies
+them as one `batch` of `commands-to` marked `meta.remote`, never sent back, last write wins, drags
+streamed as transient batches; cursors in flow coordinates, `data-testid="cursor"` and `data-peer`,
+and remote selections, `data-remote-selected` and a dashed frame; Alice orange, Bob blue),
+`export-image` (`flow-svg.ts` builds a standalone SVG string from the document with
+`staticGeometry`, no DOM, so a server makes the same file, as its node unit test does: a path per
+edge, a rect and label per sized node, a viewBox fitted to the nodes and the edges' points, every
+text escaped; `download.ts` reads the theme's look off the drawn parts at click time, a server keeps
+`DEFAULT_LOOK`; the PNG is that SVG on a canvas, `canvas.toBlob`; downloads through an anchor and an
+object URL) and `stress-test` (`generate.ts`: a seeded grid joined into one tree, `count - 1` edges,
+1 000 nodes by default, 5 000, 10 000 or 20 000 on a "Size" select; the nodes declare size and
+handles so `onlyRenderVisible` culls never-drawn nodes; `Flow.Root` keyed by size; the layers wait
+for `engine.is("ready")`, as `visible-nodes` is every node before the root is sized (2.5 s instead of
+0.3 s to open 10 000); "Shuffle" is one `batch` of `node.move`; the readout, `data-testid="readout"`
+with `data-dom-nodes`, `data-frame-ms` and the like, a rAF median from `frames.ts`).
+Follow-ups (no package change here): at 10 000 nodes a pan frame takes ~34 ms and a node drag ~67 ms
+(20 000: ~66 and ~117 ms; zoom's median ~17 ms, p95 ~100 ms), against a 16 ms target. The engine's
+layering (`create-flow-engine.ts`: `visibleEdges` → `edgePath` for every edge, its SVG string
+included, on every change, as the layering cache is keyed on `revision`, which each `notify`
+bumps; a drag notifies twice per step) took ~72 % of the busy time in a profile; `node-by` through
+the query bus (`readerOf` allocating per call), `visibleNodes` and `flushMeasured` are O(N) per
+change; and `visibleNodes` returns every node while the root size is unknown. Also: a `Middleware`
+written for any registry needs a cast on the `node.move` payload, `FlowModel<T>` whose `T` has no
+`edges` is not assignable to `FlowModel`, nothing tells whether a batch may run transient,
+`useKeyPress` reports held keys only (no one-shot shortcut, no `preventDefault`), and the core has
+no bounds of an edge path or of the content (`export-image` parses its paths' points).
+#48 (React only, likewise `PENDING`): the Layout level, each engine behind a framework-free
+`layout.ts` / `forces.ts` the ports copy unchanged, unit-tested with the real engine in node, the
+nodes declaring their sizes (an engine needs them before any measurement). `dagre-layout`
+(`@dagrejs/dagre`: the document into a dagre graph, `rankdir` TB / LR, nodesep 40, ranksep 70,
+dagre's centres back as top-left corners, `HANDLE_SIDES` per direction; computed before the first
+render, so it opens laid out and fitted with no animation; a "Direction" radio group, Vertical /
+Horizontal, lays it out again from the nodes' current places: the handles move to the new sides (a
+context and a `key` per direction, the engine has no public re-measure), the nodes glide for
+350 ms as one transient `batch` of `node.move` per frame (`tween.ts`, ease in-out), then one final
+batch that is not transient, then `fit-view` with `duration`; the root carries `data-direction` and,
+while the nodes move, `data-animating`), `elk-layout` (`elkjs/lib/elk.bundled.js`, async: a 9-node
+pipeline whose nodes have several named inputs (left) and outputs (right), each handle an ELK port
+on its side, `FIXED_SIDE`, ids `<node>:in|out:<handle>`; ELK's port order, read back from the
+ports' y, goes into the node's `data` with `node.set-data` and its places with `node.move` in ONE
+batch, no animation (the edges would cross while the nodes move), then `fit-view`; the handles are
+keyed by their side's order so they remount; an "Algorithm" radio group, Layered = `layered`, Tree =
+`mrtree`; a request id drops a stale result; the spec waits on the root's `data-layout="running" |
+"done"` and reads `data-algorithm`; `mrtree` ignores the port order, so crossings can remain
+there), `auto-layout` (a mind map laid out again by dagre after every change, animated as
+`dagre-layout`; `layout.ts` lays out the shown nodes only and leaves out an edge to a hidden node,
+or dagre would invent it; each topic has a "+" placeholder node, `add-<id>` with a dashed edge,
+whose press adds the child, its edge, its placeholder and that edge in one `batch` (`tree.ts`); the
+collapse toggle, `aria-expanded`, writes `collapsed` with `node.set-data` and the `hidden` flags
+that change (`node.set-flags`, `edge.set-flags`) in one batch, a subtree under a still-collapsed
+topic staying hidden on expand; the root counts finished layouts in `data-layouts`, which the spec
+waits on) and `force-layout` (`d3-force`: a 14-node service network; `forces.ts` turns top-left
+boxes into bodies at their centres, radius half the box's diagonal, and links from the edges, and
+creates the simulation stopped so the tests `tick(n)`; `alphaDecay` 0.04, settling in ~3 s; every
+tick is one transient `batch` of `node.move` that skips dragged and pinned nodes, `end` one final
+batch, the first also an instant `fit-view`; a drag pins the node (`onNodeDragStart`: `fx`/`fy`
+follow `node-by` of `dragging-node-ids` on each tick, `alphaTarget(0.3)`), the drop keeps it
+pinned (`onNodesMove`, `data-pinned`), a cancel unpins; "Restart" releases every pin and runs
+`alpha(1)`; edges centre to centre, `useInternalNode` and `straightPath`, no handles; the root's
+`data-simulation="running" | "settled"` and a `role="status"`). Follow-ups (no package change
+here): `node.move` refuses a node that is not draggable even from code, failing the whole batch, so
+a layout cannot move a node the user may not drag (`auto-layout`'s placeholders stay draggable),
+and `edge.add` refuses a node that is not connectable even from code (they stay connectable).
+
+**The examples apps' dependencies.** Each app depends on its adapter (`workspace:*`), its framework,
+its icons (`lucide-react`, `@lucide/vue`, `@lucide/svelte`, `@lucide/angular`) and what its
+vendored Fragiola UI needs; nothing else but, since Epic #49 and in `examples/react` only so far,
+the layout engines `@dagrejs/dagre` 3.1.3, `elkjs` 0.12.1 and `d3-force` 3.0.1 (`@types/d3-force`
+3.0.10), approved by the maintainer and pinned exactly (each published at least 7 days before).
+`tests/examples.test.ts` allows exactly `@dagrejs/dagre`, `elkjs/lib/elk.bundled.js` (ELK's
+browser build, no worker to serve) and `d3-force`, and `EXAMPLE_PACKAGES` (`examples/shared/src/framework.ts`)
+lists them in an example's manifest `packages` by package name, so the code panel names what to
+install. A port's Epic adds the same pins to its app. Declined: `yjs`, `html-to-image`,
+`perfect-freehand`, `libavoid`, puppeteer or a server (`collaborative` syncs over
+`BroadcastChannel`, `export-image` draws its own SVG, `whiteboard` smooths its own strokes).
+
+The Vue, Svelte and Angular apps have every example from before Epic #49 (their own sections
+below), with no parity filter left; Epic #49's new examples and extensions wait in `PENDING`.
 
 **Theme tokens** (`--fl-*`; `tests/themes.test.ts` holds the list, `e2e/themes.spec.ts` checks the
 shapes differ on computed styles): shape `font`, `font-size`, `title-weight`, `node-padding`,
@@ -2442,3 +2598,27 @@ Decisions of Epic #40 (#38 core, #39 adapters and docs; React Flow v12's SSR, `z
   `api/json-document.mdx` (the node fields, `DeclaredHandle`), the primitives' pages (`root`,
   `edges`, `nodes`, `node`, `resize-handle`, `node-resizer`, `nodes-selection`), the resizing,
   selection and keyboard guides, and `limitations.mdx`.
+
+Decisions of the React Flow examples (Epic #49: #44 to #48):
+
+- **Every case of React Flow's catalogue, no example twice**: 27 cases were already shown by an
+  existing example (two of them extended: `edge-reconnect`'s Delete on drop, `sub-flows`' grouping),
+  39 collapse into 22 new examples, and Base Style, Dark Mode and Tailwind are the five themes.
+  The map is `site/docs/guides/react-flow-examples.mdx` (its title avoids "Flow", which `www`
+  appends). React Flow was a behaviour reference only: the code, the data and the look are ours.
+- **The gallery by topic in nine levels** (`basics` … `apps`), the ids and URLs unchanged; the
+  orders follow the Epic's table.
+- **React first, the ports in their own Epics**: the new examples and extensions are `PENDING` in
+  Vue, Svelte and Angular (one place that lists what each port owes), so their suites skip them
+  instead of failing.
+- **Library gaps are follow-ups, never a package change here**: each Issue's paragraph above lists
+  them (the large-flow hot spots of #47, the flags `node.move` and `edge.add` enforce from code,
+  the unexported path helpers of #46, …); the examples build what is missing from the public API.
+- **Three dependencies, layout only** (approved): dagre, ELK and d3-force, in `examples/react`;
+  everything else is built in the example (the stress test's numbers, the collaborative transport,
+  the SVG export, the stroke smoothing, the edge routing).
+- **The stress test opens at 1 000 nodes** and offers 5 000, 10 000 and 20 000, with
+  `onlyRenderVisible`; the smoke runs the default size.
+- **Animations, async layouts and simulations are awaited through attributes** the example
+  renders (`data-animating`, `data-layouts`, `data-layout`, `data-simulation`), never timeouts;
+  a layout's final move is one non-transient batch, so an undo history sees one step.

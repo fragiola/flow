@@ -42,6 +42,11 @@ const ALLOWED = [
     /^lucide-react$/,
     /^#\/components\/(ui|atoms)\/[a-z-]+$/,
     /^#\/lib\/cn$/,
+    // the layout examples' engines (Epic #49): exact pins in examples/react/package.json; ELK's
+    // browser build is its bundled file (no worker to serve)
+    /^@dagrejs\/dagre$/,
+    /^elkjs\/lib\/elk\.bundled\.js$/,
+    /^d3-force$/,
 ];
 
 /** Whether an example may import `specifier` (relative files aside). */
@@ -162,6 +167,11 @@ describe("the examples", () => {
         expect(allowed("examples-shared/themes")).toBe(false);
         expect(allowed("#/components/ui/switch")).toBe(true);
         expect(allowed("@fragiola/flow-react")).toBe(true);
+        expect(allowed("@dagrejs/dagre")).toBe(true);
+        expect(allowed("elkjs/lib/elk.bundled.js")).toBe(true);
+        expect(allowed("elkjs")).toBe(false);
+        expect(allowed("d3-force")).toBe(true);
+        expect(allowed("d3")).toBe(false);
     });
 
     it("fail on a folder without metadata", async () => {

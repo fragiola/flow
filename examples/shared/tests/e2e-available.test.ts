@@ -1,12 +1,17 @@
 // From Splitter (fragiola/splitter, examples/shared/tests/e2e-available.test.ts), same author and licence.
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
     COMPLETE_FRAMEWORKS,
+    caseSkipReason,
     embedBase,
     frameworkOf,
+    PENDING,
+    pendingCase,
     skipOrFail,
     skipReason,
 } from "../e2e/available.ts";
+import { listMetaSlugs } from "../scripts/examples-lib.ts";
 import type { Framework } from "../src/framework.ts";
 
 // The shared e2e suite runs against every framework's embed; a spec that opens an example the
@@ -83,5 +88,77 @@ describe("a complete framework", () => {
         expect(skipOrFail(writing, available, ["workflow-builder"])).toBe(
             "solid has no workflow-builder example",
         );
+    });
+});
+
+describe("what is pending in a complete framework", () => {
+    const available = ["basic"];
+
+    it("skips a pending example instead of failing", () => {
+        expect(
+            skipOrFail(
+                "vue",
+                available,
+                ["workflow-builder"],
+                ["workflow-builder"],
+            ),
+        ).toBe("vue has no workflow-builder example yet (PENDING)");
+        expect(() =>
+            skipOrFail("vue", available, ["workflow-builder", "x"], ["x"]),
+        ).toThrow(/every vue example is required/);
+    });
+
+    it("skips a pending case of a spec, and runs every other", () => {
+        const pending = [pendingCase("sub-flows", "selection-grouping")];
+        expect(
+            caseSkipReason(
+                "svelte",
+                "sub-flows",
+                "selection-grouping",
+                pending,
+            ),
+        ).toBe("svelte has no sub-flows#selection-grouping yet (PENDING)");
+        expect(
+            caseSkipReason("svelte", "sub-flows", "other", pending),
+        ).toBeUndefined();
+    });
+
+    it("is nothing in React, where every example is written first", () => {
+        expect(PENDING.react).toEqual([]);
+    });
+
+    it("names only examples that exist", () => {
+        const slugs = new Set(listMetaSlugs());
+        for (const [framework, entries] of Object.entries(PENDING)) {
+            for (const entry of entries) {
+                const slug = entry.split("#")[0] ?? "";
+                expect(slugs.has(slug), `${framework}: ${entry}`).toBe(true);
+            }
+        }
+    });
+
+    it("names only cases a spec asks for, with requireCase", () => {
+        for (const [framework, entries] of Object.entries(PENDING)) {
+            for (const entry of entries) {
+                const [slug = "", name] = entry.split("#");
+                if (name === undefined) continue;
+                const spec = new URL(
+                    `../e2e/examples/${slug}.spec.ts`,
+                    import.meta.url,
+                );
+                expect(existsSync(spec), `${framework}: ${entry}'s spec`).toBe(
+                    true,
+                );
+                const source = existsSync(spec)
+                    ? readFileSync(spec, "utf8")
+                    : "";
+                const asked = [
+                    ...source.matchAll(
+                        /requireCase\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)/g,
+                    ),
+                ].map((match) => pendingCase(match[1] ?? "", match[2] ?? ""));
+                expect(asked, `${framework}: ${entry}`).toContain(entry);
+            }
+        }
     });
 });

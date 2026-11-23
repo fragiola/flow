@@ -9,9 +9,11 @@ import { dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
     ENTRY_FILES,
+    EXAMPLE_PACKAGES,
     FRAMEWORKS,
     type Framework,
     ICON_PACKAGES,
+    packageOf,
 } from "../src/framework.ts";
 import { type ExampleMeta, LAYOUTS, LEVELS } from "../src/meta-types.ts";
 
@@ -191,8 +193,9 @@ export function registryItemOf(
 /**
  * The example's files: its entry file and everything reachable through relative imports, all
  * inside the app's examples/. Returned relative to examples/, the entry first, the rest sorted.
- * `packages` are the npm packages it imports that the consumer installs themselves (the icons:
- * not the framework, not the flow, not a registry item's own dependency).
+ * `packages` are the npm packages it imports that the consumer installs themselves (the icons and
+ * the layout engines of `EXAMPLE_PACKAGES`, by package name: not the framework, not the flow, not a
+ * registry item's own dependency).
  */
 export function collectFiles(
     app: ExamplesApp,
@@ -202,7 +205,10 @@ export function collectFiles(
     registry: string[];
     packages: string[];
 } {
-    const ownPackages = new Set([ICON_PACKAGES[app.framework]]);
+    const ownPackages = new Set([
+        ICON_PACKAGES[app.framework],
+        ...EXAMPLE_PACKAGES,
+    ]);
     const entry = join(app.examplesDir, slug, app.entry);
     const seen = new Set<string>();
     const registry = new Set<string>();
@@ -226,8 +232,8 @@ export function collectFiles(
                     );
                 }
                 queue.push(target);
-            } else if (ownPackages.has(specifier)) {
-                packages.add(specifier);
+            } else if (ownPackages.has(packageOf(specifier))) {
+                packages.add(packageOf(specifier));
             } else {
                 const item = registryItemOf(app, specifier);
                 if (item) registry.add(item);

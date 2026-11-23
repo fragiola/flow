@@ -13,4 +13,7 @@ export const styles = {
     lines: "text-(--fl-grid-color) [display:var(--fl-grid-lines)]",
     cross: "text-(--fl-grid-color) [display:var(--fl-grid-cross)]",
     edge: "fill-none stroke-(--fl-edge-color) stroke-(length:--fl-edge-width) [stroke-dasharray:var(--fl-edge-dash)] data-selected:stroke-(--fl-edge-selected) data-selected:stroke-(length:--fl-edge-selected-width)",
+    toolbar:
+        "palette-raised absolute top-3 start-3 flex gap-1 rounded-(--fl-control-radius) border border-palette-line bg-palette-base p-1 shadow-(--fl-node-shadow)",
+    button: "rounded-(--fl-control-radius) px-2.5 py-1 text-sm text-palette-accent hover:bg-palette-soft disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-palette-ring",
 };

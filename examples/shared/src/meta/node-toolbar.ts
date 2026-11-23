@@ -4,8 +4,8 @@ export default {
     title: "Node toolbar",
     description:
         "A toolbar above the selected note, outside the zoom, and one below the selection for several notes: duplicate, recolour or delete.",
-    level: "building-blocks",
-    order: 3,
+    level: "nodes",
+    order: 4,
     features: [
         "Flow.NodeToolbar",
         "nodeIds",

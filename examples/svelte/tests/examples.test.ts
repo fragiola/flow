@@ -1,6 +1,7 @@
 // examples/vue/tests/examples.test.ts for the Svelte app.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { PENDING } from "examples-shared/e2e/available";
 import {
     collectFiles,
     type ExampleEntry,
@@ -81,7 +82,12 @@ describe("the Svelte examples", () => {
     it("are every example of examples/react, with the same ids", () => {
         // Svelte is a complete framework (examples/shared/e2e/available.ts): it ships every example
         expect(slugs.length).toBeGreaterThan(0);
-        expect(slugs).toEqual(listExampleSlugs(examplesApp("react")));
+        // but those a later Epic brings to it (`PENDING`)
+        expect(slugs).toEqual(
+            listExampleSlugs(examplesApp("react")).filter(
+                (slug) => !PENDING.svelte.includes(slug),
+            ),
+        );
     });
 
     it("import only what a consumer can copy", () => {
