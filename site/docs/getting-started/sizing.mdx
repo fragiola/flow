@@ -126,8 +126,11 @@ export class EditorPage {
 
 The engine reads the root's box when it needs it: `engine.get("root-size")` gives it, and
 `fit-view`, `center-on`, the zoom buttons (they zoom around the root's centre), the minimap and
-`visible-nodes` use it. It reads the box once per turn: a root you resize in your own code shows its
-new size from the next microtask (the next `await`, event or frame).
+`visible-nodes` use it. A render reads the box once per turn: a root you resize in your own code
+shows its new size there from the next microtask (the next `await`, event or frame). The verbs you
+call that place or map the view (`fit-view`, `center-on`, `focus-node`, `set-viewport`, the zooms,
+`pan-by`, `screen-to-flow` and `flow-to-screen`) read it again, so they see a root you resized or
+scrolled just before them.
 
 ## Nodes size themselves
 

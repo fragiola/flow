@@ -549,13 +549,18 @@ large-flow micro-benchmark.
 **The root's box is read once per turn** (#51, `rootBox()` in `create-flow-engine.ts`): every read
 that needs the view (the view rect, `root-size`, the client ↔ flow conversions) asks for the
 root's `getBoundingClientRect`, and a read after a DOM change forces a layout (Vue patches a node
-between two reads: a layout per new node). The engine keeps the box until the root window's next
-microtask (`queueMicrotask`, one clear queued at a time), and drops it at once on `setOptions` and
-when the root attaches or detaches (`destroy` detaches). The engine's own viewport writes (the
+between two reads: a layout per new node). The engine keeps the box until the next microtask
+(`Promise.resolve().then`, one clear queued at a time; not the window's `queueMicrotask`, which an
+app's Jest or Vitest fake timers may hold; `Promise` is a JS builtin, the core guard allows it),
+and drops it at once on `setOptions`, when the root attaches or detaches (`destroy` detaches), and
+at the start of the app's verbs that place or map the view (`FRESH_BOX_ACTIONS`: `fit-view`,
+`center-on`, `focus-node`, `set-viewport`, `zoom-in`, `zoom-out`, `zoom-to`, `pan-by`, their
+`can`/`check` too; `FRESH_BOX_READS`: `get` of `screen-to-flow` and `flow-to-screen`; no adapter
+calls them per render, so the per-render saving stays). The engine's own viewport writes (the
 viewport element's transform) never move or resize the root, and the root has no `ResizeObserver`
-(the observer measures nodes), so nothing else clears it. Without a root window's microtask queue
-it reads each time. A read sees the box as of its turn's first read: a root resized or moved in the
-same synchronous turn shows from the next microtask (`tests/engine/root-box.test.ts`).
+(the observer measures nodes), so nothing else clears it. Any other read sees the box as of its
+turn's first read: a root resized or moved in the same synchronous turn shows there from the next
+microtask (`tests/engine/root-box.test.ts`).
 
 ## The React adapter (Issue #5)
 
@@ -962,11 +967,16 @@ Decisions of large flows in Vue (#51, Epic #52; React's of Epic #61, see the Rea
 - **A culled flow renders nothing before the engine** (`onlyRenderVisible` on the context):
   `Flow.Nodes` no node and the edges no edge (their levels kept, empty), on the server too; a flow
   that is not culled keeps its first render (`tests/ssr.test.ts`, `hydration.test.ts`).
-- **Node registrations wait for the end of the patch** (`useNode`, a `nextTick` batch; an unmount
-  cancels a pending one): Vue calls an element's function ref as soon as it is inserted, and the
-  engine measures a node when it is registered, so each node mounted in a patch forced a layout
-  of its own (~4.2 s of a 10 000-node gestures profile, ~0.2 s after). Handles still register at
-  once.
+- **Node registrations wait for the end of the patch** (`useNode`; an unmount cancels a pending
+  one): Vue calls an element's function ref as soon as it is inserted, and the engine measures a
+  node when it is registered, so each node mounted in a patch forced a layout of its own (~4.2 s
+  of a 10 000-node gestures profile, ~0.2 s after). The batch is a `queuePostFlushCb` job with
+  the template-ref id (-1), not a `nextTick` callback (with which a node added by the app was not
+  registered after its own `await nextTick()`: `focus-node` refused it): it runs after the patch,
+  before the mounted hooks, the `flush: "post"` watchers and the patch's `nextTick`, as a ref set
+  during the patch did. Each registration runs on its own; the ones that throw go to Vue's
+  `handleError` (the app's `errorHandler`) after the batch, the rest still registered
+  (`tests/nodes.test.ts`, "node registration"). Handles still register at once.
 - **Tested** in `tests/render-counts.test.ts` (React's cases: a pan and zoom steps re-render and
   read no node or edge; nodes brought into view render alone and their measurement reads only the
   others' boxes and paths; a step that changes the render levels places the nodes again; a drag
@@ -2825,8 +2835,9 @@ Decisions of large flows (Epic #61: #59, the core; #60, the harness and the numb
   appears) or drawing far zooms otherwise (canvas, out of scope).
 - **The root's box is read once per turn** (#51; until then per read, ~4 % of the busy time of
   the 10 000-node gestures in the profile of #59, 99 ms of 2.4 s): the engine has no resize signal
-  for the root, so the box is kept only until the root window's next microtask (and dropped on
-  `setOptions`, attach and detach), never across turns; a read's value changes only for a root
+  for the root, so the box is kept only until the next microtask (a promise, not the window's
+  `queueMicrotask`: fake timers), dropped on `setOptions`, attach, detach and the app's verbs
+  that place or map the view, never across turns; a render read's value changes only for a root
   resized within one synchronous turn (the engine section). It replaced #51's first fix, a
   Vue-side `getBoundingClientRect` shadowing the app's root element while `Flow.Nodes` patched
   (anything reading the box meanwhile, the app included, got the held one).
