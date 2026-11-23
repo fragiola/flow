@@ -23,6 +23,11 @@ test("dragging the knob turns the node: the angle is stored, and its handles tur
     await expect(knob).toHaveAttribute("aria-valuenow", "0");
     const centre = await middle(content(page, "check"));
     const from = await middle(knob);
+    const incoming = edge(page, "read-check")
+        .locator('[data-flow-part="edge-path"]')
+        .last();
+    const pathBefore = await incoming.getAttribute("d");
+    expect(pathBefore).toMatch(/^M/);
     // a quarter turn clockwise: from above the centre to its right
     await page.mouse.move(from.x, from.y);
     await page.mouse.down();
@@ -39,10 +44,9 @@ test("dragging the knob turns the node: the angle is stored, and its handles tur
     const point = await middle(input);
     expect(point.x).toBeGreaterThan(centre.x + 20);
     expect(Math.abs(point.y - centre.y)).toBeLessThan(3);
-    // the edges still reach it
-    await expect(
-        edge(page, "read-check").locator('[data-flow-part="edge-path"]').last(),
-    ).toHaveAttribute("d", /^M/);
+    // the edges follow it: the incoming edge now ends at the turned handle, on the right
+    await expect(incoming).toHaveAttribute("d", /^M/);
+    await expect(incoming).not.toHaveAttribute("d", pathBefore ?? "");
     // the node is still where it was: the knob turns, it never drags
     const after = await middle(content(page, "check"));
     expect(Math.abs(after.x - centre.x)).toBeLessThan(1);
