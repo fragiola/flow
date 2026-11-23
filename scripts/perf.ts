@@ -80,12 +80,22 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     });
 }
 
+/** Runs a build step, quietly: its output is shown only when it fails. */
 function run(command: string, commandArgs: string[], cwd: string, env = {}) {
-    execFileSync(command, commandArgs, {
-        cwd,
-        stdio: ["ignore", "ignore", "inherit"],
-        env: { ...process.env, ...env },
-    });
+    try {
+        execFileSync(command, commandArgs, {
+            cwd,
+            stdio: "pipe",
+            env: { ...process.env, ...env },
+        });
+    } catch (error) {
+        const { stdout, stderr } = error as {
+            stdout?: Buffer;
+            stderr?: Buffer;
+        };
+        process.stderr.write(`${stdout ?? ""}${stderr ?? ""}`);
+        throw error;
+    }
 }
 
 if (!args.dist) {
