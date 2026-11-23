@@ -743,10 +743,15 @@ Decisions of large flows in React (Epic #61, #60; the other adapters take them u
 stress-test port Epics):
 
 - **One store per model and engine** (`utils/flow-store.ts`, a `WeakMap` by engine, or by model
-  before it): it subscribes once, from its creation, to the model (a commit counts only when
-  `all-nodes` or `all-edges` changed identity, as the old per-reader cache did) and to the engine,
-  and every `useFlowValue` reads its version instead of subscribing to both and reading the lists
-  itself. Alternative: a subscription per reader (as before); refused: at 2 600 mounted nodes each
+  before it): it subscribes once to the model (a commit counts only when `all-nodes` or
+  `all-edges` changed identity, as the old per-reader cache did) and to the engine, and every
+  `useFlowValue` reads its version instead of subscribing to both and reading the lists itself.
+  It listens to the engine from its creation (the engine's `destroy` drops it), but to the model
+  only while it has a reader: an app-owned model outlives its roots, and a listener kept on it
+  held every unmounted root's store and destroyed engine (StrictMode: one per mount). Starting
+  again, or read with no reader, it compares the lists with the last ones seen and moves its
+  versions if they changed (`tests/flow-store.test.tsx`). The engine's `destroy` also empties
+  its cached geometry (`EngineGeometry.release`). Alternative: a subscription per reader (as before); refused: at 2 600 mounted nodes each
   notification called ~8 000 snapshots.
 - **Two scopes.** `view` (the default): every change. `entity` (`useNode`, `useEdge`,
   `useEdgePath`, `EdgePath`, `EdgeLabel`, `ReconnectAnchor`, `useHandle`, `MiniMapNode`,
