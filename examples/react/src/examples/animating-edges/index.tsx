@@ -6,6 +6,7 @@ import {
     type FlowNodeInput,
     type FlowTypes,
     useEdge,
+    useFlowStore,
 } from "@fragiola/flow-react";
 import { drag } from "@fragiola/flow-react/drag";
 import { keyboard } from "@fragiola/flow-react/keyboard";
@@ -15,6 +16,7 @@ import {
     type AnimationEvent,
     createContext,
     useContext,
+    useEffect,
     useMemo,
     useState,
     useSyncExternalStore,
@@ -117,6 +119,8 @@ interface Values {
     readonly send: () => void;
     /** the pulse ended: the value arrives */
     readonly arrive: () => void;
+    /** the pulse's edge is gone: the value is dropped */
+    readonly drop: () => void;
 }
 
 const ValuesContext = createContext<Values>({
@@ -124,6 +128,7 @@ const ValuesContext = createContext<Values>({
     received: 0,
     send: () => {},
     arrive: () => {},
+    drop: () => {},
 });
 
 const ReducedMotion = createContext(false);
@@ -186,8 +191,25 @@ function renderEdge(edge: FlowEdge<Types>) {
     return <AnimatedEdge edge={edge} />;
 }
 
+/** Whether the flow still has the edge that pulses: deleted, nothing carries a value. */
+const hasPulseEdge = ({
+    model,
+}: {
+    model: { get(key: "all-edges"): readonly FlowEdge<Types>[] };
+}) =>
+    model
+        .get("all-edges")
+        .some(
+            (edge) => edge.type === "animated" && edge.data?.motion === "pulse",
+        );
+
 function SenderBody({ label }: { label: string }) {
-    const { sending, send } = useContext(ValuesContext);
+    const { sending, send, drop } = useContext(ValuesContext);
+    const pulse = useFlowStore<boolean, Types>(hasPulseEdge);
+    // the pulse's edge deleted while a value was on its way: no animationend will come
+    useEffect(() => {
+        if (sending && !pulse) drop();
+    }, [sending, pulse, drop]);
     return (
         <div className={styles.body}>
             {label}
@@ -195,7 +217,9 @@ function SenderBody({ label }: { label: string }) {
                 type="button"
                 aria-label="Send a value"
                 disabled={sending}
-                onClick={send}
+                onClick={() => {
+                    if (pulse) send();
+                }}
                 className={styles.send}
             >
                 <SendIcon aria-hidden="true" />
@@ -254,6 +278,7 @@ export default function AnimatingEdges() {
                 setSending(false);
                 setReceived((count) => count + 1);
             },
+            drop: () => setSending(false),
         }),
         [sending, received],
     );
