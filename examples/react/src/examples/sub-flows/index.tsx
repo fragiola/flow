@@ -5,6 +5,7 @@ import {
     type FlowNodeInput,
     type FlowTypes,
     useFlow,
+    useSelection,
 } from "@fragiola/flow-react";
 import { drag } from "@fragiola/flow-react/drag";
 import { selection } from "@fragiola/flow-react/selection";
@@ -20,6 +21,12 @@ import { styles } from "./styles";
 // drawn at its ends' level: above the groups it crosses, under the nodes it joins; a selected edge
 // rises above every node. `"basic"` keeps every edge under every node, and `"manual"` follows only
 // the `zIndex` values.
+//
+// "Group selection" wraps two or more selected top-level nodes in a new group sized to their box
+// (`nodes-bounds`) plus a margin: one `batch` of `node.add` and a `node.set-parent` per node, so
+// they keep their places and one undo takes it back. "Ungroup" puts the children of the selected
+// groups back on the flow (`node.set-parent` to `null`) and removes the groups, in one `batch`
+// too: removing a group first would remove its children with it.
 
 interface Types extends FlowTypes {
     readonly nodes: {
@@ -74,10 +81,20 @@ const nodes: FlowNodeInput<Types>[] = [
     {
         id: "cache",
         type: "item",
-        position: { x: 180, y: 280 },
+        position: { x: 140, y: 280 },
         data: { label: "Cache (drop me in a group)" },
     },
+    {
+        id: "logs",
+        type: "item",
+        position: { x: 400, y: 280 },
+        data: { label: "Logs" },
+    },
 ];
+
+/** The room a new group leaves around its nodes, and above them for its title. */
+const MARGIN = 20;
+const TITLE = 24;
 
 const edges: FlowEdgeInput<Types>[] = [
     { id: "ui-state", source: "ui", target: "state" },
@@ -127,6 +144,98 @@ function DropIntoGroups() {
     return null;
 }
 
+/** Groups the selected top-level nodes into a new group, and ungroups the selected groups. */
+function Grouping() {
+    const { model, engine } = useFlow<Types, typeof features>();
+    const selected = useSelection<Types>().nodes;
+    const loose = selected.filter((node) => node.parentId === undefined);
+    const groups = selected.filter((node) => node.type === "group");
+
+    function group() {
+        const nodeIds = loose.map((node) => node.id);
+        const bounds = engine.get("nodes-bounds", { nodeIds });
+        if (!bounds) return;
+        let count = 1;
+        while (model.get("node-by", { id: `group-${count}` })) count += 1;
+        const groupId = `group-${count}`;
+        model.run("batch", {
+            commands: [
+                {
+                    command: "node.add",
+                    payload: {
+                        id: groupId,
+                        type: "group",
+                        position: {
+                            x: bounds.x - MARGIN,
+                            y: bounds.y - MARGIN - TITLE,
+                        },
+                        width: bounds.width + 2 * MARGIN,
+                        height: bounds.height + 2 * MARGIN + TITLE,
+                        data: { label: `Group ${count}` },
+                    },
+                },
+                ...nodeIds.map((nodeId) => ({
+                    command: "node.set-parent" as const,
+                    payload: {
+                        nodeId,
+                        parentId: groupId,
+                        extent: "parent" as const,
+                    },
+                })),
+                {
+                    command: "selection.set",
+                    payload: { nodeIds: [groupId], mode: "replace" },
+                },
+            ],
+        });
+    }
+
+    function ungroup() {
+        const groupIds = new Set(groups.map((node) => node.id));
+        const children = model
+            .get("all-nodes")
+            .filter((node) => node.parentId && groupIds.has(node.parentId));
+        model.run("batch", {
+            commands: [
+                ...children.map((node) => ({
+                    command: "node.set-parent" as const,
+                    payload: { nodeId: node.id, parentId: null, extent: null },
+                })),
+                ...[...groupIds].map((nodeId) => ({
+                    command: "node.remove" as const,
+                    payload: { nodeId },
+                })),
+            ],
+        });
+    }
+
+    return (
+        <div
+            role="toolbar"
+            aria-label="Grouping"
+            data-flow-no-gesture
+            className={styles.toolbar}
+        >
+            <button
+                type="button"
+                disabled={loose.length < 2}
+                onClick={group}
+                className={styles.button}
+            >
+                Group selection
+            </button>
+            <button
+                type="button"
+                disabled={groups.length === 0}
+                onClick={ungroup}
+                className={styles.button}
+            >
+                Ungroup
+            </button>
+        </div>
+    );
+}
+
 function renderNode(node: FlowNode<Types>) {
     if (node.type === "group") {
         return (
@@ -172,6 +281,7 @@ export default function SubFlows() {
                 <Flow.Nodes<Types>>{renderNode}</Flow.Nodes>
             </Flow.Viewport>
             <DropIntoGroups />
+            <Grouping />
         </Flow.Root>
     );
 }
