@@ -39,7 +39,7 @@ export const styles = {
     /** a stop of an edge's gradient, in its palette's accent */
     stop: (tone: Tone) => STOP[tone],
     edgeGroup:
-        "cursor-pointer outline-none focus-visible:[&>[data-flow-part=edge-path]]:stroke-(--fl-focus-line)",
+        "cursor-pointer outline-none focus-visible:[&>[data-flow-part=edge-path]:last-child]:stroke-(--fl-focus-line)",
     edgeHit: "fill-none stroke-transparent stroke-[16px]",
     /**
      * the visible path: its stroke is its gradient (the `stroke` attribute), under a soft shadow;

@@ -9,7 +9,7 @@ export const styles = {
     lines: "text-(--fl-grid-color) [display:var(--fl-grid-lines)]",
     cross: "text-(--fl-grid-color) [display:var(--fl-grid-cross)]",
     edgeGroup:
-        "cursor-pointer outline-none focus-visible:[&>[data-flow-part=edge-path]]:stroke-(--fl-focus-line)",
+        "cursor-pointer outline-none focus-visible:[&>[data-flow-part=edge-path]:nth-of-type(2)]:stroke-(--fl-focus-line)",
     edgeHit: "fill-none stroke-transparent stroke-[16px]",
     edge: "fill-none stroke-(--fl-edge-color) stroke-(length:--fl-edge-width) [stroke-dasharray:var(--fl-edge-dash)] data-selected:stroke-(--fl-edge-selected) data-selected:stroke-(length:--fl-edge-selected-width)",
     /** a control point: a handle on the edge, grabbed to bend it */

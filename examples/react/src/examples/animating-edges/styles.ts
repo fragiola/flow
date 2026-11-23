@@ -20,7 +20,7 @@ export const styles = {
     cross: "text-(--fl-grid-color) [display:var(--fl-grid-cross)]",
     /** an edge's group; a pulsing one fades out and back once */
     edgeGroup:
-        "group cursor-pointer outline-none focus-visible:[&>[data-flow-part=edge-path]]:stroke-(--fl-focus-line) data-pulsing:animate-pulse data-pulsing:[animation-iteration-count:1]!",
+        "group cursor-pointer outline-none focus-visible:[&>[data-flow-part=edge-path]:nth-of-type(2)]:stroke-(--fl-focus-line) data-pulsing:animate-pulse data-pulsing:[animation-iteration-count:1]!",
     edgeHit: "fill-none stroke-transparent stroke-[16px]",
     /** the visible path, in the tone of what it does */
     edge: (motion: Motion) =>

@@ -34,7 +34,7 @@ export const styles = {
     filled: "fill-current",
     outlined: "fill-(--fl-canvas-bg) stroke-current [stroke-width:1.5]",
     edgeGroup:
-        "cursor-pointer outline-none focus-visible:[&>[data-flow-part=edge-path]]:stroke-(--fl-focus-line)",
+        "cursor-pointer outline-none focus-visible:[&>[data-flow-part=edge-path]:last-child]:stroke-(--fl-focus-line)",
     edgeHit: "fill-none stroke-transparent stroke-[16px]",
     /** the visible path in its tone; selected, the selected markers replace the tone's */
     edge: (tone: Tone) =>
