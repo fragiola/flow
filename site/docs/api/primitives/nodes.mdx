@@ -6,7 +6,8 @@ description: Flow.Nodes is the layer of the nodes, calling your children functio
 `Flow.Nodes` goes inside `Flow.Viewport`, after `Flow.Edges`. It calls its children function for
 each node that is not hidden, in drawing order, keyed by the node's id (a node keeps its element
 when it moves). With the root's `onlyRenderVisible`, only the nodes in view (and those not measured
-yet) are rendered (`visible-nodes`). You render each node: usually a `Flow.Node` with its content
+yet) are rendered (`visible-nodes`); in React, none before the engine knows the view (the server
+render, the first client render). You render each node: usually a `Flow.Node` with its content
 and handles, switching on `node.type` when the flow has several.
 
 <Framework name="react">

@@ -1,0 +1,91 @@
+---
+title: Large flows
+description: Keep a flow of thousands of nodes smooth by rendering only what is in view, declaring node sizes, keeping render functions stable and batching changes.
+---
+
+A flow of 10 000 nodes and as many edges pans, zooms and drags at the display's frame rate, as
+long as the DOM holds only what is on screen. The engine does the rest: it culls the nodes and
+edges through a spatial index, builds an edge's path only when it is drawn, and keeps every box
+and path it computed until something it depends on changes. What is yours: four habits, below,
+and the [stress test](/examples/stress-test) shows them all.
+
+<Example id="stress-test" />
+
+## Render only what is in view
+
+Set `onlyRenderVisible` on the root. `Flow.Nodes` then renders the nodes in view
+(`visible-nodes`) and `Flow.Edges` the edges whose ends' box is in view (`visible-edges`), so the
+DOM stays a few dozen nodes whatever the flow's size. A node that leaves the view keeps its last
+measured size, so its edges are still drawn right, and it mounts again when it comes back.
+
+Before the root has a size, nothing is in view: a culled flow renders no node and no edge until
+the engine knows the view, then only the visible ones mount. There is nothing to wait for (no
+`ready` gate of your own). In React this holds from the first render; Vue, Svelte and Angular
+render the static geometry of every node first (see [Limitations](/docs/limitations)).
+
+## Declare node sizes
+
+A node with `width` and `height` in the document has a box before it is rendered: it is culled
+rightly while it was never drawn, and its edges have ends. Declare its `handles` too (boxes
+relative to its corner), and an edge needs no handle element to know where it ends: a culled
+node's edges are drawn without it ([Server rendering](/docs/guides/server-rendering) has the
+fields).
+
+```ts title="generate.ts"
+const node = (id: string, x: number, y: number): FlowNodeInput<Types> => ({
+    id,
+    type: "cell",
+    position: { x, y },
+    data: { label: id },
+    width: 120,
+    height: 40,
+    handles: [
+        { type: "target", position: "left", x: -4, y: 16, width: 8, height: 8 },
+        { type: "source", position: "right", x: 116, y: 16, width: 8, height: 8 },
+    ],
+});
+```
+
+A node without a size is measured when it first renders; until then it counts as visible (it
+must render to be measured), so many unsized nodes mount at once.
+
+## Keep the render functions stable
+
+`Flow.Nodes` and `Flow.Edges` render each node or edge again only when it changed (the model
+shares the nodes a command did not touch), and each part reads only its own node or edge: a pan
+or a zoom re-renders no node that stays in view, and dragging a node re-renders that node and its
+edges. A new children function re-renders every one, though. In an app that re-renders on every
+change (controlled `nodes` / `edges`), keep it stable: a function declared outside the component
+(the stress test's `renderNode`), or one memoized by your framework (React's `useCallback`).
+
+Keep each node cheap: one element and its content, no transition on its `transform`, and a
+`Flow.Handle` only where a user connects from it (declared handles cost no element).
+
+## Batch your changes
+
+A command is one change, one notification and one render. Moving many nodes from code (a layout,
+a shuffle) in one `batch` is one change too, so the flow renders once:
+
+```ts title="shuffle.ts"
+model.run("batch", {
+    commands: moves.map((payload) => ({ command: "node.move" as const, payload })),
+});
+```
+
+## Measured
+
+The `stress-test` example in a production build (React, Chromium 153, an i7-10700F, a 1280 × 800
+window, `onlyRenderVisible`), 120 pointer steps at 60 Hz per gesture, three runs per size: frame
+times in milliseconds, median / p95. `pnpm perf` in the repository measures them again.
+
+| nodes | open | pan | zoom (out and back) | drag a node |
+| --- | --- | --- | --- | --- |
+| 1 000 | 34 ms | 16.7 / 19 | 16.8 / 32 | 16.7 / 19 |
+| 10 000 | 175 ms | 16.7 / 18 | 16.8 / 34 | 16.7 / 22 |
+| 20 000 | 353 ms | 16.6 / 19 | 16.7 / 33 | 16.7 / 23 |
+
+At 16.7 ms a frame the display's rate (60 Hz) is kept. Opening is the time from the size switch
+to the first frame, with only the visible nodes ever mounted. What is left is the zoom out: at
+the far end, a frame mounts a few hundred nodes at once (up to 2 600 are in view at the minimum
+zoom), and laying them out costs a frame or two of 40 to 70 ms. Keep `minZoom` higher for a large
+flow, or render fewer, simpler elements per node, to keep that frame short.

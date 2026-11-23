@@ -13,5 +13,5 @@ export default {
         "width / height",
         "handles",
     ],
-    docs: "/docs/concepts/viewport#large-flows",
+    docs: "/docs/guides/large-flows",
 } satisfies ExampleMeta;
