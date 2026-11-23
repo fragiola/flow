@@ -127,13 +127,17 @@ test.describe("at 10,000 nodes", () => {
             .getByRole("button", { name: "Shuffle", exact: true })
             .click();
         await expect(readout(page)).not.toHaveAttribute("data-shuffle-ms", "–");
+        let compared = 0;
         for (const [id, position] of before) {
             if ((await node(page, id).count()) === 0) continue;
             await expect(node(page, id)).not.toHaveAttribute(
                 "data-position",
                 position ?? "",
             );
+            compared++;
         }
+        // a node still drawn after the shuffle was compared: the loop ran
+        expect(compared).toBeGreaterThan(0);
     });
 });
 
@@ -166,6 +170,9 @@ test("every control, node and edge is named", async ({ page }) => {
         stage(page).getByRole("button", { name: "Shuffle", exact: true }),
     ).toHaveCount(1);
     await expect(readout(page)).toHaveAccessibleName("Readout");
+    // the loops below check something: the nodes and edges in view are drawn
+    await expect(part(page, "node").first()).toBeVisible();
+    await expect(part(page, "edge").first()).toBeAttached();
     for (const element of await part(page, "node").all()) {
         await expect(element).toHaveAccessibleName(/\S/);
     }
