@@ -203,8 +203,9 @@ in one PR. `main` has no required checks: a skipped job blocks nothing.
 
 **Shards: none.** Shard a suite only when its test step alone passes about 3 minutes. Measured
 locally (4 workers; CI runs 2): the playground's 214 tests (107 per browser) in ~80 s, each examples
-app's 226 tests (110 smoke runs: 22 examples × 5 themes) in ~24 to ~55 s, its embed build
-included (counts after #40, times measured after #36; Angular and React the slower).
+app's 229 tests (110 smoke runs: 22 examples × 5 themes; Vue, Svelte and Angular skip the 3
+`PENDING` cases) in ~24 to ~65 s, its embed build included (counts after #44, times measured
+after #44; Angular and React the slower).
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
@@ -1283,6 +1284,13 @@ the same in the four apps; the shared specs cover both. #28: `edge-types` draws 
 `edge-types` gives `smoothstep` `animated` + `pathOptions.borderRadius` and `step`
 `pathOptions.stepPosition: 0.25`; `connected-data` (new) sums its inputs with
 `useNodeConnections` + `useNodesData` (test ids `sum-total`, `sum-sources`, `value-<id>`).
+#44 (React only so far, `PENDING` in the other apps): `edge-reconnect` has a "Delete on drop"
+switch (a native `role="switch"` checkbox, off by default: `onReconnectCancel` with `dropped`, no
+`to`, not `refused` runs `edge.remove`), and `sub-flows` a "Grouping" toolbar, "Group selection"
+(two or more selected top-level nodes into a new `group-<n>` sized to their `nodes-bounds` plus a
+margin and a title band: one `batch` of `node.add`, `node.set-parent` per node and `selection.set`)
+and "Ungroup" (the selected groups' children back on the flow, then the groups removed: one
+`batch`), with a loose `logs` node beside `cache`. The ports already copy both `styles.ts`.
 The Vue, Svelte and Angular apps have every one of these (their own sections below), with no
 parity filter left.
 
