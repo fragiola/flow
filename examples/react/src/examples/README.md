@@ -8,7 +8,8 @@ src/examples/
   <id>/index.tsx     the example (default export)
   <id>/styles.ts     how it looks: one class string (or function of an app value) per part
   <id>/*.ts(x)       optional sibling files, shown in the code panel (workflow-builder's catalog,
-                     rules, nodes, palette and inspector)
+                     rules, nodes, palette and inspector; a layout example's framework-free
+                     layout.ts, which its port copies unchanged)
   _kit/              shared demo code and app policy: persistence.ts (local storage), undo.ts (an
                      undo history over the model's events); no Flow assembly, no styles
 ```
@@ -37,19 +38,20 @@ fails `examples/shared/tests/meta.test.ts`. An example keeps its id in every fra
 
 The gallery groups examples by topic, its levels (`LEVELS` in `examples/shared/src/meta-types.ts`,
 in sidebar order); `order` is an example's place inside its level. The orders follow the gallery
-table of Epic #49 and keep gaps where its new examples go.
+table of Epic #49, whose coverage map (the docs page `guides/react-flow-examples`) ties every case
+of React Flow's example catalogue to one example here.
 
 | level | title | what belongs in it |
 |---|---|---|
-| `basics` | Basics | a flow drawn: the first flow, a read-only diagram, server rendering, the minimap and the controls |
-| `nodes` | Nodes | what a node is and does: custom nodes, resizers, toolbars, sub-flows and grouping |
-| `edges` | Edges | how an edge is drawn and changed: edge types, labels and toolbars, reconnecting and deleting on drop |
-| `connections` | Connections | drawing a new edge: rules and validation, the connection's announcements |
-| `interaction` | Interaction | what a user does to the flow: select and use the keyboard, snap, add nodes, context menus |
-| `layout` | Layout | placing nodes automatically (the layout examples of Epic #49) |
-| `data` | Data and state | the flow as data: computing over connections, saving and restoring, undo and redo |
-| `styling` | Styling | how a flow looks beyond the themes: backgrounds |
-| `apps` | Apps | several features together, as a product would put them (`workflow-builder`, the landing's showcase) |
+| `basics` | Basics | a flow drawn: the first flow, a read-only diagram, server rendering, the minimap and the controls, a stress test of thousands of nodes |
+| `nodes` | Nodes | what a node is and does: custom nodes, shapes, resizers, toolbars, contextual zoom, intersections, deleting a middle node, sub-flows and grouping |
+| `edges` | Edges | how an edge is drawn and changed: edge types, labels and toolbars, markers, animation, floating and editable edges, reconnecting and deleting on drop |
+| `connections` | Connections | drawing a new edge: rules and validation, easy and proximity connect, the connection line, the connection's announcements |
+| `interaction` | Interaction | what a user does to the flow: select and use the keyboard, snap, helper lines, add nodes, context menus, copy and paste |
+| `layout` | Layout | placing nodes automatically: dagre, ELK, a tree that lays itself out again (add, collapse) and a force simulation |
+| `data` | Data and state | the flow as data: computing over connections, saving and restoring, undo and redo, collaboration, exporting an image |
+| `styling` | Styling | how a flow looks beyond the themes: backgrounds, gradients |
+| `apps` | Apps | several features together, as a product would put them (`workflow-builder`, the landing's showcase, and `whiteboard`) |
 
 ## Adding an example
 
@@ -101,7 +103,9 @@ which API is called. How it looks is one click away, in `styles.ts`.
 
 - **Copyable imports only**: `react`, `@fragiola/flow-react` and its feature entries
   (`@fragiola/flow-react/drag`, …; it re-exports the core), `lucide-react`, Fragiola UI
-  (`#/components/ui/*`, `#/components/atoms/*`, `#/lib/cn`), and relative files inside
+  (`#/components/ui/*`, `#/components/atoms/*`, `#/lib/cn`), the layout engines of the Layout
+  examples (`@dagrejs/dagre`, `elkjs/lib/elk.bundled.js`, `d3-force`: exact pins in
+  `package.json`, listed in the example's manifest `packages`), and relative files inside
   `src/examples/`. `#/` is the app's `src/`; `@name` is reserved for packages (site export
   contract, §6), so `@/` is never used. `tests/examples.test.ts` enforces it.
 - **Theme-agnostic**: style through palette roles (`bg-palette-base`, …) and the theme tokens

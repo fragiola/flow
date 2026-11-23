@@ -202,10 +202,12 @@ the playground, `examples/shared` and `examples/react`), and **never runs `playw
 in one PR. `main` has no required checks: a skipped job blocks nothing.
 
 **Shards: none.** Shard a suite only when its test step alone passes about 3 minutes. Measured
-locally (4 workers; CI runs 2): the playground's 214 tests (107 per browser) in ~80 s, each examples
-app in ~22 to ~100 s, its embed build included: React's 420 tests (200 smoke runs: 40 examples ×
-5 themes), Vue's, Svelte's and Angular's 312 with the 86 `PENDING` ones skipped (counts and times
-measured after #47; Angular and React the slower).
+locally after #48, at the end of Epic #49 (4 workers; CI runs 2): the playground's 214 tests (107
+per browser) in ~59 s; React's examples 460 tests (220 smoke runs: 44 examples × 5 themes) in
+~120 s (~123 s with its embed build), Vue's, Svelte's and Angular's 328 each, 226 run and the 102
+`PENDING` ones skipped, in ~27 to ~37 s. React's is the one near the line: at CI's 2 workers its
+step may pass 3 minutes, so check that job's time on the Epic's pull request and shard it
+(`--shard`, a matrix of two) when it does; the ports' suites grow to React's as their Epics land.
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
@@ -1263,7 +1265,8 @@ framework deletes it there. Today Vue, Svelte and Angular wait for `edge-reconne
 `proximity-connect`, `delete-middle-node`, `intersections`, `contextual-zoom`, `connection-line`)
 and of #46 (`edge-markers`, `animating-edges`, `floating-edges`, `editable-edge`,
 `gradient-styling`, `whiteboard`) and of #47 (`helper-lines`, `copy-paste`, `collaborative`,
-`export-image`, `stress-test`): Epic #49 writes them in React, the ports' Epics follow. A pending whole example has nothing in the
+`export-image`, `stress-test`) and of #48 (`dagre-layout`, `elk-layout`, `auto-layout`,
+`force-layout`): Epic #49 writes them in React, the ports' Epics follow. A pending whole example has nothing in the
 port's app yet: its `tests/examples.test.ts` leaves it out of React's ids and `tests/vendored.test.ts`
 expects no copy of its `styles.ts` and siblings.
 Alternative: a capability attribute the example renders, checked by the spec; refused: it would
@@ -1271,13 +1274,19 @@ put test plumbing in copyable example code, and a forgotten port would skip sile
 being listed in one place.
 
 **The examples** (`examples/react/src/examples/<id>/index.tsx` + `styles.ts`; the README there is
-the authoring guide), by topic since #44 (Epic #49's gallery table; the orders keep gaps where its
-new examples go): Basics `basic`, `read-only`, `server-rendering`, `minimap-and-controls`; Nodes
-`custom-nodes`, `node-resizer`, `node-toolbar`, `sub-flows`; Edges `edge-types`, `edge-labels`,
-`edge-reconnect`; Connections `connection-validation`, `announcements`; Interaction
-`selection-and-keyboard`, `snap-to-grid`, `add-nodes`, `context-menu` (#33); Layout (none yet);
-Data and state `connected-data` (#36), `save-and-restore`, `undo-redo`; Styling `backgrounds`; Apps
-`workflow-builder` (the landing's showcase). `_kit/persistence.ts` and `_kit/undo.ts` are the
+the authoring guide), 44 since Epic #49, by topic in nine levels (#44; in sidebar order, each
+level's examples by `order`): Basics `basic`, `read-only`, `server-rendering`,
+`minimap-and-controls`, `stress-test`; Nodes `custom-nodes`, `shapes`, `node-resizer`,
+`node-toolbar`, `contextual-zoom`, `intersections`, `delete-middle-node`, `sub-flows`; Edges
+`edge-types`, `edge-labels`, `edge-markers`, `animating-edges`, `floating-edges`, `editable-edge`,
+`edge-reconnect`; Connections `connection-validation`, `easy-connect`, `proximity-connect`,
+`connection-line`, `announcements`; Interaction `selection-and-keyboard`, `snap-to-grid`,
+`helper-lines`, `add-nodes`, `context-menu` (#33), `copy-paste`; Layout `dagre-layout`,
+`elk-layout`, `auto-layout`, `force-layout`; Data and state `connected-data` (#36),
+`save-and-restore`, `undo-redo`, `collaborative`, `export-image`; Styling `backgrounds`,
+`gradient-styling`; Apps `workflow-builder` (the landing's showcase), `whiteboard`. Every case of
+React Flow's example catalogue maps to one of them (Epic #49's coverage map, the docs page
+`guides/react-flow-examples.mdx`, "Coming from xyflow's examples"). `_kit/persistence.ts` and `_kit/undo.ts` are the
 copyable app policy. Epic #26's options where they are natural (#25): `custom-nodes`' preview drags
 only by its title bar (`data-flow-drag-handle`, `styles.dragHandle` and `styles.grip` from the
 theme tokens), `minimap-and-controls`' zoom and fit-view buttons animate for 200 ms (`duration`),
@@ -1369,8 +1378,58 @@ written for any registry needs a cast on the `node.move` payload, `FlowModel<T>`
 `edges` is not assignable to `FlowModel`, nothing tells whether a batch may run transient,
 `useKeyPress` reports held keys only (no one-shot shortcut, no `preventDefault`), and the core has
 no bounds of an edge path or of the content (`export-image` parses its paths' points).
-The Vue, Svelte and Angular apps have every one of these (their own sections below), with no
-parity filter left.
+#48 (React only, likewise `PENDING`): the Layout level, each engine behind a framework-free
+`layout.ts` / `forces.ts` the ports copy unchanged, unit-tested with the real engine in node, the
+nodes declaring their sizes (an engine needs them before any measurement). `dagre-layout`
+(`@dagrejs/dagre`: the document into a dagre graph, `rankdir` TB / LR, nodesep 40, ranksep 70,
+dagre's centres back as top-left corners, `HANDLE_SIDES` per direction; computed before the first
+render, so it opens laid out and fitted with no animation; a "Direction" radio group, Vertical /
+Horizontal, lays it out again from the nodes' current places: the handles move to the new sides (a
+context and a `key` per direction, the engine has no public re-measure), the nodes glide for
+350 ms as one transient `batch` of `node.move` per frame (`tween.ts`, ease in-out), then one final
+batch that is not transient, then `fit-view` with `duration`; the root carries `data-direction` and,
+while the nodes move, `data-animating`), `elk-layout` (`elkjs/lib/elk.bundled.js`, async: a 9-node
+pipeline whose nodes have several named inputs (left) and outputs (right), each handle an ELK port
+on its side, `FIXED_SIDE`, ids `<node>:in|out:<handle>`; ELK's port order, read back from the
+ports' y, goes into the node's `data` with `node.set-data` and its places with `node.move` in ONE
+batch, no animation (the edges would cross while the nodes move), then `fit-view`; the handles are
+keyed by their side's order so they remount; an "Algorithm" radio group, Layered = `layered`, Tree =
+`mrtree`; a request id drops a stale result; the spec waits on the root's `data-layout="running" |
+"done"` and reads `data-algorithm`; `mrtree` ignores the port order, so crossings can remain
+there), `auto-layout` (a mind map laid out again by dagre after every change, animated as
+`dagre-layout`; `layout.ts` lays out the shown nodes only and leaves out an edge to a hidden node,
+or dagre would invent it; each topic has a "+" placeholder node, `add-<id>` with a dashed edge,
+whose press adds the child, its edge, its placeholder and that edge in one `batch` (`tree.ts`); the
+collapse toggle, `aria-expanded`, writes `collapsed` with `node.set-data` and the `hidden` flags
+that change (`node.set-flags`, `edge.set-flags`) in one batch, a subtree under a still-collapsed
+topic staying hidden on expand; the root counts finished layouts in `data-layouts`, which the spec
+waits on) and `force-layout` (`d3-force`: a 14-node service network; `forces.ts` turns top-left
+boxes into bodies at their centres, radius half the box's diagonal, and links from the edges, and
+creates the simulation stopped so the tests `tick(n)`; `alphaDecay` 0.04, settling in ~3 s; every
+tick is one transient `batch` of `node.move` that skips dragged and pinned nodes, `end` one final
+batch, the first also an instant `fit-view`; a drag pins the node (`onNodeDragStart`: `fx`/`fy`
+follow `node-by` of `dragging-node-ids` on each tick, `alphaTarget(0.3)`), the drop keeps it
+pinned (`onNodesMove`, `data-pinned`), a cancel unpins; "Restart" releases every pin and runs
+`alpha(1)`; edges centre to centre, `useInternalNode` and `straightPath`, no handles; the root's
+`data-simulation="running" | "settled"` and a `role="status"`). Follow-ups (no package change
+here): `node.move` refuses a node that is not draggable even from code, failing the whole batch, so
+a layout cannot move a node the user may not drag (`auto-layout`'s placeholders stay draggable),
+and `edge.add` refuses a node that is not connectable even from code (they stay connectable).
+
+**The examples apps' dependencies.** Each app depends on its adapter (`workspace:*`), its framework,
+its icons (`lucide-react`, `@lucide/vue`, `@lucide/svelte`, `@lucide/angular`) and what its
+vendored Fragiola UI needs; nothing else but, since Epic #49 and in `examples/react` only so far,
+the layout engines `@dagrejs/dagre` 3.1.3, `elkjs` 0.12.1 and `d3-force` 3.0.1 (`@types/d3-force`
+3.0.10), approved by the maintainer and pinned exactly (each published at least 7 days before).
+`tests/examples.test.ts` allows exactly `@dagrejs/dagre`, `elkjs/lib/elk.bundled.js` (ELK's
+browser build, no worker to serve) and `d3-force`, and `EXAMPLE_PACKAGES` (`examples/shared/src/framework.ts`)
+lists them in an example's manifest `packages` by package name, so the code panel names what to
+install. A port's Epic adds the same pins to its app. Declined: `yjs`, `html-to-image`,
+`perfect-freehand`, `libavoid`, puppeteer or a server (`collaborative` syncs over
+`BroadcastChannel`, `export-image` draws its own SVG, `whiteboard` smooths its own strokes).
+
+The Vue, Svelte and Angular apps have every example from before Epic #49 (their own sections
+below), with no parity filter left; Epic #49's new examples and extensions wait in `PENDING`.
 
 **Theme tokens** (`--fl-*`; `tests/themes.test.ts` holds the list, `e2e/themes.spec.ts` checks the
 shapes differ on computed styles): shape `font`, `font-size`, `title-weight`, `node-padding`,
@@ -2538,3 +2597,27 @@ Decisions of Epic #40 (#38 core, #39 adapters and docs; React Flow v12's SSR, `z
   `api/json-document.mdx` (the node fields, `DeclaredHandle`), the primitives' pages (`root`,
   `edges`, `nodes`, `node`, `resize-handle`, `node-resizer`, `nodes-selection`), the resizing,
   selection and keyboard guides, and `limitations.mdx`.
+
+Decisions of the React Flow examples (Epic #49: #44 to #48):
+
+- **Every case of React Flow's catalogue, no example twice**: 27 cases were already shown by an
+  existing example (two of them extended: `edge-reconnect`'s Delete on drop, `sub-flows`' grouping),
+  39 collapse into 22 new examples, and Base Style, Dark Mode and Tailwind are the five themes.
+  The map is `site/docs/guides/react-flow-examples.mdx` (its title avoids "Flow", which `www`
+  appends). React Flow was a behaviour reference only: the code, the data and the look are ours.
+- **The gallery by topic in nine levels** (`basics` … `apps`), the ids and URLs unchanged; the
+  orders follow the Epic's table.
+- **React first, the ports in their own Epics**: the new examples and extensions are `PENDING` in
+  Vue, Svelte and Angular (one place that lists what each port owes), so their suites skip them
+  instead of failing.
+- **Library gaps are follow-ups, never a package change here**: each Issue's paragraph above lists
+  them (the large-flow hot spots of #47, the flags `node.move` and `edge.add` enforce from code,
+  the unexported path helpers of #46, …); the examples build what is missing from the public API.
+- **Three dependencies, layout only** (approved): dagre, ELK and d3-force, in `examples/react`;
+  everything else is built in the example (the stress test's numbers, the collaborative transport,
+  the SVG export, the stroke smoothing, the edge routing).
+- **The stress test opens at 1 000 nodes** and offers 5 000, 10 000 and 20 000, with
+  `onlyRenderVisible`; the smoke runs the default size.
+- **Animations, async layouts and simulations are awaited through attributes** the example
+  renders (`data-animating`, `data-layouts`, `data-layout`, `data-simulation`), never timeouts;
+  a layout's final move is one non-transient batch, so an undo history sees one step.
