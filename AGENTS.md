@@ -546,6 +546,17 @@ through random flows and steps; `engine-geometry.test.ts` covers each invalidati
 `pnpm --filter @fragiola/flow bench` (`vitest.bench.config.ts`, not in `pnpm test`) prints the
 large-flow micro-benchmark.
 
+**The root's box is read once per turn** (#51, `rootBox()` in `create-flow-engine.ts`): every read
+that needs the view (the view rect, `root-size`, the client ↔ flow conversions) asks for the
+root's `getBoundingClientRect`, and a read after a DOM change forces a layout (Vue patches a node
+between two reads: a layout per new node). The engine keeps the box until the root window's next
+microtask (`queueMicrotask`, one clear queued at a time), and drops it at once on `setOptions` and
+when the root attaches or detaches (`destroy` detaches). The engine's own viewport writes (the
+viewport element's transform) never move or resize the root, and the root has no `ResizeObserver`
+(the observer measures nodes), so nothing else clears it. Without a root window's microtask queue
+it reads each time. A read sees the box as of its turn's first read: a root resized or moved in the
+same synchronous turn shows from the next microtask (`tests/engine/root-box.test.ts`).
+
 ## The React adapter (Issue #5)
 
 `@fragiola/flow-react` renders and wires; every rule is the core's. `export *` of the core (a local
@@ -956,19 +967,12 @@ Decisions of large flows in Vue (#51, Epic #52; React's of Epic #61, see the Rea
   engine measures a node when it is registered, so each node mounted in a patch forced a layout
   of its own (~4.2 s of a 10 000-node gestures profile, ~0.2 s after). Handles still register at
   once.
-- **The root's box is read once while the nodes layer patches** (`utils/root-box.ts`): the core
-  reads the root's `getBoundingClientRect` on each read that needs the view, and Vue renders a
-  new node after inserting the one before (React reads before committing), so each read forced a
-  layout (~3.8 s of the same profile, ~0.08 s after). The root element gets an own
-  `getBoundingClientRect` (removed when it detaches) that, while `Flow.Nodes` patches
-  (`onBeforeUpdate` → `holdRootBox`, until the microtask checkpoint), answers the box it read
-  first; else it reads. Follow-up: the core should cache the root's box (per task, or behind a
-  resize signal), which would drop this shadowing and help the other adapters.
 - **Tested** in `tests/render-counts.test.ts` (React's cases: a pan and zoom steps re-render and
   read no node or edge; nodes brought into view render alone and their measurement reads only the
   others' boxes and paths; a step that changes the render levels places the nodes again; a drag
   step re-renders the node and its edge; a culled flow renders none on the server and before the
-  engine), `flow-store.test.ts` and `root-box.test.ts`.
+  engine; a zoom out mounting 40 nodes reads the root's box a few times a step, not once per node:
+  the core keeps it for the turn, see the engine section), and `flow-store.test.ts`.
 
 ## The Svelte adapter (Issue #12)
 
@@ -2819,22 +2823,34 @@ Decisions of large flows (Epic #61: #59, the core; #60, the harness and the numb
   on the example's nodes (`contain: layout style`, `strict`) changed nothing measurable. What
   would remain: mounting fewer nodes per frame (spread over frames, which changes when a node
   appears) or drawing far zooms otherwise (canvas, out of scope).
-- **The root's box is still read per read** (`getBoundingClientRect`, for the view): caching it
-  needs a resize signal the engine does not have; it was ~4 % of the busy time of the 10 000-node
-  gestures in the profile of #59 (99 ms of 2.4 s).
+- **The root's box is read once per turn** (#51; until then per read, ~4 % of the busy time of
+  the 10 000-node gestures in the profile of #59, 99 ms of 2.4 s): the engine has no resize signal
+  for the root, so the box is kept only until the root window's next microtask (and dropped on
+  `setOptions`, attach and detach), never across turns; a read's value changes only for a root
+  resized within one synchronous turn (the engine section). It replaced #51's first fix, a
+  Vue-side `getBoundingClientRect` shadowing the app's root element while `Flow.Nodes` patched
+  (anything reading the box meanwhile, the app included, got the held one).
 - **Vue's numbers** (#51, `pnpm perf --framework vue`, the same machine and method; median / p95 /
   max ms, open with the nodes mounted meanwhile; React's on that day: 10 000 open 178 ms (51),
   zoom 16.7/34/71; 20 000 open 362 ms (50)):
 
-  | nodes | gesture | before #51 | after #51 |
-  | --- | --- | --- | --- |
-  | 1 000 | open | 122 ms (1 052 mounted) | 38 ms (52) |
-  | 1 000 | pan / zoom / drag | 16.6/18/22, 16.8/64/117, 16.7/18/50 | 16.6/19/24, 16.8/33/46, 16.7/18/33 |
-  | 10 000 | open | 1 058 ms (10 051 mounted) | 208 ms (51) |
-  | 10 000 | pan / zoom / drag | 16.6/20/24, 16.8/110/1 194, 16.7/20/51 | 16.7/18/23, 16.7/40/89, 16.7/19/43 |
-  | 20 000 | open | 2 035 ms (20 050 mounted) | 362 ms (50) |
-  | 20 000 | pan / zoom / drag | 16.7/21/38, 16.8/122/1 241, 16.7/24/57 | 16.7/19/41, 16.7/41/83, 16.7/18/58 |
+  | nodes | gesture | before #51 | after #51 | the box in the core |
+  | --- | --- | --- | --- | --- |
+  | 1 000 | open | 122 ms (1 052 mounted) | 38 ms (52) | |
+  | 1 000 | pan / zoom / drag | 16.6/18/22, 16.8/64/117, 16.7/18/50 | 16.6/19/24, 16.8/33/46, 16.7/18/33 | |
+  | 10 000 | open | 1 058 ms (10 051 mounted) | 208 ms (51) | 204 ms (51) |
+  | 10 000 | pan / zoom / drag | 16.6/20/24, 16.8/110/1 194, 16.7/20/51 | 16.7/18/23, 16.7/40/89, 16.7/19/43 | 16.6/19/34, 16.8/39/87, 16.7/19/53 |
+  | 20 000 | open | 2 035 ms (20 050 mounted) | 362 ms (50) | 352 ms (50) |
+  | 20 000 | pan / zoom / drag | 16.7/21/38, 16.8/122/1 241, 16.7/24/57 | 16.7/19/41, 16.7/41/83, 16.7/18/58 | 16.7/19/38, 16.8/39/81, 16.7/19/37 |
 
   The store and the culled first render alone left the 10 000 zoom at 16.8/104/1 017: the rest
-  was the two forced layouts above. What is left (zoom p95 40 against React's 34) is Vue's render
-  and patch of the nodes a far zoom out mounts; the profile showed no other adapter hot spot.
+  was two forced layouts per new node, one from its registration (see the Vue section) and one
+  from the root's box (~3.8 s of a 10 000-node gestures profile, ~0.08 s once read once per patch).
+  "The box in the core" is the engine's per-turn box with the Vue-side hold removed (five runs;
+  #51's code measured 181 ms / 16.8/42/83 / 357 ms the same hour, 189–208 ms over the day: the open
+  varies by ±20 ms between runs). React's 10 000 with and without the core's box, five runs each,
+  three times: open 185–202 against 176–201 ms, pan 16.7/18.3–18.8, zoom 16.7–16.8/34–36,
+  drag 16.7/19–20 either way: no measurable React change (React reads before its commit's DOM
+  changes, so a repeated read cost no layout, only the call). What is left (zoom p95 ~39
+  against React's ~35) is Vue's render and patch of the nodes a far zoom out mounts; the profile
+  showed no other adapter hot spot.

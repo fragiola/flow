@@ -126,7 +126,8 @@ export class EditorPage {
 
 The engine reads the root's box when it needs it: `engine.get("root-size")` gives it, and
 `fit-view`, `center-on`, the zoom buttons (they zoom around the root's centre), the minimap and
-`visible-nodes` use it.
+`visible-nodes` use it. It reads the box once per turn: a root you resize in your own code shows its
+new size from the next microtask (the next `await`, event or frame).
 
 ## Nodes size themselves
 
