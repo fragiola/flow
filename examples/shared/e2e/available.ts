@@ -66,6 +66,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "dagre-layout",
         "elk-layout",
         "auto-layout",
+        "force-layout",
     ],
     svelte: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -95,6 +96,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "dagre-layout",
         "elk-layout",
         "auto-layout",
+        "force-layout",
     ],
     angular: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -124,6 +126,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "dagre-layout",
         "elk-layout",
         "auto-layout",
+        "force-layout",
     ],
 };
 
