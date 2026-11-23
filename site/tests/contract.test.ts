@@ -101,6 +101,27 @@ describe("the site export", () => {
     it("passes the contract checks", () => {
         expect(validateSite(site)).toEqual([]);
     });
+
+    it("lists the gallery's nine topic groups, and every manifest in their order", () => {
+        expect(site.examples.levels.map((level) => level.id)).toEqual([
+            "basics",
+            "nodes",
+            "edges",
+            "connections",
+            "interaction",
+            "layout",
+            "data",
+            "styling",
+            "apps",
+        ]);
+        const rank = site.examples.levels.map((level) => level.id);
+        for (const [framework, manifest] of site.manifests) {
+            const keys = manifest.examples.map(
+                (example) => rank.indexOf(example.level) * 1000 + example.order,
+            );
+            expect(keys, framework).toEqual([...keys].sort((a, b) => a - b));
+        }
+    });
 });
 
 describe("the contract checks", () => {

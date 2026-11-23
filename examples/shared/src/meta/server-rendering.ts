@@ -5,7 +5,7 @@ export default {
     description:
         "Nodes that declare their size and handles, so their edges are drawn before anything is measured: in the server's HTML and the first render, with nothing moving once measured.",
     level: "basics",
-    order: 7,
+    order: 3,
     features: [
         "width / height",
         "handles",

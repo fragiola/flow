@@ -4,8 +4,8 @@ export default {
     title: "Context menu",
     description:
         "Right-click a node, the selection or the canvas for a menu of your own: the root's context-menu callbacks tell where, and a double click marks a task done.",
-    level: "building-blocks",
-    order: 8,
+    level: "interaction",
+    order: 5,
     features: [
         "onNodeContextMenu",
         "onPaneContextMenu",

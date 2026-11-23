@@ -1243,7 +1243,7 @@ Flow decided on top of it:
 | path | holds |
 | --- | --- |
 | `src/meta/<id>.ts` | one file per example: title, description, `level`, order, features, docs link, layout, height |
-| `src/meta-types.ts` | `LEVELS` (`basics`, `interaction`, `building-blocks`, `apps`, titled Basics, Interaction, Building blocks, Apps: `examples.json`'s `levels`), `DEFAULT_HEIGHT` |
+| `src/meta-types.ts` | `LEVELS` (#44: `basics`, `nodes`, `edges`, `connections`, `interaction`, `layout`, `data`, `styling`, `apps`, titled Basics, Nodes, Edges, Connections, Interaction, Layout, Data and state, Styling, Apps: `examples.json`'s `levels`), `DEFAULT_HEIGHT` (460, 600 for `layout` and `apps`) |
 | `src/framework.ts` | `FRAMEWORKS` (react, vue, svelte, angular), entry files, adapter and icon packages |
 | `src/themes/` | `light`, `dark`, `ide`, `paper`, `terminal` (one CSS file of values each, `themes.ts`: name, title, description, scheme, swatch) |
 | `src/embed/messages.ts` | `fragiola:example:ready` / `resize` / `theme` |
@@ -1255,11 +1255,12 @@ example, so a missing one fails its spec; a framework of a later adapter Epic is
 while its app is written (the test uses a fake one).
 
 **The examples** (`examples/react/src/examples/<id>/index.tsx` + `styles.ts`; the README there is
-the authoring guide): Basics `basic`, `custom-nodes`, `edge-types`, `edge-labels`, `backgrounds`,
-`read-only`; Interaction `selection-and-keyboard`, `connection-validation`, `edge-reconnect`,
-`snap-to-grid`, `minimap-and-controls`; Building blocks `sub-flows`, `node-resizer`,
-`node-toolbar`, `add-nodes`, `save-and-restore`, `undo-redo`, `announcements`, `context-menu` (#33),
-`connected-data` (#36); Apps
+the authoring guide), by topic since #44 (Epic #49's gallery table; the orders keep gaps where its
+new examples go): Basics `basic`, `read-only`, `server-rendering`, `minimap-and-controls`; Nodes
+`custom-nodes`, `node-resizer`, `node-toolbar`, `sub-flows`; Edges `edge-types`, `edge-labels`,
+`edge-reconnect`; Connections `connection-validation`, `announcements`; Interaction
+`selection-and-keyboard`, `snap-to-grid`, `add-nodes`, `context-menu` (#33); Layout (none yet);
+Data and state `connected-data` (#36), `save-and-restore`, `undo-redo`; Styling `backgrounds`; Apps
 `workflow-builder` (the landing's showcase). `_kit/persistence.ts` and `_kit/undo.ts` are the
 copyable app policy. Epic #26's options where they are natural (#25): `custom-nodes`' preview drags
 only by its title bar (`data-flow-drag-handle`, `styles.dragHandle` and `styles.grip` from the

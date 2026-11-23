@@ -35,15 +35,21 @@ fails `examples/shared/tests/meta.test.ts`. An example keeps its id in every fra
 
 ## Levels
 
-The gallery groups examples by level (`LEVELS` in `examples/shared/src/meta-types.ts`, in sidebar
-order); `order` is an example's place inside its level.
+The gallery groups examples by topic, its levels (`LEVELS` in `examples/shared/src/meta-types.ts`,
+in sidebar order); `order` is an example's place inside its level. The orders follow the gallery
+table of Epic #49 and keep gaps where its new examples go.
 
-| level | what belongs in it |
-|---|---|
-| `basics` | a flow drawn: the first flow, custom nodes, edge types and labels, backgrounds, a read-only diagram |
-| `interaction` | what a user does to it: select and use the keyboard, connect under rules, reconnect, snap, the minimap and the controls |
-| `building-blocks` | the pieces an editor is made of: sub-flows, resizers, toolbars, a palette, saving, undo, announcements |
-| `apps` | several features together, as a product would put them (`workflow-builder`, the landing's showcase) |
+| level | title | what belongs in it |
+|---|---|---|
+| `basics` | Basics | a flow drawn: the first flow, a read-only diagram, server rendering, the minimap and the controls |
+| `nodes` | Nodes | what a node is and does: custom nodes, resizers, toolbars, sub-flows and grouping |
+| `edges` | Edges | how an edge is drawn and changed: edge types, labels and toolbars, reconnecting and deleting on drop |
+| `connections` | Connections | drawing a new edge: rules and validation, the connection's announcements |
+| `interaction` | Interaction | what a user does to the flow: select and use the keyboard, snap, add nodes, context menus |
+| `layout` | Layout | placing nodes automatically (the layout examples of Epic #49) |
+| `data` | Data and state | the flow as data: computing over connections, saving and restoring, undo and redo |
+| `styling` | Styling | how a flow looks beyond the themes: backgrounds |
+| `apps` | Apps | several features together, as a product would put them (`workflow-builder`, the landing's showcase) |
 
 ## Adding an example
 

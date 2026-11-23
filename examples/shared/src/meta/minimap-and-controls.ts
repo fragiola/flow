@@ -4,8 +4,8 @@ export default {
     title: "Minimap and controls",
     description:
         "A minimap that pans and zooms the flow, and the zoom in, zoom out, fit view and lock buttons, each disabled at its limit.",
-    level: "interaction",
-    order: 5,
+    level: "basics",
+    order: 4,
     features: [
         "minimap()",
         "MiniMap",

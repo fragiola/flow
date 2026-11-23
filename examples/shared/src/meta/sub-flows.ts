@@ -4,8 +4,8 @@ export default {
     title: "Sub-flows",
     description:
         "Groups that hold child nodes: a child moves with its group and stays inside it, dragging a node onto a group puts it in, and edges between children are drawn above the groups.",
-    level: "building-blocks",
-    order: 1,
+    level: "nodes",
+    order: 8,
     features: [
         "subflows()",
         "parentId",

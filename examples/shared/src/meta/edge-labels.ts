@@ -4,8 +4,8 @@ export default {
     title: "Edge labels",
     description:
         "HTML labels at each edge's midpoint (a text, a badge, a remove button) and a toolbar on the selected edge that keeps its size at any zoom.",
-    level: "basics",
-    order: 4,
+    level: "edges",
+    order: 2,
     features: [
         "Flow.EdgeLabel",
         "Flow.EdgeToolbar",
