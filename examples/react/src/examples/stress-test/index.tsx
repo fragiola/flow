@@ -195,7 +195,7 @@ export default function StressTest() {
                     <Layers />
                 </Flow.Viewport>
             </Flow.Root>
-            <div className={styles.panel}>
+            <div data-flow-no-gesture="" className={styles.panel}>
                 <label className={styles.field}>
                     <span>Size</span>
                     <select

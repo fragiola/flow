@@ -264,7 +264,12 @@ function Clipboard({ pointer }: { pointer: RefObject<XY | undefined> }) {
     }, [pasteKeys]);
 
     return (
-        <div role="toolbar" aria-label="Clipboard" className={styles.panel}>
+        <div
+            role="toolbar"
+            aria-label="Clipboard"
+            data-flow-no-gesture=""
+            className={styles.panel}
+        >
             <button
                 type="button"
                 disabled={selected === 0}

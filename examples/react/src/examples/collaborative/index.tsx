@@ -244,7 +244,7 @@ function Side({ name, hub }: { name: string; hub: Hub }) {
                         <Flow.ConnectionLine className={styles.connection} />
                         <Cursors presence={presence} />
                     </Flow.Viewport>
-                    <div className={styles.header}>
+                    <div data-flow-no-gesture="" className={styles.header}>
                         <h2 className={styles.name(name)}>{name}</h2>
                         <button
                             type="button"

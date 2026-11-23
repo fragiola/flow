@@ -120,7 +120,12 @@ function Toolbar() {
     }
 
     return (
-        <div role="toolbar" aria-label="Export" className={styles.panel}>
+        <div
+            role="toolbar"
+            aria-label="Export"
+            data-flow-no-gesture=""
+            className={styles.panel}
+        >
             <button type="button" onClick={onSvg} className={styles.primary}>
                 <FileCodeIcon />
                 Download SVG
