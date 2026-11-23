@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createFlowModel, createFlowRef, type FlowModel } from "../src/index";
+import { elementProps, styleRecord } from "../src/utils/render";
 import EdgePathFlow from "./fixtures/edge-path-flow.svelte";
 import TestFlow from "./fixtures/test-flow.svelte";
 import { installLayout, pair, part, render, task } from "./flow";
@@ -128,5 +129,36 @@ describe("rendering a flow", () => {
                 .ok,
         ).toBe(true);
         expect(onnodeschange).not.toHaveBeenCalled();
+    });
+});
+
+describe("a part's style", () => {
+    const base = { position: "absolute", top: "0", left: "50%" };
+
+    it("lets a consumer's undefined (or null) key remove the part's default key, as React's and Vue's", () => {
+        const props = elementProps({
+            rest: {},
+            style: { top: undefined, left: null, color: "red" },
+            state: {},
+            own: {},
+            baseStyle: base,
+        });
+        expect(props.style).toBe("position: absolute; color: red");
+    });
+
+    it("keeps an undefined key in the record, and the structural keys over the consumer's", () => {
+        expect(styleRecord({ fontSize: 12, top: undefined })).toEqual({
+            "font-size": 12,
+            top: undefined,
+        });
+        const props = elementProps({
+            rest: {},
+            style: { position: undefined, left: "10px" },
+            state: {},
+            own: {},
+            baseStyle: base,
+            structural: { position: "absolute" },
+        });
+        expect(props.style).toBe("position: absolute; top: 0; left: 10px");
     });
 });

@@ -1165,6 +1165,10 @@ point)`, `NodeResizer`'s `direction`, `FitView`'s `padding`, `nodeIds`, `include
 - **`Flow.EdgePath` renders its `children` snippet inside its `<path>`** (#53), given `{ state }`,
   as React's children (an `<animate>`); it had none (Vue's #51 gap). `tests/render.test.ts`
   (`fixtures/edge-path-flow.svelte`): the child in the SVG namespace, and an empty path without.
+- **A consumer's `undefined` style key removes the part's default one** (#54, React's and Vue's):
+  `styleRecord` keeps a record's `undefined` (or `null`) key, so `{ ...baseStyle, ...consumer }`
+  drops the default (a handle's side placement) and `styleString` writes no declaration for it;
+  structural keys still win. `tests/render.test.ts` ("a part's style").
 - **Gotcha, a template's `{f(x.current)}` is no render count**: once the value had changed, Svelte
   (5.57.3) called `f` again on every later revision although `x.current` stayed equal (the DOM was
   untouched); the probes count with an `$effect.pre` instead.
@@ -1817,11 +1821,11 @@ whose top elements are bare SVG declares `<svelte:options namespace="svg" />` (`
 drawing layer carries the examples' first `svelte-ignore a11y_no_static_element_interactions` (its
 markup is React's, a `div` with pointer handlers and no role). `animating-edges` puts its
 `<animate>` in `Flow.EdgePath`'s `children` snippet, which #53 added to the adapter (it had none).
-**Gap, worked around:** Svelte's `styleRecord` drops a consumer style key whose value is
-`undefined`, where React's (and Vue's) `undefined` removes the part's base key, so `easy-connect`
-clears a handle's side placement with empty strings (`{ top: "", left: "", transform: "" }`).
-Follow-up: let an `undefined` consumer key remove a base key in the adapter. Every shared spec of
-these passed with no other adapter fix.
+Svelte's `styleRecord` dropped a consumer style key whose value is `undefined`, where React's
+(and Vue's) `undefined` removes the part's base key, so `easy-connect` cleared a handle's side
+placement with empty strings; #54 fixed the adapter (see the Svelte adapter's style note) and the
+example's `COVER` is React's (`{ top: undefined, left: undefined, transform: undefined }`). Every
+shared spec of these passed with no other adapter fix.
 
 ## The Angular examples and the Angular docs (Issue #16)
 

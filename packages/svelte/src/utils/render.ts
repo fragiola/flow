@@ -107,11 +107,15 @@ function cssName(name: string): string {
         : name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
 }
 
-/** A consumer's style (a CSS string or a record) as one record of kebab-case properties. */
+/**
+ * A consumer's style (a CSS string or a record) as one record of kebab-case properties. A record's
+ * `undefined` (or `null`) key is kept as `undefined`, so it removes the part's default key, as in
+ * React and Vue.
+ */
 export function styleRecord(
     style: StyleValue | null | undefined,
-): Record<string, string | number> {
-    const result: Record<string, string | number> = {};
+): Record<string, string | number | undefined> {
+    const result: Record<string, string | number | undefined> = {};
     if (typeof style === "string") {
         for (const declaration of style.split(/;(?![^(]*\))/g)) {
             const index = declaration.indexOf(":");
@@ -122,9 +126,7 @@ export function styleRecord(
         }
     } else if (style) {
         for (const [name, value] of Object.entries(style)) {
-            if (value !== undefined && value !== null) {
-                result[cssName(name)] = value;
-            }
+            result[cssName(name)] = value ?? undefined;
         }
     }
     return result;
@@ -165,7 +167,7 @@ interface ElementOptions<State> {
  * The props of a primitive's element: the consumer's over the primitive's (handlers composed,
  * internal first; attachments kept), the class and the style resolved against the state, the
  * structural style keys over the consumer's (an `undefined` one removes the consumer's), the
- * consumer's over the default ones.
+ * consumer's over the default ones (an `undefined` one removes the default).
  */
 export function elementProps<State, E extends Element = HTMLElement>(
     options: ElementOptions<State>,

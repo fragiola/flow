@@ -67,11 +67,12 @@
         json.nodes.map((node) => [node.id, node.data.label]),
     );
 
-    /**
-     * A handle as large as its node: the classes place it, not its side. A style's `undefined`
-     * leaves the side's place in Svelte, so each is emptied (an empty declaration is dropped).
-     */
-    const COVER = { top: "", left: "", transform: "" };
+    /** A handle as large as its node: the classes place it, not its side. */
+    const COVER = {
+        top: undefined,
+        left: undefined,
+        transform: undefined,
+    };
 </script>
 
 <script lang="ts">
