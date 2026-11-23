@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createFlowModel, createFlowRef, type FlowModel } from "../src/index";
+import EdgePathFlow from "./fixtures/edge-path-flow.svelte";
 import TestFlow from "./fixtures/test-flow.svelte";
 import { installLayout, pair, part, render, task } from "./flow";
 
@@ -32,6 +33,29 @@ describe("rendering a flow", () => {
         expect(
             container.querySelectorAll('[data-flow-part="handle"]'),
         ).toHaveLength(4);
+    });
+
+    it("renders an edge path's children snippet inside its <path>, given its state, as React's children", async () => {
+        const { container } = await render(EdgePathFlow, {
+            defaultNodes: pair().nodes,
+            defaultEdges: pair().edges,
+        });
+        const path = part(part(container, "edge", "ab"), "edge-path");
+        const animate = path.querySelector("animate");
+        expect(animate).not.toBeNull();
+        expect(animate?.parentElement).toBe(path);
+        expect(animate?.namespaceURI).toBe("http://www.w3.org/2000/svg");
+        expect(animate).toHaveAttribute("data-edge", "ab");
+    });
+
+    it("renders an edge path with no children as an empty <path>", async () => {
+        const { container } = await render(TestFlow, {
+            defaultNodes: pair().nodes,
+            defaultEdges: pair().edges,
+        });
+        expect(
+            part(part(container, "edge", "ab"), "edge-path").children,
+        ).toHaveLength(0);
     });
 
     it("positions each node with a structural transform at its place, with the document's size", async () => {
