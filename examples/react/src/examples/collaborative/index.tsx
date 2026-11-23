@@ -265,10 +265,24 @@ export default function Collaborative() {
     const [hub] = useState(createHub);
     const [tabs, setTabs] = useState(false);
     // other tabs of this page join over a BroadcastChannel, where the browser has one
+    // the page leaving (closed, reloaded, navigated away) closes it too: an unmount does not run
+    // then, and the other tabs would keep this page's cursors; a page back from the back-forward
+    // cache joins again
     useEffect(() => {
-        const bridge = bridgeTabs(hub, CHANNEL);
+        let bridge = bridgeTabs(hub, CHANNEL);
         setTabs(bridge.connected);
-        return () => bridge.close();
+        const onPageHide = () => bridge.close();
+        const onPageShow = (event: PageTransitionEvent) => {
+            if (!event.persisted) return;
+            bridge = bridgeTabs(hub, CHANNEL);
+        };
+        window.addEventListener("pagehide", onPageHide);
+        window.addEventListener("pageshow", onPageShow);
+        return () => {
+            window.removeEventListener("pagehide", onPageHide);
+            window.removeEventListener("pageshow", onPageShow);
+            bridge.close();
+        };
     }, [hub]);
     return (
         <div className={styles.frame}>

@@ -156,6 +156,35 @@ describe("the bridge to other tabs", () => {
         bridge.close();
     });
 
+    it("says leave for each of this page's peers before its channel closes", () => {
+        const hub = createHub();
+        const alice = hub.join("alice", "Alice", () => {});
+        hub.join("bob", "Bob", () => {});
+        const posted: unknown[] = [];
+        let closed = false;
+        const bridge = bridgeTabs(hub, "fake", () => ({
+            postMessage: (message) => {
+                if (closed) throw new Error("posted after closing");
+                posted.push(message);
+            },
+            addEventListener: () => {},
+            close() {
+                closed = true;
+            },
+        }));
+        alice.send({ type: "cursor", at: { x: 1, y: 2 } });
+        posted.length = 0;
+        bridge.close();
+        expect(closed).toBe(true);
+        expect(posted).toEqual([
+            { type: "leave", from: "alice", name: "Alice" },
+            { type: "leave", from: "bob", name: "bob" },
+        ]);
+        // closing twice says nothing more
+        bridge.close();
+        expect(posted).toHaveLength(2);
+    });
+
     it("does nothing where there is no BroadcastChannel", () => {
         vi.stubGlobal("BroadcastChannel", undefined);
         const bridge = bridgeTabs(createHub(), "none");

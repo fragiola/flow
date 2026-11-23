@@ -171,8 +171,9 @@ function openBroadcast(name: string): ChannelLike | undefined {
  * Joins `hub` to the hubs of other tabs over a `BroadcastChannel` named `name`: what a peer of
  * this page sends is posted to the channel, and what another tab posts is passed into this hub
  * under its own sender, never back out (a message of this page's own peers coming back is
- * dropped). On opening it says hello, for a peer of a tab already open to send the document. Where
- * `BroadcastChannel` does not exist, it does nothing.
+ * dropped). On opening it says hello, for a peer of a tab already open to send the document; on
+ * closing it says leave for each of this page's peers. Where `BroadcastChannel` does not exist, it
+ * does nothing.
  */
 export function bridgeTabs(
     hub: Hub,
@@ -183,8 +184,12 @@ export function bridgeTabs(
     if (!channel) return { connected: false, close() {} };
     let closed = false;
     const id = `tab-${Math.random().toString(36).slice(2, 10)}`;
+    // the names of this page's peers, as their messages pass, for their leave on closing
+    const names = new Map<string, string>();
     const peer = hub.join(id, "tab", (message) => {
-        if (!closed) channel.postMessage(message);
+        if (closed) return;
+        names.set(message.from, message.name);
+        channel.postMessage(message);
     });
     channel.addEventListener("message", (event) => {
         if (closed || !isMessage(event.data)) return;
@@ -200,6 +205,16 @@ export function bridgeTabs(
         connected: true,
         close() {
             if (closed) return;
+            // the other tabs forget this page's peers (their cursors and selections) before the
+            // channel closes: a peer leaving after it would never reach them
+            for (const from of hub.peers()) {
+                if (from === id) continue;
+                channel.postMessage({
+                    type: "leave",
+                    from,
+                    name: names.get(from) ?? from,
+                } satisfies Message);
+            }
             peer.leave();
             closed = true;
             channel.close();

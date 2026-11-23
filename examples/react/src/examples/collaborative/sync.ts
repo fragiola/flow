@@ -4,6 +4,10 @@ import type { Changes, Entity, Message, Peer, Point } from "./transport";
 // changed (`changesOf`: the nodes and edges it put or removed, the selection left out, because a
 // selection is each side's own), and a peer applies what it receives as one `batch` of the
 // commands `commands-to` gives (`merged`), so the last command to arrive wins for what it touched.
+// That is this example's limit, on purpose: nothing is versioned, so two sides changing one node at
+// the same moment are not merged. With the hub in memory, and a BroadcastChannel delivering in
+// order, they still agree; over a real network, where each side can see the other's change last,
+// they need versions or a CRDT (or a server ordering the changes) to agree.
 // A batch applied from a peer carries `REMOTE_META`, and what carries it is never sent again: no
 // echo. A drag's transient moves are sent as they come, so the other side follows the drag. What
 // each side selects and where its pointer is travel as presence (`presenceAfter`), never as
