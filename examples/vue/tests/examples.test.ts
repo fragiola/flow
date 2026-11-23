@@ -15,7 +15,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 // The Vue side of the example contract: an example is single-file components (`index.vue` its
 // entry), `styles.ts` and plain TypeScript siblings, importing only what a consumer can copy:
 // `vue`, the Vue package and its feature entries, `@lucide/vue`, the Fragiola UI pieces
-// (`#/components/…`, `#/lib/cn`) and relative files inside examples/. Every example assembles the
+// (`#/components/…`, `#/lib/cn`), the layout engines and relative files inside examples/. Every example assembles the
 // flow itself, keeps the id it has in examples/react, and binds its classes from `styles.ts`. What
 // every framework shares (the metadata) is checked in examples/shared/tests.
 
@@ -32,6 +32,11 @@ const ALLOWED = [
     /^@lucide\/vue$/,
     /^#\/components\/(ui|atoms)\/[a-z-]+$/,
     /^#\/lib\/cn$/,
+    // the layout examples' engines (Epic #49): examples/react's exact pins in examples/vue/package.json;
+    // ELK's browser build is its bundled file (no worker to serve)
+    /^@dagrejs\/dagre$/,
+    /^elkjs\/lib\/elk\.bundled\.js$/,
+    /^d3-force$/,
 ];
 
 /** Whether an example may import `specifier` (relative files aside). */
@@ -114,6 +119,11 @@ describe("the Vue examples", () => {
         expect(allowed("@fragiola/flow-vue")).toBe(true);
         expect(allowed("@fragiola/flow-vue/minimap")).toBe(true);
         expect(allowed("#/components/ui/select")).toBe(true);
+        expect(allowed("@dagrejs/dagre")).toBe(true);
+        expect(allowed("elkjs/lib/elk.bundled.js")).toBe(true);
+        expect(allowed("elkjs")).toBe(false);
+        expect(allowed("d3-force")).toBe(true);
+        expect(allowed("d3")).toBe(false);
     });
 
     it.each(slugs)("%s shows its entry first in the code panel", (slug) => {

@@ -1,5 +1,5 @@
 import { partAttributes } from "@fragiola/flow";
-import { useFlowValue } from "../composables/internal";
+import { sameValue, useFlowValue } from "../composables/internal";
 import { useFlowContext } from "../context";
 import {
     definePrimitive,
@@ -33,14 +33,19 @@ export const MiniMapNode: FlowComponent<MiniMapNodeProps, MiniMapNodeSlots> =
         (props, { attrs, slots }) => {
             const view = useMiniMapView("MiniMapNode");
             const context = useFlowContext("MiniMapNode");
-            const attributes = useFlowValue(context, () => {
-                const engine = context.engine.value;
-                return engine
-                    ? engine.adapter.attributes("minimap-node", {
-                          nodeId: props.nodeId,
-                      })
-                    : partAttributes("minimap-node", props.nodeId);
-            });
+            const attributes = useFlowValue(
+                context,
+                () => {
+                    const engine = context.engine.value;
+                    return engine
+                        ? engine.adapter.attributes("minimap-node", {
+                              nodeId: props.nodeId,
+                          })
+                        : partAttributes("minimap-node", props.nodeId);
+                },
+                sameValue,
+                "entity",
+            );
             return () => {
                 const box = view.value.nodes.find(
                     (node) => node.nodeId === props.nodeId,

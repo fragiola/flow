@@ -60,6 +60,32 @@ describe("the manifest", () => {
         ]);
     });
 
+    it("lists the layout engines a Vue example imports, from its SFC and its plain siblings", async () => {
+        const fake = fakeApp("vue", {
+            "basic/index.vue": [
+                '<script setup lang="ts">',
+                'import { Flow } from "@fragiola/flow-vue";',
+                'import ELK from "elkjs/lib/elk.bundled.js";',
+                'import { layout } from "./layout";',
+                "</script>",
+                "",
+            ].join("\n"),
+            "basic/layout.ts": [
+                'import dagre from "@dagrejs/dagre";',
+                'import { forceSimulation } from "d3-force";',
+                "",
+            ].join("\n"),
+        });
+        remove = fake.remove;
+        const manifest = await buildManifest(fake.app);
+        expect(manifest.examples[0]?.packages).toEqual([
+            "@fragiola/flow-vue",
+            "@dagrejs/dagre",
+            "d3-force",
+            "elkjs",
+        ]);
+    });
+
     it("lists the React package for every React example", async () => {
         const manifest = await buildManifest(examplesApp("react"));
         expect(manifest.examples.length).toBeGreaterThan(0);

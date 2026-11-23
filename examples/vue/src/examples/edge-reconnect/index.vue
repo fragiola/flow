@@ -1,6 +1,7 @@
 <script lang="ts">
 import type {
     FlowEdgeInput,
+    FlowEngineEventOf,
     FlowNodeInput,
     FlowTypes,
 } from "@fragiola/flow-vue";
@@ -13,6 +14,9 @@ import { selection } from "@fragiola/flow-vue/selection";
 // (drawn here as a ring at each end) or the stroke near an end, and drop it on another handle. The
 // edge keeps its id (`edge.reconnect`); dropped nowhere or on a refused handle, it goes back. The
 // "locked" edge is not reconnectable (`reconnectable: false`).
+//
+// "Delete on drop" is app policy over the `reconnect-cancel` event (`@reconnect-cancel`): an end
+// released over no handle (`dropped`, no `to`, not `refused`) removes its edge with `edge.remove`.
 
 interface Types extends FlowTypes {
     readonly nodes: { device: { label: string } };
@@ -54,10 +58,21 @@ const edges: FlowEdgeInput<Types>[] = [
 </script>
 
 <script setup lang="ts">
-import { typedFlow } from "@fragiola/flow-vue";
+import { typedFlow, useFlowRef } from "@fragiola/flow-vue";
+import { ref } from "vue";
 import { styles } from "./styles";
 
 const Flow = typedFlow<Types, typeof features>();
+const flow = useFlowRef<Types, typeof features>();
+const deleteOnDrop = ref(false);
+
+/** An end dropped on the pane, with "Delete on drop" on: the edge goes. */
+function onReconnectCancel(event: FlowEngineEventOf<"reconnect-cancel">) {
+    if (!deleteOnDrop.value || !event.dropped || event.to || event.refused) {
+        return;
+    }
+    flow.value?.model.run("edge.remove", { edgeId: event.edgeId });
+}
 </script>
 
 <template>
@@ -66,7 +81,9 @@ const Flow = typedFlow<Types, typeof features>();
         :default-nodes="nodes"
         :default-edges="edges"
         :fit-view="{ padding: 0.2, maxZoom: 1 }"
+        :flow-ref="flow"
         :class="styles.root"
+        @reconnect-cancel="onReconnectCancel"
     >
         <Flow.Background variant="dots" :size="2" :class="styles.dots" />
         <Flow.Background variant="lines" :class="styles.lines" />
@@ -96,5 +113,15 @@ const Flow = typedFlow<Types, typeof features>();
             </Flow.Nodes>
             <Flow.ConnectionLine :class="styles.connection" />
         </Flow.Viewport>
+        <label data-flow-no-gesture :class="styles.option">
+            <input
+                v-model="deleteOnDrop"
+                type="checkbox"
+                role="switch"
+                :aria-checked="deleteOnDrop"
+                :class="styles.switch"
+            />
+            Delete on drop
+        </label>
     </Flow.Root>
 </template>

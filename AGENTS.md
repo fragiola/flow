@@ -158,7 +158,7 @@ examples show them as copyable code.
 | `pnpm --filter examples-angular dev` | the Angular embed alone, port 5188 (`PORT` moves it; `?id=<id>&theme=<name>`) |
 | `pnpm --filter examples-react vendor` | vendors Fragiola UI (`scripts/vendor-fragiola.ts`; `FRAGIOLA_REGISTRY` points it elsewhere) |
 | `pnpm site:export --base /flow --out <dir>` | the site export (contract v1.7): builds the packages and each framework's embed, writes the pages, `examples.json`, `project.json` and the manifests, then validates the output and exits non-zero on any violation ([The site export](#the-site-export-issue-7)) |
-| `pnpm perf` | the large-flow frame times (Epic #61, `scripts/perf.ts`, not in CI): builds the core, the React package and the React embed (into a temporary directory), serves it (`examples/shared/e2e/serve.ts`, its own process group, stopped on exit) and drives `stress-test` in Chromium with Playwright: per size, the open time and the nodes mounted meanwhile, then a pan, a zoom out and back and a node drag of 120 steps at 60 Hz; prints median / p95 / max frame times per size and gesture, the median of the runs. `--sizes 1000,10000,20000`, `--runs 3`, `--steps 120`, `--no-build` (the packages' last `dist`), `--dist <dir>` (an embed built before with `EMBED_BASE=/`), `--profile <dir>` (CPU profiles of each size's first open and gestures), `--json <file>`, `--headed`, `--verbose`. About a minute for the defaults |
+| `pnpm perf` | the large-flow frame times (Epic #61, `scripts/perf.ts`, not in CI): `--framework react` (the default) or `vue` (#51); builds the core, that framework's package and its embed (into a temporary directory), serves it (`examples/shared/e2e/serve.ts`, its own process group, stopped on exit) and drives `stress-test` in Chromium with Playwright: per size, the open time and the nodes mounted meanwhile, then a pan, a zoom out and back and a node drag of 120 steps at 60 Hz; prints median / p95 / max frame times per size and gesture, the median of the runs. `--sizes 1000,10000,20000`, `--runs 3`, `--steps 120`, `--no-build` (the packages' last `dist`), `--dist <dir>` (an embed built before with `EMBED_BASE=/`), `--profile <dir>` (CPU profiles of each size's first open and gestures), `--json <file>`, `--headed`, `--verbose`. About a minute for the defaults |
 | `pnpm site:dev --base /flow --port 5185` | every framework's embed with hot reload behind one port (`site/dev-proxy.ts`), for `www`'s dev mode |
 
 There is no `changeset` or `release:version` script (D15).
@@ -209,7 +209,8 @@ matrix runs every framework in two shards (`shard: ["1/2", "2/2"]`, `--shard`): 
 Vue's, Svelte's and Angular's suites to React's size. Each shard builds its own embed. The
 playground's suite (214 tests, ~3 min 26 s for the whole job) stays in one. Measured locally
 after #48 (4 workers): the playground in ~59 s; React's examples in ~120 s; Vue's, Svelte's and
-Angular's 328 each, 226 run and the 102 `PENDING` ones skipped, in ~27 to ~37 s.
+Angular's 328 each, 226 run and the 102 `PENDING` ones skipped, in ~27 to ~37 s. After #51 (Epic
+#52), Vue's 462, every one run (none `PENDING`), in ~56 s; React's 462 in ~2 min.
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
@@ -544,6 +545,22 @@ per gesture step (a pan's first step included: `tests/engine/gesture-notificatio
 through random flows and steps; `engine-geometry.test.ts` covers each invalidation;
 `pnpm --filter @fragiola/flow bench` (`vitest.bench.config.ts`, not in `pnpm test`) prints the
 large-flow micro-benchmark.
+
+**The root's box is read once per turn** (#51, `rootBox()` in `create-flow-engine.ts`): every read
+that needs the view (the view rect, `root-size`, the client ↔ flow conversions) asks for the
+root's `getBoundingClientRect`, and a read after a DOM change forces a layout (Vue patches a node
+between two reads: a layout per new node). The engine keeps the box until the next microtask
+(`Promise.resolve().then`, one clear queued at a time; not the window's `queueMicrotask`, which an
+app's Jest or Vitest fake timers may hold; `Promise` is a JS builtin, the core guard allows it),
+and drops it at once on `setOptions`, when the root attaches or detaches (`destroy` detaches), and
+at the start of the app's verbs that place or map the view (`FRESH_BOX_ACTIONS`: `fit-view`,
+`center-on`, `focus-node`, `set-viewport`, `zoom-in`, `zoom-out`, `zoom-to`, `pan-by`, their
+`can`/`check` too; `FRESH_BOX_READS`: `get` of `screen-to-flow` and `flow-to-screen`; no adapter
+calls them per render, so the per-render saving stays). The engine's own viewport writes (the
+viewport element's transform) never move or resize the root, and the root has no `ResizeObserver`
+(the observer measures nodes), so nothing else clears it. Any other read sees the box as of its
+turn's first read: a root resized or moved in the same synchronous turn shows there from the next
+microtask (`tests/engine/root-box.test.ts`).
 
 ## The React adapter (Issue #5)
 
@@ -932,6 +949,40 @@ Decisions of #39 in Vue (React's, see the React section and the engine's SSR rul
   with its `svg` and its own HTML layer, where its edges' labels render; `Flow.Nodes` without `isolation` then. An edge that changes level is a new slot
   component (remounted); `Flow.Edge` calls `refocus` on mount. `tests/layers.test.ts`.
 - **`ResizeHandle`** takes `direction` and `variant` (in its slot state), as React's.
+
+Decisions of large flows in Vue (#51, Epic #52; React's of Epic #61, see the React section):
+
+- **One store per root** (`utils/flow-store.ts`, on `context.store`): `shallowRef` counters the
+  root bumps, read by each `useFlowValue` computed of its scope. `view` (still `revision`):
+  every model commit and every engine notification. `entity` (`useNode`, `useEdge`,
+  `useEdgePath`, `EdgePath`, `EdgeLabel`, `ReconnectAnchor`, `useHandle`, `MiniMapNode`,
+  `NodeResizer`, `ResizeHandle`, React's list): a commit that changed `all-nodes` or `all-edges`,
+  a gesture, any notification while there are (or were) several render levels, a measurement
+  with a viewport change. A measured-only notification bumps `measure` (an entity reader with no
+  node or edge) and only the records whose token (`node-rect-by` + `node-measured`, or
+  `edge-path-by`) changed identity; a record is kept while it has readers (acquired by a `watch`
+  of the entity's key, released on scope dispose). A commit that keeps both lists bumps `view`
+  only (React tells nothing; kept so the existing tests stay as they were). The static geometry
+  follows `entity`.
+- **A culled flow renders nothing before the engine** (`onlyRenderVisible` on the context):
+  `Flow.Nodes` no node and the edges no edge (their levels kept, empty), on the server too; a flow
+  that is not culled keeps its first render (`tests/ssr.test.ts`, `hydration.test.ts`).
+- **Node registrations wait for the end of the patch** (`useNode`; an unmount cancels a pending
+  one): Vue calls an element's function ref as soon as it is inserted, and the engine measures a
+  node when it is registered, so each node mounted in a patch forced a layout of its own (~4.2 s
+  of a 10 000-node gestures profile, ~0.2 s after). The batch is a `queuePostFlushCb` job with
+  the template-ref id (-1), not a `nextTick` callback (with which a node added by the app was not
+  registered after its own `await nextTick()`: `focus-node` refused it): it runs after the patch,
+  before the mounted hooks, the `flush: "post"` watchers and the patch's `nextTick`, as a ref set
+  during the patch did. Each registration runs on its own; the ones that throw go to Vue's
+  `handleError` (the app's `errorHandler`) after the batch, the rest still registered
+  (`tests/nodes.test.ts`, "node registration"). Handles still register at once.
+- **Tested** in `tests/render-counts.test.ts` (React's cases: a pan and zoom steps re-render and
+  read no node or edge; nodes brought into view render alone and their measurement reads only the
+  others' boxes and paths; a step that changes the render levels places the nodes again; a drag
+  step re-renders the node and its edge; a culled flow renders none on the server and before the
+  engine; a zoom out mounting 40 nodes reads the root's box a few times a step, not once per node:
+  the core keeps it for the turn, see the engine section), and `flow-store.test.ts`.
 
 ## The Svelte adapter (Issue #12)
 
@@ -1330,13 +1381,15 @@ the per-framework skip of what a later Epic ports: whole examples (`<slug>`) and
 (`<slug>#<case>`, `pendingCase`); a spec that needs one is skipped in that framework with a
 "(PENDING)" reason instead of failing (`requireCase(slug, case)` as a test's first line for a
 case; `openExample` for an example). React never has any; the Epic that ports an entry to a
-framework deletes it there. Today Vue, Svelte and Angular wait for `edge-reconnect#delete-on-drop`,
+framework deletes it there. Today Svelte and Angular wait for `edge-reconnect#delete-on-drop`,
 `sub-flows#selection-grouping` and the new examples of #45 (`shapes`, `easy-connect`,
 `proximity-connect`, `delete-middle-node`, `intersections`, `contextual-zoom`, `connection-line`)
 and of #46 (`edge-markers`, `animating-edges`, `floating-edges`, `editable-edge`,
 `gradient-styling`, `whiteboard`) and of #47 (`helper-lines`, `copy-paste`, `collaborative`,
 `export-image`, `stress-test`) and of #48 (`dagre-layout`, `elk-layout`, `auto-layout`,
-`force-layout`): Epic #49 writes them in React, the ports' Epics follow. A pending whole example has nothing in the
+`force-layout`): Epic #49 writes them in React, the ports' Epics follow. Vue (Epic #52) has
+every one since #51 (the extensions and the examples of #45 and #46 since #50): `PENDING.vue` is
+empty. A pending whole example has nothing in the
 port's app yet: its `tests/examples.test.ts` leaves it out of React's ids and `tests/vendored.test.ts`
 expects no copy of its `styles.ts` and siblings.
 Alternative: a capability attribute the example renders, checked by the spec; refused: it would
@@ -1489,10 +1542,11 @@ and `edge.add` refuses a node that is not connectable even from code (they stay 
 
 **The examples apps' dependencies.** Each app depends on its adapter (`workspace:*`), its framework,
 its icons (`lucide-react`, `@lucide/vue`, `@lucide/svelte`, `@lucide/angular`) and what its
-vendored Fragiola UI needs; nothing else but, since Epic #49 and in `examples/react` only so far,
+vendored Fragiola UI needs; nothing else but, since Epic #49 in `examples/react` and since #51 in
+`examples/vue` (the same pins),
 the layout engines `@dagrejs/dagre` 3.1.3, `elkjs` 0.12.1 and `d3-force` 3.0.1 (`@types/d3-force`
 3.0.10), approved by the maintainer and pinned exactly (each published at least 7 days before).
-`tests/examples.test.ts` allows exactly `@dagrejs/dagre`, `elkjs/lib/elk.bundled.js` (ELK's
+Each app's `tests/examples.test.ts` allows exactly `@dagrejs/dagre`, `elkjs/lib/elk.bundled.js` (ELK's
 browser build, no worker to serve) and `d3-force`, and `EXAMPLE_PACKAGES` (`examples/shared/src/framework.ts`)
 lists them in an example's manifest `packages` by package name, so the code panel names what to
 install. A port's Epic adds the same pins to its app. Declined: `yjs`, `html-to-image`,
@@ -1500,7 +1554,8 @@ install. A port's Epic adds the same pins to its app. Declined: `yjs`, `html-to-
 `BroadcastChannel`, `export-image` draws its own SVG, `whiteboard` smooths its own strokes).
 
 The Vue, Svelte and Angular apps have every example from before Epic #49 (their own sections
-below), with no parity filter left; Epic #49's new examples and extensions wait in `PENDING`.
+below), with no parity filter left; Epic #49's new examples and extensions wait in `PENDING`
+in Svelte and Angular. Vue has every one since #51 (Epic #52).
 
 **Theme tokens** (`--fl-*`; `tests/themes.test.ts` holds the list, `e2e/themes.spec.ts` checks the
 shapes differ on computed styles): shape `font`, `font-size`, `title-weight`, `node-padding`,
@@ -1577,7 +1632,7 @@ Decisions of #6:
 
 ## The Vue examples and the Vue docs (Issue #10)
 
-`examples/vue` (`examples-vue`, private) is `examples/react` in Vue: the 20 examples (19 before #33) with the same
+`examples/vue` (`examples-vue`, private) is `examples/react` in Vue: the 44 examples (35 before #51, 20 before #50, 19 before #33) with the same
 ids, metadata, text, names, roles and test ids, and the same scripts (`generate`, `dev` (port
 5186), `build`, `typecheck` (`vue-tsc`, TypeScript 6.0.3 pinned in this app, Splitter's), `e2e`,
 `test`); `src/examples/README.md` says how an example is written in Vue. Its
@@ -1597,7 +1652,8 @@ validates `embed/vue/` with its manifest (`project.json` `frameworks`). Vue is i
 
 `tests/examples.test.ts`: every React id, the manifest, copyable imports (`vue`,
 `@fragiola/flow-vue` and its eight feature entries, `@lucide/vue`, `#/components/{ui,atoms}/*`,
-`#/lib/cn`, relative), the entry first in the code panel, `<Flow.Root>` in `index.vue`, no class
+`#/lib/cn`, since #51 the layout engines `@dagrejs/dagre`, `elkjs/lib/elk.bundled.js` and
+`d3-force`, relative), the entry first in the code panel, `<Flow.Root>` in `index.vue`, no class
 string, string inside `:class` or `cn()` in a template, no `engine.adapter`; the kit imports no
 primitive.
 
@@ -1634,6 +1690,33 @@ Decisions of #10:
   `EDGE_OPTIONS` of React; `connected-data` splits React's file into `index.vue`, `number-body.vue`
   and `sum-body.vue` (`useNodesData` given a getter of the connections' sources). Every shared
   spec passed (215) with no adapter fix.
+- **#50 (Epic #52)**: `edge-reconnect`'s "Delete on drop" (`@reconnect-cancel`, a native
+  `role="switch"` checkbox), `sub-flows`' "Grouping" toolbar (`grouping.vue`), and `shapes`,
+  `easy-connect`, `proximity-connect`, `delete-middle-node`, `intersections`, `contextual-zoom`,
+  `connection-line`, `edge-markers`, `animating-edges`, `floating-edges`, `editable-edge`,
+  `gradient-styling`, `whiteboard`. React's in-file components and contexts became `.vue`
+  siblings with props and emits (a constant or helper they share is exported from `index.vue`'s
+  plain script); the framework-free siblings and their unit tests (`tests/<id>.test.ts`) are
+  React's, unchanged. `delete-middle-node` builds its features per instance in `<script setup>`
+  (its `beforeDelete` reads the flow ref), typed by their `ReturnType`. Every shared spec of these
+  passed with no adapter fix. #50 found that Vue's `Flow.EdgePath` dropped its default slot
+  (React's renders its children), so `animating-edges` drew its dashed path through the `render`
+  slot; #51 fixed the adapter (its default slot renders inside the `<path>`, given `{ state }`,
+  `packages/vue/tests/render.test.ts`) and the example puts its `<animate>` in that slot, as
+  React's.
+- **#51 (Epic #52)**: `helper-lines`, `copy-paste`, `collaborative`, `export-image`,
+  `stress-test`, `dagre-layout`, `elk-layout`, `auto-layout` and `force-layout`, with the layout
+  engines at `examples/react`'s pins; `PENDING.vue` is empty and every shared spec runs in Vue
+  (462, none skipped). React's contexts became `provide` / `inject` (`dagre-layout`'s direction,
+  `auto-layout`'s actions, `force-layout`'s pinned set), its refs plain variables in `setup`,
+  `useKeyPress` + `useEffect` a `watch` of the key's ref (`copy-paste`), and `collaborative`'s
+  `Side` a `useSide` composable rendered by a `v-for` (`<Flow.Root>` stays in `index.vue`; a
+  remote selection is a node prop, not a provide, which cannot differ per item). Animation
+  frames, simulations, the `BroadcastChannel` bridge and pending ELK requests stop in
+  `onUnmounted`. `export-image`'s `flow-svg.ts` keeps React's node test (no DOM, as a server
+  makes the file). The framework-free siblings and their tests are React's, unchanged. No example
+  needed an adapter fix; the stress test led to the large-flow work of
+  [the Vue adapter](#the-vue-adapter-issue-9).
 
 ## The Svelte examples and the Svelte docs (Issue #13)
 
@@ -2715,8 +2798,8 @@ Decisions of large flows (Epic #61: #59, the core; #60, the harness and the numb
   and `visible-edges` (so `drawn-edges`) are empty until then, where every node and edge counted
   as visible and mounted. Edges follow the nodes' rule so that no edge mounts dangling before its
   nodes. Without culling, and for the server render (`staticGeometry`), the first render is as
-  before; #60: a culled React flow renders no node or edge before the engine either (the other
-  adapters still draw the static geometry then).
+  before; #60: a culled React flow renders no node or edge before the engine either, and Vue's
+  since #51 (Svelte and Angular still draw the static geometry then).
 - **A drag step stays O(N) in the model only**: its commit copies the node list (the document is
   immutable and frozen, D3); the engine reads the replaced ids instead of comparing the list.
 - **`pnpm perf` measures the React embed's production build** (`scripts/perf.ts`): Playwright's
@@ -2750,6 +2833,39 @@ Decisions of large flows (Epic #61: #59, the core; #60, the harness and the numb
   on the example's nodes (`contain: layout style`, `strict`) changed nothing measurable. What
   would remain: mounting fewer nodes per frame (spread over frames, which changes when a node
   appears) or drawing far zooms otherwise (canvas, out of scope).
-- **The root's box is still read per read** (`getBoundingClientRect`, for the view): caching it
-  needs a resize signal the engine does not have; it was ~4 % of the busy time of the 10 000-node
-  gestures in the profile of #59 (99 ms of 2.4 s).
+- **The root's box is read once per turn** (#51; until then per read, ~4 % of the busy time of
+  the 10 000-node gestures in the profile of #59, 99 ms of 2.4 s): the engine has no resize signal
+  for the root, so the box is kept only until the next microtask (a promise, not the window's
+  `queueMicrotask`: fake timers), dropped on `setOptions`, attach, detach and the app's verbs
+  that place or map the view, never across turns; a render read's value changes only for a root
+  resized within one synchronous turn (the engine section). It replaced #51's first fix, a
+  Vue-side `getBoundingClientRect` shadowing the app's root element while `Flow.Nodes` patched
+  (anything reading the box meanwhile, the app included, got the held one).
+- **Vue's numbers** (#51, `pnpm perf --framework vue`, the same machine and method; median / p95 /
+  max ms, open with the nodes mounted meanwhile; React's on that day: 10 000 open 178 ms (51),
+  zoom 16.7/34/71; 20 000 open 362 ms (50)):
+
+  | nodes | gesture | before #51 | after #51 | the box in the core |
+  | --- | --- | --- | --- | --- |
+  | 1 000 | open | 122 ms (1 052 mounted) | 38 ms (52) | |
+  | 1 000 | pan / zoom / drag | 16.6/18/22, 16.8/64/117, 16.7/18/50 | 16.6/19/24, 16.8/33/46, 16.7/18/33 | |
+  | 10 000 | open | 1 058 ms (10 051 mounted) | 208 ms (51) | 204 ms (51) |
+  | 10 000 | pan / zoom / drag | 16.6/20/24, 16.8/110/1 194, 16.7/20/51 | 16.7/18/23, 16.7/40/89, 16.7/19/43 | 16.6/19/34, 16.8/39/87, 16.7/19/53 |
+  | 20 000 | open | 2 035 ms (20 050 mounted) | 362 ms (50) | 352 ms (50) |
+  | 20 000 | pan / zoom / drag | 16.7/21/38, 16.8/122/1 241, 16.7/24/57 | 16.7/19/41, 16.7/41/83, 16.7/18/58 | 16.7/19/38, 16.8/39/81, 16.7/19/37 |
+
+  The store and the culled first render alone left the 10 000 zoom at 16.8/104/1 017: the rest
+  was two forced layouts per new node, one from its registration (see the Vue section) and one
+  from the root's box (~3.8 s of a 10 000-node gestures profile, ~0.08 s once read once per patch).
+  "The box in the core" is the engine's per-turn box with the Vue-side hold removed (five runs;
+  #51's code measured 181 ms / 16.8/42/83 / 357 ms the same hour, 189–208 ms over the day: the open
+  varies by ±20 ms between runs). React's 10 000 with and without the core's box, five runs each,
+  three times: open 185–202 against 176–201 ms, pan 16.7/18.3–18.8, zoom 16.7–16.8/34–36,
+  drag 16.7/19–20 either way: no measurable React change (React reads before its commit's DOM
+  changes, so a repeated read cost no layout, only the call). The review fixes of #51 (the
+  registrations as a post-flush job, the view verbs reading the box again, the promise clear),
+  10 000 nodes, three runs, twice: open 215/191 ms, pan 16.6–16.7/18.6–19.0, zoom
+  16.7–16.8/40–42, drag 16.7/18.5–19.7, against the code before them the same hour: 193 ms,
+  16.7/18.1, 16.7/43.3, 16.7/19.1 (no change beyond the runs' spread). What is left (zoom p95 ~39
+  against React's ~35) is Vue's render and patch of the nodes a far zoom out mounts; the profile
+  showed no other adapter hot spot.

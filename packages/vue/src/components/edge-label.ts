@@ -1,6 +1,6 @@
 import type { EdgePath } from "@fragiola/flow";
 import { inject, onScopeDispose, shallowRef } from "vue";
-import { useFlowValue } from "../composables/internal";
+import { sameValue, useFlowValue } from "../composables/internal";
 import { edgeAttributes, useEdgePath } from "../composables/use-edge";
 import { EdgeLabelLayerKey, useEdgeId, useFlowContext } from "../context";
 import {
@@ -44,8 +44,12 @@ export const EdgeLabel: FlowComponent<EdgeLabelProps, EdgeLabelSlots> =
             const edgeId = useEdgeId("EdgeLabel", () => props.edgeId);
             const layer = inject(EdgeLabelLayerKey, null);
             const path = useEdgePath(context, edgeId);
-            const attributes = useFlowValue(context, () =>
-                edgeAttributes(context, "edge-label", edgeId()),
+            const attributes = useFlowValue(
+                context,
+                () => edgeAttributes(context, "edge-label", edgeId()),
+                sameValue,
+                "entity",
+                () => ({ kind: "edge", id: edgeId() }),
             );
             const version = shallowRef(0);
             // the label's element, rendered by the layer

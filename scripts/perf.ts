@@ -1,12 +1,12 @@
-// The large-flow measurement (Epic #61): the `stress-test` example of the React embed, in a
-// production build, driven by Playwright in Chromium. For each size it opens a fresh flow (the
+// The large-flow measurement (Epic #61): the `stress-test` example of an embed (React's by
+// default, `--framework vue` for Vue's, #51), in a production build, driven by Playwright in Chromium. For each size it opens a fresh flow (the
 // time until its first frame, and how many nodes mounted on the way), then pans, zooms (out, then
 // back in) and drags a node with 120 pointer steps at 60 Hz, timing every frame
 // (requestAnimationFrame intervals), and prints the median / p95 / max frame time per size and
 // gesture, each the median of the runs. Not run in CI: frame times are the machine's.
 //
-//   pnpm perf [--sizes 1000,10000,20000] [--runs 3] [--steps 120] [--no-build]
-//             [--dist <dir>] [--profile <dir>] [--headed] [--verbose] [--json <file>]
+//   pnpm perf [--framework react|vue] [--sizes 1000,10000,20000] [--runs 3] [--steps 120]
+//             [--no-build] [--dist <dir>] [--profile <dir>] [--headed] [--verbose] [--json <file>]
 //
 // `--no-build` reuses the packages' last `dist` (the embed is built again); `--dist` serves an
 // embed built before (`EMBED_BASE=/`), building nothing; `--profile` writes a
@@ -23,10 +23,16 @@ import { parseArgs } from "node:util";
 import type * as Playwright from "@playwright/test";
 
 const root = join(import.meta.dirname, "..");
-const app = join(root, "examples/react");
+
+/** The embeds `--framework` measures, with the adapter package each one is built against. */
+const FRAMEWORKS = {
+    react: { name: "React", adapter: "@fragiola/flow-react" },
+    vue: { name: "Vue", adapter: "@fragiola/flow-vue" },
+} as const;
 
 const { values: args } = parseArgs({
     options: {
+        framework: { type: "string", default: "react" },
         sizes: { type: "string", default: "1000,10000,20000" },
         runs: { type: "string", default: "3" },
         steps: { type: "string", default: "120" },
@@ -42,6 +48,13 @@ const { values: args } = parseArgs({
 const verbose = (step: string) => {
     if (args.verbose) process.stderr.write(`  … ${step}\n`);
 };
+if (!Object.hasOwn(FRAMEWORKS, args.framework)) {
+    throw new Error(
+        `--framework must be one of ${Object.keys(FRAMEWORKS).join(", ")} (got ${args.framework})`,
+    );
+}
+const framework = FRAMEWORKS[args.framework as keyof typeof FRAMEWORKS];
+const app = join(root, "examples", args.framework);
 const SIZES = args.sizes.split(",").map(Number);
 const RUNS = Number(args.runs);
 const STEPS = Number(args.steps);
@@ -101,7 +114,7 @@ function run(command: string, commandArgs: string[], cwd: string, env = {}) {
 if (!args.dist) {
     if (!args["no-build"]) {
         console.log(
-            "building the core, the React package and the React embed…",
+            `building the core, the ${framework.name} package and the ${framework.name} embed…`,
         );
         run(
             "pnpm",
@@ -109,7 +122,7 @@ if (!args.dist) {
                 "--filter",
                 "@fragiola/flow",
                 "--filter",
-                "@fragiola/flow-react",
+                framework.adapter,
                 "build",
             ],
             root,
@@ -250,8 +263,8 @@ await page.evaluate(() => {
         } else last = undefined;
         requestAnimationFrame(tick);
     });
-    // every node element inserted, counted as it is inserted (React builds a subtree before it
-    // attaches it, and may remove a node before an observer would see it)
+    // every node element inserted, counted as it is inserted (React and Vue build a subtree
+    // before they attach it, and may remove a node before an observer would see it)
     const proto = Node.prototype;
     const counted = <A extends unknown[]>(
         insert: (this: Node, child: Node, ...rest: A) => Node,
@@ -536,14 +549,23 @@ const widths = header.map((title, i) =>
 const line = (cells: readonly string[]) =>
     `| ${cells.map((cell, i) => cell.padEnd(widths[i] ?? 0)).join(" | ")} |`;
 console.log("");
-console.log("Frame times in ms, the median of the runs:");
+console.log(`${framework.name}: frame times in ms, the median of the runs:`);
 console.log(line(header));
 console.log(`|${widths.map((width) => "-".repeat(width + 2)).join("|")}|`);
 for (const row of rows) console.log(line(row));
 if (args.json) {
     writeFileSync(
         args.json,
-        JSON.stringify({ chromium: version, steps: STEPS, runs }, null, 4),
+        JSON.stringify(
+            {
+                framework: args.framework,
+                chromium: version,
+                steps: STEPS,
+                runs,
+            },
+            null,
+            4,
+        ),
     );
 }
 // the exit handler stops the server and removes the build

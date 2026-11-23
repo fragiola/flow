@@ -207,7 +207,7 @@ describe("the cached lists", () => {
         expect(ids(engine.get("visible-nodes"))).toEqual([]);
     });
 
-    it("are empty with onlyRenderVisible until the root has a size; without it, every shown node", () => {
+    it("are empty with onlyRenderVisible until the root has a size; without it, every shown node", async () => {
         const culled = mount(json(), {
             sizes,
             engine: { onlyRenderVisible: true },
@@ -228,6 +228,8 @@ describe("the cached lists", () => {
                 y: 0,
                 toJSON: () => ({}),
             }) as DOMRect;
+        // the root's box is read once per turn: the new size counts from the next one
+        await Promise.resolve();
         expect(ids(culled.engine.get("visible-nodes"))).toEqual(["a", "b"]);
         // bc's ends' box (b to c) meets the view
         expect(ids(culled.engine.get("drawn-edges"))).toEqual(["ab", "bc"]);

@@ -13,7 +13,7 @@ import {
 } from "vue";
 import { useFlowContext, usePartNodeId } from "../context";
 import { type ElementRef, elementRef } from "../utils/render";
-import { useFlowValue } from "./internal";
+import { sameValue, useFlowValue } from "./internal";
 
 export interface UseHandleOptions {
     /** whether edges start (`source`) or end (`target`) here */
@@ -111,17 +111,22 @@ export function useHandle(
             ? previous
             : next;
     });
-    const attributes = useFlowValue(context, () => {
-        const value = registration.value;
-        const engine = context.engine.value;
-        return engine
-            ? engine.adapter.attributes("handle", value)
-            : {
-                  ...partAttributes("handle", value.handleId),
-                  "data-handle-type": value.type,
-                  "data-side": value.side,
-              };
-    });
+    const attributes = useFlowValue(
+        context,
+        () => {
+            const value = registration.value;
+            const engine = context.engine.value;
+            return engine
+                ? engine.adapter.attributes("handle", value)
+                : {
+                      ...partAttributes("handle", value.handleId),
+                      "data-handle-type": value.type,
+                      "data-side": value.side,
+                  };
+        },
+        sameValue,
+        "entity",
+    );
     const ref = elementRef(
         (element) => {
             const engine = context.engine.value;

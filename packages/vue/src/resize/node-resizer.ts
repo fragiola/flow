@@ -1,6 +1,6 @@
 import type { ResizeDirection } from "@fragiola/flow/resize";
 import { h, watchEffect } from "vue";
-import { useFlowValue } from "../composables/internal";
+import { sameValue, useFlowValue } from "../composables/internal";
 import { useFlowContext, usePartNodeId } from "../context";
 import {
     definePrimitive,
@@ -86,13 +86,18 @@ export const NodeResizer: FlowComponent<NodeResizerProps, NodeResizerSlots> =
                     engine.adapter.setPartOptions("resizer", id, null),
                 );
             });
-            const attributes = useFlowValue(context, () => {
-                const engine = context.engine.value;
-                const id = nodeId();
-                return engine
-                    ? engine.adapter.attributes("resizer", { nodeId: id })
-                    : { "data-flow-part": "resizer", "data-flow-id": id };
-            });
+            const attributes = useFlowValue(
+                context,
+                () => {
+                    const engine = context.engine.value;
+                    const id = nodeId();
+                    return engine
+                        ? engine.adapter.attributes("resizer", { nodeId: id })
+                        : { "data-flow-part": "resizer", "data-flow-id": id };
+                },
+                sameValue,
+                "entity",
+            );
             return () => {
                 const own = attributes.value;
                 const state: NodeResizerState = {

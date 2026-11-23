@@ -3,13 +3,21 @@ import { keyboard } from "@fragiola/flow/keyboard";
 import { selection } from "@fragiola/flow/selection";
 import { subflows } from "@fragiola/flow/subflows";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { defineComponent, h, onMounted, type PropType, shallowRef } from "vue";
+import {
+    defineComponent,
+    h,
+    nextTick,
+    onMounted,
+    type PropType,
+    shallowRef,
+} from "vue";
 import {
     type AnyTypes,
     createFlowRef,
     Flow,
     type FlowEdge,
     type FlowNode,
+    useFlow,
     useNode,
 } from "../src/index";
 import {
@@ -241,5 +249,124 @@ describe("nodes", () => {
         flow.value?.model.run("selection.clear", {});
         await settle();
         expect(toolbar()).toBeNull();
+    });
+});
+
+describe("node registration", () => {
+    const newRef = () => createFlowRef();
+    const flowWith = (
+        flow: ReturnType<typeof newRef>,
+        content?: (node: FlowNode) => ReturnType<typeof h>,
+    ) =>
+        render(() =>
+            h(Flow.Root, { flowRef: flow, defaultNodes: [task("a")] }, () => [
+                h(Flow.Viewport, null, () => [
+                    h(Flow.Nodes, null, {
+                        default: ({ node }: { node: FlowNode }) => [
+                            h(Flow.Node, { node }, () =>
+                                content ? [content(node)] : [],
+                            ),
+                        ],
+                    }),
+                ]),
+            ]),
+        );
+
+    it("is done once the patch is: after the app's nextTick, focus-node finds an added node", async () => {
+        const flow = createFlowRef();
+        await flowWith(flow);
+        flow.value?.model.run("node.add", task("b", 0, 200));
+        await nextTick();
+        expect(
+            flow.value?.engine.run("focus-node", { nodeId: "b" }),
+        ).toMatchObject({ ok: true });
+    });
+
+    it("is done before a custom node's onMounted, in the node's content or with useNode", async () => {
+        const seen: [string, boolean][] = [];
+        const Content = defineComponent({
+            props: { id: { type: String, required: true } },
+            setup(props) {
+                const { engine } = useFlow();
+                onMounted(() =>
+                    seen.push([
+                        `content ${props.id}`,
+                        engine.check("focus-node", { nodeId: props.id }).ok,
+                    ]),
+                );
+                return () => h("span");
+            },
+        });
+        const Custom = defineComponent({
+            props: {
+                node: { type: Object as PropType<FlowNode>, required: true },
+            },
+            setup(props) {
+                const { engine } = useFlow();
+                const { props: element } = useNode(() => props.node);
+                onMounted(() =>
+                    seen.push([
+                        `custom ${props.node.id}`,
+                        engine.check("focus-node", { nodeId: props.node.id })
+                            .ok,
+                    ]),
+                );
+                return () => h("div", element.value);
+            },
+        });
+        const flow = createFlowRef();
+        await render(() =>
+            h(Flow.Root, { flowRef: flow, defaultNodes: [task("a")] }, () => [
+                h(Flow.Viewport, null, () => [
+                    h(Flow.Nodes, null, {
+                        default: ({ node }: { node: FlowNode }) => [
+                            node.id === "c"
+                                ? h(Custom, { node })
+                                : h(Flow.Node, { node }, () => [
+                                      h(Content, { id: node.id }),
+                                  ]),
+                        ],
+                    }),
+                ]),
+            ]),
+        );
+        seen.length = 0;
+        flow.value?.model.run("node.add", task("b", 0, 200));
+        flow.value?.model.run("node.add", task("c", 0, 400));
+        await nextTick();
+        expect(seen.sort()).toEqual([
+            ["content b", true],
+            ["custom c", true],
+        ]);
+    });
+
+    it("of one node that throws leaves the others registered, and reports the error to the app", async () => {
+        const flow = createFlowRef();
+        const { wrapper } = await flowWith(flow);
+        const errors: unknown[] = [];
+        wrapper.vm.$.appContext.config.errorHandler = (error) =>
+            errors.push(error);
+        // b's first measurement (on its registration) throws
+        const failure = new Error("measure b");
+        const width = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get");
+        const layout = width.getMockImplementation();
+        let thrown = false;
+        width.mockImplementation(function (this: HTMLElement) {
+            if (!thrown && this.getAttribute("data-flow-id") === "b") {
+                thrown = true;
+                throw failure;
+            }
+            return layout?.call(this) ?? 0;
+        });
+        const focusable = (nodeId: string) =>
+            flow.value?.engine.check("focus-node", { nodeId }).ok;
+        flow.value?.model.run("node.add", task("b", 0, 200));
+        flow.value?.model.run("node.add", task("c", 0, 400));
+        await nextTick();
+        expect(errors).toEqual([failure]);
+        expect(focusable("c")).toBe(true);
+        flow.value?.model.run("node.add", task("d", 0, 600));
+        await nextTick();
+        expect(focusable("d")).toBe(true);
     });
 });

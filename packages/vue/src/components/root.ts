@@ -49,6 +49,7 @@ import {
     FlowKey,
 } from "../context";
 import { createEngineFacade } from "../utils/engine-facade";
+import { createFlowStore } from "../utils/flow-store";
 import {
     definePrimitive,
     type FlowComponent,
@@ -431,11 +432,9 @@ const RootFlow = definePrimitive<AnyRootProps, RootSlots, RootEmits<AnyTypes>>(
         );
         const facade = createEngineFacade(start);
         const engine = shallowRef<AnyFlowEngine | null>(null);
-        const revision = shallowRef(0);
+        const store = createFlowStore(model);
+        const revision = store.view;
         const rootElement = shallowRef<HTMLElement | null>(null);
-        const bump = () => {
-            revision.value++;
-        };
 
         // the engine options last sent, by key: a change sends only the keys that changed (an
         // `interactive` that stays must not undo the lock of `Flow.ToggleInteractive`)
@@ -452,7 +451,7 @@ const RootFlow = definePrimitive<AnyRootProps, RootSlots, RootEmits<AnyTypes>>(
             }) as unknown as AnyFlowEngine;
             sentOptions = optionKeys(options);
             stops.push(
-                created.adapter.subscribe(bump),
+                store.attach(created),
                 created.subscribe((event) => {
                     if (event.type === "viewport-change") {
                         emit("update:viewport", event.viewport, event.gesture);
@@ -612,7 +611,7 @@ const RootFlow = definePrimitive<AnyRootProps, RootSlots, RootEmits<AnyTypes>>(
             syncControlled();
             onScopeDispose(
                 model.subscribe((event: CommandEvent) => {
-                    bump();
+                    store.commit();
                     if (event.meta?.source === CONTROLLED_META.source) return;
                     if (event.before.nodes !== event.after.nodes) {
                         emit("update:nodes", event.after.nodes);
@@ -635,7 +634,8 @@ const RootFlow = definePrimitive<AnyRootProps, RootSlots, RootEmits<AnyTypes>>(
               }
             | undefined;
         const geometry = computed<StaticGeometry | null>(() => {
-            revision.value;
+            // the lists: a commit that keeps them keeps the geometry
+            store.entity.value;
             if (engine.value) {
                 lastGeometry = undefined;
                 return null;
@@ -669,6 +669,8 @@ const RootFlow = definePrimitive<AnyRootProps, RootSlots, RootEmits<AnyTypes>>(
             publicEngine: facade.engine as unknown as AnyFlowEngine,
             rootElement,
             revision,
+            store,
+            onlyRenderVisible: computed(() => props.onlyRenderVisible === true),
             geometry,
         };
         provide(FlowKey, context);
