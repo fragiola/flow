@@ -1162,6 +1162,9 @@ point)`, `NodeResizer`'s `direction`, `FitView`'s `padding`, `nodeIds`, `include
   renders one level as today, several as `edges-layer` wrappers each with its `svg` and its labels'
   layer; `Flow.Nodes` drops `isolation` then; an edge that changes level remounts and `Flow.Edge`
   calls `refocus` on mount. `ResizeHandle` takes `direction` and `variant` (in its snippet state).
+- **`Flow.EdgePath` renders its `children` snippet inside its `<path>`** (#53), given `{ state }`,
+  as React's children (an `<animate>`); it had none (Vue's #51 gap). `tests/render.test.ts`
+  (`fixtures/edge-path-flow.svelte`): the child in the SVG namespace, and an empty path without.
 - **Gotcha, a template's `{f(x.current)}` is no render count**: once the value had changed, Svelte
   (5.57.3) called `f` again on every later revision although `x.current` stayed equal (the DOM was
   untouched); the probes count with an `$effect.pre` instead.
@@ -1381,7 +1384,7 @@ the per-framework skip of what a later Epic ports: whole examples (`<slug>`) and
 (`<slug>#<case>`, `pendingCase`); a spec that needs one is skipped in that framework with a
 "(PENDING)" reason instead of failing (`requireCase(slug, case)` as a test's first line for a
 case; `openExample` for an example). React never has any; the Epic that ports an entry to a
-framework deletes it there. Today Svelte and Angular wait for `edge-reconnect#delete-on-drop`,
+framework deletes it there. Today Angular waits for `edge-reconnect#delete-on-drop`,
 `sub-flows#selection-grouping` and the new examples of #45 (`shapes`, `easy-connect`,
 `proximity-connect`, `delete-middle-node`, `intersections`, `contextual-zoom`, `connection-line`)
 and of #46 (`edge-markers`, `animating-edges`, `floating-edges`, `editable-edge`,
@@ -1389,7 +1392,8 @@ and of #46 (`edge-markers`, `animating-edges`, `floating-edges`, `editable-edge`
 `export-image`, `stress-test`) and of #48 (`dagre-layout`, `elk-layout`, `auto-layout`,
 `force-layout`): Epic #49 writes them in React, the ports' Epics follow. Vue (Epic #52) has
 every one since #51 (the extensions and the examples of #45 and #46 since #50): `PENDING.vue` is
-empty. A pending whole example has nothing in the
+empty. Svelte (Epic #55) has the extensions and the examples of #45 and #46 since #53, and waits
+for those of #47 and #48. A pending whole example has nothing in the
 port's app yet: its `tests/examples.test.ts` leaves it out of React's ids and `tests/vendored.test.ts`
 expects no copy of its `styles.ts` and siblings.
 Alternative: a capability attribute the example renders, checked by the spec; refused: it would
@@ -1555,7 +1559,8 @@ install. A port's Epic adds the same pins to its app. Declined: `yjs`, `html-to-
 
 The Vue, Svelte and Angular apps have every example from before Epic #49 (their own sections
 below), with no parity filter left; Epic #49's new examples and extensions wait in `PENDING`
-in Svelte and Angular. Vue has every one since #51 (Epic #52).
+in Angular, and those of #47 and #48 in Svelte (the rest since #53, Epic #55). Vue has every one
+since #51 (Epic #52).
 
 **Theme tokens** (`--fl-*`; `tests/themes.test.ts` holds the list, `e2e/themes.spec.ts` checks the
 shapes differ on computed styles): shape `font`, `font-size`, `title-weight`, `node-padding`,
@@ -1720,8 +1725,8 @@ Decisions of #10:
 
 ## The Svelte examples and the Svelte docs (Issue #13)
 
-`examples/svelte` (`examples-svelte`, private) is `examples/react` in Svelte 5 (runes): the 20
-examples with the same ids, metadata, text, names, roles and test ids, and the same scripts
+`examples/svelte` (`examples-svelte`, private) is `examples/react` in Svelte 5 (runes): the 35
+examples (21 before #53) with the same ids, metadata, text, names, roles and test ids, and the same scripts
 (`generate`, `dev` (port 5187), `build`, `typecheck` (`svelte-check --fail-on-warnings`, TypeScript
 6.0.3 pinned in this app, as `packages/svelte`), `e2e`, `test`); `src/examples/README.md` says how an
 example is written in Svelte. Its `playwright.config.ts` is `examplesE2eConfig("svelte")` (port
@@ -1792,6 +1797,31 @@ after the connection line; `node-resizer` the `banner` (`direction="horizontal"`
 `connected-data` (new: `index.svelte`, `number-body.svelte`, `sum-body.svelte`) sums its inputs
 with `useNodeConnections` + `useNodesData(() => connections.current.map(…))`. `tests/examples.test.ts`
 compares every React example again; the shared specs pass unchanged (215).
+
+#53 (Epic #55) in the Svelte examples: `edge-reconnect`'s "Delete on drop" (`onreconnectcancel`, a
+native `role="switch"` checkbox), `sub-flows`' "Grouping" toolbar (`grouping.svelte`, and the loose
+`logs` node; `cache` moved to React's place), and `shapes`, `easy-connect`, `proximity-connect`,
+`delete-middle-node`, `intersections`, `contextual-zoom`, `connection-line`, `edge-markers`,
+`animating-edges`, `floating-edges`, `editable-edge`, `gradient-styling`, `whiteboard`. React's
+in-file components became `.svelte` siblings named as Vue's files, with props and lowercase
+callback props (`onediting`, `onarrive`, `ontool`); a constant or helper they share is exported
+from `index.svelte`'s module script, and React's contexts became props (`gradient-styling`'s id
+prefix) or one file (`edge-markers`). The framework-free siblings and their unit tests
+(`tests/<id>.test.ts`, Vue's copies) are React's, unchanged. Svelte specifics: `shapes` remounts
+its handles per angle with `{#key}` and focuses its label field with a plain attachment function
+(`tests/examples.test.ts` refuses a `svelte/attachments` import); `delete-middle-node` builds its
+features per instance (`makeFeatures(beforeDelete)`, typed by `ReturnType`), as Vue; a component
+whose top elements are bare SVG declares `<svelte:options namespace="svg" />` (`lines.svelte`,
+`animated-edge.svelte`, `floating-edge.svelte`, `bendable-edge.svelte`, `gradient-edge.svelte`);
+`$props.id()` is its own declaration (`const uid = $props.id()`), React's `useId`; `whiteboard`'s
+drawing layer carries the examples' first `svelte-ignore a11y_no_static_element_interactions` (its
+markup is React's, a `div` with pointer handlers and no role). `animating-edges` puts its
+`<animate>` in `Flow.EdgePath`'s `children` snippet, which #53 added to the adapter (it had none).
+**Gap, worked around:** Svelte's `styleRecord` drops a consumer style key whose value is
+`undefined`, where React's (and Vue's) `undefined` removes the part's base key, so `easy-connect`
+clears a handle's side placement with empty strings (`{ top: "", left: "", transform: "" }`).
+Follow-up: let an `undefined` consumer key remove a base key in the adapter. Every shared spec of
+these passed with no other adapter fix.
 
 ## The Angular examples and the Angular docs (Issue #16)
 
