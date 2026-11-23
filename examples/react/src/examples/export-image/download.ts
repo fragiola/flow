@@ -12,17 +12,20 @@ function pixels(value: string): number | undefined {
 /**
  * The theme's look, resolved: the computed styles of the flow's own parts (the root's canvas and
  * font, a node's frame and text, an edge's stroke), so the file looks like the page in every
- * theme. What is not drawn yet keeps the default.
+ * theme. A part at rest is read first, a selected one when every part is; what is not drawn yet
+ * keeps the default.
  */
 export function lookOf(root: Element): Partial<SvgLook> {
     const look: Record<string, string | number | undefined> = {};
     const canvas = getComputedStyle(root);
     look.background = canvas.backgroundColor;
     look.fontFamily = canvas.fontFamily;
-    // a node at rest: a selected one shows the selection's colours
-    const frame = root.querySelector(
-        '[data-flow-part="node"]:not([data-selected]) [data-frame]',
-    );
+    // a node at rest: a selected one shows the selection's colours, so it is read only when every
+    // node is selected (its look is still the theme's, closer than the defaults)
+    const frame =
+        root.querySelector(
+            '[data-flow-part="node"]:not([data-selected]) [data-frame]',
+        ) ?? root.querySelector('[data-flow-part="node"] [data-frame]');
     if (frame) {
         const style = getComputedStyle(frame);
         look.nodeFill = style.backgroundColor;
@@ -33,9 +36,13 @@ export function lookOf(root: Element): Partial<SvgLook> {
         look.fontSize = pixels(style.fontSize);
         look.fontWeight = style.fontWeight;
     }
-    const path = root.querySelector(
-        '[data-flow-part="edge"]:not([data-selected]) [data-flow-part="edge-path"]',
-    );
+    const path =
+        root.querySelector(
+            '[data-flow-part="edge"]:not([data-selected]) [data-flow-part="edge-path"]',
+        ) ??
+        root.querySelector(
+            '[data-flow-part="edge"] [data-flow-part="edge-path"]',
+        );
     if (path) {
         const style = getComputedStyle(path);
         look.edgeStroke = style.stroke;
