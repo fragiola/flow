@@ -55,6 +55,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "floating-edges",
         "editable-edge",
         "gradient-styling",
+        "whiteboard",
     ],
     svelte: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -73,6 +74,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "floating-edges",
         "editable-edge",
         "gradient-styling",
+        "whiteboard",
     ],
     angular: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -91,6 +93,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "floating-edges",
         "editable-edge",
         "gradient-styling",
+        "whiteboard",
     ],
 };
 
