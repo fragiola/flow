@@ -30,7 +30,7 @@ export const styles = {
         "palette-blue pointer-events-none fill-palette-accent stroke-(--fl-canvas-bg) [stroke-width:2]",
     node: "palette-raised min-w-28 select-none rounded-(--fl-node-radius) border-(length:--fl-node-border) border-(--fl-node-line) bg-(--fl-node-bg) p-(--fl-node-padding) text-center font-(--fl-title-weight) shadow-(--fl-node-shadow) transition-[border-color,box-shadow] duration-(--fl-motion) data-dragging:cursor-grabbing data-selected:border-(--fl-edge-selected) data-selected:ring-(length:--fl-focus-width) data-selected:ring-(--fl-edge-selected)/30 focus-visible:outline-(length:--fl-focus-width) focus-visible:outline-offset-2 focus-visible:outline-(--fl-focus-line)",
     body: "flex flex-col items-center gap-1.5",
-    send: "palette-orange inline-flex items-center gap-1 rounded-(--fl-control-radius) bg-palette-accent px-2 py-1 font-normal text-palette-accent-contrast text-xs outline-none hover:bg-palette-accent-hover focus-visible:outline-(length:--fl-focus-width) focus-visible:outline-offset-2 focus-visible:outline-(--fl-focus-line) disabled:opacity-60 [&_svg]:size-3.5",
-    received: "font-normal text-palette-muted text-xs tabular-nums",
+    send: "palette-orange inline-flex items-center gap-1 rounded-(--fl-control-radius) bg-palette-base px-2 py-1 font-normal text-palette-contrast text-xs outline-none hover:bg-palette-base-hover focus-visible:outline-(length:--fl-focus-width) focus-visible:outline-offset-2 focus-visible:outline-(--fl-focus-line) disabled:opacity-60 [&_svg]:size-3.5",
+    received: "font-normal text-palette-contrast/70 text-xs tabular-nums",
     handle: "size-(--fl-handle-size) rounded-(--fl-handle-radius) border-(length:--fl-handle-border) border-(--fl-handle-line) bg-(--fl-handle-bg)",
 };
