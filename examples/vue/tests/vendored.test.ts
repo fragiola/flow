@@ -1,6 +1,7 @@
 // From Splitter (fragiola/splitter, examples/vue/tests/vendored.test.ts), same author and licence.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { PENDING } from "examples-shared/e2e/available";
 import { describe, expect, it } from "vitest";
 
 // The Fragiola UI theme (the palettes, the base stylesheet), `cn` and the style families the Vue
@@ -51,7 +52,9 @@ const DIFFERENT = [
 const SAME = listFiles(join(react, "src/examples"))
     .filter((file) => file.endsWith(".ts") && !file.endsWith(".generated.ts"))
     .map((file) => relative(react, file))
-    .filter((file) => !DIFFERENT.includes(file));
+    .filter((file) => !DIFFERENT.includes(file))
+    // an example a later Epic brings to this app (`PENDING`) has nothing here yet
+    .filter((file) => !PENDING.vue.includes(file.split("/")[2] ?? ""));
 
 const body = (source: string) => source.slice(source.indexOf("\n") + 1);
 
