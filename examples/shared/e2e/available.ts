@@ -40,7 +40,6 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
     vue: [],
     svelte: [
         // Epic #49 (#46): new React examples, ported by a later Epic
-        "floating-edges",
         "editable-edge",
         "gradient-styling",
         "whiteboard",
