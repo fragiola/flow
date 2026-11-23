@@ -13,7 +13,7 @@ import {
 import { drag } from "@fragiola/flow-react/drag";
 import { keyboard } from "@fragiola/flow-react/keyboard";
 import { selection } from "@fragiola/flow-react/selection";
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useId, useState } from "react";
 import {
     type Box,
     type Ends,
@@ -165,6 +165,8 @@ function renderNode(node: FlowNode<Types>) {
 
 export default function FloatingEdges() {
     const [variant, setVariant] = useState<Variant>("straight");
+    // the radios' group name, unique to this flow: two of them on a page never share it
+    const group = useId();
     return (
         <VariantContext.Provider value={variant}>
             <Flow.Root<Types, typeof features>
@@ -193,7 +195,7 @@ export default function FloatingEdges() {
                         <label key={option.value} className={styles.option}>
                             <input
                                 type="radio"
-                                name="floating-edge-variant"
+                                name={group}
                                 value={option.value}
                                 checked={variant === option.value}
                                 onChange={() => setVariant(option.value)}
