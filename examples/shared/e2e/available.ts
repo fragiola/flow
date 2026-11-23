@@ -40,7 +40,6 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
     vue: [],
     svelte: [
         // Epic #49 (#45): new React examples, ported by a later Epic
-        "delete-middle-node",
         "intersections",
         "contextual-zoom",
         "connection-line",
