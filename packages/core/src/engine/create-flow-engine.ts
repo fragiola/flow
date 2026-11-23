@@ -656,7 +656,18 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     }
 
     get(key: string, payload?: unknown): unknown {
-        const values = {
+        const values = this.getters;
+        if (Object.hasOwn(values, key)) {
+            return values[key as keyof typeof values](payload ?? {});
+        }
+        return this.features.get.get(key)?.(payload ?? {});
+    }
+
+    /** The core's `get` keys, made once (a read is hot: an adapter reads per node and edge). */
+    private readonly getters = this.makeGetters();
+
+    private makeGetters() {
+        return {
             viewport: () => this.current,
             "root-size": () => this.rootSize(),
             "edge-path-by": (p) =>
@@ -733,14 +744,21 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 payload: unknown,
             ) => unknown;
         };
-        if (Object.hasOwn(values, key)) {
-            return values[key as keyof typeof values](payload ?? {});
-        }
-        return this.features.get.get(key)?.(payload ?? {});
     }
 
     is(key: string, payload?: unknown): boolean {
-        const questions = {
+        const questions = this.questions;
+        if (Object.hasOwn(questions, key)) {
+            return questions[key as keyof typeof questions](payload ?? {});
+        }
+        return this.features.is.get(key)?.(payload ?? {}) ?? false;
+    }
+
+    /** The core's `is` keys, made once. */
+    private readonly questions = this.makeQuestions();
+
+    private makeQuestions() {
+        return {
             interactive: () => this.interactivity.interactive,
             "interactive-by": (p) => {
                 const { kind } = payloadRecord(p);
@@ -763,10 +781,6 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 payload: unknown,
             ) => boolean;
         };
-        if (Object.hasOwn(questions, key)) {
-            return questions[key as keyof typeof questions](payload ?? {});
-        }
-        return this.features.is.get(key)?.(payload ?? {}) ?? false;
     }
 
     subscribe(listener: (event: FlowEngineEvent) => void): () => void {
