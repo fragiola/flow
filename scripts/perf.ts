@@ -1,11 +1,11 @@
 // The large-flow measurement (Epic #61): the `stress-test` example of an embed (React's by
-// default, `--framework vue` for Vue's, #51), in a production build, driven by Playwright in Chromium. For each size it opens a fresh flow (the
+// default, `--framework vue` for Vue's, #51, `--framework svelte` for Svelte's, #54), in a production build, driven by Playwright in Chromium. For each size it opens a fresh flow (the
 // time until its first frame, and how many nodes mounted on the way), then pans, zooms (out, then
 // back in) and drags a node with 120 pointer steps at 60 Hz, timing every frame
 // (requestAnimationFrame intervals), and prints the median / p95 / max frame time per size and
 // gesture, each the median of the runs. Not run in CI: frame times are the machine's.
 //
-//   pnpm perf [--framework react|vue] [--sizes 1000,10000,20000] [--runs 3] [--steps 120]
+//   pnpm perf [--framework react|vue|svelte] [--sizes 1000,10000,20000] [--runs 3] [--steps 120]
 //             [--no-build] [--dist <dir>] [--profile <dir>] [--headed] [--verbose] [--json <file>]
 //
 // `--no-build` reuses the packages' last `dist` (the embed is built again); `--dist` serves an
@@ -28,6 +28,7 @@ const root = join(import.meta.dirname, "..");
 const FRAMEWORKS = {
     react: { name: "React", adapter: "@fragiola/flow-react" },
     vue: { name: "Vue", adapter: "@fragiola/flow-vue" },
+    svelte: { name: "Svelte", adapter: "@fragiola/flow-svelte" },
 } as const;
 
 const { values: args } = parseArgs({
@@ -264,24 +265,41 @@ await page.evaluate(() => {
         requestAnimationFrame(tick);
     });
     // every node element inserted, counted as it is inserted (React and Vue build a subtree
-    // before they attach it, and may remove a node before an observer would see it)
+    // before they attach it, and may remove a node before an observer would see it; Svelte
+    // inserts with `before` / `append`, a fragment's top-level children counted)
+    const isNode = (node: unknown) =>
+        node instanceof Element &&
+        node.getAttribute("data-flow-part") === "node";
+    const count = (child: unknown) => {
+        if (child instanceof DocumentFragment) {
+            for (const top of child.children)
+                if (isNode(top)) sampler.mounted++;
+        } else if (isNode(child)) sampler.mounted++;
+    };
     const proto = Node.prototype;
     const counted = <A extends unknown[]>(
         insert: (this: Node, child: Node, ...rest: A) => Node,
     ) =>
         function (this: Node, child: Node, ...rest: A) {
-            if (
-                child instanceof Element &&
-                child.getAttribute("data-flow-part") === "node"
-            ) {
-                sampler.mounted++;
-            }
+            // into a fragment: counted when the fragment is inserted
+            if (!(this instanceof DocumentFragment)) count(child);
             return insert.call(this, child, ...rest);
         };
     proto.appendChild = counted(proto.appendChild) as typeof proto.appendChild;
     proto.insertBefore = counted(
         proto.insertBefore,
     ) as typeof proto.insertBefore;
+    const countedMany = (insert: (...nodes: (Node | string)[]) => void) =>
+        function (this: ChildNode | ParentNode, ...nodes: (Node | string)[]) {
+            for (const node of nodes) count(node);
+            insert.apply(this, nodes);
+        };
+    for (const target of [Element.prototype, CharacterData.prototype]) {
+        target.before = countedMany(target.before);
+        target.after = countedMany(target.after);
+    }
+    Element.prototype.append = countedMany(Element.prototype.append);
+    Element.prototype.prepend = countedMany(Element.prototype.prepend);
 });
 
 const frame = () =>
