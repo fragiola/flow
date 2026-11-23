@@ -61,6 +61,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "copy-paste",
         "collaborative",
         "export-image",
+        "stress-test",
     ],
     svelte: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -85,6 +86,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "copy-paste",
         "collaborative",
         "export-image",
+        "stress-test",
     ],
     angular: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -109,6 +111,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "copy-paste",
         "collaborative",
         "export-image",
+        "stress-test",
     ],
 };
 
