@@ -38,6 +38,7 @@ import {
 } from "../geometry/z-order";
 import type { FlowModel } from "../model/create-flow-model";
 import type { HandleType } from "../state/queries";
+import { replacedSince } from "../state/replaced-items";
 import type { FlowHandle } from "./adapter";
 import type { Measurements } from "./measurements";
 
@@ -577,7 +578,31 @@ export class EngineGeometry {
         this.stale = false;
         const dirty = new Set<string>();
         if (nodes !== this.nodes) {
-            if (full || nodes.length !== this.nodes.length) {
+            // the commits since the last sync only replaced these nodes: no need to compare all
+            const replaced = full
+                ? undefined
+                : replacedSince(nodes, this.nodes);
+            const changed = (before: FlowNode, after: FlowNode) => {
+                dirty.add(after.id);
+                if (stackChanged(before, after)) this.orderVersion++;
+                if (before.parentId !== after.parentId) {
+                    this.unparent(after.id, before.parentId);
+                    this.parent(after.id, after.parentId);
+                }
+            };
+            if (replaced) {
+                for (const id of replaced) {
+                    const at = this.nodeIndex.get(id);
+                    const before =
+                        at === undefined ? undefined : this.nodes[at];
+                    const after = at === undefined ? undefined : nodes[at];
+                    if (!before || !after || before.id !== after.id) {
+                        full = true;
+                        break;
+                    }
+                    if (before !== after) changed(before, after);
+                }
+            } else if (full || nodes.length !== this.nodes.length) {
                 full = true;
             } else {
                 for (let i = 0; i < nodes.length; i++) {
@@ -588,12 +613,7 @@ export class EngineGeometry {
                         full = true;
                         break;
                     }
-                    dirty.add(after.id);
-                    if (stackChanged(before, after)) this.orderVersion++;
-                    if (before.parentId !== after.parentId) {
-                        this.unparent(after.id, before.parentId);
-                        this.parent(after.id, after.parentId);
-                    }
+                    changed(before, after);
                 }
             }
             this.nodes = nodes;
@@ -621,7 +641,32 @@ export class EngineGeometry {
             }
         }
         if (edges !== this.edges) {
-            if (!fullEdges && edges.length === this.edges.length) {
+            const replaced = fullEdges
+                ? undefined
+                : replacedSince(edges, this.edges);
+            const changed = (before: FlowEdge, after: FlowEdge) => {
+                dirtyEdges.add(after.id);
+                if (
+                    before.source !== after.source ||
+                    before.target !== after.target
+                ) {
+                    this.detach(after.id, before);
+                    this.attach(after.id, after);
+                }
+            };
+            if (replaced) {
+                for (const id of replaced) {
+                    const at = this.edgeIndex.get(id);
+                    const before =
+                        at === undefined ? undefined : this.edges[at];
+                    const after = at === undefined ? undefined : edges[at];
+                    if (!before || !after || before.id !== after.id) {
+                        fullEdges = true;
+                        break;
+                    }
+                    if (before !== after) changed(before, after);
+                }
+            } else if (!fullEdges && edges.length === this.edges.length) {
                 for (let i = 0; i < edges.length; i++) {
                     const before = this.edges[i] as FlowEdge;
                     const after = edges[i] as FlowEdge;
@@ -630,19 +675,12 @@ export class EngineGeometry {
                         fullEdges = true;
                         break;
                     }
-                    dirtyEdges.add(after.id);
-                    if (
-                        before.source !== after.source ||
-                        before.target !== after.target
-                    ) {
-                        this.detach(after.id, before);
-                        this.attach(after.id, after);
-                    }
+                    changed(before, after);
                 }
-                this.orderVersion++;
             } else {
                 fullEdges = true;
             }
+            this.orderVersion++;
             this.edges = edges;
         }
         if (fullEdges) {
