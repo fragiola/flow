@@ -71,6 +71,22 @@ test("deleting an end of a chain adds nothing", async ({ page }) => {
     );
 });
 
+test("Delete on a selected edge alone names the edge it removed", async ({
+    page,
+}) => {
+    const target = edge(page, "fetch-parse");
+    await target.focus();
+    await page.keyboard.press("Enter");
+    await expect(target).toHaveAttribute("data-selected", "");
+    await page.keyboard.press("Delete");
+    await expect(edge(page, "fetch-parse")).toHaveCount(0);
+    await expect(part(page, "node")).toHaveCount(8);
+    await expect(part(page, "edge")).toHaveCount(6);
+    await expect(stage(page).getByTestId("outcome")).toHaveText(
+        "Removed Fetch to Parse.",
+    );
+});
+
 test("every node and edge a keyboard reaches is named", async ({ page }) => {
     const nodes = part(page, "node");
     await expect(nodes).toHaveCount(8);
