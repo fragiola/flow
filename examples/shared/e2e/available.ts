@@ -45,6 +45,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "shapes",
         "easy-connect",
         "proximity-connect",
+        "delete-middle-node",
     ],
     svelte: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -53,6 +54,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "shapes",
         "easy-connect",
         "proximity-connect",
+        "delete-middle-node",
     ],
     angular: [
         pendingCase("edge-reconnect", "delete-on-drop"),
@@ -61,6 +63,7 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "shapes",
         "easy-connect",
         "proximity-connect",
+        "delete-middle-node",
     ],
 };
 
