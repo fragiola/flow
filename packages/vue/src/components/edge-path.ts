@@ -6,6 +6,7 @@ import {
     definePrimitive,
     type FlowComponent,
     type PrimitiveProps,
+    type SlotFunction,
 } from "../utils/primitive";
 import { type RenderSlot, renderElement } from "../utils/render";
 
@@ -22,12 +23,16 @@ export interface EdgePathProps extends PrimitiveProps {
     edgeId?: string | undefined;
 }
 
-export interface EdgePathSlots extends RenderSlot<EdgePathState> {}
+export interface EdgePathSlots extends RenderSlot<EdgePathState> {
+    /** the path's SVG content (an `<animate>`, a `<title>`), as React's children */
+    default?: SlotFunction<{ state: EdgePathState }>;
+}
 
 /**
  * An edge's path (`data-flow-part="edge-path"`): an SVG `<path>` whose `d` is the engine's
  * (`edge-path-by`, D9; before the engine exists, the static geometry's), unfilled. A `d` of your own draws an app type (from `state.path`'s ends).
- * Several may share an edge: a wide transparent one is a bigger press target.
+ * Several may share an edge: a wide transparent one is a bigger press target. Its default slot
+ * renders inside the `<path>` (an `<animate>`, a `<title>`), as React's children.
  */
 export const EdgePath: FlowComponent<EdgePathProps, EdgePathSlots> =
     definePrimitive<EdgePathProps, EdgePathSlots>(
@@ -44,17 +49,21 @@ export const EdgePath: FlowComponent<EdgePathProps, EdgePathSlots> =
                 const current = path.value;
                 const own = attributes.value;
                 if (!current || !own) return null;
+                const state: EdgePathState = {
+                    edgeId: edgeId(),
+                    path: current,
+                    selected: own["data-selected"] !== undefined,
+                };
                 return renderElement({
                     tag: "path",
                     as: props.as,
                     attrs,
                     render: slots.render,
-                    state: {
-                        edgeId: edgeId(),
-                        path: current,
-                        selected: own["data-selected"] !== undefined,
-                    },
+                    state,
                     props: { ...own, d: current.path, fill: "none" },
+                    children: slots.default
+                        ? () => slots.default?.({ state })
+                        : undefined,
                 });
             };
         },

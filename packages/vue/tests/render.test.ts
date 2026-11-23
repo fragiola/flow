@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { h } from "vue";
+import { Flow, type FlowEdge, type FlowNode } from "../src/index";
 import { installLayout, pair, part, render, TestFlow, task } from "./flow";
 
 beforeEach(() => {
@@ -32,6 +33,73 @@ describe("rendering a flow", () => {
         expect(
             container.querySelectorAll('[data-flow-part="handle"]'),
         ).toHaveLength(4);
+    });
+
+    it("renders an edge path's default slot inside its <path>, given its state, as React's children", async () => {
+        const { container } = await render(() =>
+            h(
+                Flow.Root,
+                {
+                    defaultNodes: pair().nodes,
+                    defaultEdges: pair().edges,
+                },
+                () => [
+                    h(Flow.Viewport, null, () => [
+                        h(Flow.Edges, null, {
+                            default: ({ edge }: { edge: FlowEdge }) => [
+                                h(Flow.Edge, { edge }, () => [
+                                    h(Flow.EdgePath, null, {
+                                        default: ({
+                                            state,
+                                        }: {
+                                            state: { edgeId: string };
+                                        }) => [
+                                            h("animate", {
+                                                attributeName:
+                                                    "stroke-dashoffset",
+                                                "data-edge": state.edgeId,
+                                            }),
+                                        ],
+                                    }),
+                                ]),
+                            ],
+                        }),
+                        h(Flow.Nodes, null, {
+                            default: ({ node }: { node: FlowNode }) => [
+                                h(Flow.Node, { node }, () => [
+                                    h(Flow.Handle, {
+                                        type: "target",
+                                        side: "top",
+                                    }),
+                                    h(Flow.Handle, {
+                                        type: "source",
+                                        side: "bottom",
+                                    }),
+                                ]),
+                            ],
+                        }),
+                    ]),
+                ],
+            ),
+        );
+        const path = part(part(container, "edge", "ab"), "edge-path");
+        const animate = path.querySelector("animate");
+        expect(animate).not.toBeNull();
+        expect(animate?.parentElement).toBe(path);
+        expect(animate?.namespaceURI).toBe("http://www.w3.org/2000/svg");
+        expect(animate).toHaveAttribute("data-edge", "ab");
+    });
+
+    it("renders an edge path with no default slot as an empty <path>", async () => {
+        const { container } = await render(() =>
+            h(TestFlow, {
+                defaultNodes: pair().nodes,
+                defaultEdges: pair().edges,
+            }),
+        );
+        expect(
+            part(part(container, "edge", "ab"), "edge-path").childNodes,
+        ).toHaveLength(0);
     });
 
     it("positions each node with a structural transform at its place, with the document's size", async () => {

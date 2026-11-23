@@ -45,19 +45,14 @@ function onAnimationEnd(event: AnimationEvent) {
         <!-- a wide transparent path: a bigger target for a click -->
         <Flow.EdgePath :class="styles.edgeHit" />
         <Flow.EdgePath :class="styles.edge(motion)">
-            <!-- the path's own element, to hold the dashes' animate -->
-            <template #render="{ props: path }">
-                <path v-bind="path">
-                    <animate
-                        v-if="motion === 'dash' && moving"
-                        attributeName="stroke-dashoffset"
-                        :from="DASH_PERIOD"
-                        :to="0"
-                        dur="0.8s"
-                        repeatCount="indefinite"
-                    />
-                </path>
-            </template>
+            <animate
+                v-if="motion === 'dash' && moving"
+                attributeName="stroke-dashoffset"
+                :from="DASH_PERIOD"
+                :to="0"
+                dur="0.8s"
+                repeatCount="indefinite"
+            />
         </Flow.EdgePath>
         <circle
             v-if="motion === 'travel' && moving && state.path"

@@ -1645,9 +1645,11 @@ Decisions of #10:
   plain script); the framework-free siblings and their unit tests (`tests/<id>.test.ts`) are
   React's, unchanged. `delete-middle-node` builds its features per instance in `<script setup>`
   (its `beforeDelete` reads the flow ref), typed by their `ReturnType`. Every shared spec of these
-  passed with no adapter fix. Follow-up (no package change here): Vue's `Flow.EdgePath` drops its
-  default slot (React's renders its children), so `animating-edges` draws its dashed path through
-  the `render` slot to put an `<animate>` inside it.
+  passed with no adapter fix. #50 found that Vue's `Flow.EdgePath` dropped its default slot
+  (React's renders its children), so `animating-edges` drew its dashed path through the `render`
+  slot; #51 fixed the adapter (its default slot renders inside the `<path>`, given `{ state }`,
+  `packages/vue/tests/render.test.ts`) and the example puts its `<animate>` in that slot, as
+  React's.
 
 ## The Svelte examples and the Svelte docs (Issue #13)
 
