@@ -1330,13 +1330,14 @@ the per-framework skip of what a later Epic ports: whole examples (`<slug>`) and
 (`<slug>#<case>`, `pendingCase`); a spec that needs one is skipped in that framework with a
 "(PENDING)" reason instead of failing (`requireCase(slug, case)` as a test's first line for a
 case; `openExample` for an example). React never has any; the Epic that ports an entry to a
-framework deletes it there. Today Vue, Svelte and Angular wait for `edge-reconnect#delete-on-drop`,
+framework deletes it there. Today Svelte and Angular wait for `edge-reconnect#delete-on-drop`,
 `sub-flows#selection-grouping` and the new examples of #45 (`shapes`, `easy-connect`,
 `proximity-connect`, `delete-middle-node`, `intersections`, `contextual-zoom`, `connection-line`)
 and of #46 (`edge-markers`, `animating-edges`, `floating-edges`, `editable-edge`,
 `gradient-styling`, `whiteboard`) and of #47 (`helper-lines`, `copy-paste`, `collaborative`,
 `export-image`, `stress-test`) and of #48 (`dagre-layout`, `elk-layout`, `auto-layout`,
-`force-layout`): Epic #49 writes them in React, the ports' Epics follow. A pending whole example has nothing in the
+`force-layout`): Epic #49 writes them in React, the ports' Epics follow. Vue (Epic #52) has
+the extensions and the examples of #45 and #46 since #50, and waits for those of #47 and #48. A pending whole example has nothing in the
 port's app yet: its `tests/examples.test.ts` leaves it out of React's ids and `tests/vendored.test.ts`
 expects no copy of its `styles.ts` and siblings.
 Alternative: a capability attribute the example renders, checked by the spec; refused: it would
@@ -1500,7 +1501,8 @@ install. A port's Epic adds the same pins to its app. Declined: `yjs`, `html-to-
 `BroadcastChannel`, `export-image` draws its own SVG, `whiteboard` smooths its own strokes).
 
 The Vue, Svelte and Angular apps have every example from before Epic #49 (their own sections
-below), with no parity filter left; Epic #49's new examples and extensions wait in `PENDING`.
+below), with no parity filter left; Epic #49's new examples and extensions wait in `PENDING`
+(in Vue, since #50, only those of #47 and #48).
 
 **Theme tokens** (`--fl-*`; `tests/themes.test.ts` holds the list, `e2e/themes.spec.ts` checks the
 shapes differ on computed styles): shape `font`, `font-size`, `title-weight`, `node-padding`,
@@ -1577,7 +1579,7 @@ Decisions of #6:
 
 ## The Vue examples and the Vue docs (Issue #10)
 
-`examples/vue` (`examples-vue`, private) is `examples/react` in Vue: the 20 examples (19 before #33) with the same
+`examples/vue` (`examples-vue`, private) is `examples/react` in Vue: the 35 examples (20 before #50, 19 before #33) with the same
 ids, metadata, text, names, roles and test ids, and the same scripts (`generate`, `dev` (port
 5186), `build`, `typecheck` (`vue-tsc`, TypeScript 6.0.3 pinned in this app, Splitter's), `e2e`,
 `test`); `src/examples/README.md` says how an example is written in Vue. Its
@@ -1634,6 +1636,18 @@ Decisions of #10:
   `EDGE_OPTIONS` of React; `connected-data` splits React's file into `index.vue`, `number-body.vue`
   and `sum-body.vue` (`useNodesData` given a getter of the connections' sources). Every shared
   spec passed (215) with no adapter fix.
+- **#50 (Epic #52)**: `edge-reconnect`'s "Delete on drop" (`@reconnect-cancel`, a native
+  `role="switch"` checkbox), `sub-flows`' "Grouping" toolbar (`grouping.vue`), and `shapes`,
+  `easy-connect`, `proximity-connect`, `delete-middle-node`, `intersections`, `contextual-zoom`,
+  `connection-line`, `edge-markers`, `animating-edges`, `floating-edges`, `editable-edge`,
+  `gradient-styling`, `whiteboard`. React's in-file components and contexts became `.vue`
+  siblings with props and emits (a constant or helper they share is exported from `index.vue`'s
+  plain script); the framework-free siblings and their unit tests (`tests/<id>.test.ts`) are
+  React's, unchanged. `delete-middle-node` builds its features per instance in `<script setup>`
+  (its `beforeDelete` reads the flow ref), typed by their `ReturnType`. Every shared spec of these
+  passed with no adapter fix. Follow-up (no package change here): Vue's `Flow.EdgePath` drops its
+  default slot (React's renders its children), so `animating-edges` draws its dashed path through
+  the `render` slot to put an `<animate>` inside it.
 
 ## The Svelte examples and the Svelte docs (Issue #13)
 
