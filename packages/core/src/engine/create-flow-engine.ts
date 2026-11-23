@@ -317,6 +317,24 @@ const ZERO_SIZE: Size = { width: 0, height: 0 };
 
 const TOP_LEFT: XY = { x: 0, y: 0 };
 
+/** the app's actions that place the view: they read the root's box again, not the turn's kept one */
+const FRESH_BOX_ACTIONS: ReadonlySet<string> = new Set([
+    "fit-view",
+    "center-on",
+    "focus-node",
+    "set-viewport",
+    "zoom-in",
+    "zoom-out",
+    "zoom-to",
+    "pan-by",
+]);
+
+/** the app's reads that map points through the view: likewise */
+const FRESH_BOX_READS: ReadonlySet<string> = new Set([
+    "screen-to-flow",
+    "flow-to-screen",
+]);
+
 function finite(value: unknown): value is number {
     return typeof value === "number" && Number.isFinite(value);
 }
@@ -638,6 +656,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         dryRun: boolean,
     ): CommandResult<unknown> {
         if (this.destroyed) return fail("refused", "the engine was destroyed");
+        // an app may have moved or resized the root since the turn's first read
+        if (FRESH_BOX_ACTIONS.has(action)) this.cachedRootBox = undefined;
         const handler = Object.hasOwn(this.actions, action)
             ? this.actions[action as keyof typeof this.actions]
             : this.features.run.get(action);
@@ -652,6 +672,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     get(key: string, payload?: unknown): unknown {
         const values = this.getters;
+        if (FRESH_BOX_READS.has(key)) this.cachedRootBox = undefined;
         if (Object.hasOwn(values, key)) {
             return values[key as keyof typeof values](payload ?? {});
         }
@@ -1166,10 +1187,11 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     }
 
     /**
-     * The root's client box (its position on the page and its size), read once until the root
-     * window's next microtask: every read that needs the view asks for it, and a layout forced
-     * per read is what an adapter's render pays (Vue patches a node between two reads). Without a
-     * root window's microtask queue, read each time.
+     * The root's client box (its position on the page and its size), read once until the next
+     * microtask: every read that needs the view asks for it, and a layout forced per read is what
+     * an adapter's render pays (Vue patches a node between two reads). The app's own verbs that
+     * place or map the view read it again (`FRESH_BOX_ACTIONS`, `FRESH_BOX_READS`). Cleared with
+     * a promise, not the window's `queueMicrotask`, which an app's fake timers may hold.
      */
     private rootBox(): Rect {
         if (this.cachedRootBox) return this.cachedRootBox;
@@ -1182,12 +1204,10 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             width: box.width,
             height: box.height,
         };
-        const view = viewOf(element);
-        if (!view || typeof view.queueMicrotask !== "function") return rect;
         this.cachedRootBox = rect;
         if (!this.rootBoxClearQueued) {
             this.rootBoxClearQueued = true;
-            view.queueMicrotask(() => {
+            void Promise.resolve().then(() => {
                 this.rootBoxClearQueued = false;
                 this.cachedRootBox = undefined;
             });
