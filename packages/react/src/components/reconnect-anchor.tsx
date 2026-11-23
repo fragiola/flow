@@ -53,6 +53,7 @@ export function ReconnectAnchor(props: ReconnectAnchorProps) {
                 : undefined,
         sameValue,
         "entity",
+        { kind: "edge", id: edgeId },
     );
     if (!path || !view?.movable) return null;
     return (

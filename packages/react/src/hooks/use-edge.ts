@@ -93,6 +93,7 @@ export function useEdge<T extends FlowTypes = AnyTypes>(
             sameEdgePath(a.path, b.path) &&
             shallowEqual(a.attributes, b.attributes),
         "entity",
+        { kind: "edge", id: edgeId },
     );
     const { attributes } = view;
     return {
@@ -147,5 +148,6 @@ export function useEdgePath(edgeId: string): EdgePath | undefined {
                 : staticGeometry?.edgePaths[edgeId],
         sameEdgePath,
         "entity",
+        { kind: "edge", id: edgeId },
     );
 }

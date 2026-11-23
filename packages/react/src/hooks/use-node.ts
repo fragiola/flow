@@ -98,6 +98,7 @@ export function useNode<T extends FlowTypes = AnyTypes>(
         },
         sameValue,
         "entity",
+        { kind: "node", id: nodeId },
     );
     const ref = React.useCallback(
         (element: HTMLElement | null) => {

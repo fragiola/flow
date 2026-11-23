@@ -2,6 +2,7 @@
 import * as React from "react";
 import type { AnyFlowEngine, AnyFlowModel } from "../context";
 import {
+    type FlowEntity,
     type FlowStore,
     type FlowValueScope,
     flowStoreOf,
@@ -42,7 +43,8 @@ export function sameValue<S>(a: S, b: S): boolean {
  * changes (`isEqual`; records by their entries by default). It is read again on every change of
  * the model's lists and every view change of the engine (`engine.adapter`: measurements, the
  * viewport, a gesture) that may concern its `scope` (`entity`: a node's or an edge's own view, not
- * read again on a viewport step), and on every render (the reader may close over props); a value
+ * read again on a viewport step; given its node or edge, not on a measurement that leaves it
+ * alone), and on every render (the reader may close over props); a value
  * equal to the last one keeps the last object. Every reader of a root shares one subscription
  * (`flowStoreOf`).
  */
@@ -52,6 +54,7 @@ export function useFlowValue<S>(
     read: () => S,
     isEqual: (a: S, b: S) => boolean = sameValue,
     scope: FlowValueScope = "view",
+    entity?: FlowEntity,
 ): S {
     const latest = React.useRef({ read, isEqual });
     latest.current = { read, isEqual };
@@ -65,12 +68,21 @@ export function useFlowValue<S>(
         | undefined
     >(undefined);
     const store = flowStoreOf(model, engine);
+    const kind = entity?.kind;
+    const id = entity?.id;
     const subscribe = React.useCallback(
-        (onChange: () => void) => store.subscribe(scope, onChange),
-        [store, scope],
+        (onChange: () => void) =>
+            store.subscribe(
+                scope,
+                onChange,
+                kind === undefined || id === undefined
+                    ? undefined
+                    : { kind, id },
+            ),
+        [store, scope, kind, id],
     );
     const getSnapshot = (): S => {
-        const version = store.version(scope);
+        const version = store.version(scope, entity);
         const previous = cache.current;
         if (
             previous?.store === store &&

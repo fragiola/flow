@@ -40,6 +40,7 @@ export function EdgePath(props: EdgePathProps) {
                   ),
         sameValue,
         "entity",
+        { kind: "edge", id: edgeId },
     );
     if (!path || !attributes) return null;
     return (

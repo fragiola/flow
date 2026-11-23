@@ -2,7 +2,13 @@
 // no node or edge whose visibility did not change, and reads none of their views again (`entity`
 // readers skip it); dragging one node re-renders that node and its edges only; a culled flow
 // renders no node or edge before the engine knows the view.
-import type { FlowEngine, FlowEngineOptions, FlowModel } from "@fragiola/flow";
+import type {
+    AnyTypes,
+    FlowEngine,
+    FlowEngineOptions,
+    FlowFeatures,
+    FlowModel,
+} from "@fragiola/flow";
 import { drag as dragFeature } from "@fragiola/flow/drag";
 import { selection } from "@fragiola/flow/selection";
 import { act, render } from "@testing-library/react";
@@ -11,7 +17,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createFlowRef, Flow, type RootProps } from "../src/index";
 import { drag, installLayout, part, pointer, settle, task } from "./flow";
 
-/** The engine reads of a node's or an edge's own view, by key, since the last reset. */
+/**
+ * The engine reads of a node's or an edge's own view since the last reset, by key and by the
+ * node or edge read (`node-z-index-by a`).
+ */
 const reads = new Map<string, number>();
 const ENTITY_KEYS = new Set([
     "node-rect-by",
@@ -27,19 +36,24 @@ vi.mock("@fragiola/flow", async (importOriginal) => {
         ...core,
         createFlowEngine(model: FlowModel, options: FlowEngineOptions) {
             const engine = core.createFlowEngine(model, options) as FlowEngine;
-            const count = (key: string) => {
-                if (ENTITY_KEYS.has(key))
-                    reads.set(key, (reads.get(key) ?? 0) + 1);
+            const count = (key: string, payload?: unknown) => {
+                if (!ENTITY_KEYS.has(key)) return;
+                const { nodeId, edgeId } = (payload ?? {}) as {
+                    nodeId?: string;
+                    edgeId?: string;
+                };
+                const read = `${key} ${nodeId ?? edgeId}`;
+                reads.set(read, (reads.get(read) ?? 0) + 1);
             };
             const get = (key: string, payload?: unknown) => {
-                count(key);
+                count(key, payload);
                 return (engine.get as (k: string, p?: unknown) => unknown)(
                     key,
                     payload,
                 );
             };
             const is = (key: string, payload?: unknown) => {
-                count(key);
+                count(key, payload);
                 return (engine.is as (k: string, p?: unknown) => boolean)(
                     key,
                     payload,
@@ -91,7 +105,9 @@ const edges = [
 ];
 
 function CountedFlow(
-    props: { renders: ReturnType<typeof counter> } & Partial<RootProps>,
+    props: { renders: ReturnType<typeof counter> } & Partial<
+        RootProps<AnyTypes, FlowFeatures>
+    >,
 ) {
     const { renders, ...root } = props;
     return (
@@ -197,6 +213,7 @@ describe("render counts", () => {
         await settle();
         renders.reset();
         const root = part(container, "root");
+        reads.clear();
         // zoomed out to the minimum (0.5): y and z come into view
         for (let i = 0; i < 12; i++) wheel(root, 100);
         await settle();
@@ -205,6 +222,17 @@ describe("render counts", () => {
             "node y",
             "node z",
             "path yz",
+        ]);
+        // their measurement reads the nodes and edges that stayed only to see it left them alone
+        const others = [...reads.keys()].filter(
+            (read) => !/ [yz]$|yz$/.test(read),
+        );
+        expect(others.sort()).toEqual([
+            "edge-path-by ab",
+            "edge-path-by bc",
+            "node-rect-by a",
+            "node-rect-by b",
+            "node-rect-by c",
         ]);
     });
 

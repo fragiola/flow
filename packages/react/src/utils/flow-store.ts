@@ -14,16 +14,27 @@ import type { AnyFlowEngine, AnyFlowModel } from "../context";
  */
 export type FlowValueScope = "view" | "entity";
 
+/**
+ * @internal the node or the edge an `entity` reader shows: a change that is only a measurement
+ * (nodes mounted, a node resized) tells it only when the measurement changed it (its node's box or
+ * measured state, its edge's path), not every node and edge on screen
+ */
+export interface FlowEntity {
+    readonly kind: "node" | "edge";
+    readonly id: string;
+}
+
 type Listener = () => void;
 
 /** @internal the shared subscription of one model (and engine, once there is one) */
 export interface FlowStore {
-    /** a number that changes whenever a value of `scope` may have changed */
-    readonly version: (scope: FlowValueScope) => number;
-    /** calls `listener` when a value of `scope` may have changed; returns its remover */
+    /** a number that changes whenever a value of `scope` (of `entity`) may have changed */
+    readonly version: (scope: FlowValueScope, entity?: FlowEntity) => number;
+    /** calls `listener` when a value of `scope` (of `entity`) may have changed; returns its remover */
     readonly subscribe: (
         scope: FlowValueScope,
         listener: Listener,
+        entity?: FlowEntity,
     ) => () => void;
 }
 
@@ -47,21 +58,81 @@ export function flowStoreOf(
     return store;
 }
 
+/** One node's or edge's readers, and what a measurement may change of it. */
+interface EntityRecord {
+    readonly entity: FlowEntity;
+    readonly listeners: Set<Listener>;
+    /** the stamp of its last change told by a measurement */
+    stamp: number;
+    /**
+     * its node's box and measured state, or its edge's path (frozen, the same until changed), as
+     * of the last measurement; none after any other change (read again at the next measurement,
+     * which then tells it)
+     */
+    token: readonly unknown[] | undefined;
+}
+
 function createFlowStore(
     model: AnyFlowModel,
     engine: AnyFlowEngine | null,
 ): FlowStore {
-    let viewVersion = 0;
-    let entityVersion = 0;
+    // every change takes the next stamp; a version is the stamp of the last change it covers
+    let stamp = 0;
+    let viewStamp = 0;
+    /** the last change of every node and edge (the lists, a gesture, several levels) */
+    let entityStamp = 0;
+    /** the last change that was only a measurement: what every reader without an entity hears */
+    let measureStamp = 0;
     const listeners: Record<FlowValueScope, Set<Listener>> = {
         view: new Set(),
         entity: new Set(),
     };
-    const tell = (entity: boolean) => {
-        viewVersion += 1;
-        if (entity) entityVersion += 1;
-        for (const listener of [...listeners.view]) listener();
-        if (entity) for (const listener of [...listeners.entity]) listener();
+    const records = new Map<string, EntityRecord>();
+    const keyOf = (entity: FlowEntity) => `${entity.kind}\u0000${entity.id}`;
+    const tokenOf = ({ kind, id }: FlowEntity): readonly unknown[] =>
+        !engine
+            ? []
+            : kind === "node"
+              ? [
+                    engine.get("node-rect-by", { nodeId: id }),
+                    engine.is("node-measured", { nodeId: id }),
+                ]
+              : [engine.get("edge-path-by", { edgeId: id })];
+    const call = (set: Iterable<Listener>) => {
+        for (const listener of [...set]) listener();
+    };
+
+    /** A change: of the view only, only a measurement, or of everything. */
+    const tell = (kind: "view" | "measured" | "entity") => {
+        stamp += 1;
+        viewStamp = stamp;
+        call(listeners.view);
+        if (kind === "view") return;
+        if (kind === "entity") {
+            entityStamp = stamp;
+            call(listeners.entity);
+            for (const record of records.values()) {
+                record.token = undefined;
+                call(record.listeners);
+            }
+            return;
+        }
+        measureStamp = stamp;
+        call(listeners.entity);
+        const changed: EntityRecord[] = [];
+        for (const record of records.values()) {
+            const token = tokenOf(record.entity);
+            const was = record.token;
+            const same =
+                was !== undefined &&
+                token.length === was.length &&
+                token.every((value, i) => Object.is(value, was[i]));
+            if (same) continue;
+            record.token = token;
+            record.stamp = stamp;
+            changed.push(record);
+        }
+        for (const record of changed) call(record.listeners);
     };
 
     // a commit that keeps both lists changes nothing a reader reads
@@ -73,7 +144,7 @@ function createFlowStore(
         if (nextNodes === nodes && nextEdges === edges) return;
         nodes = nextNodes;
         edges = nextEdges;
-        tell(true);
+        tell("entity");
     });
 
     if (engine) {
@@ -82,19 +153,48 @@ function createFlowStore(
         let wasLayered = layered();
         engine.adapter.subscribe((change: ViewChange) => {
             const isLayered = layered();
-            const entity =
-                change.measured || change.gesture || isLayered || wasLayered;
+            const levels = isLayered || wasLayered;
             wasLayered = isLayered;
-            tell(entity);
+            if (change.gesture || levels) tell("entity");
+            else if (change.measured)
+                tell(change.viewport ? "entity" : "measured");
+            else tell("view");
         });
     }
 
     return {
-        version: (scope) => (scope === "entity" ? entityVersion : viewVersion),
-        subscribe: (scope, listener) => {
-            listeners[scope].add(listener);
+        version: (scope, entity) => {
+            if (scope === "view") return viewStamp;
+            const record = entity ? records.get(keyOf(entity)) : undefined;
+            return Math.max(entityStamp, record ? record.stamp : measureStamp);
+        },
+        subscribe: (scope, listener, entity) => {
+            if (scope === "view" || !entity) {
+                listeners[scope].add(listener);
+                return () => {
+                    listeners[scope].delete(listener);
+                };
+            }
+            const key = keyOf(entity);
+            let record = records.get(key);
+            if (!record) {
+                // the last measurement counts as its change: a reader that read before it
+                // subscribed (its render) reads again if a measurement came in between
+                record = {
+                    entity,
+                    listeners: new Set(),
+                    stamp: measureStamp,
+                    token: tokenOf(entity),
+                };
+                records.set(key, record);
+            }
+            const own = record;
+            own.listeners.add(listener);
             return () => {
-                listeners[scope].delete(listener);
+                own.listeners.delete(listener);
+                if (own.listeners.size === 0 && records.get(key) === own) {
+                    records.delete(key);
+                }
             };
         },
     };

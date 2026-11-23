@@ -43,6 +43,7 @@ export function EdgeLabel(props: EdgeLabelProps) {
                   ),
         sameValue,
         "entity",
+        { kind: "edge", id: edgeId },
     );
     if (!path || !attributes || !layer) return null;
     return createPortal(
