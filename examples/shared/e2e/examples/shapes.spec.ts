@@ -115,6 +115,14 @@ test("a label is edited in place: Enter keeps it, Escape drops it", async ({
     await again.press("Escape");
     await expect(again).toHaveCount(0);
     await expect(ship).toHaveAccessibleName("Deliver (Hexagon)");
+    // the next edit, after a drop, is kept on leaving the field
+    await ship.dblclick();
+    const third = ship.getByRole("textbox", { name: "Label of Deliver" });
+    await expect(third).toBeFocused();
+    await third.fill("Send");
+    await third.blur();
+    await expect(third).toHaveCount(0);
+    await expect(ship).toHaveAccessibleName("Send (Hexagon)");
 });
 
 test("every node, handle, knob and picker a keyboard reaches is named", async ({
