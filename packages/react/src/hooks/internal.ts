@@ -1,6 +1,11 @@
 // The hooks and helpers only the primitives call.
 import * as React from "react";
 import type { AnyFlowEngine, AnyFlowModel } from "../context";
+import {
+    type FlowStore,
+    type FlowValueScope,
+    flowStoreOf,
+} from "../utils/flow-store";
 import { shallowEqual } from "../utils/shallow-equal";
 
 /** @internal `useLayoutEffect` in a browser, nothing on the server (where it would warn) */
@@ -32,57 +37,44 @@ export function sameValue<S>(a: S, b: S): boolean {
     return false;
 }
 
-const noSubscribe = () => () => {};
-
 /**
  * @internal a value read from the model and the engine, re-rendering the component only when it
- * changes (`isEqual`; records by their entries by default). It is read again on every commit of
- * the model and every view change of the engine (`engine.adapter`: measurements, the viewport, a
- * gesture), and on every render (the reader may close over props); a value equal to the last one
- * keeps the last object.
+ * changes (`isEqual`; records by their entries by default). It is read again on every change of
+ * the model's lists and every view change of the engine (`engine.adapter`: measurements, the
+ * viewport, a gesture) that may concern its `scope` (`entity`: a node's or an edge's own view, not
+ * read again on a viewport step), and on every render (the reader may close over props); a value
+ * equal to the last one keeps the last object. Every reader of a root shares one subscription
+ * (`flowStoreOf`).
  */
 export function useFlowValue<S>(
     model: AnyFlowModel,
     engine: AnyFlowEngine | null,
     read: () => S,
     isEqual: (a: S, b: S) => boolean = sameValue,
+    scope: FlowValueScope = "view",
 ): S {
     const latest = React.useRef({ read, isEqual });
     latest.current = { read, isEqual };
     const cache = React.useRef<
         | {
-              nodes: unknown;
-              edges: unknown;
-              engine: unknown;
-              revision: number;
+              store: FlowStore;
+              version: number;
               read: () => S;
               value: S;
           }
         | undefined
     >(undefined);
+    const store = flowStoreOf(model, engine);
     const subscribe = React.useCallback(
-        (onChange: () => void) => {
-            const stopModel = model.subscribe(() => onChange());
-            const stopEngine = engine
-                ? engine.adapter.subscribe(() => onChange())
-                : noSubscribe();
-            return () => {
-                stopModel();
-                stopEngine();
-            };
-        },
-        [model, engine],
+        (onChange: () => void) => store.subscribe(scope, onChange),
+        [store, scope],
     );
     const getSnapshot = (): S => {
-        const nodes = model.get("all-nodes");
-        const edges = model.get("all-edges");
-        const revision = engine ? engine.adapter.getSnapshot() : -1;
+        const version = store.version(scope);
         const previous = cache.current;
         if (
-            previous?.nodes === nodes &&
-            previous.edges === edges &&
-            previous.engine === engine &&
-            previous.revision === revision &&
+            previous?.store === store &&
+            previous.version === version &&
             previous.read === latest.current.read
         ) {
             return previous.value;
@@ -94,10 +86,8 @@ export function useFlowValue<S>(
                 ? previous.value
                 : value;
         cache.current = {
-            nodes,
-            edges,
-            engine,
-            revision,
+            store,
+            version,
             read: latest.current.read,
             value: kept,
         };

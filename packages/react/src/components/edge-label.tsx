@@ -2,7 +2,7 @@ import type { EdgePath } from "@fragiola/flow";
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { EdgeLabelLayerContext, useEdgeId, useFlowContext } from "../context";
-import { useFlowValue } from "../hooks/internal";
+import { sameValue, useFlowValue } from "../hooks/internal";
 import { staticEdgeAttributes, useEdgePath } from "../hooks/use-edge";
 import { type DivPrimitiveProps, useRenderElement } from "../utils/use-render";
 
@@ -31,13 +31,18 @@ export function EdgeLabel(props: EdgeLabelProps) {
     const layer = React.useContext(EdgeLabelLayerContext);
     const { model, engine } = useFlowContext("EdgeLabel");
     const path = useEdgePath(edgeId);
-    const attributes = useFlowValue(model, engine, () =>
-        engine
-            ? engine.adapter.attributes("edge-label", { edgeId })
-            : staticEdgeAttributes(
-                  "edge-label",
-                  model.get("edge-by", { id: edgeId }) ?? { id: edgeId },
-              ),
+    const attributes = useFlowValue(
+        model,
+        engine,
+        () =>
+            engine
+                ? engine.adapter.attributes("edge-label", { edgeId })
+                : staticEdgeAttributes(
+                      "edge-label",
+                      model.get("edge-by", { id: edgeId }) ?? { id: edgeId },
+                  ),
+        sameValue,
+        "entity",
     );
     if (!path || !attributes || !layer) return null;
     return createPortal(

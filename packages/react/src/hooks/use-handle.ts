@@ -8,7 +8,7 @@ import {
 import * as React from "react";
 import { useFlowContext, usePartNodeId } from "../context";
 import { type AttributeProps, attributeProps } from "../utils/use-render";
-import { useFlowValue } from "./internal";
+import { sameValue, useFlowValue } from "./internal";
 
 export interface UseHandleOptions {
     /** whether edges start (`source`) or end (`target`) here */
@@ -92,14 +92,19 @@ export function useHandle(options: UseHandleOptions): UseHandleResult {
             connectableEnd,
         ],
     );
-    const attributes = useFlowValue(model, engine, () =>
-        engine
-            ? engine.adapter.attributes("handle", registration)
-            : {
-                  ...partAttributes("handle", handleId),
-                  "data-handle-type": type,
-                  "data-side": side,
-              },
+    const attributes = useFlowValue(
+        model,
+        engine,
+        () =>
+            engine
+                ? engine.adapter.attributes("handle", registration)
+                : {
+                      ...partAttributes("handle", handleId),
+                      "data-handle-type": type,
+                      "data-side": side,
+                  },
+        sameValue,
+        "entity",
     );
     const ref = React.useCallback(
         (element: Element | null) => {

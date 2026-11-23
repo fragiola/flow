@@ -1,7 +1,11 @@
 import type { ResizeDirection } from "@fragiola/flow/resize";
 import type * as React from "react";
 import { useFlowContext, usePartNodeId } from "../context";
-import { useFlowValue, useIsomorphicLayoutEffect } from "../hooks/internal";
+import {
+    sameValue,
+    useFlowValue,
+    useIsomorphicLayoutEffect,
+} from "../hooks/internal";
 import { type DivPrimitiveProps, useRenderElement } from "../utils/use-render";
 import { RESIZE_POSITIONS, ResizeHandle } from "./resize-handle";
 
@@ -79,10 +83,15 @@ export function NodeResizer(props: NodeResizerProps) {
         keepAspectRatio,
         direction,
     ]);
-    const attributes = useFlowValue(model, engine, () =>
-        engine
-            ? engine.adapter.attributes("resizer", { nodeId })
-            : { "data-flow-part": "resizer", "data-flow-id": nodeId },
+    const attributes = useFlowValue(
+        model,
+        engine,
+        () =>
+            engine
+                ? engine.adapter.attributes("resizer", { nodeId })
+                : { "data-flow-part": "resizer", "data-flow-id": nodeId },
+        sameValue,
+        "entity",
     );
     return useRenderElement("div", rest, {
         state: { nodeId, resizing: attributes["data-resizing"] !== undefined },

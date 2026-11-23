@@ -5,7 +5,7 @@ import {
 } from "@fragiola/flow";
 import type * as React from "react";
 import { useFlowContext, usePartNodeId } from "../context";
-import { useFlowValue } from "../hooks/internal";
+import { sameValue, useFlowValue } from "../hooks/internal";
 import {
     attributeProps,
     type DivPrimitiveProps,
@@ -129,15 +129,20 @@ export function ResizeHandle(props: ResizeHandleProps) {
     const { model, engine } = useFlowContext("ResizeHandle");
     // the engine's record: `data-position`, `data-variant`, `data-direction`, and `tabindex` with
     // `keyboard()` (arrows resize)
-    const attributes = useFlowValue(model, engine, () =>
-        engine
-            ? engine.adapter.attributes("resize-handle", {
-                  nodeId,
-                  position,
-                  direction,
-                  variant,
-              })
-            : resizeHandleAttributes(position, { direction, variant }),
+    const attributes = useFlowValue(
+        model,
+        engine,
+        () =>
+            engine
+                ? engine.adapter.attributes("resize-handle", {
+                      nodeId,
+                      position,
+                      direction,
+                      variant,
+                  })
+                : resizeHandleAttributes(position, { direction, variant }),
+        sameValue,
+        "entity",
     );
     return useRenderElement("div", rest, {
         state: {
