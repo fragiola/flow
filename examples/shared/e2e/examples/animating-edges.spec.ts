@@ -126,6 +126,22 @@ test("sending a value pulses its edge once, then the counter receives it", async
     await expect(edge(page, PULSE)).not.toHaveAttribute("data-pulsing");
 });
 
+test("deleting the pulsing edge drops the value and frees Send", async ({
+    page,
+}) => {
+    const send = page.getByRole("button", { name: "Send a value" });
+    await send.click();
+    await expect(edge(page, PULSE)).toHaveAttribute("data-pulsing", "");
+    await expect(send).toBeDisabled();
+    // selected and deleted from the keyboard while the value is on its way
+    await edge(page, PULSE).focus();
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Delete");
+    await expect(edge(page, PULSE)).toHaveCount(0);
+    await expect(send).toBeEnabled();
+    await expect(page.getByTestId("received")).toHaveText("0");
+});
+
 test("every node, edge and control is named", async ({ page }) => {
     const nodes = part(page, "node");
     await expect(nodes).toHaveCount(5);
