@@ -16,6 +16,12 @@
     // drawn at its ends' level: above the groups it crosses, under the nodes it joins; a selected edge
     // rises above every node. `"basic"` keeps every edge under every node, and `"manual"` follows only
     // the `zIndex` values.
+    //
+    // "Group selection" wraps two or more selected top-level nodes in a new group sized to their box
+    // (`nodes-bounds`) plus a margin: one `batch` of `node.add` and a `node.set-parent` per node, so
+    // they keep their places and one undo takes it back. "Ungroup" puts the children of the selected
+    // groups back on the flow (`node.set-parent` to `null`) and removes the groups, in one `batch`
+    // too: removing a group first would remove its children with it (grouping.svelte).
 
     export interface Types extends FlowTypes {
         readonly nodes: {
@@ -70,8 +76,14 @@
         {
             id: "cache",
             type: "item",
-            position: { x: 180, y: 280 },
+            position: { x: 140, y: 280 },
             data: { label: "Cache (drop me in a group)" },
+        },
+        {
+            id: "logs",
+            type: "item",
+            position: { x: 400, y: 280 },
+            data: { label: "Logs" },
         },
     ];
 
@@ -84,6 +96,7 @@
 <script lang="ts">
     import { typedFlow } from "@fragiola/flow-svelte";
     import DropIntoGroups from "./drop-into-groups.svelte";
+    import Grouping from "./grouping.svelte";
     import { styles } from "./styles";
 
     const Flow = typedFlow<Types, typeof features>();
@@ -125,4 +138,5 @@
         </Flow.Nodes>
     </Flow.Viewport>
     <DropIntoGroups />
+    <Grouping />
 </Flow.Root>

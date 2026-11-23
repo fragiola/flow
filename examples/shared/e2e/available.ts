@@ -39,8 +39,6 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
     react: [],
     vue: [],
     svelte: [
-        // Epic #49 (#44): the extensions of edge-reconnect and sub-flows, React first
-        pendingCase("sub-flows", "selection-grouping"),
         // Epic #49 (#45): new React examples, ported by a later Epic
         "shapes",
         "easy-connect",
