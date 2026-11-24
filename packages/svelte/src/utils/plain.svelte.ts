@@ -6,7 +6,8 @@
  * A value the app owns, without its proxy (a frozen value is taken as it is). Plain objects and
  * arrays are copied here, key by key (a proxy read through gives its values), the frozen parts
  * shared; anything else goes to `$state.snapshot`. Not `$state.snapshot` for the whole value: it
- * clones each primitive with `structuredClone` (#54: ~250 ms of a 10 000-node open).
+ * clones each primitive with `structuredClone` (#54: ~250 ms of a 10 000-node open). Cyclic data
+ * is not supported (the model refuses it anyway), and a shared object comes out as two copies.
  */
 export function plain<V>(value: V): V {
     return copy(value) as V;

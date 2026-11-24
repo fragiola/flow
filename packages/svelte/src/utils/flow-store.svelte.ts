@@ -130,6 +130,10 @@ export function createFlowStore(model: () => AnyFlowModel): FlowStore {
                 return;
             }
             entity.value;
+            // An entity reader without an entity (handle, resizer, minimap node attributes) does
+            // not re-read on a measurement, unlike React's and Vue's: none of those attributes
+            // depends on one today, and re-reading them would re-render every handle on a zoom
+            // (render-counts test). A feature that adds a measured attribute must track `measure`.
             if (of) (records.get(keyOf(of))?.counter ?? measure).value;
         },
         acquire(of) {
