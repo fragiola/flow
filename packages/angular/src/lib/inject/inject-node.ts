@@ -21,7 +21,7 @@ import {
     px,
     type StructuralStyle,
 } from "../utils/helpers";
-import { flowValue, type ValueOrSignal, valueNow } from "./internal";
+import { entityOf, flowValue, type ValueOrSignal, valueNow } from "./internal";
 
 /** What a node shows: its state on screen. */
 export interface NodeState<T extends FlowTypes = AnyTypes> {
@@ -97,35 +97,43 @@ export function bindNode<T extends FlowTypes>(
     node: () => FlowNode<T> | undefined,
 ): InjectNodeResult<T> {
     const nodeId = computed(() => node()?.id);
-    const view = flowValue(context, (): NodeView | undefined => {
-        const current = node() as FlowNode | undefined;
-        if (!current) return undefined;
-        const id = current.id;
-        const engine = context.engine();
-        if (!engine) {
-            // the first render: the static geometry's place (the node's origin applied) and stack
-            const geometry = context.geometry();
-            const rect = geometry?.nodeRects[id];
+    const view = flowValue(
+        context,
+        (): NodeView | undefined => {
+            const current = node() as FlowNode | undefined;
+            if (!current) return undefined;
+            const id = current.id;
+            const engine = context.engine();
+            if (!engine) {
+                // the first render: the static geometry's place (the node's origin applied) and stack
+                const geometry = context.geometry();
+                const rect = geometry?.nodeRects[id];
+                return {
+                    attributes: {
+                        ...partAttributes("node", id),
+                        "data-selected": flag(current.selected === true),
+                    },
+                    x: rect?.x ?? current.position.x,
+                    y: rect?.y ?? current.position.y,
+                    zIndex: geometry?.nodeZIndexes[id],
+                    focusable: false,
+                };
+            }
+            const rect = engine.get("node-rect-by", { nodeId: id });
             return {
-                attributes: {
-                    ...partAttributes("node", id),
-                    "data-selected": flag(current.selected === true),
-                },
+                attributes: engine.adapter.attributes("node", { nodeId: id }),
                 x: rect?.x ?? current.position.x,
                 y: rect?.y ?? current.position.y,
-                zIndex: geometry?.nodeZIndexes[id],
-                focusable: false,
+                zIndex: engine.get("node-z-index-by", { nodeId: id }),
+                focusable: engine.is("node-focusable", { nodeId: id }),
             };
-        }
-        const rect = engine.get("node-rect-by", { nodeId: id });
-        return {
-            attributes: engine.adapter.attributes("node", { nodeId: id }),
-            x: rect?.x ?? current.position.x,
-            y: rect?.y ?? current.position.y,
-            zIndex: engine.get("node-z-index-by", { nodeId: id }),
-            focusable: engine.is("node-focusable", { nodeId: id }),
-        };
-    });
+        },
+        undefined,
+        {
+            scope: "entity",
+            entity: entityOf("node", () => node()?.id),
+        },
+    );
     const state = computed((): NodeState<T> | undefined => {
         const current = node();
         const shown = view();
@@ -166,15 +174,22 @@ export function bindNode<T extends FlowTypes>(
     });
     bindAttributes(element, () => props().attributes);
     bindStructuralStyle(element, () => props().style);
-    // registered once per engine and node id: a move or a selection registers nothing again
-    afterRenderEffect((onCleanup) => {
-        const engine = context.engine();
-        const id = nodeId();
-        if (!engine || id === undefined) return;
-        untracked(() => {
-            engine.adapter.registerNode(id, element);
-            onCleanup(() => engine.adapter.registerNode(id, null));
-        });
+    // registered once per engine and node id: a move or a selection registers nothing again.
+    // After the render (every node of it inserted, so the first measurement lays the page out
+    // once), in the first phase (`earlyRead`: the engine measures the node, reading the DOM), so
+    // a node the app added is registered before the app's own after-render hooks of the other
+    // phases run (`afterNextRender`'s default, `mixedReadWrite`), and its content's. Each node's
+    // is its own hook: one that throws goes to the app's `ErrorHandler`, the others still run
+    afterRenderEffect({
+        earlyRead: (onCleanup) => {
+            const engine = context.engine();
+            const id = nodeId();
+            if (!engine || id === undefined) return;
+            untracked(() => {
+                engine.adapter.registerNode(id, element);
+                onCleanup(() => engine.adapter.registerNode(id, null));
+            });
+        },
     });
     return { state, props };
 }

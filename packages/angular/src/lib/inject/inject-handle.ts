@@ -146,18 +146,23 @@ export function bindHandle(
         },
         { equal: sameRegistration },
     );
-    const attributes = flowValue(context, (): PartAttributes | undefined => {
-        const handle = registration();
-        if (!handle) return undefined;
-        const engine = context.engine();
-        return engine
-            ? engine.adapter.attributes("handle", handle)
-            : {
-                  ...partAttributes("handle", handle.handleId),
-                  "data-handle-type": handle.type,
-                  "data-side": handle.side,
-              };
-    });
+    const attributes = flowValue(
+        context,
+        (): PartAttributes | undefined => {
+            const handle = registration();
+            if (!handle) return undefined;
+            const engine = context.engine();
+            return engine
+                ? engine.adapter.attributes("handle", handle)
+                : {
+                      ...partAttributes("handle", handle.handleId),
+                      "data-handle-type": handle.type,
+                      "data-side": handle.side,
+                  };
+        },
+        undefined,
+        { scope: "entity" },
+    );
     const state = computed((): HandleState | undefined => {
         const handle = registration();
         const current = attributes();
@@ -182,14 +187,18 @@ export function bindHandle(
         const side = registration()?.side;
         return side ? SIDE_STYLE[side] : {};
     });
-    afterRenderEffect((onCleanup) => {
-        const engine = context.engine();
-        const handle = registration();
-        if (!engine || !handle) return;
-        untracked(() => {
-            engine.adapter.registerHandle(handle, element);
-            onCleanup(() => engine.adapter.registerHandle(handle, null));
-        });
+    // registered after the render in the first phase, as its node (`bindNode`): after it, and
+    // before the app's own after-render hooks of the other phases
+    afterRenderEffect({
+        earlyRead: (onCleanup) => {
+            const engine = context.engine();
+            const handle = registration();
+            if (!engine || !handle) return;
+            untracked(() => {
+                engine.adapter.registerHandle(handle, element);
+                onCleanup(() => engine.adapter.registerHandle(handle, null));
+            });
+        },
     });
     return { state };
 }

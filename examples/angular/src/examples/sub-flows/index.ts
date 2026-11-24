@@ -10,6 +10,7 @@ import { drag } from "@fragiola/flow-angular/drag";
 import { selection } from "@fragiola/flow-angular/selection";
 import { subflows } from "@fragiola/flow-angular/subflows";
 import { DropIntoGroups } from "./drop-into-groups";
+import { Grouping } from "./grouping";
 import { styles } from "./styles";
 
 // `subflows()` gives a node a parent (`parentId`): its position is relative to the parent, it moves
@@ -20,6 +21,12 @@ import { styles } from "./styles";
 // drawn at its ends' level: above the groups it crosses, under the nodes it joins; a selected edge
 // rises above every node. `"basic"` keeps every edge under every node, and `"manual"` follows only
 // the `zIndex` values.
+//
+// "Group selection" wraps two or more selected top-level nodes in a new group sized to their box
+// (`nodes-bounds`) plus a margin: one `batch` of `node.add` and a `node.set-parent` per node, so
+// they keep their places and one undo takes it back. "Ungroup" puts the children of the selected
+// groups back on the flow (`node.set-parent` to `null`) and removes the groups, in one `batch`
+// too: removing a group first would remove its children with it.
 
 export interface Types extends FlowTypes {
     readonly nodes: {
@@ -74,8 +81,14 @@ const nodes: FlowNodeInput<Types>[] = [
     {
         id: "cache",
         type: "item",
-        position: { x: 180, y: 280 },
+        position: { x: 140, y: 280 },
         data: { label: "Cache (drop me in a group)" },
+    },
+    {
+        id: "logs",
+        type: "item",
+        position: { x: 400, y: 280 },
+        data: { label: "Logs" },
     },
 ];
 
@@ -86,7 +99,7 @@ const edges: FlowEdgeInput<Types>[] = [
 
 @Component({
     selector: "example-sub-flows",
-    imports: [FLOW, DropIntoGroups],
+    imports: [FLOW, DropIntoGroups, Grouping],
     host: { class: "contents" },
     template: `
         <div flowRoot [model]="model" [fitView]="{ padding: 0.2, maxZoom: 1 }" zIndexMode="auto" [class]="styles.root">
@@ -118,6 +131,7 @@ const edges: FlowEdgeInput<Types>[] = [
                 </div>
             </div>
             <example-sub-flows-drop-into-groups />
+            <example-sub-flows-grouping />
         </div>
     `,
 })

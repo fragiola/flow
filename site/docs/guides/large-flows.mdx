@@ -20,8 +20,8 @@ measured size, so its edges are still drawn right, and it mounts again when it c
 
 Before the root has a size, nothing is in view: a culled flow renders no node and no edge until
 the engine knows the view, then only the visible ones mount. There is nothing to wait for (no
-`ready` gate of your own). In React, Vue and Svelte this holds from the first render; Angular
-renders the static geometry of every node first (see [Limitations](/docs/limitations)).
+`ready` gate of your own). This holds from the first render in every framework (and on the
+server in React, Vue and Svelte).
 
 ## Declare node sizes
 

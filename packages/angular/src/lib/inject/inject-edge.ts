@@ -15,7 +15,7 @@ import {
     injectHost,
 } from "../utils/helpers";
 import { shallowEqual } from "../utils/shallow-equal";
-import { flowValue, type ValueOrSignal, valueNow } from "./internal";
+import { entityOf, flowValue, type ValueOrSignal, valueNow } from "./internal";
 
 /** What an edge shows: its state on screen. */
 export interface EdgeState<T extends FlowTypes = AnyTypes> {
@@ -118,6 +118,10 @@ export function bindEdge<T extends FlowTypes>(
                 a.focusable === b.focusable &&
                 sameEdgePath(a.path, b.path) &&
                 shallowEqual(a.attributes, b.attributes)),
+        {
+            scope: "entity",
+            entity: entityOf("edge", () => edge()?.id),
+        },
     );
     const state = computed((): EdgeState<T> | undefined => {
         const current = edge();
@@ -180,5 +184,9 @@ export function edgePathOf(
                 : context.geometry()?.edgePaths[id];
         },
         sameEdgePath,
+        {
+            scope: "entity",
+            entity: entityOf("edge", () => edgeId()),
+        },
     );
 }

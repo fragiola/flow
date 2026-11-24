@@ -46,3 +46,10 @@ What differs from React, by Angular's idioms:
   (`span[kitBadge]`, `input[kitInput]`, `kitFieldRoot` …, `<kit-select>`), wearing the same
   classes from the copied families (`src/components/families`); the Select is a native `<select>`
   in the field's box, as examples/svelte's.
+- A part's own content is always written (an edge's `flowEdgePath`s, a connection line's paths,
+  their attributes unset until there is a path): a part adds its default content when the app
+  wrote no element by its first render. Content that changes on every drag or pointer step is a
+  component on the part's own element, reading the injected part directive's `state()`.
+- React's `style={{ top: undefined }}` on a handle (let the classes place it, not its side) is
+  `[style.top]="'revert-layer'"`: Angular writes nothing for an `undefined` binding, and
+  `revert-layer` hands the key back to the classes.

@@ -6,7 +6,7 @@ import type { EdgePath } from "@fragiola/flow";
 import type { FlowContext } from "../context";
 import { bindAttributes, bindBaseAttributes } from "../utils/helpers";
 import { edgePathOf, staticEdgeAttributes } from "./inject-edge";
-import { flowValue } from "./internal";
+import { entityOf, flowValue } from "./internal";
 
 export interface EdgePathState {
     readonly edgeId: string;
@@ -23,14 +23,22 @@ export function bindEdgePath(
     edgeId: Signal<string | undefined>,
 ): Signal<EdgePathState | undefined> {
     const path = edgePathOf(context, edgeId);
-    const attributes = flowValue(context, () => {
-        const id = edgeId();
-        if (id === undefined) return undefined;
-        const engine = context.engine();
-        return engine
-            ? engine.adapter.attributes("edge-path", { edgeId: id })
-            : staticEdgeAttributes(context, "edge-path", id);
-    });
+    const attributes = flowValue(
+        context,
+        () => {
+            const id = edgeId();
+            if (id === undefined) return undefined;
+            const engine = context.engine();
+            return engine
+                ? engine.adapter.attributes("edge-path", { edgeId: id })
+                : staticEdgeAttributes(context, "edge-path", id);
+        },
+        undefined,
+        {
+            scope: "entity",
+            entity: entityOf("edge", () => edgeId()),
+        },
+    );
     bindAttributes(element, () => attributes() ?? {});
     // the app's own `d` (an app type drawn from `state.path`'s ends) and `fill` win
     bindBaseAttributes(element, () => ({

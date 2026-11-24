@@ -24,14 +24,19 @@ export function bindMiniMapNode(
     view: Signal<MinimapView>,
     nodeId: () => string | undefined,
 ): Signal<MiniMapNodeState | undefined> {
-    const attributes = flowValue(context, () => {
-        const id = nodeId();
-        if (id === undefined) return undefined;
-        const engine = context.engine();
-        return engine
-            ? engine.adapter.attributes("minimap-node", { nodeId: id })
-            : partAttributes("minimap-node", id);
-    });
+    const attributes = flowValue(
+        context,
+        () => {
+            const id = nodeId();
+            if (id === undefined) return undefined;
+            const engine = context.engine();
+            return engine
+                ? engine.adapter.attributes("minimap-node", { nodeId: id })
+                : partAttributes("minimap-node", id);
+        },
+        undefined,
+        { scope: "entity" },
+    );
     const box = computed(() => {
         const id = nodeId();
         return view().nodes.find((node) => node.nodeId === id);

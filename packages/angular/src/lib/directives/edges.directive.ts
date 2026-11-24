@@ -107,7 +107,10 @@ export class FlowEdgesDirective {
         const engine = this.context.engine();
         // the core's drawing order: shown, measured, in view with `onlyRenderVisible`, by z-order
         if (engine) return engine.get("drawn-edges");
-        // before the engine: the static geometry's (the edges whose nodes have a declared size)
+        // before the engine: none in a culled flow (the view is not known yet: React's, so no
+        // edge mounts to be torn down at once), else the static geometry's (the edges whose nodes
+        // have a declared size); its levels are kept, empty
+        if (this.context.culled()) return [];
         const geometry = this.context.geometry();
         if (!geometry) return [];
         const model = this.context.model();

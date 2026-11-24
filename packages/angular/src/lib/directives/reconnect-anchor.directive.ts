@@ -2,7 +2,7 @@ import { computed, Directive, input, type Signal } from "@angular/core";
 import type { EdgePath } from "@fragiola/flow";
 import { injectEdgeContext, injectFlowContext } from "../context";
 import { edgePathOf } from "../inject/inject-edge";
-import { flowValue, partOwnerId } from "../inject/internal";
+import { entityOf, flowValue, partOwnerId } from "../inject/internal";
 import {
     beforeInputs,
     bindAttributes,
@@ -51,26 +51,44 @@ export class FlowReconnectAnchorDirective {
      * this end may move (`edge-reconnectable`): `reconnectable: "source"` (or `"target"`, or
      * false) keeps the other end fixed, which draws no anchor
      */
-    private readonly movable = flowValue(this.context, () => {
-        const edgeId = this.id();
-        const end = beforeInputs(undefined, this.end);
-        if (edgeId === undefined || !end) return true;
-        return this.context.model().is("edge-reconnectable", { edgeId, end });
-    });
-    private readonly view = flowValue(this.context, () => {
-        const edgeId = this.id();
-        const engine = this.context.engine();
-        const end = beforeInputs(undefined, this.end);
-        if (edgeId === undefined || !engine || !end) return undefined;
-        return {
-            end,
-            attributes: engine.adapter.attributes("reconnect-anchor", {
-                edgeId,
+    private readonly movable = flowValue(
+        this.context,
+        () => {
+            const edgeId = this.id();
+            const end = beforeInputs(undefined, this.end);
+            if (edgeId === undefined || !end) return true;
+            return this.context
+                .model()
+                .is("edge-reconnectable", { edgeId, end });
+        },
+        undefined,
+        {
+            scope: "entity",
+            entity: entityOf("edge", () => this.id()),
+        },
+    );
+    private readonly view = flowValue(
+        this.context,
+        () => {
+            const edgeId = this.id();
+            const engine = this.context.engine();
+            const end = beforeInputs(undefined, this.end);
+            if (edgeId === undefined || !engine || !end) return undefined;
+            return {
                 end,
-            }),
-            reconnecting: engine.is("edge-reconnecting", { edgeId }),
-        };
-    });
+                attributes: engine.adapter.attributes("reconnect-anchor", {
+                    edgeId,
+                    end,
+                }),
+                reconnecting: engine.is("edge-reconnecting", { edgeId }),
+            };
+        },
+        undefined,
+        {
+            scope: "entity",
+            entity: entityOf("edge", () => this.id()),
+        },
+    );
 
     /** the anchor's state (`undefined` while its edge has no path, or its end may not move) */
     readonly state: Signal<ReconnectAnchorState | undefined> = computed(() => {
