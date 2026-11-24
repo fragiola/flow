@@ -45,7 +45,6 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
         "copy-paste",
         "collaborative",
         "export-image",
-        "stress-test",
         // Epic #49 (#48): new React examples, ported by a later Epic
         "dagre-layout",
         "elk-layout",
