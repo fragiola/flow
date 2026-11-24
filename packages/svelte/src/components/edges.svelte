@@ -115,13 +115,17 @@
         context,
         (): readonly EdgeLevel[] => {
             const { engine, model, geometry } = context;
+            // a culled flow draws no edge before the engine (its levels kept, empty), as its nodes
+            const culled = !engine && context.onlyRenderVisible;
             const layers = engine
                 ? engine.get("render-layers")
                 : (geometry?.layers ?? []);
             if (layers.length <= 1) {
                 const edges = engine
                     ? engine.get("drawn-edges")
-                    : (layers[0]?.edgeIds ?? []).flatMap((id) => {
+                    : culled
+                      ? []
+                      : (layers[0]?.edgeIds ?? []).flatMap((id) => {
                           const edge = model.get("edge-by", { id });
                           return edge ? [edge] : [];
                       });
@@ -142,7 +146,7 @@
                           level: layer.level,
                       })
                     : edgesLayerAttributes(layer.level),
-                edges: layer.edgeIds.flatMap((id) => {
+                edges: (culled ? [] : layer.edgeIds).flatMap((id) => {
                     const edge = model.get("edge-by", { id });
                     return edge ? [edge] : [];
                 }),

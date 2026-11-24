@@ -158,7 +158,7 @@ examples show them as copyable code.
 | `pnpm --filter examples-angular dev` | the Angular embed alone, port 5188 (`PORT` moves it; `?id=<id>&theme=<name>`) |
 | `pnpm --filter examples-react vendor` | vendors Fragiola UI (`scripts/vendor-fragiola.ts`; `FRAGIOLA_REGISTRY` points it elsewhere) |
 | `pnpm site:export --base /flow --out <dir>` | the site export (contract v1.7): builds the packages and each framework's embed, writes the pages, `examples.json`, `project.json` and the manifests, then validates the output and exits non-zero on any violation ([The site export](#the-site-export-issue-7)) |
-| `pnpm perf` | the large-flow frame times (Epic #61, `scripts/perf.ts`, not in CI): `--framework react` (the default) or `vue` (#51); builds the core, that framework's package and its embed (into a temporary directory), serves it (`examples/shared/e2e/serve.ts`, its own process group, stopped on exit) and drives `stress-test` in Chromium with Playwright: per size, the open time and the nodes mounted meanwhile, then a pan, a zoom out and back and a node drag of 120 steps at 60 Hz; prints median / p95 / max frame times per size and gesture, the median of the runs. `--sizes 1000,10000,20000`, `--runs 3`, `--steps 120`, `--no-build` (the packages' last `dist`), `--dist <dir>` (an embed built before with `EMBED_BASE=/`), `--profile <dir>` (CPU profiles of each size's first open and gestures), `--json <file>`, `--headed`, `--verbose`. About a minute for the defaults |
+| `pnpm perf` | the large-flow frame times (Epic #61, `scripts/perf.ts`, not in CI): `--framework react` (the default), `vue` (#51) or `svelte` (#54); builds the core, that framework's package and its embed (into a temporary directory), serves it (`examples/shared/e2e/serve.ts`, its own process group, stopped on exit) and drives `stress-test` in Chromium with Playwright: per size, the open time and the nodes mounted meanwhile, then a pan, a zoom out and back and a node drag of 120 steps at 60 Hz; prints median / p95 / max frame times per size and gesture, the median of the runs. `--sizes 1000,10000,20000`, `--runs 3`, `--steps 120`, `--no-build` (the packages' last `dist`), `--dist <dir>` (an embed built before with `EMBED_BASE=/`), `--profile <dir>` (CPU profiles of each size's first open and gestures), `--json <file>`, `--headed`, `--verbose`. About a minute for the defaults |
 | `pnpm site:dev --base /flow --port 5185` | every framework's embed with hot reload behind one port (`site/dev-proxy.ts`), for `www`'s dev mode |
 
 There is no `changeset` or `release:version` script (D15).
@@ -210,7 +210,8 @@ Vue's, Svelte's and Angular's suites to React's size. Each shard builds its own 
 playground's suite (214 tests, ~3 min 26 s for the whole job) stays in one. Measured locally
 after #48 (4 workers): the playground in ~59 s; React's examples in ~120 s; Vue's, Svelte's and
 Angular's 328 each, 226 run and the 102 `PENDING` ones skipped, in ~27 to ~37 s. After #51 (Epic
-#52), Vue's 462, every one run (none `PENDING`), in ~56 s; React's 462 in ~2 min.
+#52), Vue's 462, every one run (none `PENDING`), in ~56 s; React's 462 in ~2 min. After #54 (Epic
+#55), Svelte's 462, every one run, in ~56 s; Angular's 330, 104 `PENDING`.
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
@@ -1002,7 +1003,7 @@ beside each), checked by `svelte-check` (its `typecheck`), tested with Vitest, j
 | --- | --- |
 | `src/components/` | one primitive per file (`.svelte`): its props and state types in `<script module>`, the component's doc in `<!-- @component -->` |
 | `src/runes/` | the public runes (`use-*.svelte.ts`), `create-flow-ref.svelte.ts`, `internal.svelte.ts` (`flowValue`, `sameValue`, `MaybeGetter`), `use-control-button.svelte.ts` |
-| `src/utils/` | `render.ts` (`elementProps`, `refProps`, the primitive and render-snippet types, styles), `merge-props.ts`, `plain.svelte.ts` (`$state.snapshot` of what the app gives), `portal.svelte` + `portal-content.svelte`, `shallow-equal.ts`, `engine-facade.ts` (React's) |
+| `src/utils/` | `render.ts` (`elementProps`, `refProps`, the primitive and render-snippet types, styles), `merge-props.ts`, `plain.svelte.ts` (a plain copy of what the app gives), `flow-store.svelte.ts` (#54: the root's counters every `flowValue` reads), `portal.svelte` + `portal-content.svelte`, `shallow-equal.ts`, `engine-facade.ts` (React's) |
 | `src/<feature>/` | a feature's entry, and its primitives (`minimap/`, `resize/`) |
 | `src/` root | `index.ts`, `parts.ts`, `context.ts` (`setContext` / `getContext` with symbol keys, values of getters), `typed.ts` |
 
@@ -1042,7 +1043,8 @@ The Epic's decisions, as settled (S1 to S5):
   take a value or a function of the state (Svelte never normalizes a component's props).
 - **S4, state:** the model's frozen state is never a deep proxy: the root holds `engine`,
   `rootElement` in `$state.raw` and a `revision` counter bumped on every model commit and every
-  `adapter.subscribe` notification; each part reads the model and the engine in a `$derived`
+  `adapter.subscribe` notification (#54: the store's `view`; node and edge readers read its
+  narrower counters, see the large-flow decisions below); each part reads the model and the engine in a `$derived`
   (`flowValue`) that keeps its last object while equal (React's comparison), so only what changed
   updates. What the app gives (lists, features, engine options) goes through `plain` / `plainList`:
   a frozen value as it is, anything else `$state.snapshot`ted (entries one by one, the frozen ones
@@ -1162,9 +1164,52 @@ point)`, `NodeResizer`'s `direction`, `FitView`'s `padding`, `nodeIds`, `include
   renders one level as today, several as `edges-layer` wrappers each with its `svg` and its labels'
   layer; `Flow.Nodes` drops `isolation` then; an edge that changes level remounts and `Flow.Edge`
   calls `refocus` on mount. `ResizeHandle` takes `direction` and `variant` (in its snippet state).
+- **`Flow.EdgePath` renders its `children` snippet inside its `<path>`** (#53), given `{ state }`,
+  as React's children (an `<animate>`); it had none (Vue's #51 gap). `tests/render.test.ts`
+  (`fixtures/edge-path-flow.svelte`): the child in the SVG namespace, and an empty path without.
+- **A node's registration that throws is reported** (`reportError`, else a rejected promise),
+  not thrown into the render: the flush and the other nodes go on (#54). Registrations stay in
+  the node's attachment, at once: a node the app adds is registered before its `await tick()` and
+  before its content's effects. Batching them (Vue's post-patch job) was measured and dropped: the
+  10 000-node gestures profile spent the same time in the first `offsetWidth` (268 ms against 263
+  ms), the frame's own layout, since Svelte's attachments run once the flush's elements are in.
+- **A consumer's `undefined` style key removes the part's default one** (#54, React's and Vue's):
+  `styleRecord` keeps a record's `undefined` (or `null`) key, so `{ ...baseStyle, ...consumer }`
+  drops the default (a handle's side placement) and `styleString` writes no declaration for it;
+  structural keys still win. `tests/render.test.ts` ("a part's style").
 - **Gotcha, a template's `{f(x.current)}` is no render count**: once the value had changed, Svelte
   (5.57.3) called `f` again on every later revision although `x.current` stayed equal (the DOM was
   untouched); the probes count with an `$effect.pre` instead.
+
+Decisions of large flows in Svelte (#54, Epic #55; React's of Epic #61, Vue's of #51):
+
+- **One store per root** (`utils/flow-store.svelte.ts`, on `context.store`; Vue's counters as
+  `$state` fields): `view` (the context's `revision`): every model commit and every engine
+  notification; `entity` (`useNode`, `useEdge`, `edgePathValue`, `EdgePath`, `EdgeLabel`,
+  `ReconnectAnchor`, `useHandle`, `MiniMapNode`, `NodeResizer`, `ResizeHandle`): a commit that
+  changed `all-nodes` or `all-edges` (or another model), a gesture, any notification while there
+  are (or were) several render levels, a measurement with a viewport change. A measured-only
+  notification bumps `measure` and only the records whose token (`node-rect-by` +
+  `node-measured`, or `edge-path-by`) changed identity. `flowValue(context, read, isEqual,
+  { scope, entity })` reads them through `store.track`; an entity reader acquires its record in an
+  `$effect.pre` (it runs as the component initializes, before the deriveds are read) and releases
+  it on destroy. The store starts from the model's lists. Its lifetime is the root's: the model's
+  and the engine's listeners are the root's effects, gone on unmount (`tests/lifetime.test.ts`:
+  five mounts and unmounts of one app-owned model return to the baseline).
+- **A culled flow renders nothing before the engine** (`onlyRenderVisible` on the context):
+  `Flow.Nodes` no node, `Flow.Edges` no edge (its levels kept, empty), on the server too; a flow
+  that is not culled keeps its first render (`tests/culled.test.ts`: the server body, and its
+  hydration with no warning; `tests/render-counts.test.ts`).
+- **What the app gives is copied without `$state.snapshot`** (`plain`): it clones each primitive
+  with `structuredClone`, ~250 ms of a 10 000-node open; plain objects and arrays are copied key by
+  key (a proxy read through), frozen parts shared, anything else still snapshotted.
+- **Tested** in `tests/render-counts.test.ts` (Vue's cases: pan and zoom steps re-render and read
+  no node or edge; a zoom out renders the nodes brought into view alone and reads only the
+  others' boxes and paths; a step that changes the render levels places the nodes again; a drag
+  re-renders the node and its edge; a culled flow mounts none before the engine), `flow-store`,
+  `lifetime`, `culled` and `registration.test.ts` (a node the app adds is registered after
+  `await tick()`, before its content's `$effect` / `onMount` and a `useNode` node's; one that
+  throws leaves the others registered).
 
 ## The Angular adapter (Issue #15)
 
@@ -1381,7 +1426,7 @@ the per-framework skip of what a later Epic ports: whole examples (`<slug>`) and
 (`<slug>#<case>`, `pendingCase`); a spec that needs one is skipped in that framework with a
 "(PENDING)" reason instead of failing (`requireCase(slug, case)` as a test's first line for a
 case; `openExample` for an example). React never has any; the Epic that ports an entry to a
-framework deletes it there. Today Svelte and Angular wait for `edge-reconnect#delete-on-drop`,
+framework deletes it there. Today Angular waits for `edge-reconnect#delete-on-drop`,
 `sub-flows#selection-grouping` and the new examples of #45 (`shapes`, `easy-connect`,
 `proximity-connect`, `delete-middle-node`, `intersections`, `contextual-zoom`, `connection-line`)
 and of #46 (`edge-markers`, `animating-edges`, `floating-edges`, `editable-edge`,
@@ -1389,7 +1434,8 @@ and of #46 (`edge-markers`, `animating-edges`, `floating-edges`, `editable-edge`
 `export-image`, `stress-test`) and of #48 (`dagre-layout`, `elk-layout`, `auto-layout`,
 `force-layout`): Epic #49 writes them in React, the ports' Epics follow. Vue (Epic #52) has
 every one since #51 (the extensions and the examples of #45 and #46 since #50): `PENDING.vue` is
-empty. A pending whole example has nothing in the
+empty. Svelte (Epic #55) has the extensions and the examples of #45 and #46 since #53, and waits
+for those of #47 and #48. A pending whole example has nothing in the
 port's app yet: its `tests/examples.test.ts` leaves it out of React's ids and `tests/vendored.test.ts`
 expects no copy of its `styles.ts` and siblings.
 Alternative: a capability attribute the example renders, checked by the spec; refused: it would
@@ -1555,7 +1601,7 @@ install. A port's Epic adds the same pins to its app. Declined: `yjs`, `html-to-
 
 The Vue, Svelte and Angular apps have every example from before Epic #49 (their own sections
 below), with no parity filter left; Epic #49's new examples and extensions wait in `PENDING`
-in Svelte and Angular. Vue has every one since #51 (Epic #52).
+in Angular. Vue has every one since #51 (Epic #52), Svelte since #54 (Epic #55).
 
 **Theme tokens** (`--fl-*`; `tests/themes.test.ts` holds the list, `e2e/themes.spec.ts` checks the
 shapes differ on computed styles): shape `font`, `font-size`, `title-weight`, `node-padding`,
@@ -1720,8 +1766,8 @@ Decisions of #10:
 
 ## The Svelte examples and the Svelte docs (Issue #13)
 
-`examples/svelte` (`examples-svelte`, private) is `examples/react` in Svelte 5 (runes): the 20
-examples with the same ids, metadata, text, names, roles and test ids, and the same scripts
+`examples/svelte` (`examples-svelte`, private) is `examples/react` in Svelte 5 (runes): the 44
+examples (35 before #54, 21 before #53) with the same ids, metadata, text, names, roles and test ids, and the same scripts
 (`generate`, `dev` (port 5187), `build`, `typecheck` (`svelte-check --fail-on-warnings`, TypeScript
 6.0.3 pinned in this app, as `packages/svelte`), `e2e`, `test`); `src/examples/README.md` says how an
 example is written in Svelte. Its `playwright.config.ts` is `examplesE2eConfig("svelte")` (port
@@ -1739,7 +1785,8 @@ Svelte is in `COMPLETE_FRAMEWORKS`: every shared spec passes there unchanged, in
 | `src/embed/` | `main.ts` mounts `embed.svelte` (the same protocol: `ready` once, two frames after the example mounts or a 500 ms timeout, `resize` for a `flow` layout, an error through `<svelte:boundary>`) or `embed-index.svelte` |
 
 `tests/examples.test.ts`: Vue's, for Svelte (copyable imports: `svelte`, `@fragiola/flow-svelte` and
-its eight feature entries, `@lucide/svelte`, `#/components/{ui,atoms}/*`, `#/lib/cn`, relative; the
+its eight feature entries, `@lucide/svelte`, `#/components/{ui,atoms}/*`, `#/lib/cn`, since #54 the
+layout engines `@dagrejs/dagre`, `elkjs/lib/elk.bundled.js` and `d3-force`, relative; the
 markup, the file without its `<script>` / `<style>` blocks, has `<Flow.Root>` in `index.svelte` and
 no `class="…"`, string inside `class={…}`, `class:` directive or `cn()`).
 
@@ -1792,6 +1839,48 @@ after the connection line; `node-resizer` the `banner` (`direction="horizontal"`
 `connected-data` (new: `index.svelte`, `number-body.svelte`, `sum-body.svelte`) sums its inputs
 with `useNodeConnections` + `useNodesData(() => connections.current.map(…))`. `tests/examples.test.ts`
 compares every React example again; the shared specs pass unchanged (215).
+
+#53 (Epic #55) in the Svelte examples: `edge-reconnect`'s "Delete on drop" (`onreconnectcancel`, a
+native `role="switch"` checkbox), `sub-flows`' "Grouping" toolbar (`grouping.svelte`, and the loose
+`logs` node; `cache` moved to React's place), and `shapes`, `easy-connect`, `proximity-connect`,
+`delete-middle-node`, `intersections`, `contextual-zoom`, `connection-line`, `edge-markers`,
+`animating-edges`, `floating-edges`, `editable-edge`, `gradient-styling`, `whiteboard`. React's
+in-file components became `.svelte` siblings named as Vue's files, with props and lowercase
+callback props (`onediting`, `onarrive`, `ontool`); a constant or helper they share is exported
+from `index.svelte`'s module script, and React's contexts became props (`gradient-styling`'s id
+prefix) or one file (`edge-markers`). The framework-free siblings and their unit tests
+(`tests/<id>.test.ts`, Vue's copies) are React's, unchanged. Svelte specifics: `shapes` remounts
+its handles per angle with `{#key}` and focuses its label field with a plain attachment function
+(`tests/examples.test.ts` refuses a `svelte/attachments` import); `delete-middle-node` builds its
+features per instance (`makeFeatures(beforeDelete)`, typed by `ReturnType`), as Vue; a component
+whose top elements are bare SVG declares `<svelte:options namespace="svg" />` (`lines.svelte`,
+`animated-edge.svelte`, `floating-edge.svelte`, `bendable-edge.svelte`, `gradient-edge.svelte`);
+`$props.id()` is its own declaration (`const uid = $props.id()`), React's `useId`; `whiteboard`'s
+drawing layer carries the examples' first `svelte-ignore a11y_no_static_element_interactions` (its
+markup is React's, a `div` with pointer handlers and no role). `animating-edges` puts its
+`<animate>` in `Flow.EdgePath`'s `children` snippet, which #53 added to the adapter (it had none).
+Svelte's `styleRecord` dropped a consumer style key whose value is `undefined`, where React's
+(and Vue's) `undefined` removes the part's base key, so `easy-connect` cleared a handle's side
+placement with empty strings; #54 fixed the adapter (see the Svelte adapter's style note) and the
+example's `COVER` is React's (`{ top: undefined, left: undefined, transform: undefined }`). Every
+shared spec of these passed with no other adapter fix.
+
+#54 (Epic #55) in the Svelte examples: `helper-lines`, `copy-paste`, `collaborative`,
+`export-image`, `stress-test`, `dagre-layout`, `elk-layout`, `auto-layout` and `force-layout`, with
+the layout engines at `examples/react`'s pins (`@dagrejs/dagre` 3.1.3, `elkjs` 0.12.1, `d3-force`
+3.0.1, `@types/d3-force` 3.0.10); `PENDING.svelte` is empty and every shared spec runs in Svelte.
+React's contexts became props (`dagre-layout`'s direction, `force-layout`'s pinned set) or
+lowercase callback props (`auto-layout`'s `onadd` / `ontoggle`), its refs plain variables, a size
+or a direction that remounts `{#key}`, `useKeyPress` + `useEffect` one `$effect` per key whose
+action runs `untrack`ed (`copy-paste`), and `collaborative`'s `Side` a `createSide(name)` in
+`index.svelte`'s instance script rendered by an `{#each}` (`<Flow.Root>` stays in `index.svelte`;
+a remote selection is a node prop). Animation frames, simulations, the `BroadcastChannel` bridge,
+pending ELK requests and pending clipboard reads or PNG draws stop (or are ignored) on destroy; a
+first layout or simulation waits for `flow.current` in an `$effect`. `collaborative` passes
+`aria-description` through a spread (Svelte's element types lack it, ARIA 1.3). `export-image`
+keeps React's node test of `flow-svg.ts`. The framework-free siblings and their tests are React's,
+unchanged. No example needed an adapter fix; the stress test led to the large-flow work of
+[the Svelte adapter](#the-svelte-adapter-issue-12), and #54 fixed the `styleRecord` gap.
 
 ## The Angular examples and the Angular docs (Issue #16)
 
@@ -2798,8 +2887,8 @@ Decisions of large flows (Epic #61: #59, the core; #60, the harness and the numb
   and `visible-edges` (so `drawn-edges`) are empty until then, where every node and edge counted
   as visible and mounted. Edges follow the nodes' rule so that no edge mounts dangling before its
   nodes. Without culling, and for the server render (`staticGeometry`), the first render is as
-  before; #60: a culled React flow renders no node or edge before the engine either, and Vue's
-  since #51 (Svelte and Angular still draw the static geometry then).
+  before; #60: a culled React flow renders no node or edge before the engine either, Vue's
+  since #51 and Svelte's since #54 (Angular still draws the static geometry then).
 - **A drag step stays O(N) in the model only**: its commit copies the node list (the document is
   immutable and frozen, D3); the engine reads the replaced ids instead of comparing the list.
 - **`pnpm perf` measures the React embed's production build** (`scripts/perf.ts`): Playwright's
@@ -2869,3 +2958,27 @@ Decisions of large flows (Epic #61: #59, the core; #60, the harness and the numb
   16.7/18.1, 16.7/43.3, 16.7/19.1 (no change beyond the runs' spread). What is left (zoom p95 ~39
   against React's ~35) is Vue's render and patch of the nodes a far zoom out mounts; the profile
   showed no other adapter hot spot.
+- **Svelte's numbers** (#54, `pnpm perf --framework svelte`, the same method; median / p95 / max
+  ms, open with the nodes mounted meanwhile; the same hour: React 10 000 open 171 ms (51), zoom
+  16.7/34/70; Vue 10 000 open 195 ms (51), zoom 16.7/38/80; 20 000 open 342 / 331 ms):
+
+  | nodes | gesture | before #54 | after #54 |
+  | --- | --- | --- | --- |
+  | 1 000 | open | 369 ms (1 052 mounted) | 37 ms (52) |
+  | 1 000 | pan / zoom / drag | 16.6/18/20, 16.7/50/72, 16.7/17/22 | 16.6/18/21, 16.8/36/50, 16.7/18/24 |
+  | 10 000 | open | 3 384 ms (10 051 mounted) | 236 ms (51) |
+  | 10 000 | pan / zoom / drag | 16.7/19/29, 16.8/74/189, 16.7/18/35 | 16.7/19/22, 16.7/52/129, 16.7/18/34 |
+  | 20 000 | open | 7 028 ms (20 050 mounted) | 380 ms (50) |
+  | 20 000 | pan / zoom / drag | 16.7/18/19, 16.7/76/189, 16.7/18/33 | 16.7/19/26, 16.8/50/134, 16.7/19/66 |
+
+  The culled first render took the 10 000 open from 3.4 s to ~480 ms, the copy without
+  `$state.snapshot` to ~210–240 ms; the store took the 10 000 zoom p95 from 74 to ~49. `pnpm perf`
+  counted each Svelte node five times before #54 (an element inserted into fragments inserted in
+  turn): it counts an element once now. **What is left** (zoom p95 ~50 against React's ~34 and
+  Vue's ~38): in the 10 000-node gestures profile (unminified, `vite build --minify false`) about
+  0.7 s of ~2.4 s busy is Svelte creating the components of the nodes and edges a zoom out brings
+  into view (`create_item`: `Flow.Edge` + `Flow.EdgePath` ~0.4 s, `Flow.Node` ~0.24 s), ~0.27 s the
+  first `offsetWidth` of a node's registration (the frame's own layout of the new nodes, as React's),
+  ~0.09 s `render-layers` read by the store on each notification (as React's and Vue's), the rest
+  the browser's style, layout and paint; no other adapter hot spot. Mounting fewer components per
+  node or edge (or spreading the mounts over frames) would be the next step.

@@ -33,7 +33,7 @@
 -->
 <script lang="ts">
     import { useEdgeId, useFlowContext } from "../context.js";
-    import { flowValue } from "../runes/internal.svelte.js";
+    import { flowValue, sameValue } from "../runes/internal.svelte.js";
     import { edgePathValue } from "../runes/use-edge.svelte.js";
     import {
         elementProps,
@@ -68,7 +68,10 @@
                   movable: context.model.is("edge-reconnectable", { edgeId, end }),
               }
             : undefined;
-    });
+    },
+        sameValue,
+        { entity: () => ({ kind: "edge", id: edgeIdOf() }) },
+    );
     const refs = refProps((element) => {
         ref = element as SVGCircleElement | null;
     });

@@ -44,7 +44,7 @@
 -->
 <script lang="ts">
     import { useFlowContext, usePartNodeId } from "../context.js";
-    import { flowValue } from "../runes/internal.svelte.js";
+    import { flowValue, sameValue } from "../runes/internal.svelte.js";
     import {
         elementProps,
         refProps,
@@ -89,11 +89,15 @@
         engine.adapter.setPartOptions("resizer", id, options);
         return () => engine.adapter.setPartOptions("resizer", id, null);
     });
-    const attributes = flowValue(context, () => {
-        return context.engine
-            ? context.engine.adapter.attributes("resizer", { nodeId })
-            : { "data-flow-part": "resizer", "data-flow-id": nodeId };
-    });
+    const attributes = flowValue(
+        context,
+        () =>
+            context.engine
+                ? context.engine.adapter.attributes("resizer", { nodeId })
+                : { "data-flow-part": "resizer", "data-flow-id": nodeId },
+        sameValue,
+        { scope: "entity" },
+    );
     const refs = refProps((element) => {
         ref = element as HTMLDivElement | null;
     });

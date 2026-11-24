@@ -9,7 +9,12 @@ import {
 import { type Attachment, createAttachmentKey } from "svelte/attachments";
 import { useFlowContext } from "../context.js";
 import { type DataAttributes, px, styleString } from "../utils/render.js";
-import { flowValue, type MaybeGetter, read } from "./internal.svelte.js";
+import {
+    flowValue,
+    type MaybeGetter,
+    read,
+    sameValue,
+} from "./internal.svelte.js";
 
 /** What a node shows: its state on screen. */
 export interface NodeState<T extends FlowTypes = AnyTypes> {
@@ -70,36 +75,41 @@ export function useNode<T extends FlowTypes = AnyTypes>(
 ): UseNodeResult<T> {
     const context = useFlowContext("useNode");
     const current = () => read(node);
-    const view = flowValue<NodeView>(context, () => {
-        const value = current();
-        const nodeId = value.id;
-        const { engine, model, geometry } = context;
-        if (!engine) {
-            // before the engine: the static geometry's box (the node's origin applied) and z-index
-            const rect = geometry?.nodeRects[nodeId];
-            const at = rect
-                ? undefined
-                : model.get("absolute-position-by", { nodeId });
+    const view = flowValue<NodeView>(
+        context,
+        () => {
+            const value = current();
+            const nodeId = value.id;
+            const { engine, model, geometry } = context;
+            if (!engine) {
+                // before the engine: the static geometry's box (the node's origin applied) and z-index
+                const rect = geometry?.nodeRects[nodeId];
+                const at = rect
+                    ? undefined
+                    : model.get("absolute-position-by", { nodeId });
+                return {
+                    attributes: {
+                        ...partAttributes("node", nodeId),
+                        "data-selected": flag(value.selected === true),
+                    },
+                    x: rect?.x ?? at?.x ?? value.position.x,
+                    y: rect?.y ?? at?.y ?? value.position.y,
+                    zIndex: geometry?.nodeZIndexes[nodeId],
+                    focusable: false,
+                };
+            }
+            const rect = engine.get("node-rect-by", { nodeId });
             return {
-                attributes: {
-                    ...partAttributes("node", nodeId),
-                    "data-selected": flag(value.selected === true),
-                },
-                x: rect?.x ?? at?.x ?? value.position.x,
-                y: rect?.y ?? at?.y ?? value.position.y,
-                zIndex: geometry?.nodeZIndexes[nodeId],
-                focusable: false,
+                attributes: engine.adapter.attributes("node", { nodeId }),
+                x: rect?.x ?? value.position.x,
+                y: rect?.y ?? value.position.y,
+                zIndex: engine.get("node-z-index-by", { nodeId }),
+                focusable: engine.is("node-focusable", { nodeId }),
             };
-        }
-        const rect = engine.get("node-rect-by", { nodeId });
-        return {
-            attributes: engine.adapter.attributes("node", { nodeId }),
-            x: rect?.x ?? value.position.x,
-            y: rect?.y ?? value.position.y,
-            zIndex: engine.get("node-z-index-by", { nodeId }),
-            focusable: engine.is("node-focusable", { nodeId }),
-        };
-    });
+        },
+        sameValue,
+        { entity: () => ({ kind: "node", id: current().id }) },
+    );
     // registered with the engine once both are there, again for another engine or node id only:
     // the id is derived, so that a new node object (each drag step) does not register it again
     const nodeId = $derived(current().id);
@@ -108,7 +118,15 @@ export function useNode<T extends FlowTypes = AnyTypes>(
         const id = nodeId;
         const engine = context.engine;
         if (!engine) return;
-        engine.adapter.registerNode(id, element as HTMLElement);
+        // at once, as the element is in place: a node the app adds is registered before its
+        // `await tick()` and before its content's effects. One that throws (its measurement)
+        // leaves the flush and the other nodes alone: the error is reported, not thrown into
+        // the render
+        try {
+            engine.adapter.registerNode(id, element as HTMLElement);
+        } catch (error) {
+            report(error);
+        }
         return () => engine.adapter.registerNode(id, null);
     };
     const state = $derived.by((): NodeState<T> => {
@@ -163,4 +181,16 @@ function nodeStyle(
         ...(node.width === undefined ? {} : { width: px(node.width) }),
         ...(node.height === undefined ? {} : { height: px(node.height) }),
     };
+}
+
+/**
+ * An error the render must not stop for, reported as an uncaught one (the window's `error` event,
+ * `reportError`), as a listener's would be.
+ */
+function report(error: unknown): void {
+    if (typeof globalThis.reportError === "function") {
+        globalThis.reportError(error);
+        return;
+    }
+    void Promise.reject(error);
 }

@@ -8,7 +8,12 @@ import {
 import { type Attachment, createAttachmentKey } from "svelte/attachments";
 import { useFlowContext, usePartNodeId } from "../context.js";
 import type { DataAttributes } from "../utils/render.js";
-import { flowValue, type MaybeGetter, read } from "./internal.svelte.js";
+import {
+    flowValue,
+    type MaybeGetter,
+    read,
+    sameValue,
+} from "./internal.svelte.js";
 
 export interface UseHandleOptions {
     /** whether edges start (`source`) or end (`target`) here */
@@ -112,17 +117,22 @@ export function useHandle(
         last = next;
         return next;
     });
-    const attributes = flowValue(context, () => {
-        const value = registration;
-        const engine = context.engine;
-        return engine
-            ? engine.adapter.attributes("handle", value)
-            : {
-                  ...partAttributes("handle", value.handleId),
-                  "data-handle-type": value.type,
-                  "data-side": value.side,
-              };
-    });
+    const attributes = flowValue(
+        context,
+        () => {
+            const value = registration;
+            const engine = context.engine;
+            return engine
+                ? engine.adapter.attributes("handle", value)
+                : {
+                      ...partAttributes("handle", value.handleId),
+                      "data-handle-type": value.type,
+                      "data-side": value.side,
+                  };
+        },
+        sameValue,
+        { scope: "entity" },
+    );
     const key = createAttachmentKey();
     const attachment: Attachment<Element> = (element) => {
         const engine = context.engine;

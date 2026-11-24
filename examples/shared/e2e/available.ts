@@ -38,37 +38,7 @@ export function pendingCase(slug: string, name: string): string {
 export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
     react: [],
     vue: [],
-    svelte: [
-        // Epic #49 (#44): the extensions of edge-reconnect and sub-flows, React first
-        pendingCase("edge-reconnect", "delete-on-drop"),
-        pendingCase("sub-flows", "selection-grouping"),
-        // Epic #49 (#45): new React examples, ported by a later Epic
-        "shapes",
-        "easy-connect",
-        "proximity-connect",
-        "delete-middle-node",
-        "intersections",
-        "contextual-zoom",
-        "connection-line",
-        // Epic #49 (#46): new React examples, ported by a later Epic
-        "edge-markers",
-        "animating-edges",
-        "floating-edges",
-        "editable-edge",
-        "gradient-styling",
-        "whiteboard",
-        // Epic #49 (#47): new React examples, ported by a later Epic
-        "helper-lines",
-        "copy-paste",
-        "collaborative",
-        "export-image",
-        "stress-test",
-        // Epic #49 (#48): new React examples, ported by a later Epic
-        "dagre-layout",
-        "elk-layout",
-        "auto-layout",
-        "force-layout",
-    ],
+    svelte: [],
     angular: [
         // Epic #49 (#44): the extensions of edge-reconnect and sub-flows, React first
         pendingCase("edge-reconnect", "delete-on-drop"),

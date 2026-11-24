@@ -11,7 +11,7 @@ the first client render) it draws the document's [static geometry](/docs/guides/
 the edges whose nodes declare a size (`width` / `height` or `initialWidth` / `initialHeight`), at
 their declared `handles`; the others wait for their nodes' measurements. Hidden edges, and edges
 of hidden nodes, are left out; with `onlyRenderVisible`, only those in view (`visible-edges`), and
-in React and Vue none before the engine knows the view. They
+in React, Vue and Svelte none before the engine knows the view. They
 are drawn in the engine's order (`drawn-edges`): by their stack value (`zIndex`, a selected edge
 raised with `elevateEdgesOnSelect`, an edge of a child at least as high as its ends with
 `zIndexMode: "auto"`), then in the document's order.
