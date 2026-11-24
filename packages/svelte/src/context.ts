@@ -3,8 +3,9 @@
 // typed surface is each part's props, `useFlow<Types, typeof features>()` and
 // `typedFlow<Types, typeof features>()`. Every context value is an object of getters over the
 // root's `$state.raw` fields: the model's state never becomes a deep proxy (S4), and a part reads
-// the model and the engine through `revision` (bumped on every commit and every view change) into
-// derived values that keep their last object while equal (`runes/internal.svelte.ts`).
+// the model and the engine through the root's store (`utils/flow-store.svelte.ts`: counters bumped
+// on the commits and the view changes that may concern it) into derived values that keep their
+// last object while equal (`runes/internal.svelte.ts`).
 import type {
     AnyTypes,
     FlowEngine,
@@ -14,6 +15,7 @@ import type {
     StaticGeometry,
 } from "@fragiola/flow";
 import { getContext, hasContext, setContext } from "svelte";
+import type { FlowStore } from "./utils/flow-store.svelte.js";
 
 /** The model as the primitives see it: any registry, any features. */
 export type AnyFlowModel = FlowModel<AnyTypes, FlowFeatures>;
@@ -33,6 +35,13 @@ export interface FlowContextValue {
     readonly rootElement: HTMLElement | null;
     /** bumped on every commit of the model and every view change of the engine */
     readonly revision: number;
+    /** what the parts read through: the root's counters, by scope (#54, React's store) */
+    readonly store: FlowStore;
+    /**
+     * the root's `onlyRenderVisible`: a culled flow renders no node or edge before the engine (the
+     * server render and the first client render)
+     */
+    readonly onlyRenderVisible: boolean;
     /**
      * the flow's geometry from its document alone (`staticGeometry`, the root's options) while
      * there is no engine (the server render and the first client render), null once it exists:

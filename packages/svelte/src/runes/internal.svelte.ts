@@ -1,5 +1,7 @@
 // The reactive helpers only the primitives call.
+import { untrack } from "svelte";
 import type { FlowContextValue } from "../context.js";
+import type { FlowEntity, FlowValueScope } from "../utils/flow-store.svelte.js";
 import { shallowEqual } from "../utils/shallow-equal.js";
 
 /** @internal two values the same for re-rendering: records compared by their entries */
@@ -33,20 +35,44 @@ export interface FlowValue<S> {
 }
 
 /**
+ * @internal what a reader depends on (`flowValue`'s last argument): a scope (`view` by default),
+ * and for an `entity` reader of one node or edge, which one (its measurements are told to it alone)
+ */
+export interface FlowValueOptions {
+    readonly scope?: FlowValueScope;
+    /** the node or the edge it shows (a getter: another id is followed) */
+    readonly entity?: () => FlowEntity;
+}
+
+/**
  * @internal a value read from the model and the engine (the React adapter's `useFlowValue`), as a
  * `$derived` that notifies its readers only when it changes (`isEqual`; records by their entries
- * by default). It is read again on every commit of the model and every view change of the engine
- * (the root's `revision`), when the engine is created, and when a reactive value the reader uses
- * changes (a prop); a value equal to the last one keeps the last object, so nothing re-renders.
+ * by default). It is read again when the root's store tells its scope (`view`: every commit and
+ * view change; `entity`: not a viewport-only one, and a measurement only when it changed its node
+ * or edge), when the engine is created, and when a reactive value the reader uses changes (a
+ * prop); a value equal to the last one keeps the last object, so nothing re-renders. Called while
+ * a component initializes (an `entity` reader keeps its record in the store while mounted).
  */
 export function flowValue<S>(
     context: FlowContextValue,
     read: () => S,
     isEqual: (a: S, b: S) => boolean = sameValue,
+    options: FlowValueOptions = {},
 ): FlowValue<S> {
+    const scope = options.scope ?? (options.entity ? "entity" : "view");
+    const { entity } = options;
+    if (entity) {
+        // its record, kept while it is mounted (before the deriveds read it: a pre effect runs as
+        // the component initializes); another id acquires another one
+        $effect.pre(() => {
+            const of = entity();
+            const store = context.store;
+            return untrack(() => store.acquire({ kind: of.kind, id: of.id }));
+        });
+    }
     let last: { value: S } | undefined;
     const value = $derived.by(() => {
-        context.revision;
+        context.store.track(scope, entity?.());
         context.engine;
         const next = read();
         if (last !== undefined && isEqual(last.value, next)) {

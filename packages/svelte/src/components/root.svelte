@@ -202,6 +202,7 @@
     import { setFlowRef } from "../runes/create-flow-ref.svelte.js";
     import { flowValue } from "../runes/internal.svelte.js";
     import { createEngineFacade } from "../utils/engine-facade.js";
+    import { createFlowStore } from "../utils/flow-store.svelte.js";
     import { plain, plainList, warnOnce } from "../utils/plain.svelte.js";
     import {
         elementProps,
@@ -337,11 +338,9 @@
     );
     const facade = createEngineFacade(start);
     let engine = $state.raw<AnyFlowEngine | null>(null);
-    let revision = $state(0);
     let rootElement = $state.raw<HTMLElement | null>(null);
-    const bump = () => {
-        revision++;
-    };
+    // what the parts read through: counters told only to the readers a change may concern
+    const store = createFlowStore(() => model);
 
     // the model's lists written back to `bind:nodes` / `bind:edges`, and what the props read back:
     // a parent that keeps them in a deep `$state` proxies what it is given, and a proxy of a frozen
@@ -358,12 +357,12 @@
         return edges;
     };
 
-    // the model's changes: every part reads them through `revision`; the app hears them through
+    // the model's changes: every part reads them through the store; the app hears them through
     // the bound lists and the callbacks, but the controlled props' own commands
     $effect.pre(() => {
         const current = model;
         return current.subscribe((event: CommandEvent) => {
-            bump();
+            store.commit();
             if (event.meta?.source === CONTROLLED_META.source) return;
             if (event.before.nodes !== event.after.nodes) {
                 const next = event.after.nodes as readonly FlowNode<T>[];
@@ -482,7 +481,7 @@
             return made;
         });
         const stops = [
-            created.adapter.subscribe(bump),
+            store.attach(created),
             created.subscribe((event) => {
                 if (event.type !== "viewport-change") {
                     // the event's callback (`onnodeclick`, `onmovestart`, …): the latest prop
@@ -575,7 +574,8 @@
           }
         | undefined;
     const geometry = $derived.by((): StaticGeometry | null => {
-        revision;
+        // what a node's or an edge's static view follows (a commit of the lists)
+        store.track("entity");
         if (engine) {
             lastGeometry = undefined;
             return null;
@@ -617,7 +617,11 @@
             return rootElement;
         },
         get revision() {
-            return revision;
+            return store.view;
+        },
+        store,
+        get onlyRenderVisible() {
+            return onlyRenderVisible === true;
         },
         get geometry() {
             return geometry;

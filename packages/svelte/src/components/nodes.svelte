@@ -28,6 +28,7 @@
         isolation: "isolate",
     };
     const LAYERED_NODES_STYLE = { position: "absolute", top: "0", left: "0" };
+    const NO_NODES: readonly FlowNode[] = Object.freeze([]);
 </script>
 
 <!--
@@ -59,6 +60,9 @@
     const context = useFlowContext("Nodes");
     const list = flowValue(context, () => {
         const { engine, model } = context;
+        // a culled flow renders no node before the engine (the server render, the first client
+        // render): it knows no size to cull by, and every node mounted once costs the open
+        if (!engine && context.onlyRenderVisible) return NO_NODES as never;
         return (
             engine?.adapter.settings.onlyRenderVisible
                 ? engine.get("visible-nodes")

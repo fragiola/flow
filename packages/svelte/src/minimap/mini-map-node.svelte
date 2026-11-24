@@ -25,7 +25,7 @@
 <script lang="ts">
     import { partAttributes } from "@fragiola/flow";
     import { useFlowContext } from "../context.js";
-    import { flowValue } from "../runes/internal.svelte.js";
+    import { flowValue, sameValue } from "../runes/internal.svelte.js";
     import {
         elementProps,
         refProps,
@@ -48,6 +48,8 @@
         context.engine
             ? context.engine.adapter.attributes("minimap-node", { nodeId })
             : partAttributes("minimap-node", nodeId),
+        sameValue,
+        { scope: "entity" },
     );
     const refs = refProps((element) => {
         ref = element as SVGRectElement | null;

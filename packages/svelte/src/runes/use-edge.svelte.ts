@@ -113,6 +113,7 @@ export function useEdge<T extends FlowTypes = AnyTypes>(
             a.focusable === b.focusable &&
             sameEdgePath(a.path, b.path) &&
             shallowEqual(a.attributes, b.attributes),
+        { entity: () => ({ kind: "edge", id: current().id }) },
     );
     const state = $derived.by((): EdgeState<T> => {
         const { attributes, path, reconnecting, focusable } = view.current;
@@ -161,6 +162,7 @@ export function edgePathValue(
                 : geometry?.edgePaths[id];
         },
         sameEdgePath,
+        { entity: () => ({ kind: "edge", id: edgeId() }) },
     );
 }
 

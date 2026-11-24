@@ -31,7 +31,7 @@
         useEdgeLabelLayer,
         useFlowContext,
     } from "../context.js";
-    import { flowValue } from "../runes/internal.svelte.js";
+    import { flowValue, sameValue } from "../runes/internal.svelte.js";
     import {
         edgePathValue,
         staticAttributes,
@@ -69,7 +69,10 @@
                   edgeId,
                   model.get("edge-by", { id: edgeId }),
               );
-    });
+    },
+        sameValue,
+        { entity: () => ({ kind: "edge", id: edgeIdOf() }) },
+    );
     const refs = refProps((element) => {
         ref = element as HTMLDivElement | null;
     });

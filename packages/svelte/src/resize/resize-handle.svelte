@@ -120,7 +120,7 @@
 <script lang="ts">
     import { resizeHandleAttributes } from "@fragiola/flow";
     import { useFlowContext, usePartNodeId } from "../context.js";
-    import { flowValue } from "../runes/internal.svelte.js";
+    import { flowValue, sameValue } from "../runes/internal.svelte.js";
     import {
         elementProps,
         refProps,
@@ -153,6 +153,8 @@
                   variant,
               })
             : resizeHandleAttributes(position, { direction, variant }),
+        sameValue,
+        { scope: "entity" },
     );
     const refs = refProps((element) => {
         ref = element as HTMLDivElement | null;
