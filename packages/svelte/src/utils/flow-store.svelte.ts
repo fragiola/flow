@@ -3,6 +3,7 @@
 // it may concern. A `flowValue` derived reads the counter of its scope (and of its node or edge),
 // so a viewport step reads no node or edge again, and a measurement only those it changed.
 import type { ViewChange } from "@fragiola/flow";
+import { untrack } from "svelte";
 import type { AnyFlowEngine, AnyFlowModel } from "../context.js";
 
 /**
@@ -107,9 +108,14 @@ export function createFlowStore(model: () => AnyFlowModel): FlowStore {
         }
     };
 
-    // a commit that keeps both lists changes no node's or edge's own view
-    let lists: { model: AnyFlowModel; nodes: unknown; edges: unknown } | null =
-        null;
+    // a commit that keeps both lists changes no node's or edge's own view (the lists the store
+    // starts from: the model's when it is made)
+    const listsOf = (current: AnyFlowModel) => ({
+        model: current,
+        nodes: current.get("all-nodes") as unknown,
+        edges: current.get("all-edges") as unknown,
+    });
+    let lists = untrack(() => listsOf(model()));
 
     return {
         get view() {
@@ -151,15 +157,12 @@ export function createFlowStore(model: () => AnyFlowModel): FlowStore {
             };
         },
         commit() {
-            const current = model();
-            const nodes = current.get("all-nodes");
-            const edges = current.get("all-edges");
+            const next = listsOf(model());
             const changed =
-                lists === null ||
-                lists.model !== current ||
-                lists.nodes !== nodes ||
-                lists.edges !== edges;
-            lists = { model: current, nodes, edges };
+                lists.model !== next.model ||
+                lists.nodes !== next.nodes ||
+                lists.edges !== next.edges;
+            lists = next;
             tell(changed ? "entity" : "view");
         },
         attach(created) {
