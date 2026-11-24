@@ -4,10 +4,18 @@
 import {
     afterNextRender,
     computed,
+    DestroyRef,
+    inject,
     isSignal,
     type Signal,
+    untracked,
 } from "@angular/core";
 import type { EdgeContext, FlowContext, NodeContext } from "../context";
+import {
+    entityKey,
+    type FlowEntity,
+    type FlowValueScope,
+} from "../utils/flow-store";
 import { beforeInputs } from "../utils/helpers";
 import { shallowEqual } from "../utils/shallow-equal";
 
@@ -36,25 +44,80 @@ export function sameValue<S>(a: S, b: S): boolean {
     return false;
 }
 
+/** What a `flowValue` depends on: its scope, and the node or edge it shows */
+export interface FlowValueOptions {
+    /** `view` (the default): every change; `entity`: a node's or an edge's own view */
+    readonly scope?: FlowValueScope;
+    /**
+     * the node or edge an `entity` reader shows (`undefined` while its input is not set): a
+     * measurement tells it only when it changed that node's box or that edge's path. Given, the
+     * value is made in an injection context (its record is released on destroy)
+     */
+    readonly entity?: () => FlowEntity | undefined;
+}
+
 /**
  * A value read from the model and the engine, as a signal that changes only when the value does
  * (`equal`; records by their entries by default): it is read again on every commit of the model,
  * every view change of the engine (measurements, the viewport, a gesture) and every change of a
  * signal `read` reads (an input), and a value equal to the last one keeps the last object, so
- * nothing that reads it updates.
+ * nothing that reads it updates. An `entity` reader (a node's or an edge's own view) is not read
+ * again on a viewport-only step, nor on a measurement that did not change its node or edge.
  */
 export function flowValue<S>(
     context: FlowContext,
     read: () => S,
     equal: (a: S, b: S) => boolean = sameValue,
+    options: FlowValueOptions = {},
 ): Signal<S> {
+    const { store } = context;
+    const { scope = "view", entity } = options;
+    if (scope === "view") {
+        return computed(
+            () => {
+                store.view();
+                return read();
+            },
+            { equal },
+        );
+    }
+    // the record of the node or edge it reads, held while it reads it (released on destroy)
+    let held: { key: string; release: () => void } | undefined;
+    if (entity) {
+        inject(DestroyRef).onDestroy(() => {
+            held?.release();
+            held = undefined;
+        });
+    }
     return computed(
         () => {
-            context.revision();
+            store.entity();
+            const of = entity?.();
+            if (of) {
+                const key = entityKey(of);
+                if (held?.key !== key) {
+                    held?.release();
+                    held = { key, release: untracked(() => store.acquire(of)) };
+                }
+                store.counterOf(of)();
+            } else {
+                store.measure();
+            }
             return read();
         },
         { equal },
     );
+}
+
+/** @internal an `entity` reader's node or edge, from its id (`undefined` while not known) */
+export function entityOf(
+    kind: FlowEntity["kind"],
+    id: () => string | undefined,
+): () => FlowEntity | undefined {
+    return () => {
+        const current = id();
+        return current === undefined ? undefined : { kind, id: current };
+    };
 }
 
 /** A value an injection function takes: a signal (an input), a getter, or the value itself. */

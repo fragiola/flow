@@ -53,6 +53,7 @@ import {
 import { type FlowRef, setFlowRef } from "../inject/create-flow-ref";
 import { flowValue } from "../inject/internal";
 import { createEngineFacade } from "../utils/engine-facade";
+import { createFlowStore } from "../utils/flow-store";
 import {
     bindAttributes,
     bindStructuralStyle,
@@ -135,7 +136,12 @@ function notInitialized(): Error {
 
 const DEFAULT_VIEWPORT: Viewport = Object.freeze({ x: 0, y: 0, zoom: 1 });
 
-/** Two lists of render layers that draw the same (`render-layers` builds new ones as the flow changes). */
+/**
+ * Two lists of render layers that draw the same (`render-layers` builds new ones as the flow
+ * changes): their levels, `z-index` and edges, what the parts read of them. Not their nodes: no
+ * part reads a level's `nodeIds` (a node's own `z-index` is `node-z-index-by`), and comparing them
+ * walked every node of a large flow on each viewport step.
+ */
 function sameLayers(
     a: readonly RenderLayer[],
     b: readonly RenderLayer[],
@@ -151,7 +157,6 @@ function sameLayers(
                     other !== undefined &&
                     layer.level === other.level &&
                     layer.zIndex === other.zIndex &&
-                    sameIds(layer.nodeIds, other.nodeIds) &&
                     sameIds(layer.edgeIds, other.edgeIds)
                 );
             }))
@@ -460,9 +465,16 @@ export class FlowRootDirective<
     readonly engine: FlowEngine<T, F> = typedEngine<T, F>(this.facade.engine);
 
     private readonly current = signal<AnyFlowEngine | null>(null);
-    private readonly revision = signal(0);
-    private readonly bump = () => {
-        this.revision.update((value) => value + 1);
+    /**
+     * the root's one store (React's `flow-store`): its counters are bumped once per commit of the
+     * model and engine notification, each told to the readers it may concern; its listeners are
+     * the root's effects, gone with it
+     */
+    private readonly store = createFlowStore();
+    private readonly revision = this.store.view;
+    /** a commit of the model: told to the readers, then rendered before the next task */
+    private readonly committed = (model: AnyFlowModel) => {
+        this.store.commit(model);
         this.renderSoon();
     };
     private readonly application = inject(ApplicationRef);
@@ -508,7 +520,7 @@ export class FlowRootDirective<
      */
     private readonly geometry = computed((): StaticGeometry | null => {
         if (this.current()) return null;
-        this.revision();
+        this.store.entity();
         const model = this.erased();
         const props = this.engineProps();
         const options = {
@@ -554,7 +566,9 @@ export class FlowRootDirective<
         engine: this.current.asReadonly(),
         publicEngine: this.facade.engine as unknown as AnyFlowEngine,
         rootElement: this.host,
-        revision: this.revision.asReadonly(),
+        revision: this.revision,
+        store: this.store,
+        culled: computed(() => this.onlyRenderVisible() === true),
         geometry: this.geometry,
         layers: this.layers,
     };
@@ -656,7 +670,7 @@ export class FlowRootDirective<
             const model = this.erased();
             onCleanup(
                 model.subscribe((event: CommandEvent) => {
-                    this.bump();
+                    this.committed(model);
                     if (event.meta?.source === CONTROLLED_META.source) return;
                     if (event.before.nodes !== event.after.nodes) {
                         this.nodesChange.emit(
@@ -671,7 +685,7 @@ export class FlowRootDirective<
                 }),
             );
             // a commit between the first read and the subscription is read again
-            untracked(this.bump);
+            untracked(() => this.committed(model));
         });
 
         // the controlled lists, on every new list (a model the app gives starts at them)
@@ -706,7 +720,7 @@ export class FlowRootDirective<
                 }) as unknown as AnyFlowEngine;
                 sentOptions = optionKeys(options);
                 const stops = [
-                    created.adapter.subscribe(this.bump),
+                    this.store.attach(created, () => this.renderSoon()),
                     created.subscribe((event) => {
                         if (event.type !== "viewport-change") {
                             // the event's output (`nodeClick`, `moveStart`, …)

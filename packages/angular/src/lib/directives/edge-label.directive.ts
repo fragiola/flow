@@ -6,7 +6,7 @@ import {
     injectFlowContext,
 } from "../context";
 import { edgePathOf, staticEdgeAttributes } from "../inject/inject-edge";
-import { flowValue, partOwnerId } from "../inject/internal";
+import { entityOf, flowValue, partOwnerId } from "../inject/internal";
 import {
     bindAttributes,
     bindStructuralStyle,
@@ -43,14 +43,22 @@ export class FlowEdgeLabelDirective {
         "edge",
     );
     private readonly path = edgePathOf(this.context, this.id);
-    private readonly attributes = flowValue(this.context, () => {
-        const edgeId = this.id();
-        if (edgeId === undefined) return undefined;
-        const engine = this.context.engine();
-        return engine
-            ? engine.adapter.attributes("edge-label", { edgeId })
-            : staticEdgeAttributes(this.context, "edge-label", edgeId);
-    });
+    private readonly attributes = flowValue(
+        this.context,
+        () => {
+            const edgeId = this.id();
+            if (edgeId === undefined) return undefined;
+            const engine = this.context.engine();
+            return engine
+                ? engine.adapter.attributes("edge-label", { edgeId })
+                : staticEdgeAttributes(this.context, "edge-label", edgeId);
+        },
+        undefined,
+        {
+            scope: "entity",
+            entity: entityOf("edge", () => this.id()),
+        },
+    );
 
     /** the label's state (`undefined` while its edge has no path) */
     readonly state: Signal<EdgeLabelState | undefined> = computed(() => {

@@ -21,7 +21,7 @@ import {
     px,
     type StructuralStyle,
 } from "../utils/helpers";
-import { flowValue, type ValueOrSignal, valueNow } from "./internal";
+import { entityOf, flowValue, type ValueOrSignal, valueNow } from "./internal";
 
 /** What a node shows: its state on screen. */
 export interface NodeState<T extends FlowTypes = AnyTypes> {
@@ -97,35 +97,43 @@ export function bindNode<T extends FlowTypes>(
     node: () => FlowNode<T> | undefined,
 ): InjectNodeResult<T> {
     const nodeId = computed(() => node()?.id);
-    const view = flowValue(context, (): NodeView | undefined => {
-        const current = node() as FlowNode | undefined;
-        if (!current) return undefined;
-        const id = current.id;
-        const engine = context.engine();
-        if (!engine) {
-            // the first render: the static geometry's place (the node's origin applied) and stack
-            const geometry = context.geometry();
-            const rect = geometry?.nodeRects[id];
+    const view = flowValue(
+        context,
+        (): NodeView | undefined => {
+            const current = node() as FlowNode | undefined;
+            if (!current) return undefined;
+            const id = current.id;
+            const engine = context.engine();
+            if (!engine) {
+                // the first render: the static geometry's place (the node's origin applied) and stack
+                const geometry = context.geometry();
+                const rect = geometry?.nodeRects[id];
+                return {
+                    attributes: {
+                        ...partAttributes("node", id),
+                        "data-selected": flag(current.selected === true),
+                    },
+                    x: rect?.x ?? current.position.x,
+                    y: rect?.y ?? current.position.y,
+                    zIndex: geometry?.nodeZIndexes[id],
+                    focusable: false,
+                };
+            }
+            const rect = engine.get("node-rect-by", { nodeId: id });
             return {
-                attributes: {
-                    ...partAttributes("node", id),
-                    "data-selected": flag(current.selected === true),
-                },
+                attributes: engine.adapter.attributes("node", { nodeId: id }),
                 x: rect?.x ?? current.position.x,
                 y: rect?.y ?? current.position.y,
-                zIndex: geometry?.nodeZIndexes[id],
-                focusable: false,
+                zIndex: engine.get("node-z-index-by", { nodeId: id }),
+                focusable: engine.is("node-focusable", { nodeId: id }),
             };
-        }
-        const rect = engine.get("node-rect-by", { nodeId: id });
-        return {
-            attributes: engine.adapter.attributes("node", { nodeId: id }),
-            x: rect?.x ?? current.position.x,
-            y: rect?.y ?? current.position.y,
-            zIndex: engine.get("node-z-index-by", { nodeId: id }),
-            focusable: engine.is("node-focusable", { nodeId: id }),
-        };
-    });
+        },
+        undefined,
+        {
+            scope: "entity",
+            entity: entityOf("node", () => node()?.id),
+        },
+    );
     const state = computed((): NodeState<T> | undefined => {
         const current = node();
         const shown = view();

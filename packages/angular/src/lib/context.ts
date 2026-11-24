@@ -12,6 +12,7 @@ import type {
     RenderLayer,
     StaticGeometry,
 } from "@fragiola/flow";
+import type { FlowStore } from "./utils/flow-store";
 
 /** The model as the parts see it: any registry, any features. */
 export type AnyFlowModel = FlowModel<AnyTypes, FlowFeatures>;
@@ -35,6 +36,16 @@ export interface FlowContext {
      * follows them (the model's state is never made reactive)
      */
     readonly revision: Signal<number>;
+    /**
+     * the counters behind `revision`, by scope (`flowValue`'s `entity` readers: a node's or an
+     * edge's own view, told no viewport-only step and only the measurements that changed it)
+     */
+    readonly store: FlowStore;
+    /**
+     * the root culls (`onlyRenderVisible`): before the engine exists (the first render) the
+     * layers render no node and no edge, where they would draw every one's static geometry
+     */
+    readonly culled: Signal<boolean>;
     /**
      * the flow's geometry from its document alone (`staticGeometry`, with the root's options)
      * while there is no engine (the first render), `null` once there is: the parts draw the

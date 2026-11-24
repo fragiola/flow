@@ -104,12 +104,20 @@ export function bindStructuralStyle(
         string,
         { value: string; written: string; previous: string }
     >();
+    /**
+     * the element's `style` attribute as it was left last: while it reads the same, no binding
+     * replaced a key (one read after each render instead of one per key; a large flow has
+     * hundreds of such elements)
+     */
+    let left: string | null | undefined;
     const write = (name: string, entry: { value: string; written: string }) => {
         element.style.setProperty(name, entry.value);
         entry.written = element.style.getPropertyValue(name);
     };
     /** writes the structural keys back where the consumer's style replaced them */
     const assert = () => {
+        const now = element.getAttribute("style");
+        if (left !== undefined && now === left) return;
         for (const [name, entry] of owned) {
             const current = element.style.getPropertyValue(name);
             if (current !== entry.written) {
@@ -117,6 +125,7 @@ export function bindStructuralStyle(
                 write(name, entry);
             }
         }
+        left = element.getAttribute("style");
     };
     effect(() => {
         const next = cssEntries(style());
@@ -144,6 +153,7 @@ export function bindStructuralStyle(
                     write(name, entry);
                 }
             }
+            left = element.getAttribute("style");
         });
     });
     afterEveryRender({ write: assert });

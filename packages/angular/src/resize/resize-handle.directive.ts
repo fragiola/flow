@@ -113,20 +113,25 @@ export function bindResizeHandle(
     position: () => ResizePosition | undefined,
     look: () => ResizeHandleLook = () => ({}),
 ): void {
-    const attributes = flowValue(context, () => {
-        const id = nodeId();
-        const at = position();
-        const { direction, variant } = look();
-        const engine = context.engine();
-        return engine && id !== undefined && at !== undefined
-            ? engine.adapter.attributes("resize-handle", {
-                  nodeId: id,
-                  position: at,
-                  direction,
-                  variant,
-              })
-            : resizeHandleAttributes(at, { direction, variant });
-    });
+    const attributes = flowValue(
+        context,
+        () => {
+            const id = nodeId();
+            const at = position();
+            const { direction, variant } = look();
+            const engine = context.engine();
+            return engine && id !== undefined && at !== undefined
+                ? engine.adapter.attributes("resize-handle", {
+                      nodeId: id,
+                      position: at,
+                      direction,
+                      variant,
+                  })
+                : resizeHandleAttributes(at, { direction, variant });
+        },
+        undefined,
+        { scope: "entity" },
+    );
     bindAttributes(element, attributes);
     bindStructuralStyle(element, () => {
         const at = position();

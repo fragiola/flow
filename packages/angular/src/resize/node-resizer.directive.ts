@@ -53,14 +53,19 @@ export class FlowNodeResizerDirective {
         injectNodeContext(),
         "node",
     );
-    private readonly attributes = flowValue(this.context, () => {
-        const nodeId = this.id();
-        if (nodeId === undefined) return undefined;
-        const engine = this.context.engine();
-        return engine
-            ? engine.adapter.attributes("resizer", { nodeId })
-            : { "data-flow-part": "resizer", "data-flow-id": nodeId };
-    });
+    private readonly attributes = flowValue(
+        this.context,
+        () => {
+            const nodeId = this.id();
+            if (nodeId === undefined) return undefined;
+            const engine = this.context.engine();
+            return engine
+                ? engine.adapter.attributes("resizer", { nodeId })
+                : { "data-flow-part": "resizer", "data-flow-id": nodeId };
+        },
+        undefined,
+        { scope: "entity" },
+    );
 
     /** the resizer's state */
     readonly state: Signal<NodeResizerState | undefined> = computed(() => {

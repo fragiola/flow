@@ -146,18 +146,23 @@ export function bindHandle(
         },
         { equal: sameRegistration },
     );
-    const attributes = flowValue(context, (): PartAttributes | undefined => {
-        const handle = registration();
-        if (!handle) return undefined;
-        const engine = context.engine();
-        return engine
-            ? engine.adapter.attributes("handle", handle)
-            : {
-                  ...partAttributes("handle", handle.handleId),
-                  "data-handle-type": handle.type,
-                  "data-side": handle.side,
-              };
-    });
+    const attributes = flowValue(
+        context,
+        (): PartAttributes | undefined => {
+            const handle = registration();
+            if (!handle) return undefined;
+            const engine = context.engine();
+            return engine
+                ? engine.adapter.attributes("handle", handle)
+                : {
+                      ...partAttributes("handle", handle.handleId),
+                      "data-handle-type": handle.type,
+                      "data-side": handle.side,
+                  };
+        },
+        undefined,
+        { scope: "entity" },
+    );
     const state = computed((): HandleState | undefined => {
         const handle = registration();
         const current = attributes();

@@ -49,8 +49,8 @@ const ATTRIBUTES = partAttributes("nodes");
 /**
  * The layer of the nodes (`data-flow-part="nodes"`), on the app's element inside `[flowViewport]`:
  * `<div flowNodes>`. Its `<ng-template flowNodesItem let-node>` renders each node that is not
- * hidden (with `onlyRenderVisible`, each one in view, `visible-nodes`), in drawing order, keyed by
- * its id (a node keeps its view and its element when it moves).
+ * hidden (with `onlyRenderVisible`, each one in view, `visible-nodes`, and none before the engine
+ * exists), in drawing order, keyed by its id (a node keeps its view and its element when it moves).
  */
 @Directive({ selector: "[flowNodes]", exportAs: "flowNodes" })
 export class FlowNodesDirective {
@@ -59,12 +59,16 @@ export class FlowNodesDirective {
     /** @internal the nodes it renders now */
     readonly list: Signal<readonly FlowNode[]> = flowValue(this.context, () => {
         const engine = this.context.engine();
-        return engine?.adapter.settings.onlyRenderVisible
-            ? engine.get("visible-nodes")
-            : this.context
-                  .model()
-                  .get("all-nodes")
-                  .filter((node) => node.hidden !== true);
+        if (engine?.adapter.settings.onlyRenderVisible) {
+            return engine.get("visible-nodes");
+        }
+        // a culled flow renders no node before the engine (React's): every node's static
+        // geometry mounted for one render, then torn down, took most of a large flow's open
+        if (!engine && this.context.culled()) return [];
+        return this.context
+            .model()
+            .get("all-nodes")
+            .filter((node) => node.hidden !== true);
     });
 
     /** what it shows (`#nodes="flowNodes"`, then `nodes.state().count`) */
