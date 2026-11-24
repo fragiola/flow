@@ -83,8 +83,11 @@ export function flowValue<S>(
     }
     // the record of the node or edge it reads, held while it reads it (released on destroy)
     let held: { key: string; release: () => void } | undefined;
+    // a read after destroy must not acquire a record nothing would release
+    let destroyed = false;
     if (entity) {
         inject(DestroyRef).onDestroy(() => {
+            destroyed = true;
             held?.release();
             held = undefined;
         });
@@ -93,7 +96,7 @@ export function flowValue<S>(
         () => {
             store.entity();
             const of = entity?.();
-            if (of) {
+            if (of && !destroyed) {
                 const key = entityKey(of);
                 if (held?.key !== key) {
                     held?.release();
@@ -101,6 +104,9 @@ export function flowValue<S>(
                 }
                 store.counterOf(of)();
             } else {
+                // no entity (or no longer one): let go of the old record
+                held?.release();
+                held = undefined;
                 store.measure();
             }
             return read();
