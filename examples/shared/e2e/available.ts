@@ -40,8 +40,6 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
     vue: [],
     svelte: [],
     angular: [
-        // Epic #49 (#47): new React examples, ported by a later Epic
-        "export-image",
         // Epic #49 (#48): new React examples, ported by a later Epic
         "dagre-layout",
         "elk-layout",
