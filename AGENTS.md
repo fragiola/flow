@@ -211,7 +211,8 @@ playground's suite (214 tests, ~3 min 26 s for the whole job) stays in one. Meas
 after #48 (4 workers): the playground in ~59 s; React's examples in ~120 s; Vue's, Svelte's and
 Angular's 328 each, 226 run and the 102 `PENDING` ones skipped, in ~27 to ~37 s. After #51 (Epic
 #52), Vue's 462, every one run (none `PENDING`), in ~56 s; React's 462 in ~2 min. After #54 (Epic
-#55), Svelte's 462, every one run, in ~56 s; Angular's 330, 104 `PENDING`.
+#55), Svelte's 462, every one run, in ~56 s; Angular's 330, 104 `PENDING`. After #56 (Epic #58),
+Angular's 408, 371 run and the 37 `PENDING` ones (#57's nine examples) skipped, in ~56 s.
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
@@ -1401,6 +1402,16 @@ Decisions of the Angular adapter (#15):
   more; a generic part (`[flowEdge]`) does not infer its type from an entity narrowed by an `@if`
   around it (narrow inside the part, as `edge-types` does); the gestures' real feel is
   checked by the Angular examples' shared specs (#16: they needed the fix above).
+- **#56's parity checks** (the gaps Vue's #50 and Svelte's #53 found in their adapters), in
+  `tests/parity.test.ts`, with no package change: `flowEdgePath` is the app's own `<svg:path>`, so
+  its children (`animating-edges`' `<animate>`) render inside it, as React's; and a handle's side
+  placement (`bindBaseStyle`) gives way to any value of the app's own. React's `{ top: undefined }`
+  (drop the part's key, let the classes place it) has no Angular twin, since Angular writes nothing
+  for an `undefined` binding; the app hands the key back to its classes with the CSS-wide
+  `revert-layer` (`[style.top]="'revert-layer'"`: the style attribute is its own layer, so the
+  value rolls back to the class's, checked in Chromium and Firefox). Alternative: a `style` input
+  on `flowHandle` (Angular then routes `[style]` and the static `style` to the directive, which
+  would write every key itself); refused: it changes how every handle's style is applied.
 
 ## The playground and the examples (Issue #6)
 
@@ -1885,7 +1896,7 @@ unchanged. No example needed an adapter fix; the stress test led to the large-fl
 ## The Angular examples and the Angular docs (Issue #16)
 
 `examples/angular` (`examples-angular`, private) is `examples/react` in Angular 22 (standalone
-components, signals, zoneless, OnPush): the 21 examples (`connected-data` since #36) with the same ids, metadata, text, names,
+components, signals, zoneless, OnPush): the 34 examples (21 before #56, `connected-data` since #36) with the same ids, metadata, text, names,
 roles and test ids, and the same scripts as Splitter's Angular app (`generate`, `dev` (port 5188),
 `build` (Vite + `@analogjs/vite-plugin-angular`, `tsconfig.app.json`), `typecheck` (`ngc -p
 tsconfig.json --noEmit`, strict templates, TypeScript 6.0.3 pinned in this app, as
@@ -1959,6 +1970,33 @@ Decisions of #16:
   (`add-nodes`, `workflow-builder`) checks the example's template while an outside drag hovers it;
   locally, the smoke apps' and the playground's Vite servers need `CHOKIDAR_USEPOLLING=1` when the
   machine's inotify watchers are used up (an environment limit, not the repository's).
+
+#56 (Epic #58) in the Angular examples: `edge-reconnect`'s "Delete on drop" (`(reconnectCancel)`,
+a native `role="switch"` checkbox), `sub-flows`' "Grouping" toolbar (`grouping.ts`, and the loose
+`logs` node; `cache` moved to React's place), and `shapes`, `easy-connect`, `proximity-connect`,
+`delete-middle-node`, `intersections`, `contextual-zoom`, `connection-line`, `edge-markers`,
+`animating-edges`, `floating-edges`, `editable-edge`, `gradient-styling`, `whiteboard`. React's
+in-file components became `.ts` siblings named as Vue's and Svelte's files (`easy-connect`'s edge is
+`floating-edge-view.ts`: `floating-edge.ts` is React's framework-free helper), importing `Types`,
+`features` and shared helpers from `./index`; the framework-free siblings and their unit tests
+(`tests/<id>.test.ts`) are React's, unchanged. Angular specifics:
+- **A component on the part's own element** (`[exampleStepNode]` on `[flowNode]`,
+  `[exampleFloatingEdge]` on `[flowEdge]`, `[exampleLines]` on `flowConnectionLine`) injects the
+  part's directive and reads its `state()`, so a drag or pointer step checks that view only, and a
+  class such as `[[data-selected]>&]:visible` keeps its direct child. Such a part always writes its
+  `flowEdgePath`s (their `d` unset until there is a path) and its line content: a part adds its
+  default content when the app wrote no element by the first render, so an `@if` around all of it
+  would draw the default path beside the app's.
+- **Per-instance SVG ids** (`edge-markers`' markers, `gradient-styling`'s gradients,
+  `floating-edges`' radio group) come from a module counter (React's `useId`, which Angular lacks).
+- `easy-connect`'s cover handles write `[style.top]="'revert-layer'"` (and `left`, `transform`)
+  for React's `undefined` keys (see the Angular adapter's #56 note); `shapes` remounts its handles
+  per angle in a one-item `@for` tracked by the angle; `delete-middle-node`'s `beforeDelete` closes
+  over the model field (no flow ref needed); `contextual-zoom`'s `Service` is a `type`, not an
+  `interface` (`[flowNode]`'s fallback data is a `Record`, which an interface is not assignable to);
+  `animating-edges`' sender outputs are `sendValue` / `dropValue` (a `(drop)` would also catch the
+  native drop event); `whiteboard` folds React's four preview paths into one computed path.
+Every shared spec of these passed with no adapter fix.
 
 ## The site export (Issue #7)
 
