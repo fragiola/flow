@@ -158,7 +158,7 @@ examples show them as copyable code.
 | `pnpm --filter examples-angular dev` | the Angular embed alone, port 5188 (`PORT` moves it; `?id=<id>&theme=<name>`) |
 | `pnpm --filter examples-react vendor` | vendors Fragiola UI (`scripts/vendor-fragiola.ts`; `FRAGIOLA_REGISTRY` points it elsewhere) |
 | `pnpm site:export --base /flow --out <dir>` | the site export (contract v1.7): builds the packages and each framework's embed, writes the pages, `examples.json`, `project.json` and the manifests, then validates the output and exits non-zero on any violation ([The site export](#the-site-export-issue-7)) |
-| `pnpm perf` | the large-flow frame times (Epic #61, `scripts/perf.ts`, not in CI): `--framework react` (the default), `vue` (#51) or `svelte` (#54); builds the core, that framework's package and its embed (into a temporary directory), serves it (`examples/shared/e2e/serve.ts`, its own process group, stopped on exit) and drives `stress-test` in Chromium with Playwright: per size, the open time and the nodes mounted meanwhile, then a pan, a zoom out and back and a node drag of 120 steps at 60 Hz; prints median / p95 / max frame times per size and gesture, the median of the runs. `--sizes 1000,10000,20000`, `--runs 3`, `--steps 120`, `--no-build` (the packages' last `dist`), `--dist <dir>` (an embed built before with `EMBED_BASE=/`), `--profile <dir>` (CPU profiles of each size's first open and gestures), `--json <file>`, `--headed`, `--verbose`. About a minute for the defaults |
+| `pnpm perf` | the large-flow frame times (Epic #61, `scripts/perf.ts`, not in CI): `--framework react` (the default), `vue` (#51), `svelte` (#54) or `angular` (#57); builds the core, that framework's package and its embed (into a temporary directory), serves it (`examples/shared/e2e/serve.ts`, its own process group, stopped on exit) and drives `stress-test` in Chromium with Playwright: per size, the open time and the nodes mounted meanwhile, then a pan, a zoom out and back and a node drag of 120 steps at 60 Hz; prints median / p95 / max frame times per size and gesture, the median of the runs. `--sizes 1000,10000,20000`, `--runs 3`, `--steps 120`, `--no-build` (the packages' last `dist`), `--dist <dir>` (an embed built before with `EMBED_BASE=/`), `--profile <dir>` (CPU profiles of each size's first open and gestures), `--json <file>`, `--headed`, `--verbose`. About a minute for the defaults |
 | `pnpm site:dev --base /flow --port 5185` | every framework's embed with hot reload behind one port (`site/dev-proxy.ts`), for `www`'s dev mode |
 
 There is no `changeset` or `release:version` script (D15).
@@ -212,7 +212,8 @@ after #48 (4 workers): the playground in ~59 s; React's examples in ~120 s; Vue'
 Angular's 328 each, 226 run and the 102 `PENDING` ones skipped, in ~27 to ~37 s. After #51 (Epic
 #52), Vue's 462, every one run (none `PENDING`), in ~56 s; React's 462 in ~2 min. After #54 (Epic
 #55), Svelte's 462, every one run, in ~56 s; Angular's 330, 104 `PENDING`. After #56 (Epic #58),
-Angular's 408, 371 run and the 37 `PENDING` ones (#57's nine examples) skipped, in ~56 s.
+Angular's 408, 371 run and the 37 `PENDING` ones (#57's nine examples) skipped, in ~56 s. After
+#57 (Epic #58), Angular's 462, every one run (none `PENDING` in any framework), in ~1.2 min.
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
@@ -1413,6 +1414,74 @@ Decisions of the Angular adapter (#15):
   on `flowHandle` (Angular then routes `[style]` and the static `style` to the directive, which
   would write every key itself); refused: it changes how every handle's style is applied.
 
+Decisions of large flows in Angular (#57, Epic #58; React's of Epic #61, Vue's of #51, Svelte's of
+#54):
+
+- **One store per root** (`utils/flow-store.ts`, on `context.store`; Vue's counters as signals):
+  `view` (the context's `revision`): every model commit and every engine notification; `entity`
+  (`bindNode`, `bindEdge`, `edgePathOf`, `flowEdgePath`, `flowEdgeLabel`, `flowReconnectAnchor`,
+  `injectHandle`, `flowMiniMapNode`, `flowNodeResizer`, `flowResizeHandle`, React's list): a
+  commit that changed `all-nodes` or `all-edges` (or another model), a gesture, any notification
+  while there are (or were) several render levels, a measurement with a viewport change. A
+  measured-only notification bumps `measure` and only the records whose token (`node-rect-by` +
+  `node-measured`, or `edge-path-by`) changed identity. `flowValue(context, read, equal,
+  { scope, entity })`; an entity reader acquires its record in its computed (Angular runs no
+  effect before the first read, as Vue's `watch` and Svelte's `$effect.pre` do) and releases it on
+  destroy (`DestroyRef`). The store's listeners are the root's effects (the model's `subscribe`,
+  the engine's `adapter.subscribe`), gone with it (`tests/lifetime.test.ts`: five mounts and
+  destroys of one app-owned model, and an `@if` around the root, return to the baseline).
+- **A culled flow renders nothing before the engine** (`onlyRenderVisible` on the context as
+  `culled`): `[flowNodes]` no node, `[flowEdges]` no edge (its levels kept, empty) in the
+  browser's first render; a flow that is not culled keeps it (`tests/render-counts.test.ts`, "a
+  culled flow": the elements ever inserted). At 10 000 nodes the open went from 3.5 s (every node
+  mounted, then `render-layers` reading the root's box over them: a 0.76 s forced layout) to
+  ~210 ms.
+- **Nodes and handles register in the after-render `earlyRead` phase** (`afterRenderEffect`'s
+  first): after every insertion of the render (so the first measurement lays the page out once,
+  as React's refs), and before the app's own hooks of the later phases: in `mixedReadWrite` (the
+  default) an `afterNextRender` the app registered right after adding a node ran first and found
+  it unregistered (`tests/registration.test.ts`). Each registration is its own hook: one that
+  throws goes to the `ErrorHandler`, the others still register (Angular's after-render manager
+  runs each sequence on its own). No batching was needed: unlike Vue's function refs, Angular's
+  after-render hooks already run after the whole render.
+- **Cheaper per-render work** found by the profile: the render levels are compared without their
+  `nodeIds` (no part reads them; the comparison walked every node of the flow on each viewport
+  step, ~0.11 s of a 10 000-node gestures profile), and `bindStructuralStyle`'s write-back reads
+  the element's `style` attribute once after a render, checking its keys only when it changed
+  since it was left (~0.29 s of per-key `getPropertyValue` reads there, ~0.06 s after).
+- **Tested** in `tests/render-counts.test.ts` (Vue's cases with a wrapped engine counting the
+  entity reads: pan and zoom steps re-render and read no node or edge; a zoom out renders the
+  nodes brought into view alone and reads only the others' boxes and paths; a step that changes
+  the render levels places the nodes again; a drag re-renders the dragged node only, its edge's
+  path following through `flowEdgePath`'s effect without its view being checked; the culled first
+  render), `flow-store`, `lifetime` and `registration.test.ts`. Zoneless throughout: nothing
+  assumes zone.js.
+- **The numbers** (`pnpm perf --framework angular`, the method of Epic #61, the same machine; median
+  / p95 / max ms, open with the nodes mounted meanwhile; React the same hour: 1 000 open 24 ms
+  (52), zoom 16.8/33/41; 10 000 open 168 ms (51), pan 16.7/18.5/21, zoom 16.8/35/67, drag
+  16.7/18.7/34; 20 000 open 347 ms (50), zoom 16.7/35/68). Before #57 `pnpm perf` counted no
+  Angular node (its directive names the element after inserting it: the count now follows the
+  `data-flow-part` attribute too):
+
+  | nodes | gesture | before #57 | after #57 |
+  | --- | --- | --- | --- |
+  | 1 000 | open | 331 ms (1 000 mounted) | 33 ms (52) |
+  | 1 000 | pan / zoom / drag | 16.7/18/20, 16.7/54/82, 16.7/17/22 | 16.7/19/22, 16.8/35/46, 16.7/17/23 |
+  | 10 000 | open | 3 524 ms (10 000 mounted) | 213 ms (51) |
+  | 10 000 | pan / zoom / drag | 16.6/19/25, 16.7/79/184, 16.7/18/28 | 16.6/19/22, 16.8/51/107, 16.7/19/28 |
+  | 20 000 | open | 5 992 ms (20 000 mounted) | 376 ms (50) |
+  | 20 000 | pan / zoom / drag | 16.7/20/27, 16.8/71/162, 16.9/34/49 | 16.7/20/27, 16.8/46/103, 16.7/21/59 |
+
+  **What is left** (zoom p95 ~50 against React's ~35, Vue's ~39, Svelte's ~50): in the 10 000-node
+  gestures profile (unminified, `vite build --minify false`) the busy time went from ~2.47 s to
+  ~1.65 s; of it ~1.3 s is the application ticks of the far zoom out, mostly Angular creating the
+  views of the nodes and edges it brings into view and running their parts' effects (`SlotViews`'
+  sync ~0.36 s, of which creating views ~0.16 s; the views' effects ~0.67 s), ~0.24 s the first
+  `offsetWidth` of a node's registration (the frame's own layout of the new nodes, as React's) and
+  ~0.08 s `render-layers` read on each notification (as every adapter). No other adapter hot spot;
+  fewer effects per part (one per element rather than one per binding) or spreading the mounts
+  over frames would be the next step.
+
 ## The playground and the examples (Issue #6)
 
 Every rule of the guidelines' Examples section (`../guidelines/docs/site.md#examples`) holds; what
@@ -1437,16 +1506,11 @@ the per-framework skip of what a later Epic ports: whole examples (`<slug>`) and
 (`<slug>#<case>`, `pendingCase`); a spec that needs one is skipped in that framework with a
 "(PENDING)" reason instead of failing (`requireCase(slug, case)` as a test's first line for a
 case; `openExample` for an example). React never has any; the Epic that ports an entry to a
-framework deletes it there. Today Angular waits for `edge-reconnect#delete-on-drop`,
-`sub-flows#selection-grouping` and the new examples of #45 (`shapes`, `easy-connect`,
-`proximity-connect`, `delete-middle-node`, `intersections`, `contextual-zoom`, `connection-line`)
-and of #46 (`edge-markers`, `animating-edges`, `floating-edges`, `editable-edge`,
-`gradient-styling`, `whiteboard`) and of #47 (`helper-lines`, `copy-paste`, `collaborative`,
-`export-image`, `stress-test`) and of #48 (`dagre-layout`, `elk-layout`, `auto-layout`,
-`force-layout`): Epic #49 writes them in React, the ports' Epics follow. Vue (Epic #52) has
-every one since #51 (the extensions and the examples of #45 and #46 since #50): `PENDING.vue` is
-empty. Svelte (Epic #55) has the extensions and the examples of #45 and #46 since #53, and waits
-for those of #47 and #48. A pending whole example has nothing in the
+framework deletes it there. Epic #49's extensions and new examples (#44 to #48) were ported by
+Vue's Epic #52 (#50, #51), Svelte's #55 (#53, #54) and Angular's #58 (#56, #57): **every list is
+empty since #57** and every shared spec runs in every framework. The mechanism stays (empty
+lists, its tests and `requireCase` kept): the next example written in React first is added to the
+other frameworks' lists until their port. A pending whole example has nothing in the
 port's app yet: its `tests/examples.test.ts` leaves it out of React's ids and `tests/vendored.test.ts`
 expects no copy of its `styles.ts` and siblings.
 Alternative: a capability attribute the example renders, checked by the spec; refused: it would
@@ -1896,7 +1960,7 @@ unchanged. No example needed an adapter fix; the stress test led to the large-fl
 ## The Angular examples and the Angular docs (Issue #16)
 
 `examples/angular` (`examples-angular`, private) is `examples/react` in Angular 22 (standalone
-components, signals, zoneless, OnPush): the 34 examples (21 before #56, `connected-data` since #36) with the same ids, metadata, text, names,
+components, signals, zoneless, OnPush): the 44 examples (21 before #56, 34 before #57, `connected-data` since #36) with the same ids, metadata, text, names,
 roles and test ids, and the same scripts as Splitter's Angular app (`generate`, `dev` (port 5188),
 `build` (Vite + `@analogjs/vite-plugin-angular`, `tsconfig.app.json`), `typecheck` (`ngc -p
 tsconfig.json --noEmit`, strict templates, TypeScript 6.0.3 pinned in this app, as
@@ -1997,6 +2061,39 @@ in-file components became `.ts` siblings named as Vue's and Svelte's files (`eas
   `animating-edges`' sender outputs are `sendValue` / `dropValue` (a `(drop)` would also catch the
   native drop event); `whiteboard` folds React's four preview paths into one computed path.
 Every shared spec of these passed with no adapter fix.
+
+#57 (Epic #58) in the Angular examples: `helper-lines`, `copy-paste`, `collaborative`,
+`export-image`, `stress-test`, `dagre-layout`, `elk-layout`, `auto-layout` and `force-layout`, with
+the layout engines at `examples/react`'s pins (`@dagrejs/dagre` 3.1.3, `elkjs` 0.12.1, `d3-force`
+3.0.1, `@types/d3-force` 3.0.10; the allow-list takes `elkjs/lib/elk.bundled.js` only, and the
+Vite + Analog build and `ngc` take them as they are: the ELK chunk only trips Vite's size
+warning); `PENDING.angular` is empty and every shared spec runs in Angular (462). React's
+contexts became inputs (`dagre-layout`'s direction, `force-layout`'s pinned set as
+`[pinned]="pinned().has(node.id)"`) or outputs (`auto-layout`'s `(add)` / `(toggle)`), its keys a
+one-item `@for` tracked by the value (`stress-test`'s size, a model per size; `dagre-layout`'s
+handles per direction; an `@for`'s `track` cannot read an outer template variable, NG8009, so
+`elk-layout`'s per-side key is in each row), `collaborative`'s `Side` a `createSide(name, hub)`
+in field initializers rendered by an `@for` (a remote selection a node input), and a first layout
+or simulation an `effect` waiting for `flow.current`. Animation frames, simulations, the
+`BroadcastChannel` bridge, pending ELK requests and pending clipboard reads or PNG draws stop (or
+are ignored) through `DestroyRef`. Angular specifics:
+- **What changes on every frame or pointer step is read in a component of its own**
+  (`stress-test`'s `dl[exampleReadout]` with its frame loop, `collaborative`'s cursors given the
+  presence signal itself), and the examples' pointer tracking (`copy-paste`, `collaborative`) is a
+  plain listener on the root added after the first render, not a `(pointermove)` binding (which
+  checks the example's whole template, every node's view, on each step).
+- **`copy-paste`'s shortcuts act in the key's own event** (`watchKeyPress`, the core's, which
+  `injectKeyPress` is built on): React's `useKeyPress` + effect pattern failed half its spec,
+  since zoneless Angular runs an effect after a quick press is already released (the signal goes
+  true and false before any effect reads it). Follow-up: `injectKeyPress` gives a state, not a
+  press; an action per press needs the event (or a callback option on the adapter).
+- **The registry's data must be types, not interfaces** (`[flowNode]`'s fallback data is a
+  `Record`): `auto-layout` wraps `tree.ts`'s interfaces in `Plain<T>`, leaving `tree.ts` React's.
+- `export-image` keeps React's node test of `flow-svg.ts` (`// @vitest-environment node`); the
+  framework-free siblings and their tests are React's (only the adapter's name swapped, as
+  `vendored.test.ts` asks).
+No example needed an adapter fix; the stress test led to the large-flow work of
+[the Angular adapter](#the-angular-adapter-issue-15).
 
 ## The site export (Issue #7)
 
@@ -2926,7 +3023,7 @@ Decisions of large flows (Epic #61: #59, the core; #60, the harness and the numb
   as visible and mounted. Edges follow the nodes' rule so that no edge mounts dangling before its
   nodes. Without culling, and for the server render (`staticGeometry`), the first render is as
   before; #60: a culled React flow renders no node or edge before the engine either, Vue's
-  since #51 and Svelte's since #54 (Angular still draws the static geometry then).
+  since #51, Svelte's since #54 and Angular's since #57.
 - **A drag step stays O(N) in the model only**: its commit copies the node list (the document is
   immutable and frozen, D3); the engine reads the replaced ids instead of comparing the list.
 - **`pnpm perf` measures the React embed's production build** (`scripts/perf.ts`): Playwright's
