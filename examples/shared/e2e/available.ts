@@ -33,16 +33,14 @@ export function pendingCase(slug: string, name: string): string {
  * (`<slug>`) and cases of an example's spec (`<slug>#<case>`, `pendingCase`). A spec that needs
  * one is skipped in that framework instead of failing, with a reason that says it is pending. The
  * Epic that ports it to a framework removes it from that framework's list; React, where every
- * example is written first, never has any (`tests/e2e-available.test.ts`).
+ * example is written first, never has any (`tests/e2e-available.test.ts`). Every list is empty
+ * since #57 (Epic #58): the mechanism stays for the next example written in React first.
  */
 export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
     react: [],
     vue: [],
     svelte: [],
-    angular: [
-        // Epic #49 (#48): new React examples, ported by a later Epic
-        "force-layout",
-    ],
+    angular: [],
 };
 
 /** The framework of `EXAMPLES_FRAMEWORK`; anything else throws (a config that forgot to set it). */
