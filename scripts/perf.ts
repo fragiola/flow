@@ -1,11 +1,11 @@
 // The large-flow measurement (Epic #61): the `stress-test` example of an embed (React's by
-// default, `--framework vue` for Vue's, #51, `--framework svelte` for Svelte's, #54), in a production build, driven by Playwright in Chromium. For each size it opens a fresh flow (the
+// default, `--framework vue` for Vue's, #51, `--framework svelte` for Svelte's, #54, `--framework angular` for Angular's, #57), in a production build, driven by Playwright in Chromium. For each size it opens a fresh flow (the
 // time until its first frame, and how many nodes mounted on the way), then pans, zooms (out, then
 // back in) and drags a node with 120 pointer steps at 60 Hz, timing every frame
 // (requestAnimationFrame intervals), and prints the median / p95 / max frame time per size and
 // gesture, each the median of the runs. Not run in CI: frame times are the machine's.
 //
-//   pnpm perf [--framework react|vue|svelte] [--sizes 1000,10000,20000] [--runs 3] [--steps 120]
+//   pnpm perf [--framework react|vue|svelte|angular] [--sizes 1000,10000,20000] [--runs 3] [--steps 120]
 //             [--no-build] [--dist <dir>] [--profile <dir>] [--headed] [--verbose] [--json <file>]
 //
 // `--no-build` reuses the packages' last `dist` (the embed is built again); `--dist` serves an
@@ -29,6 +29,7 @@ const FRAMEWORKS = {
     react: { name: "React", adapter: "@fragiola/flow-react" },
     vue: { name: "Vue", adapter: "@fragiola/flow-vue" },
     svelte: { name: "Svelte", adapter: "@fragiola/flow-svelte" },
+    angular: { name: "Angular", adapter: "@fragiola/flow-angular" },
 } as const;
 
 const { values: args } = parseArgs({
@@ -266,7 +267,8 @@ await page.evaluate(() => {
     });
     // every node element inserted, counted once as it is inserted (React and Vue build a subtree
     // before they attach it, and may remove a node before an observer would see it; Svelte
-    // inserts with `before` / `append`, into fragments it inserts in turn: an element counts once)
+    // inserts with `before` / `append`, into fragments it inserts in turn: an element counts once;
+    // Angular names it after inserting it, below)
     const seen = new WeakSet<Element>();
     const count = (child: unknown) => {
         const tops =
@@ -305,6 +307,17 @@ await page.evaluate(() => {
     }
     Element.prototype.append = countedMany(Element.prototype.append);
     Element.prototype.prepend = countedMany(Element.prototype.prepend);
+    // Angular inserts a node's element before its directive names its part (an effect writes
+    // the attributes once the view is checked): an element in a parent counts when it is named
+    const setAttribute = Element.prototype.setAttribute;
+    Element.prototype.setAttribute = function (
+        this: Element,
+        name: string,
+        value: string,
+    ) {
+        setAttribute.call(this, name, value);
+        if (name === "data-flow-part" && this.parentNode) count(this);
+    };
 });
 
 const frame = () =>
