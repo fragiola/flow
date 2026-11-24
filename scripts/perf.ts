@@ -264,25 +264,30 @@ await page.evaluate(() => {
         } else last = undefined;
         requestAnimationFrame(tick);
     });
-    // every node element inserted, counted as it is inserted (React and Vue build a subtree
+    // every node element inserted, counted once as it is inserted (React and Vue build a subtree
     // before they attach it, and may remove a node before an observer would see it; Svelte
-    // inserts with `before` / `append`, a fragment's top-level children counted)
-    const isNode = (node: unknown) =>
-        node instanceof Element &&
-        node.getAttribute("data-flow-part") === "node";
+    // inserts with `before` / `append`, into fragments it inserts in turn: an element counts once)
+    const seen = new WeakSet<Element>();
     const count = (child: unknown) => {
-        if (child instanceof DocumentFragment) {
-            for (const top of child.children)
-                if (isNode(top)) sampler.mounted++;
-        } else if (isNode(child)) sampler.mounted++;
+        const tops =
+            child instanceof DocumentFragment ? [...child.children] : [child];
+        for (const top of tops) {
+            if (
+                top instanceof Element &&
+                top.getAttribute("data-flow-part") === "node" &&
+                !seen.has(top)
+            ) {
+                seen.add(top);
+                sampler.mounted++;
+            }
+        }
     };
     const proto = Node.prototype;
     const counted = <A extends unknown[]>(
         insert: (this: Node, child: Node, ...rest: A) => Node,
     ) =>
         function (this: Node, child: Node, ...rest: A) {
-            // into a fragment: counted when the fragment is inserted
-            if (!(this instanceof DocumentFragment)) count(child);
+            count(child);
             return insert.call(this, child, ...rest);
         };
     proto.appendChild = counted(proto.appendChild) as typeof proto.appendChild;
