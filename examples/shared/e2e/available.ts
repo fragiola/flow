@@ -41,7 +41,6 @@ export const PENDING: Readonly<Record<Framework, readonly string[]>> = {
     svelte: [],
     angular: [
         // Epic #49 (#45): new React examples, ported by a later Epic
-        "intersections",
         "contextual-zoom",
         "connection-line",
         // Epic #49 (#46): new React examples, ported by a later Epic
