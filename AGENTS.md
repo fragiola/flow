@@ -210,7 +210,8 @@ Vue's, Svelte's and Angular's suites to React's size. Each shard builds its own 
 playground's suite (214 tests, ~3 min 26 s for the whole job) stays in one. Measured locally
 after #48 (4 workers): the playground in ~59 s; React's examples in ~120 s; Vue's, Svelte's and
 Angular's 328 each, 226 run and the 102 `PENDING` ones skipped, in ~27 to ~37 s. After #51 (Epic
-#52), Vue's 462, every one run (none `PENDING`), in ~56 s; React's 462 in ~2 min.
+#52), Vue's 462, every one run (none `PENDING`), in ~56 s; React's 462 in ~2 min. After #54 (Epic
+#55), Svelte's 462, every one run, in ~56 s; Angular's 330, 104 `PENDING`.
 
 Pushing a change under `.github/workflows/` needs a token with the `workflow` scope, or a push
 over SSH (use SSH).
