@@ -174,15 +174,22 @@ export function bindNode<T extends FlowTypes>(
     });
     bindAttributes(element, () => props().attributes);
     bindStructuralStyle(element, () => props().style);
-    // registered once per engine and node id: a move or a selection registers nothing again
-    afterRenderEffect((onCleanup) => {
-        const engine = context.engine();
-        const id = nodeId();
-        if (!engine || id === undefined) return;
-        untracked(() => {
-            engine.adapter.registerNode(id, element);
-            onCleanup(() => engine.adapter.registerNode(id, null));
-        });
+    // registered once per engine and node id: a move or a selection registers nothing again.
+    // After the render (every node of it inserted, so the first measurement lays the page out
+    // once), in the first phase (`earlyRead`: the engine measures the node, reading the DOM), so
+    // a node the app added is registered before the app's own after-render hooks of the other
+    // phases run (`afterNextRender`'s default, `mixedReadWrite`), and its content's. Each node's
+    // is its own hook: one that throws goes to the app's `ErrorHandler`, the others still run
+    afterRenderEffect({
+        earlyRead: (onCleanup) => {
+            const engine = context.engine();
+            const id = nodeId();
+            if (!engine || id === undefined) return;
+            untracked(() => {
+                engine.adapter.registerNode(id, element);
+                onCleanup(() => engine.adapter.registerNode(id, null));
+            });
+        },
     });
     return { state, props };
 }
