@@ -1,8 +1,9 @@
-import { Component } from "@angular/core";
+import { Component, signal } from "@angular/core";
 import {
     createFlowModel,
     FLOW,
     type FlowEdgeInput,
+    type FlowEngineEventOf,
     type FlowNodeInput,
     type FlowTypes,
 } from "@fragiola/flow-angular";
@@ -16,6 +17,9 @@ import { styles } from "./styles";
 // (drawn here as a ring at each end) or the stroke near an end, and drop it on another handle. The
 // edge keeps its id (`edge.reconnect`); dropped nowhere or on a refused handle, it goes back. The
 // "locked" edge is not reconnectable (`reconnectable: false`).
+//
+// "Delete on drop" is app policy over the `reconnect-cancel` event (`(reconnectCancel)`): an end
+// released over no handle (`dropped`, no `to`, not `refused`) removes its edge with `edge.remove`.
 
 interface Types extends FlowTypes {
     readonly nodes: { device: { label: string } };
@@ -60,7 +64,13 @@ const edges: FlowEdgeInput<Types>[] = [
     imports: [FLOW],
     host: { class: "contents" },
     template: `
-        <div flowRoot [model]="model" [fitView]="{ padding: 0.2, maxZoom: 1 }" [class]="styles.root">
+        <div
+            flowRoot
+            [model]="model"
+            [fitView]="{ padding: 0.2, maxZoom: 1 }"
+            (reconnectCancel)="onReconnectCancel($event)"
+            [class]="styles.root"
+        >
             <svg flowBackground variant="dots" [size]="2" [class]="styles.dots"></svg>
             <svg flowBackground variant="lines" [class]="styles.lines"></svg>
             <svg flowBackground variant="cross" [class]="styles.cross"></svg>
@@ -89,6 +99,17 @@ const edges: FlowEdgeInput<Types>[] = [
                 </div>
                 <svg flowConnectionLine [class]="styles.connection"></svg>
             </div>
+            <label data-flow-no-gesture [class]="styles.option">
+                <input
+                    type="checkbox"
+                    role="switch"
+                    [checked]="deleteOnDrop()"
+                    [attr.aria-checked]="deleteOnDrop()"
+                    (change)="toggleDeleteOnDrop($event)"
+                    [class]="styles.switch"
+                />
+                Delete on drop
+            </label>
         </div>
     `,
 })
@@ -98,4 +119,22 @@ export default class EdgeReconnect {
         { version: 1, nodes, edges },
         { features },
     );
+    protected readonly deleteOnDrop = signal(false);
+
+    protected toggleDeleteOnDrop(event: Event): void {
+        this.deleteOnDrop.set((event.target as HTMLInputElement).checked);
+    }
+
+    /** An end dropped on the pane, with "Delete on drop" on: the edge goes. */
+    protected onReconnectCancel(event: FlowEngineEventOf<"reconnect-cancel">) {
+        if (
+            !this.deleteOnDrop() ||
+            !event.dropped ||
+            event.to ||
+            event.refused
+        ) {
+            return;
+        }
+        this.model.run("edge.remove", { edgeId: event.edgeId });
+    }
 }
