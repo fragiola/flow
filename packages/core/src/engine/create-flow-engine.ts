@@ -1,5 +1,5 @@
 // The flow engine (D4, D8-D13): one flow on screen. It owns the viewport (written to its element
-// directly), measures nodes and handles with the root window's `ResizeObserver`, draws edges'
+// directly), measures nodes, handles and the root with the root window's `ResizeObserver`, draws edges'
 // paths, and runs every gesture on Pointer Events with capture (pan, pinch, the features' drags),
 // the wheel and the keys, behind the same five verbs as the model; the installed features add
 // theirs. It changes the flow only by running the model's commands, so every middleware sees what
@@ -159,7 +159,7 @@ export interface FlowEngineOptions {
     zoomOnDoubleClick?: boolean | undefined;
     /** the factor of `zoom-in` and `zoom-out`; default 1.2 */
     zoomStep?: number | undefined;
-    /** fits the nodes once they are all measured (`fit-view`'s options); default false */
+    /** fits the nodes once their sizes are known, again once measured (`fit-view`'s options); default false */
     fitView?: boolean | FitViewPayload | undefined;
     /** whether gestures and keys may change the flow (`set-interactive`); default true */
     interactive?: boolean | undefined;
@@ -414,12 +414,12 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     private wheelRest: { view: Window; id: number } | undefined;
     /** what the last primary press released (a double click needs two taps) */
     private released: Released | undefined;
-    /** the root was sized and every shown node measured (`ready`, once) */
+    /** the root was sized and a fit on init done (`ready`, once) */
     private ready = false;
     private rootElement: HTMLElement | undefined;
     /**
      * the root's client box, read once per turn: cleared on the root window's next microtask, on
-     * `setOptions`, and when the root attaches or detaches
+     * `setOptions`, when the root attaches or detaches, and when its observer reports it
      */
     private cachedRootBox: Rect | undefined;
     /** a microtask that clears `cachedRootBox` is queued */
@@ -435,6 +435,18 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     private pinch: Pinch | undefined;
     private readonly pointers = new Map<number, XY>();
     private pendingFit: FitViewPayload | undefined;
+    /**
+     * the fit on init, made before every node was measured: redone once they are; the first move
+     * of the view that is not a frame of its own animation (`animation`) drops it, and so does
+     * stopping an animation
+     */
+    private refit:
+        | { payload: FitViewPayload; animation: (() => void) | undefined }
+        | undefined;
+    /** the root's size as of the last measurement flush: its observer tells only a change */
+    private rootSeen: Size | undefined;
+    /** the root's size changed since the last measurement flush */
+    private rootChanged = false;
     /** stops the viewport animation under way */
     private stopAnimation: (() => void) | undefined;
     /** the auto-pan's pending frame, and its window */
@@ -474,6 +486,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             () => this.current.zoom,
             () => this.measured(),
             (nodeId) => this.geometry.node(nodeId) !== undefined,
+            () => this.rootResized(),
         );
         this.geometry = new EngineGeometry({
             model: this.model,
@@ -852,6 +865,12 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         if (gesture) this.stopViewportAnimation();
         const next = this.kept(viewport);
         if (sameViewport(next, this.current)) return this.current;
+        if (
+            !this.stopAnimation ||
+            this.refit?.animation !== this.stopAnimation
+        ) {
+            this.refit = undefined;
+        }
         if (!this.moving) {
             this.moving = { gesture };
             this.emit({
@@ -974,6 +993,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     private stopViewportAnimation(): void {
         const stop = this.stopAnimation;
         if (!stop) return;
+        this.refit = undefined;
         this.stopAnimation = undefined;
         stop();
         this.settle(true);
@@ -1572,21 +1592,49 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
 
     private readonly stopPrune: () => void;
 
+    /** The observer reported the root: a new size is told as a measurement, with the viewport. */
+    private rootResized(): void {
+        this.cachedRootBox = undefined;
+        const size = this.rootSize();
+        const seen = this.rootSeen;
+        // the same size (the report of `observe`, a move): nothing, so no resize loop either
+        if (seen?.width === size.width && seen.height === size.height) return;
+        this.rootSeen = size;
+        this.rootChanged = true;
+        this.measured();
+    }
+
     private flushMeasured(): void {
         if (this.destroyed) return;
-        this.notify({ measured: true });
+        const viewport = this.rootChanged;
+        this.rootChanged = false;
+        this.notify({ measured: true, viewport });
         if (!this.rootElement) return;
-        // a fit on init counts initial sizes as known; `ready` waits for the measured ones
+        // a fit on init counts initial sizes as known, and is redone once on the measured ones
         const { shown, sized: all, measured } = this.geometry.readiness();
         const fit = this.pendingFit;
-        if (fit && shown > 0 && all && this.fitView(fit, false).ok) {
-            this.pendingFit = undefined;
+        const refit = this.refit;
+        if (fit && shown > 0 && all) {
+            const result = this.fitView(fit, false);
+            if (result.ok) {
+                this.pendingFit = undefined;
+                if (!measured) {
+                    this.refit = {
+                        payload: fit,
+                        animation: this.stopAnimation,
+                    };
+                }
+            }
+        } else if (refit && measured) {
+            // still pending: the view has not moved but for the fit's own animation
+            this.refit = undefined;
+            this.fitView(refit.payload, false);
         }
-        // ready once: a sized root, every shown node measured (and a pending fit done)
+        // ready once: a sized root (and a pending fit done)
         const size = this.rootSize();
+        this.rootSeen = size;
         if (
             !this.ready &&
-            measured &&
             size.width > 0 &&
             size.height > 0 &&
             (this.pendingFit === undefined || shown === 0)
@@ -1730,6 +1778,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
             }
         };
         this.features.attached(element);
+        this.measurements.observeRoot(element);
         this.measurements.measureAll();
         this.measured();
     }
@@ -1748,6 +1797,8 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         this.blockContextMenu = false;
         this.pointers.clear();
         this.features.detached();
+        this.measurements.observeRoot(undefined);
+        this.rootSeen = undefined;
         this.removeRootListeners?.();
         this.removeRootListeners = undefined;
         clearRootTouchAction(this.rootElement);

@@ -9,8 +9,13 @@ import type { FeatureEngineHost } from "./types";
 
 /** A connection drawn with the keyboard, from a handle to the targets the model accepts. */
 export interface KeyboardConnection {
-    /** points at the next (`1`) or the previous (`-1`) target, round the list */
+    /**
+     * points at the next (`1`) or the previous (`-1`) target, round the list, its targets read
+     * again first
+     */
     next(by: 1 | -1): void;
+    /** the target pointed at, or nothing */
+    target(): FlowHandle | undefined;
     /** adds the edge to the target pointed at (`edge.add`) and ends; without one it cancels */
     connect(): void;
     /** ends with no edge */

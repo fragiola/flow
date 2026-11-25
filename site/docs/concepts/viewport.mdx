@@ -287,7 +287,8 @@ limits. Its options (also the root's `fitView`, and `Flow.FitView`'s props):
   out keeping none. Pixels keep a toolbar or a panel over the canvas clear at any root size.
 - **`nodeIds`**: only these nodes (a hidden one among them too, once its size is known).
 - **`includeHidden`**: without `nodeIds`, the hidden nodes of known size are framed too.
-- **`minZoom`**, **`maxZoom`**: the zoom it may pick, within the engine's own limits.
+- **`minZoom`**, **`maxZoom`**: the zoom it may pick. They narrow the engine's own limits, never
+  widen them.
 - **`duration`**: how long it animates, in milliseconds.
 
 <Framework name="react">

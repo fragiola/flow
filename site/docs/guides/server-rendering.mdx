@@ -273,9 +273,9 @@ should be seen at zoom 1 (as the example above does), or accept that move.
 - **Edge labels come after mount**: a `Flow.EdgeLabel` portals into its layer, so labels are not
   in the server HTML; the paths are.
 - **`fitView` moves the flow after mount**: the server draws the identity viewport, and `fitView`
-  runs once the engine is attached, counting the declared sizes; it fits once, and is not run
-  again when the measured sizes differ. Leave it out (and `defaultViewport` at the identity) for a
-  flow that does not move on hydration.
+  runs once the engine is attached, counting the declared sizes. When the measured sizes differ,
+  it fits once more on them, unless the view moved in between. Leave it out (and
+  `defaultViewport` at the identity) for a flow that does not move on hydration.
 
 ## Draw a flow yourself
 

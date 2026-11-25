@@ -34,6 +34,46 @@ describe("stepPath", () => {
         });
     });
 
+    it("loops `offset` aside when the target is behind on the same line", () => {
+        expect(stepPath(ends([0, 0], "right", [-100, 0], "left"))).toEqual({
+            path: "M0,0 L20,0 L20,20 L-120,20 L-120,0 L-100,0",
+            label: { x: -50, y: 20 },
+        });
+        expect(
+            stepPath({
+                ...ends([0, 0], "bottom", [0, -100], "top"),
+                offset: 10,
+            }).path,
+        ).toBe("M0,0 L0,10 L10,10 L10,-110 L0,-110 L0,-100");
+        // a stepPosition moves nothing; centerX / centerY still place the run
+        expect(
+            stepPath({
+                ...ends([0, 0], "right", [-100, 0], "left"),
+                stepPosition: 0.25,
+            }).path,
+        ).toBe("M0,0 L20,0 L20,20 L-120,20 L-120,0 L-100,0");
+        expect(
+            stepPath({
+                ...ends([0, 0], "right", [-100, 0], "left"),
+                centerY: -30,
+            }).path,
+        ).toBe("M0,0 L20,0 L20,-30 L-120,-30 L-120,0 L-100,0");
+        expect(
+            smoothStepPath(ends([0, 0], "right", [-100, 0], "left")).path,
+        ).toBe(
+            "M0,0 L15,0 Q20,0 20,5 L20,15 Q20,20 15,20 L-115,20 Q-120,20 -120,15 L-120,5 Q-120,0 -115,0 L-100,0",
+        );
+    });
+
+    it("loops `offset` aside of both ends when they are less than a pixel apart", () => {
+        expect(stepPath(ends([0, 0], "right", [-100, 0.5], "left")).path).toBe(
+            "M0,0 L20,0 L20,20.5 L-120,20.5 L-120,0.5 L-100,0.5",
+        );
+        expect(stepPath(ends([0, 0.5], "right", [-100, 0], "left")).path).toBe(
+            "M0,0.5 L20,0.5 L20,20.5 L-120,20.5 L-120,0 L-100,0",
+        );
+    });
+
     it("goes out to the farther end when both are on the same side", () => {
         expect(stepPath(ends([0, 0], "right", [100, 50], "right"))).toEqual({
             path: "M0,0 L120,0 L120,50 L100,50",

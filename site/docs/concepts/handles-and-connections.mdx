@@ -235,7 +235,9 @@ A connection that ends over no handle is told by `onConnectCancel` (Vue `@connec
 `onconnectcancel`, Angular `(connectCancel)`), with the handle it came from (`from`), the handle
 it was over (`to`, none here) and the drop point, as a client point (`client`) and a flow point
 (`point`): what "drop a connection on the canvas to add a node" needs. `dropped` is `false` when
-the connection was cancelled instead (Escape, the lock, a `pointercancel`): no node then.
+the connection was cancelled instead (Escape, the lock, a `pointercancel`): no node then. Every
+connection ends in one of the two: `onConnect` once it added an edge, `onConnectCancel` when it
+added none, so there is no `onConnectEnd`.
 
 <Framework name="react">
 
@@ -316,6 +318,9 @@ connection's new edges get your type and data:
 ```ts
 const model = createFlowModel(json, { features, defaultEdgeOptions: { type: "smoothstep" } });
 ```
+
+It fills `edge.add` only: the document's own edges (`defaultEdges`, a loaded flow) stay as they
+are, and an edge is drawn with the fields it holds, never with defaults it does not.
 
 ## From the keyboard
 

@@ -86,6 +86,12 @@ The root's `interactive` prop locks the whole flow from your state (the toggle t
 and a click unlocks it whole); a root whose `interactive` does not change leaves the toggle's lock
 alone.
 
+One kind switches alone from a toggle of yours: `engine.run("set-interactive", { drag, connect,
+select, reconnect })` sets the switches it names and keeps the others, and every gesture reads
+them when it acts (moving an edge's end needs `connect` too). A node's or an edge's own flags
+(`draggable`, `connectable`, `selectable`, `reconnectable`,
+[Nodes and edges](/docs/concepts/nodes-and-edges)) still apply under them.
+
 ## Props
 
 `ToggleInteractiveProps` extends the [common primitive props](/docs/api/primitives/root#common-props)

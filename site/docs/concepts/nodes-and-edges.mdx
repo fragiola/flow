@@ -159,8 +159,10 @@ const nodes: FlowNodeInput<Types>[] = [
 
 As with `nodeOrigin`, a child of a sub-flow keeps its top-left corner in its parent: its own
 `origin` does not move it, so the model's sub-flow rules hold as they are. A parent's `origin`
-moves its box, and its children with it. The model's own sub-flow rules count the position as the
-corner ([Limitations](/docs/limitations)).
+moves its box, and its children with it. The model's own sub-flow rules count a node's position
+as its corner, whatever its origin: `absolute-position-by`, `expandParent` (a parent grows around
+its origin), the model's `extent: "parent"` clamp and `node.set-parent` (which keeps a node's
+place as if it were the corner). The engine's boxes apply the origin.
 
 ## Where a node may go
 
@@ -286,11 +288,11 @@ Whether an edge may stand above nodes is the root's `zIndexMode`:
 
 These are this package's own choices, not React Flow's defaults: React Flow defaults to
 `"basic"`, and its `"basic"` already lifts an edge to the z of an end that is a child or selected.
-Here `"basic"` is the order this package had before `"auto"`: every edge below every node, which
-is what you want when a selected edge must never cover a node. `"auto"` is the default because it
-keeps a sub-flow's edges visible above their group and a selected edge visible above the nodes it
-crosses. Turn `elevateEdgesOnSelect` off to keep `"auto"`'s sub-flow order without raising the
-selected edge ([Limitations](/docs/limitations)).
+Here `"basic"` keeps every edge below every node, which is what you want when a selected edge must
+never cover a node. `"auto"` is the default because it keeps a sub-flow's edges visible above
+their group and a selected edge visible above the nodes it crosses. Turn `elevateEdgesOnSelect`
+off to keep `"auto"`'s sub-flow order without raising the selected edge. The same two props,
+`zIndexMode` and `elevateEdgesOnSelect`, are the root's in React, Vue, Svelte and Angular.
 
 ### How it is drawn
 
@@ -437,7 +439,8 @@ their `current`; in Angular, signals) ([Hooks](/docs/api/primitives/hooks)).
 The root creates its model from `defaultNodes` and `defaultEdges`, read once. Or control them:
 give `nodes` and `edges` with `onNodesChange` and `onEdgesChange`, and the root brings the model
 to your lists with the commands a user would have run, so middleware and listeners still see
-every change.
+every change. There are no change objects to apply: `onNodesChange` receives the nodes
+themselves, and a middleware or `model.subscribe` sees every command with its payload.
 
 <Framework name="react">
 

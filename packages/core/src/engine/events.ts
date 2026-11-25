@@ -86,7 +86,7 @@ export type FlowEngineEvent =
           readonly type: "viewport-change-end";
       } & ViewportMove)
     | {
-          /** the root has a size and every shown node was measured, once per engine */
+          /** the root has a size and the fit on init (`fitView`) is done, once per engine */
           readonly type: "ready";
       }
     | ({

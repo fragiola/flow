@@ -147,15 +147,22 @@ const nodes: FlowNodeInput<Types>[] = [
 ];
 ```
 
-Edges wait for sizes: an edge is drawn once both its nodes are measured (`edge-path-by` is
-undefined until then), and the root's `fitView` runs once every visible node is. A node of 0 × 0
-counts as unmeasured.
+Edges wait for sizes: an edge is drawn once both its nodes have a size (`edge-path-by` is
+undefined until then), and the root's `fitView` runs once every visible node has one. A node of
+0 × 0 counts as unmeasured.
 
 ## Fit the nodes
 
-`fitView` on the root fits every node once they are measured, at mount only. Its value is
-`true`, or the `fit-view` payload: `padding` (a share of the root's size, default 0.1),
-`nodeIds`, `minZoom` and `maxZoom`.
+`fitView` on the root fits every node at mount, once the root and every visible node have a
+size: measured, given (`width`, `height`) or initial (`initialWidth`, `initialHeight`). When the
+fit counted initial sizes, it runs once more when every node is measured, unless the view moved
+in between (a pan, a zoom, a viewport action of your code). Its value is `true`, or the
+`fit-view` payload: `padding` (a share of the root's size, default 0.1), `nodeIds`, `minZoom` and
+`maxZoom`.
+
+The engine observes the root's size. A flow mounted in a container with no size (a hidden tab, a
+closed dialog, a collapsed panel) fits its view, culls and calls `onInit` as soon as the container
+gets a size. A later resize of the root keeps the culled nodes and the minimap in step.
 
 <Framework name="react">
 
@@ -267,3 +274,8 @@ block. A panel of your own marks itself `data-flow-no-gesture` (presses on it st
 
 `Flow.Controls` and `Flow.NodeToolbar` need neither: presses and the wheel over them are already
 left to them.
+
+There is no `Panel`, `ViewportPortal` or `EdgeLabelRenderer` component: an element of yours inside
+the root is in screen pixels, one inside `Flow.Viewport` is in flow coordinates and moves with
+the view, and a [`Flow.EdgeLabel`](/docs/api/primitives/edge-label) portals into the edges' HTML
+layer.

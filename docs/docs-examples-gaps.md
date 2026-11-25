@@ -4,9 +4,9 @@ Epic #8 wrote the React adapter, the playground, nineteen examples (`examples/re
 site's documentation (`site/docs`) against the packages as they are. Everything the examples or the
 documentation work around is listed here, as input for the next Epics, in the spirit of Dockable's
 and Splitter's reports of the same name. Each workaround is also commented in the code or explained
-on its docs page, since users copy it. The public side of this list is the site's
-[Limitations](../site/docs/limitations.mdx) page (what xyflow has that Flow does not, and what to do
-instead).
+on its docs page, since users copy it. The site tells each behaviour on the page of its topic,
+with what to do instead where xyflow has a name Flow does not (`nodeTypes`, `isValidConnection`,
+`Panel`, ...).
 
 ## 1. Package gaps (proposed API)
 

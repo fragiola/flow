@@ -393,26 +393,38 @@ describe("the selection box and resize", () => {
 });
 
 describe("ready", () => {
-    it("comes once the root is sized and every shown node is measured", async () => {
+    it("comes once the root is sized, without waiting for the nodes' measurement", async () => {
         const flow = mount(flowOf({ a: [0, 0], b: [10, 10] }), {
             sizes: { a: [10, 10] },
         });
-        await Promise.resolve();
-        expect(flow.engine.is("ready")).toBe(false);
         // a reactive read (the adapters' subscription) sees it turn true
         const read: boolean[] = [];
         const stop = flow.engine.adapter.subscribe(() =>
             read.push(flow.engine.is("ready")),
         );
-        flow.sizes.set("b", [10, 10]);
-        flow.observer()?.trigger([flow.node("b")]);
+        expect(flow.engine.is("ready")).toBe(false);
         await Promise.resolve();
         stop();
         expect(flow.engine.is("ready")).toBe(true);
+        expect(flow.engine.is("node-measured", { nodeId: "b" })).toBe(false);
         expect(read.at(-1)).toBe(true);
         expect(only(flow.events, "ready")).toEqual([{ type: "ready" }]);
-        flow.observer()?.trigger([flow.node("a")]);
+        flow.sizes.set("b", [10, 10]);
+        flow.observer()?.trigger([flow.node("b")]);
         await Promise.resolve();
         expect(only(flow.events, "ready")).toHaveLength(1);
+    });
+
+    it("waits for the fit on init, and so for the sizes it needs", async () => {
+        const flow = mount(flowOf({ a: [0, 0], b: [10, 10] }), {
+            sizes: { a: [10, 10] },
+            engine: { fitView: true },
+        });
+        await Promise.resolve();
+        expect(flow.engine.is("ready")).toBe(false);
+        flow.sizes.set("b", [10, 10]);
+        flow.observer()?.trigger([flow.node("b")]);
+        await Promise.resolve();
+        expect(flow.engine.is("ready")).toBe(true);
     });
 });

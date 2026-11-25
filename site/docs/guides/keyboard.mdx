@@ -92,8 +92,7 @@ edges it would remove (a removed node's edges among them). It answers `true` (re
 is taken at once, and when the promise settles what is still there goes, in one step (a node
 removed meanwhile is skipped). Your confirmation, a dialog of your app, waits there. With a
 `beforeDelete`, the delete runs as one `batch` of `node.remove` and `edge.remove`, not
-`selection.remove`: a middleware watching `selection.remove` does not see it
-([Limitations](/docs/limitations)).
+`selection.remove`: a middleware watching `selection.remove` does not see it.
 
 ```ts
 const features = [
@@ -106,7 +105,8 @@ const features = [
 
 ## Focus and the view
 
-`keyboard({ panOnFocus: false })` keeps the view still when a node out of it takes focus. A node or
+`keyboard({ panOnFocus: false })` keeps the view still when a node out of it takes focus, or when a
+keyboard connection points at a handle of one. A node or
 an edge with `focusable: false` takes no focus (it leaves the tab order), and the root's
 `nodesFocusable={false}` / `edgesFocusable={false}` take every node's or edge's out:
 
@@ -176,16 +176,32 @@ On a focused handle:
 | Escape | cancel |
 
 The targets are the handles a drag could end at (the connection's `mode`, connectable nodes and
-handles) that `model.can("edge.add", …)` accepts when the connection starts, nearest first. So a
-rule of yours ([Connection rules](/docs/guides/connection-rules)) skips a handle it vetoes, and an
-existing edge's handles are not offered again. The handle pointed at carries `data-valid` and the
-connection line is drawn to it; the focus stays on the source handle. A connection with no target
-still starts, and Enter then cancels it.
+handles) that `model.can("edge.add", …)` accepts, nearest first. So a rule of yours
+([Connection rules](/docs/guides/connection-rules)) skips a handle it vetoes, and an existing
+edge's handles are not offered again. The list is read again on every step: a handle rendered
+while the connection waits is offered on the next Tab, and a rule that starts vetoing a handle
+drops it from the next step. The handle pointed at stays pointed at across a step; when it is
+gone, the step points at the handle that took its place. Enter runs `edge.add`, which asks the rules
+once more: a veto then ends the connection with `connect-cancel { refused: true }`. A connection
+with no target still starts, and Enter then cancels it.
+
+The handle pointed at carries `data-valid` and the connection line is drawn to it; the focus stays
+on the source handle. Its node is panned into view when the connection starts and after each
+step, as a focused node is: centred, at the same zoom, when it is not wholly in view.
+`keyboard({ panOnFocus: false })` keeps the view still.
 
 It ends by itself when the focus leaves the source handle (a click in a field, a button
 focused, the window left), when its node is removed (a delete key while it waits), on a pointer
-press, and on `set-interactive false`. A held Enter does not connect twice. Keys pressed anywhere
-else (a field, a toolbar button) are never taken by it.
+press (which does nothing else), and on `set-interactive false`. A held Enter does not connect
+twice. Keys pressed anywhere else (a field, a toolbar button) are never taken by it.
+
+An edge's ends move with the pointer ([`reconnection()`](/docs/api/primitives/reconnect-anchor)).
+From the keyboard, a menu of yours on a focused edge runs `edge.reconnect` with the new ends, one
+undo step that the same rules check:
+
+```ts
+model.run("edge.reconnect", { edgeId, source: "hall", target: "garden" });
+```
 
 Name the handles, since a screen reader reads a focused handle by its name:
 
@@ -704,16 +720,3 @@ export class LiveRegion {
 </Framework>
 
 The `announcements` example above does it: Tab to a handle and press Enter.
-
-## Known limits
-
-- **A keyboard connection's targets are fixed when it starts**: a handle rendered meanwhile is not
-  offered, and a rule that changes meanwhile is checked again only by the final `edge.add` (a
-  veto then ends it with `connect-cancel { refused: true }`).
-- **The target is not scrolled into view**: a target outside the viewport is pointed at, announced
-  and connected, but not shown. Announce it by name, or frame the nodes yourself
-  ([The viewport](/docs/concepts/viewport#frame-an-area)).
-- **An edge's end cannot be moved from the keyboard** (reconnection is a pointer gesture): remove
-  the edge and draw it again, or run `edge.reconnect` from a menu of yours.
-- **A pointer press while a keyboard connection waits only cancels it**: the press does nothing
-  else.

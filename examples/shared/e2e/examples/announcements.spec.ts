@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { handle, node, openExample, part } from "../helpers";
-import { dragBy, dragTo } from "./helpers";
+import { boxOf, dragBy, dragFrom, dragTo } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
     await openExample(page, "announcements");
@@ -71,4 +71,48 @@ test("Escape cancels a keyboard connection, and says so", async ({ page }) => {
     await page.keyboard.press("Escape");
     await expect(region).toHaveText("Connection cancelled.");
     await expect(part(page, "edge")).toHaveCount(1);
+});
+
+test("a keyboard connection pans the target it points at into view", async ({
+    page,
+}) => {
+    const region = page.getByRole("status");
+    const root = part(page, "root");
+    const output = handle(page, "hall", "source");
+    // pan the view down until the garden's bottom is past the root's, the hall's output still in
+    const view = await boxOf(root);
+    const garden = await boxOf(node(page, "garden"));
+    const below = (await boxOf(output)).y + (await boxOf(output)).height;
+    const gardenBottom = garden.y + garden.height;
+    const viewBottom = view.y + view.height;
+    await dragFrom(
+        page,
+        { x: view.x + 12, y: view.y + 12 },
+        0,
+        viewBottom - gardenBottom + (gardenBottom - below) / 2,
+    );
+    const moved = await boxOf(node(page, "garden"));
+    expect(moved.y + moved.height).toBeGreaterThan(viewBottom);
+    await output.focus();
+    await page.keyboard.press("Enter");
+    await expect(region).toHaveText(/Target 1 of 2: /);
+    if (!(await region.textContent())?.includes("Garden"))
+        await page.keyboard.press("Tab");
+    await expect(region).toHaveText(/Target \d of 2: Garden\./);
+    // the garden's node is wholly inside the root again
+    await expect
+        .poll(async () => {
+            const box = await boxOf(node(page, "garden"));
+            return (
+                box.y >= view.y &&
+                box.x >= view.x &&
+                box.y + box.height <= viewBottom &&
+                box.x + box.width <= view.x + view.width
+            );
+        })
+        .toBe(true);
+    await page.keyboard.press("Enter");
+    await expect(region).toHaveText(
+        "Connected Hall to Garden with the keyboard.",
+    );
 });

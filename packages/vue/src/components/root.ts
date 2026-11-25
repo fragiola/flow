@@ -167,7 +167,7 @@ export interface RootProps<
     viewport?: Viewport | undefined;
     /** the viewport the flow starts at (read once, at mount); default `{ x: 0, y: 0, zoom: 1 }` */
     defaultViewport?: Viewport | undefined;
-    /** fits the nodes once they are all measured (read once, at mount) */
+    /** fits the nodes once their sizes are known, again once measured (read once, at mount) */
     fitView?: boolean | FitViewPayload | undefined;
     /** access to the model and the engine from outside the root (`useFlowRef`, `createFlowRef`) */
     flowRef?: FlowRef<T, F> | undefined;
