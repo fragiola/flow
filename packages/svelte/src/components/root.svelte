@@ -150,7 +150,7 @@
         onviewportchange?:
             | ((viewport: Viewport, gesture: boolean) => void)
             | undefined;
-        /** fits the nodes once they are all measured (read once, at mount) */
+        /** fits the nodes once their sizes are known, again once measured (read once, at mount) */
         fitView?: boolean | FitViewPayload | undefined;
         /** access to the model and the engine from outside the root (`useFlowRef`, `createFlowRef`) */
         flowRef?: FlowRef<T, F> | undefined;

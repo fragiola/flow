@@ -277,7 +277,10 @@ export class FlowRootDirective<
     readonly viewport = input<Viewport | undefined>(undefined);
     /** the viewport the flow starts at (read once); default `{ x: 0, y: 0, zoom: 1 }` */
     readonly defaultViewport = input<Viewport | undefined>(undefined);
-    /** fits the nodes once they are all measured (read once): a bare `fitView`, or a payload */
+    /**
+     * fits the nodes once their sizes are known, again once measured (read once): a bare
+     * `fitView`, or a payload
+     */
     readonly fitView = input(undefined, { transform: fitViewInput });
     /** access to the model and the engine from outside the root (`createFlowRef`) */
     readonly flowRef = input<FlowRef<T, F> | undefined>(undefined);
