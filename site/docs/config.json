@@ -317,10 +317,6 @@
             "label": "More",
             "pages": [
                 {
-                    "label": "Known limitations",
-                    "path": "limitations"
-                },
-                {
                     "label": "Found a problem?",
                     "href": "https://github.com/fragiola/flow/issues",
                     "external": true
