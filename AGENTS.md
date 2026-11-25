@@ -2639,10 +2639,10 @@ Decisions of the graph and geometry helpers, the toolbars and the keyboard flows
   is the connection's `to`, `data-valid` on its handle, the line drawn to it, and a
   `connect-target` event. The targets are the handles a drag could reach (`eligible`: measured,
   connectable, the mode's types, connectable nodes, not the handle itself) that
-  `model.can("edge.add")` accepts at the start (a vetoed one is skipped, not marked), nearest to
-  the source handle's centre first. None accepted: it still starts (`connect-target` with `index`
-  -1, `count` 0) and Enter cancels (`refused: false`); a veto arriving after the start makes Enter
-  `connect-cancel { refused: true }`.
+  `model.can("edge.add")` accepts (a vetoed one is skipped, not marked), nearest to the source
+  handle's centre first, read again on every step (#68). None accepted: it still starts
+  (`connect-target` with `index` -1, `count` 0) and Enter cancels (`refused: false`); a veto
+  arriving after the last step makes Enter `connect-cancel { refused: true }`.
 - **`input` on the connection events, `source` on `resize`**: `connect.source` already names the
   source node (D5's edge end), so the connection events (`connect-start`, `connect`,
   `connect-cancel`) carry `input: "pointer" | "keyboard"`; `resize` carries `source` like
@@ -2654,9 +2654,9 @@ Decisions of the graph and geometry helpers, the toolbars and the keyboard flows
   (ArrowUp on `right`) and any arrow with Ctrl, Alt or Meta is not the resizer's (left to the
   keyboard's other uses and the page); at a limit the key is still taken (no scroll) and nothing
   runs. Without `resize()`, the arrows on a resize handle move the selection as before.
-- **Known limits:** a keyboard connection's targets are fixed at its start (a handle registered
-  meanwhile is not offered); it does not scroll the target into view; reconnection has no keyboard
-  path; a pointer press while it waits only cancels it (the press does nothing else).
+- **Reconnection is a pointer gesture**: an edge's ends move with the pointer; from the keyboard,
+  an app menu running `edge.reconnect` is the recipe (`guides/keyboard`). A pointer press while a
+  keyboard connection waits only cancels it (the press does nothing else).
 
 Decisions of the toolbars and keyboard handles in the adapters (#28, Epic #29):
 
@@ -3143,3 +3143,19 @@ Decisions of Epic #70 (#67, the core: the root's size, the refit, the step loop)
 - **A step route with the target behind on one line loops `offset` aside** (below, or right for
   vertical ends) when no `centerX` / `centerY` places the run across: the same pure
   `orthogonalRoute` for the server, the first render and the engine, every other route unchanged.
+
+Decisions of Epic #70 (#68, the core: keyboard connections follow the flow):
+
+- **A keyboard connection reads its targets again on every step** (`next`, in the session's
+  `keyboard()`): the same filter and order as at the start, so a handle registered meanwhile is
+  offered and a rule that starts vetoing drops its handle on the next step. The handle pointed at
+  is found again by node, handle and type and the step moves from it; gone, the step lands on the
+  handle that took its place in the list (Tab) or the one before it (Shift + Tab), round the list.
+  Every step emits `connect-target`, a one-target list too. `connect()` still re-checks through
+  `edge.add`. Alternative: a watch on the handle registrations and the model, re-reading between
+  steps; refused, the list only matters at a step and the watch costs bytes and churn.
+- **Its target's node is panned into view with the pan-on-focus code**: `keyboard()`'s one
+  `show(nodeId)` serves a focused node and a keyboard connection's target, at its start and after
+  each step (centred at the same zoom when not wholly in view), and `panOnFocus: false` turns
+  both off. The keyboard link's connection gains `target()` (internal, not exported). Growth:
+  ~120 B min+gz for all entries (keyboard +34, connection +69).
