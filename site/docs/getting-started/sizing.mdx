@@ -274,3 +274,8 @@ block. A panel of your own marks itself `data-flow-no-gesture` (presses on it st
 
 `Flow.Controls` and `Flow.NodeToolbar` need neither: presses and the wheel over them are already
 left to them.
+
+There is no `Panel`, `ViewportPortal` or `EdgeLabelRenderer` component: an element of yours inside
+the root is in screen pixels, one inside `Flow.Viewport` is in flow coordinates and moves with
+the view, and a [`Flow.EdgeLabel`](/docs/api/primitives/edge-label) portals into the edges' HTML
+layer.

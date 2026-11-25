@@ -132,9 +132,11 @@ when it would be the first element of an `@for`'s view.
 ## Grab, wheel speed and clicks
 
 By default a press on the minimap centres the view there and a drag moves the view with the
-pointer. `inversePan` makes a drag move the view the other way, as grabbing the flow itself, and a
-press then does not centre it. `zoomStep` sets how fast its wheel zooms (`10`, the default, is the
-flow's own wheel; `20` twice as fast). Both default to `minimap()`'s options, and are sent to the
+pointer. A drag maps the pointer through the minimap's view box as it was at the press, so a drag
+that changes the flow's bounds does not rescale under the pointer. `inversePan` makes a drag move
+the view the other way, as grabbing the flow itself, and a press then does not centre it.
+`zoomStep` sets how fast its wheel zooms (`10`, the default, is the flow's own wheel; `20` twice
+as fast). Both default to `minimap()`'s options, and are sent to the
 engine as the minimap's part options (`engine.adapter.setPartOptions("minimap", "", …)`): one set
 per root, so several minimaps on one root share one set of options: the last to set them wins, and
 removing one of them clears them (the others fall back to `minimap()`'s options until they set

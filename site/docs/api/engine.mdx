@@ -397,6 +397,9 @@ them with the edges' layers by stacking order.
 | `"node-focusable"` | `{ nodeId }` | it takes DOM focus, `tabindex="0"` (`keyboard()`): shown, its `focusable` not false, `nodesFocusable` on |
 | `"edge-focusable"` | `{ edgeId }` | it takes DOM focus (`keyboard()`): shown, its `focusable` not false, `edgesFocusable` on |
 
+The engine measures every node and its handles with a `ResizeObserver`, so there is nothing to
+refresh by hand: `engine.is("node-measured", { nodeId })` answers whether a node is measured.
+
 ## Events
 
 `engine.subscribe(listener)` hears what happens on screen, a `FlowEngineEvent` (its `type` is a

@@ -454,7 +454,10 @@ Render the resizer only when the node should be resizable, or hide it with a sty
 
 `node.resize` is transient during the drag and final on the release, like a drag's moves: an undo
 history makes one step of it, and the engine's `resize` event (`{ nodeId, width, height }`) tells
-the final size (`source`: `"pointer"` for a drag, `"keyboard"` for an arrow).
+the final size (`source`: `"pointer"` for a drag, `"keyboard"` for an arrow). The steps of a
+resize are its transient `node.resize` commands, seen by `onNodesChange` and `model.subscribe`;
+the root's `onResizeStart`, `onResizeEnd` and `onResizeCancel` frame them
+([Root](/docs/api/primitives/root#props)).
 
 ```ts
 engine.subscribe((event) => {

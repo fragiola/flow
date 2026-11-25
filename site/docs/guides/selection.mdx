@@ -547,9 +547,12 @@ The root tells what a user clicked: `onNodeClick`, `onEdgeClick`, `onPaneClick`,
 double-click and context-menu callbacks, and `onSelectionContextMenu` for a right click on one of
 several selected nodes or on the selection rectangle. Each gets the event: the node's or edge's
 id, the flow point (`point`), the client point (`client`) and the DOM event (`event`), whose
-default you prevent to show your own menu. A click is the engine's own: a press released within `nodeClickDistance` (on the pane
-`paneClickDistance`, both 3 pixels) that dragged nothing, so the click that ends a drag or a pan
-is never one. It comes after the click selected.
+default you prevent to show your own menu. A click is the engine's own tap: a press released
+within `nodeClickDistance` (on the pane `paneClickDistance`, both 3 pixels) that started no
+gesture, so the click that ends a drag or a pan is never one. A pan that stayed within the pane's
+distance is still a click (the few pixels it moved stay), and a click on a handle is not its
+node's. It comes after the click selected. Clicks are told while the flow is locked too: they
+change nothing then.
 
 <Framework name="react">
 

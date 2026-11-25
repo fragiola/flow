@@ -242,10 +242,15 @@ with the same behaviour, unstyled.
 
 ## What it never ships
 
-Undo and redo, saving, translations and announcements are app policy: they stay in your app. The
-examples show each one as copyable code ([Undo and redo](/docs/guides/undo-redo),
+Undo and redo, copy and paste, helper lines, auto layout, saving, translations and
+announcements are app policy: they stay in your app, built on the commands the model runs, and
+the examples show them as copyable code ([Undo and redo](/docs/guides/undo-redo),
 [Saving and restoring flows](/docs/guides/persistence),
 [Accessible names](/docs/getting-started/accessible-names)).
+
+No stylesheet, no default node and no label come with it: the package writes structural style
+only. Style every part from its `data-flow-part` and its state attributes
+([Styling with plain CSS](/docs/guides/styling-css)).
 
 ## Next steps
 
