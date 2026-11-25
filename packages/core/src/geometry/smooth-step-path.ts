@@ -119,11 +119,12 @@ export function orthogonalRoute(
             middle = [at(half, across(source)), at(half, across(target))];
         } else {
             // facing each other, the target behind: out, across halfway (or where asked), back in;
-            // on one line, the run across is `offset` aside, a loop instead of a line back on itself
+            // on one line (within a pixel), the run across is `offset` aside of both, a loop
+            // instead of a line back on itself
             const half =
                 (horizontal ? centerY : centerX) ??
-                (across(out) === across(into)
-                    ? across(out) + offset
+                (Math.abs(across(out) - across(into)) < 1
+                    ? Math.max(across(out), across(into)) + offset
                     : between(across(out), across(into), share));
             middle = [out, at(along(out), half), at(along(into), half), into];
         }

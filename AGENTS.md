@@ -3144,8 +3144,9 @@ Decisions of Epic #70 (#67, the core: the root's size, the refit, the step loop)
   payload, when the viewport is still the fitted one (or that fit's own animation is under way);
   any other viewport change (a gesture, an action, new zoom limits) drops it. Equal sizes give the
   same viewport, so nothing moves. Culled nodes that are never measured never trigger it.
-- **A step route with the target behind on one line loops `offset` aside** (below, or right for
-  vertical ends) when no `centerX` / `centerY` places the run across: the same pure
+- **A step route with the target behind on one line loops `offset` aside** (below the lower
+  end, or right of the rightmost for vertical ends; ends less than a pixel apart are on one line)
+  when no `centerX` / `centerY` places the run across: the same pure
   `orthogonalRoute` for the server, the first render and the engine, every other route unchanged.
 
 Decisions of Epic #70 (#68, the core: keyboard connections follow the flow):

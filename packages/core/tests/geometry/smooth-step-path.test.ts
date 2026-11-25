@@ -65,6 +65,15 @@ describe("stepPath", () => {
         );
     });
 
+    it("loops `offset` aside of both ends when they are less than a pixel apart", () => {
+        expect(stepPath(ends([0, 0], "right", [-100, 0.5], "left")).path).toBe(
+            "M0,0 L20,0 L20,20.5 L-120,20.5 L-120,0.5 L-100,0.5",
+        );
+        expect(stepPath(ends([0, 0.5], "right", [-100, 0], "left")).path).toBe(
+            "M0,0.5 L20,0.5 L20,20.5 L-120,20.5 L-120,0 L-100,0",
+        );
+    });
+
     it("goes out to the farther end when both are on the same side", () => {
         expect(stepPath(ends([0, 0], "right", [100, 50], "right"))).toEqual({
             path: "M0,0 L120,0 L120,50 L100,50",
