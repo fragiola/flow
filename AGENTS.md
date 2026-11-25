@@ -751,7 +751,7 @@ Decisions of #36 in React (the first adapter; Vue, Svelte, Angular follow):
 - **`MiniMap`'s `onClick` is the engine's `minimap-click`**: the root captures the pointer, so a
   DOM click never reaches the minimap; the contract test gives it `onDoubleClick` instead.
 - **One set of minimap part options per root** (id `""`): every `MiniMap` shares them, the last to
-  set them wins, and unmounting one clears them (documented on the limitations page).
+  set them wins, and unmounting one clears them (documented on `api/primitives/mini-map.mdx`).
 - **No `ResizeLine` part**: a side `ResizeHandle` spans its side; `direction` is the resizer's (the
   engine keeps it per node). #39: a `ResizeHandle` takes its own `direction` (over the resizer's)
   and `variant="line"` (a styling marker, side handles only), so React Flow's `NodeResizeControl`
@@ -802,7 +802,7 @@ stress-test port Epics):
   and the first client render): `Nodes` renders no node and `Edges` no edge (its static levels
   kept, empty), where they drew every node's static geometry for one render (10 000 mounted and
   torn down: ~700 ms to open). A flow that is not culled keeps its first render; the static
-  geometry is still computed (hand-rendered nodes read it). On the limitations page.
+  geometry is still computed (hand-rendered nodes read it). On `guides/large-flows.mdx`.
 - **Render counts are tested** (`tests/render-counts.test.tsx`, with a wrapped engine counting the
   entity reads): a pan and zoom steps re-render and read no node or edge; nodes brought into view
   render alone and their measurement reads the others' boxes and paths only; a step that changes
@@ -1576,7 +1576,7 @@ on `connect`). Their pure helpers are unit-tested in `examples/react/tests/<id>.
 #46 (React only, likewise `PENDING`): `edge-markers` (no marker is built in: its own `<marker>`s from
 `markers.ts` in an `aria-hidden` svg, one per shape and tone, as a marker is coloured where it is
 defined, and one per shape for the selected state, swapped by `data-selected:[marker-*:var(…)]`;
-ids from `useId`; `limitations.mdx` links it), `animating-edges` (a dot on `<animateMotion>` over
+ids from `useId`; `guides/custom-edges.mdx#arrowheads` links it), `animating-edges` (a dot on `<animateMotion>` over
 `useEdge(edge).state.path.path`, a SMIL `stroke-dashoffset` dash flow, a one-run `data-pulsing`
 cleared on `animationend`; under `prefers-reduced-motion`, followed live, the dot and dashes go and
 the edges carry `data-reduced-motion`), `floating-edges` (no handles: `useInternalNode(id).rect`
@@ -1761,7 +1761,8 @@ Decisions of #6:
 - **Known limits:** a reconnect anchor is drawn under its node's handle (edges come before nodes),
   so the mouse grabs it beside the handle; a finger beside a handle lands on the handle
   (Chromium's touch adjustment), so on touch an edge's end is grabbed on its stroke near the end:
-  give touch apps a wider `reconnection({ radius })` (the fixture uses 30).
+  give touch apps a wider `reconnection({ radius })` (the fixture uses 30). Both are told on
+  `api/primitives/reconnect-anchor.mdx` and `guides/connection-rules.mdx`.
 
 ## The Vue examples and the Vue docs (Issue #10)
 
@@ -2134,7 +2135,7 @@ outputs, templates and injection functions, every Angular export); the
 common props on
 `api/primitives/root#common-props`); API:
 core (`model`, `command-bus`, `commands` (generated), `json-document`, `engine`, `features`,
-`path-helpers`); More (`limitations`, "Found a problem?" to the issues). Every `.mdx` but
+`path-helpers`); More (only "Found a problem?", to the issues). Every `.mdx` but
 `index.mdx` is in the sidebar exactly once; only the vocabulary of `docs/site.md`; a title is at
 most 60 characters and never contains "Flow" (`www` appends it); a description is 50-160
 characters. Snippets are typed and copied from the real API; a page embeds its examples with
@@ -2415,10 +2416,10 @@ Decisions of the engine (#3):
   move the selection, or the focused node, as one non-transient step.
 - **Wheel**: `exp(-deltaY / 600)` per wheel, `/ 120` for a trackpad pinch (Ctrl); our own rates,
   not d3-zoom's. A wheel over `other` parts (controls, a field) is left to the page.
-- **Known limits:** the minimap drag maps through the view box frozen at the press; a smooth step
-  between ends facing each other on one line with the target behind doubles back on itself;
-  node presses keep their default (focus), so an app sets `user-select: none` on nodes to avoid
-  text selection while dragging. `fit-view`'s own `minZoom`/`maxZoom` narrow the engine's limits,
+- **Known limits:** the minimap drag maps through the view box frozen at the press
+  (`api/primitives/mini-map.mdx`); node presses keep their default (focus), so an app sets
+  `user-select: none` on nodes to avoid text selection while dragging. A smooth step between ends
+  facing each other on one line with the target behind loops `offset` aside (Epic #70). `fit-view`'s own `minZoom`/`maxZoom` narrow the engine's limits,
   never widen them.
 
 Decisions of the animated viewport, auto-pan and pan/zoom options (#23, Epic #26):
@@ -2558,9 +2559,10 @@ Decisions of the docs, examples and E2E of the new options (#25, part 2, Epic #2
 - **The drag handle is the literal attribute** (`data-flow-drag-handle`) in the examples and the
   docs, identical in the four frameworks; `DRAG_HANDLE_ATTRIBUTE` is named for code that builds
   it.
-- **Edges over nodes and a per-node origin are "Not yet"** in `limitations.mdx` (a cost decision,
-  not a principle; Epic #40 closed both, and the first-render note); the first render's top-left placement and missing `z-index`, the overridden
-  `z-index` and the gesture-only extent rectangle are known limits there.
+- **Edges over nodes and a per-node origin** were a cost decision, not a principle; Epic #40
+  built both. The overridden `z-index` and the gesture-only extent rectangle are told on
+  `concepts/nodes-and-edges.mdx` (z-order, where a node may go), the first render on
+  `guides/server-rendering.mdx`.
 - **What the specs and the review changed in the packages**: the docs, examples and specs of this
   part passed on their first run, but the Epic's review then fixed the adapters and the core
   (3736fd0: the nodes' layer is its own stacking context, `isolation: isolate` in the four
@@ -2732,7 +2734,7 @@ Epic #29):
   (two equal viewport polls), never waited for.
 - **Docs**: the API references (`model.mdx`, `engine.mdx`, `path-helpers.mdx`, the primitives)
   came with #27 and part 1; part 2 wrote the task sections: `guides/keyboard.mdx` (draw an edge,
-  resize, announce, known limits), `guides/resizing.mdx#from-the-keyboard` (named handles: an
+  resize, announce), `guides/resizing.mdx#from-the-keyboard` (named handles: an
   `aria-hidden` handle that takes focus hides it), `guides/custom-edges.mdx` (`simplebezier`, a
   toolbar on an edge), `guides/selection.mdx` (a toolbar for the selection),
   `concepts/viewport.mdx#frame-an-area` (`viewport-for-bounds`, and `viewportForBounds` for an
@@ -2740,10 +2742,11 @@ Epic #29):
   test), `guides/custom-nodes.mdx` (neighbours, overlaps), `concepts/handles-and-connections.mdx`
   and `getting-started/accessible-names.mdx`. Model and engine reads stay plain `ts` blocks (the
   same in every framework).
-- **`limitations.mdx`** drops the several-nodes toolbar and keyboard connections and resizing from
-  "Not yet"; keyboard reconnection is not a "Not yet" row (xyflow has none either) but a known
-  limit, beside the targets fixed at the start, no scroll into view, a press only cancelling, and
-  handles needing a name once they take focus. The `Panel` / `ViewportPortal` /
+- **The several-nodes toolbar, keyboard connections and keyboard resizing** are told on
+  `api/primitives/node-toolbar.mdx`, `guides/keyboard.mdx` and `guides/resizing.mdx`; an edge's
+  end moves with the pointer only (xyflow has no keyboard path either), told on
+  `guides/keyboard.mdx` with the menu that runs `edge.reconnect`, and handles need a name once
+  they take focus (`guides/keyboard.mdx#draw-an-edge-from-the-keyboard`). The `Panel` / `ViewportPortal` /
   `EdgeLabelRenderer` row is unchanged.
 - **No package change**: every spec of this part passed against the adapters and core as part 1
   left them.
@@ -2757,7 +2760,7 @@ Epic #29):
   keyboard connection started from and says the start, the first target and the keys in one
   message (the listener keeps `startedFrom` until that target), in `announcements` and
   `guides/keyboard.mdx` (four frameworks). A default `NodeResizer`'s eight handles cannot be named,
-  so `resizing.mdx` and `limitations.mdx` say to pass your own `ResizeHandle`s with `keyboard()`;
+  so `resizing.mdx` says to pass your own `ResizeHandle`s with `keyboard()`;
   the playground's scenario names its own. The playground spec asserts an arrow across a resize
   handle's sides reaches the page with its default kept (`defaultPrevented` false on the window).
 
@@ -2887,9 +2890,9 @@ Epic #34):
   the line, default edge fields, per-end reconnection), `guides/selection.mdx` (clicks, double
   clicks and context menus, drag without selecting), `guides/keyboard.mdx` (confirm before
   deleting, focus and the view), `guides/minimap-and-controls.mdx` and `toggle-interactive.mdx`
-  (the lock's switches), `limitations.mdx` (`onConnect` is no longer "on purpose" missing;
-  `nodesDraggable`-like props are `set-interactive`'s switches; `onConnectEnd` is
-  `onConnect` + `onConnectCancel`; the known limits of #32).
+  (the lock's switches: `nodesDraggable`-like props are `set-interactive`'s switches), and
+  `onConnectEnd` is `onConnect` + `onConnectCancel` (`concepts/handles-and-connections.mdx`, a
+  drop on the canvas); the other behaviour notes of #32 are on their topic's page.
 
 Decisions of the components, helpers and hooks (#35 core, #36 adapters and docs, Epic #37; React
 Flow's API studied, none of xyflow's code):
@@ -2923,8 +2926,8 @@ Flow's API studied, none of xyflow's code):
 - **Docs**: `api/primitives/hooks.mdx` (a section per selecting hook, four frameworks),
   `path-helpers.mdx`, `concepts/viewport.mdx` (what fit-view frames), `guides/custom-edges.mdx`
   (an edge's own shape, animated edges), `guides/selection.mdx` (the selection rectangle), the
-  primitives' pages and `limitations.mdx` (`ResizeLine`, keys on the rectangle, the per-root
-  minimap options, `useKeyPress` and typing).
+  primitives' pages (`ResizeLine`, keys on the rectangle, the per-root minimap options on
+  `mini-map.mdx`, `useKeyPress` and typing on `hooks.mdx`).
 
 Decisions of Epic #40 (#38 core, #39 adapters and docs; React Flow v12's SSR, `zIndexMode`, node
 `origin` and `NodeResizeControl` studied as behaviour, none of xyflow's code):
@@ -2936,8 +2939,8 @@ Decisions of Epic #40 (#38 core, #39 adapters and docs; React Flow v12's SSR, `z
   raised among the edges only, `elevateEdgesOnSelect` off), and `"auto"` adds the sub-flow lift
   and raises a selected edge above the nodes (`elevateEdgesOnSelect` defaults to true in
   `"auto"`). A visible change: a selected edge may now cover the nodes it crosses, and an edge
-  between a group's children stands above the group. `limitations.mdx` ("On purpose") says how to
-  get the old order back (`zIndexMode="basic"`, or `elevateEdgesOnSelect={false}`); the adapters'
+  between a group's children stands above the group. `concepts/nodes-and-edges.mdx#z-order` says
+  how to keep every edge below every node (`zIndexMode="basic"`, or `elevateEdgesOnSelect={false}`); the adapters'
   `options` tests cover both modes.
 - **One render level unless needed**: a level per distinct edge value above the lowest shown node
   value, otherwise a single level, which is exactly the DOM before the Epic, so the parts, the
@@ -2956,20 +2959,21 @@ Decisions of Epic #40 (#38 core, #39 adapters and docs; React Flow v12's SSR, `z
 - **One pure function for the server and the first client render**: `src/geometry/` (no DOM, no
   engine, a guard test) is what the engine falls back to before measurement and what the adapters
   draw before the engine, with the same inputs, so there is no hydration mismatch and no jump.
-  `fitView` on init counts initial sizes and is not redone after measurement; edge labels are not
+  `fitView` on init counts initial sizes and is redone once on the measured sizes unless the view
+  moved (Epic #70); edge labels are not
   in the server HTML (they portal once mounted); Angular has no server render (its first browser
-  render draws the declared edges). All in `limitations.mdx`.
+  render draws the declared edges). All in `guides/server-rendering.mdx`.
 - **The child origin rule**: a node's `origin` overrides `nodeOrigin` exactly where `nodeOrigin`
   applies; a child keeps its top-left corner in its parent, a parent's origin moves its box and its
   children. The model's own sub-flow rules (`absolute-position-by`, `expandParent`, the model's
   `extent: "parent"` clamp, `node.set-parent`) ignore a per-node origin as they ignore
-  `nodeOrigin`: a known limit in `limitations.mdx`.
-- **Two more gaps closed, so no "Not yet" row is left**: a `ResizeHandle`'s own `direction` (over
+  `nodeOrigin`, told in the own-origin paragraph of `concepts/nodes-and-edges.mdx`.
+- **A resize handle's own direction and variant, and a focusable selection rectangle**: a
+  `ResizeHandle`'s own `direction` (over
   its resizer's, read from `data-direction` at the press or the key) and `variant` (`data-variant`,
   `line` a styling marker on side handles only, a corner always `handle`); and the selection
   rectangle focusable with `keyboard()` (`tabindex`, the arrows moving the selection, a delete key
-  removing it, Escape clearing it, Enter and Space nothing; the app names it). `limitations.mdx`
-  loses its "Not yet" section.
+  removing it, Escape clearing it, Enter and Space nothing; the app names it).
 - **The server HTML checked without the site export**: the Issue's "site export check of a docs
   page's server HTML" became server-render tests of the `server-rendering` example
   (`examples/{react,vue,svelte}/tests/server-rendering.test.ts`: React's, Vue's and Svelte's
@@ -2986,7 +2990,7 @@ Decisions of Epic #40 (#38 core, #39 adapters and docs; React Flow v12's SSR, `z
   (`zIndexMode`, `render-layers`, `refocus`, the `edges-layer` part, static geometry),
   `api/json-document.mdx` (the node fields, `DeclaredHandle`), the primitives' pages (`root`,
   `edges`, `nodes`, `node`, `resize-handle`, `node-resizer`, `nodes-selection`), the resizing,
-  selection and keyboard guides, and `limitations.mdx`.
+  selection and keyboard guides.
 
 Decisions of the React Flow examples (Epic #49: #44 to #48):
 
