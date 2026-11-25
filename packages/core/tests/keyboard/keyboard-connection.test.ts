@@ -442,7 +442,7 @@ describe("a waiting keyboard connection keeps to its handle", () => {
 });
 
 describe("a waiting keyboard connection follows the flow", () => {
-    /** A target handle on `nodeId` registered now, its top-left corner at (x, y) in its node. */
+    /** A target handle on `nodeId` registered after the mount, its top-left corner at (x, y) in its node. */
     function lateHandle(
         flow: ReturnType<typeof both>,
         nodeId: string,
@@ -519,7 +519,7 @@ describe("a waiting keyboard connection follows the flow", () => {
         expect(targetsOf(events)).toEqual(["d:0/3", "c:1/2", "d:0/2"]);
     });
 
-    it("points at the one now in its place when the target pointed at goes", () => {
+    it("points at the one that took its place when the target pointed at goes", () => {
         const { engine, events, model, handle } = both();
         const out = handle("a", "source", "out");
         key(out, "Enter");
@@ -600,7 +600,7 @@ describe("a waiting keyboard connection follows the flow", () => {
             y: -725,
             zoom: 1,
         });
-        // back to near, out of view now: its centre (250, 25) at the root's centre
+        // back to near, out of view after that pan: its centre (250, 25) at the root's centre
         key(out, "Tab");
         expect(flow.engine.get("viewport")).toEqual({
             x: 150,

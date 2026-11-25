@@ -151,7 +151,7 @@ export class ConnectSession {
      * `connection()`): its targets are the eligible handles `model.can("edge.add", …)` accepts
      * (a vetoed one is skipped), nearest to it first, read again on every step (a handle rendered
      * meanwhile is offered, a rule that changed applies); it points at the first, `next` walks them
-     * round from the one pointed at (found again by node, handle and type; gone, the one now in its
+     * round from the one pointed at (found again by node, handle and type; gone, the one that took its
      * place), `connect` adds the edge to the one pointed at. Nothing when a connection is under way.
      */
     keyboard(from: FlowHandle): KeyboardConnection | undefined {
@@ -201,16 +201,16 @@ export class ConnectSession {
         return {
             next: (by) => {
                 if (!open) return;
-                const was = targets[index];
+                const pointed = targets[index];
                 targets = find();
                 const count = targets.length;
                 const at = targets.findIndex(
                     (handle) =>
-                        handle.nodeId === was?.nodeId &&
-                        handle.handleId === was.handleId &&
-                        handle.type === was.type,
+                        handle.nodeId === pointed?.nodeId &&
+                        handle.handleId === pointed.handleId &&
+                        handle.type === pointed.type,
                 );
-                // gone: the step lands on the one now in its place
+                // gone: the step lands on the one that took its place
                 index =
                     count === 0
                         ? -1
