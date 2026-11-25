@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 // Keyboard connections (`keyboard()` with `connection()`, through the host's keyboard links):
 // focusable handles, Enter on one starts, Tab / Shift + Tab or the arrows walk the targets the
-// model accepts nearest first (a vetoed one skipped), Enter connects, Escape cancels, with their
-// events; nothing changes for an app without both features.
+// model accepts nearest first (a vetoed one skipped), read again on each step (a handle registered
+// meanwhile offered, a rule's new veto applied, the one pointed at kept), the node of the one
+// pointed at panned into view, Enter connects, Escape cancels, with their events; nothing changes
+// for an app without both features.
 import { afterEach, describe, expect, it } from "vitest";
 import { veto } from "../../src/commands/veto";
 import { connection } from "../../src/connection/connection";
@@ -436,5 +438,204 @@ describe("a waiting keyboard connection keeps to its handle", () => {
             type: "connect-cancel",
             input: "pointer",
         });
+    });
+});
+
+describe("a waiting keyboard connection follows the flow", () => {
+    /** A target handle on `nodeId` registered now, its top-left corner at (x, y) in its node. */
+    function lateHandle(
+        flow: ReturnType<typeof both>,
+        nodeId: string,
+        handleId: string,
+        x: number,
+        y: number,
+    ) {
+        const element = document.createElement("div");
+        element.getBoundingClientRect = () => {
+            const parent = flow.node(nodeId).getBoundingClientRect();
+            const { zoom } = flow.engine.get("viewport");
+            return {
+                left: parent.left + x * zoom,
+                top: parent.top + y * zoom,
+                width: 10 * zoom,
+                height: 10 * zoom,
+                right: parent.left + (x + 10) * zoom,
+                bottom: parent.top + (y + 10) * zoom,
+                x: parent.left + x * zoom,
+                y: parent.top + y * zoom,
+                toJSON: () => ({}),
+            } as DOMRect;
+        };
+        flow.node(nodeId).append(element);
+        flow.engine.adapter.registerHandle(
+            { nodeId, handleId, type: "target", side: "left" },
+            element,
+        );
+    }
+
+    it("offers on the next step a handle registered after it started", () => {
+        const flow = both();
+        const out = flow.handle("a", "source", "out");
+        key(out, "Enter");
+        // c's second target at (300, 205): ≈ 269 away, between b's and c's first
+        lateHandle(flow, "c", "in-2", -5, 0);
+        key(out, "Tab");
+        key(out, "Tab");
+        key(out, "Tab");
+        expect(targetsOf(flow.events)).toEqual([
+            "d:0/3",
+            "b:1/4",
+            "c:2/4",
+            "c:3/4",
+        ]);
+        expect(flow.engine.get("connection")?.to).toMatchObject({
+            nodeId: "c",
+            handleId: "in",
+        });
+        key(out, "Tab");
+        key(out, "ArrowLeft");
+        expect(flow.engine.get("connection")?.to).toMatchObject({
+            nodeId: "c",
+            handleId: "in",
+        });
+        key(out, "ArrowLeft");
+        key(out, "Enter");
+        expect(flow.model.get("all-edges")).toEqual([
+            expect.objectContaining({ target: "c", targetHandle: "in-2" }),
+        ]);
+    });
+
+    it("drops on the next step a target a rule started vetoing, keeping the one pointed at", () => {
+        const { events, model, handle } = both();
+        const out = handle("a", "source", "out");
+        key(out, "Enter");
+        model.use((ctx, next) =>
+            ctx.command === "edge.add" && ctx.payload.target === "b"
+                ? veto("not b")
+                : next(),
+        );
+        key(out, "Tab");
+        key(out, "Tab");
+        expect(targetsOf(events)).toEqual(["d:0/3", "c:1/2", "d:0/2"]);
+    });
+
+    it("points at the one now in its place when the target pointed at goes", () => {
+        const { engine, events, model, handle } = both();
+        const out = handle("a", "source", "out");
+        key(out, "Enter");
+        key(out, "Tab");
+        let refused = "b";
+        model.use((ctx, next) =>
+            ctx.command === "edge.add" && ctx.payload.target === refused
+                ? veto("refused")
+                : next(),
+        );
+        key(out, "Tab");
+        expect(targetsOf(events).at(-1)).toBe("c:1/2");
+        key(out, "Tab");
+        expect(targetsOf(events).at(-1)).toBe("d:0/2");
+        // the one pointed at goes, a step back: the one before its place
+        key(out, "Tab");
+        refused = "c";
+        key(out, "Tab", { shiftKey: true });
+        expect(targetsOf(events).at(-1)).toBe("d:0/2");
+        // none left: it points nowhere, and Enter connects nothing
+        model.use(() => veto("nothing"));
+        key(out, "Tab");
+        expect(targetsOf(events).at(-1)).toBe("undefined:-1/0");
+        expect(engine.get("connection")).toMatchObject({
+            to: undefined,
+            status: null,
+        });
+        key(out, "Enter");
+        expect(events.at(-1)).toMatchObject({
+            type: "connect-cancel",
+            refused: false,
+        });
+        expect(model.get("all-edges")).toEqual([]);
+    });
+
+    it("pans the node of the target it points at into view, as a focused node", () => {
+        const flow = mount(
+            flowOf({ a: [0, 0], near: [200, 0], far: [2000, 1000] }),
+            {
+                features: [connection(), keyboard()],
+                sizes: { a: [100, 50], near: [100, 50], far: [100, 50] },
+                handles: [
+                    {
+                        nodeId: "a",
+                        handleId: "out",
+                        type: "source",
+                        side: "right",
+                        x: 95,
+                        y: 20,
+                    },
+                    {
+                        nodeId: "near",
+                        handleId: "in",
+                        type: "target",
+                        side: "left",
+                        x: -5,
+                        y: 20,
+                    },
+                    {
+                        nodeId: "far",
+                        handleId: "in",
+                        type: "target",
+                        side: "left",
+                        x: -5,
+                        y: 20,
+                    },
+                ],
+            },
+        );
+        const out = flow.handle("a", "source", "out");
+        key(out, "Enter");
+        // the nearest one is in view: the viewport stays
+        expect(flow.engine.get("viewport")).toEqual({ x: 0, y: 0, zoom: 1 });
+        key(out, "Tab");
+        // far's centre (2050, 1025) at the root's centre (400, 300)
+        expect(flow.engine.get("viewport")).toEqual({
+            x: -1650,
+            y: -725,
+            zoom: 1,
+        });
+        // back to near, out of view now: its centre (250, 25) at the root's centre
+        key(out, "Tab");
+        expect(flow.engine.get("viewport")).toEqual({
+            x: 150,
+            y: 275,
+            zoom: 1,
+        });
+    });
+
+    it("pans nothing with panOnFocus false", () => {
+        const flow = mount(flowOf({ a: [0, 0], far: [2000, 1000] }), {
+            features: [connection(), keyboard({ panOnFocus: false })],
+            sizes: { a: [100, 50], far: [100, 50] },
+            handles: [
+                {
+                    nodeId: "a",
+                    handleId: "out",
+                    type: "source",
+                    side: "right",
+                    x: 95,
+                    y: 20,
+                },
+                {
+                    nodeId: "far",
+                    handleId: "in",
+                    type: "target",
+                    side: "left",
+                    x: -5,
+                    y: 20,
+                },
+            ],
+        });
+        const out = flow.handle("a", "source", "out");
+        key(out, "Enter");
+        key(out, "Tab");
+        expect(flow.engine.get("connection")?.to?.nodeId).toBe("far");
+        expect(flow.engine.get("viewport")).toEqual({ x: 0, y: 0, zoom: 1 });
     });
 });
