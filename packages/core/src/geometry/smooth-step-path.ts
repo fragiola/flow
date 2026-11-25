@@ -6,7 +6,7 @@
 // - two ends on parallel axes facing each other (right to left), the target ahead: one turn halfway
 //   between them (at `stepPosition` of the way, or at `centerX` / `centerY`);
 // - facing each other, the target behind: out by `offset`, across halfway (the same options), and
-//   back in;
+//   back in; both ends on one line, the run across is `offset` below (right of) them: a loop;
 // - on the same side (right and right): out to the farther of the two, across, and in;
 // - on perpendicular axes: one corner where the two lines meet when both ends reach it going
 //   forward, otherwise out from both ends by `offset` and joined with one more corner.
@@ -118,10 +118,13 @@ export function orthogonalRoute(
                     : between(along(out), along(into), share));
             middle = [at(half, across(source)), at(half, across(target))];
         } else {
-            // facing each other, the target behind: out, across halfway (or where asked), back in
+            // facing each other, the target behind: out, across halfway (or where asked), back in;
+            // on one line, the run across is `offset` aside, a loop instead of a line back on itself
             const half =
                 (horizontal ? centerY : centerX) ??
-                between(across(out), across(into), share);
+                (across(out) === across(into)
+                    ? across(out) + offset
+                    : between(across(out), across(into), share));
             middle = [out, at(along(out), half), at(along(into), half), into];
         }
     } else {
