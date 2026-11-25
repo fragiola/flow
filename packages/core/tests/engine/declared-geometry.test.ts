@@ -71,19 +71,68 @@ describe("initialWidth and initialHeight", () => {
         );
     });
 
-    it("drive fit-view on init before anything is measured, and ready waits for the measurement", async () => {
+    it("drive fit-view on init before anything is measured, and ready comes with that fit", async () => {
         const flow = mount(json(), {
             engine: { fitView: { padding: 0 }, maxZoom: 4 },
         });
         await Promise.resolve();
         // the same framing as measured sizes of 100 × 100 and 100 × 50
         expect(flow.engine.get("viewport")).toEqual({ x: 0, y: 150, zoom: 2 });
-        expect(flow.engine.is("ready")).toBe(false);
-        flow.sizes.set("a", [100, 100]);
-        flow.sizes.set("b", [100, 50]);
+        expect(flow.engine.is("ready")).toBe(true);
+        expect(flow.engine.is("node-measured", { nodeId: "a" })).toBe(false);
+    });
+
+    it("have the fit on init redone once every node is measured at other sizes", async () => {
+        const flow = mount(json(), {
+            engine: { fitView: { padding: 0 }, maxZoom: 4 },
+        });
+        await Promise.resolve();
+        expect(flow.engine.get("viewport")).toEqual({ x: 0, y: 150, zoom: 2 });
+        flow.sizes.set("a", [200, 100]);
+        flow.observer()?.trigger([flow.node("a")]);
+        await Promise.resolve();
+        // one node measured: not yet
+        expect(flow.engine.get("viewport")).toEqual({ x: 0, y: 150, zoom: 2 });
+        flow.sizes.set("b", [100, 100]);
+        flow.observer()?.trigger([flow.node("b")]);
+        await Promise.resolve();
+        // the framing of 400 × 200 in 800 × 600
+        expect(flow.engine.get("viewport")).toEqual({ x: 0, y: 100, zoom: 2 });
+        // once only
+        flow.sizes.set("b", [100, 300]);
+        flow.observer()?.trigger([flow.node("b")]);
+        await Promise.resolve();
+        expect(flow.engine.get("viewport")).toEqual({ x: 0, y: 100, zoom: 2 });
+    });
+
+    it("do not have the fit redone when the view moved before the measurement", async () => {
+        const flow = mount(json(), {
+            engine: { fitView: { padding: 0 }, maxZoom: 4 },
+        });
+        await Promise.resolve();
+        flow.engine.run("pan-by", { x: 10, y: 0 });
+        flow.sizes.set("a", [200, 100]);
+        flow.sizes.set("b", [100, 100]);
         flow.observer()?.trigger([flow.node("a"), flow.node("b")]);
         await Promise.resolve();
+        expect(flow.engine.get("viewport")).toEqual({
+            x: 10,
+            y: 150,
+            zoom: 2,
+        });
+    });
+
+    it("never fit when fitView is off, a defaultViewport kept", async () => {
+        const flow = mount(json(), {
+            engine: { defaultViewport: { x: 5, y: 6, zoom: 1.5 } },
+        });
+        await Promise.resolve();
         expect(flow.engine.is("ready")).toBe(true);
+        flow.sizes.set("a", [200, 100]);
+        flow.sizes.set("b", [100, 100]);
+        flow.observer()?.trigger([flow.node("a"), flow.node("b")]);
+        await Promise.resolve();
+        expect(flow.engine.get("viewport")).toEqual({ x: 5, y: 6, zoom: 1.5 });
     });
 
     it("lose to the document's width and height, per dimension", () => {

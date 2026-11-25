@@ -442,7 +442,7 @@ export interface EngineIsMap {
     interactive: NoPayload;
     /** the gestures and keys of a kind may change the flow (`interactive` and that kind's switch) */
     "interactive-by": { kind: InteractionKind };
-    /** the root has a size and every shown node was measured (the `ready` event came) */
+    /** the root has a size and the fit on init is done (the `ready` event came) */
     ready: NoPayload;
     /** the viewport is being panned by a drag or a pinch */
     panning: NoPayload;

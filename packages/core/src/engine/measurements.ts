@@ -1,7 +1,8 @@
 // What the engine measures (D8, D9): each registered node's rendered size, with the
 // `ResizeObserver` of the node's own window (`defaultView`), and each registered handle's box
-// relative to its node, in flow units. Sizes are layout sizes (`offsetWidth`, unaffected by the
-// viewport's scale); a handle's box comes from the client rects, divided by the zoom.
+// relative to its node, in flow units; the same observer watches the root's size. Sizes are layout
+// sizes (`offsetWidth`, unaffected by the viewport's scale); a handle's box comes from the client
+// rects, divided by the zoom.
 import type { Rect } from "../geometry/types";
 import type { FlowHandle, HandleRegistration } from "./adapter";
 import { viewOf } from "./dom";
@@ -50,6 +51,8 @@ export class Measurements {
     /** the nodes whose element went while they stayed in the flow: their last measurements kept */
     private readonly retired = new Set<string>();
     private observer: Observer | undefined;
+    /** the root, observed for its size */
+    private root: Element | undefined;
     private observerView: Window | undefined;
     /**
      * the nodes whose size or handles changed since the engine last took them (`takeTouched`):
@@ -68,7 +71,16 @@ export class Measurements {
          * for an unmeasured one (rendered again) and its edges keep their ends
          */
         private readonly inFlow: (nodeId: string) => boolean = () => false,
+        /** the observer reported the root */
+        private readonly rootResized: () => void = () => {},
     ) {}
+
+    /** Observes the root's size (none: stops). */
+    observeRoot(element: Element | undefined): void {
+        if (this.root) this.observer?.unobserve(this.root);
+        this.root = element;
+        if (element) this.observerFor(element)?.observe(element);
+    }
 
     /** Takes the nodes whose size or handles changed since the last call (none: nothing did). */
     takeTouched(): ReadonlySet<string> | undefined {
@@ -309,6 +321,7 @@ export class Measurements {
     destroy(): void {
         this.observer?.disconnect();
         this.observer = undefined;
+        this.root = undefined;
         this.nodes.clear();
         this.nodeOfElement.clear();
         this.sizes.clear();
@@ -333,6 +346,7 @@ export class Measurements {
         this.observer = new Constructor((entries) => {
             const nodeIds = new Set<string>();
             for (const { target } of entries) {
+                if (target === this.root) this.rootResized();
                 const nodeId =
                     this.nodeOfElement.get(target) ?? this.handleNodeOf(target);
                 if (nodeId !== undefined) nodeIds.add(nodeId);
