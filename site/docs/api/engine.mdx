@@ -196,7 +196,7 @@ one stays as it is):
 | `interactive` | every gesture and key that changes the flow (each kind below, a resize, a delete key) |
 | `drag` | dragging nodes, and moving them with the arrows (`drag()`, `keyboard()`) |
 | `connect` | drawing edges from handles: a drag, a tap (click-to-connect), Enter on a handle (whose `tabindex` goes) |
-| `select` | a tap's selection, the selection box, Enter and Space; a drag no longer selects the node it drags |
+| `select` | a tap's selection, the selection box, Enter and Space; a drag does not select the node it drags |
 | `reconnect` | moving an edge's ends (`reconnection()`); `connect: false` stops it too (moving an end connects it anew) |
 
 `InteractionKind` names the four kinds. The switches are the engine's state, read by every
@@ -372,7 +372,7 @@ edge's toolbar (its `data-flow-id`), `{ nodeId }` for a node's, nothing for seve
 | `nodeIds` | `string[]` | the shown nodes of this level, in the document's order |
 | `edgeIds` | `string[]` | its edges, in drawing order |
 
-With one level (`zIndex` undefined) an adapter renders today's DOM: one edges SVG below the nodes.
+With one level (`zIndex` undefined) an adapter renders one edges SVG below the nodes.
 With several, the levels' z-indexes are negative ranks in one order (level 0's edges, level 0's
 nodes, level 1's edges, level 1's nodes, …); an edge at the same value as a node stays below it.
 Nodes never change wrapper: each adapter keeps them all in the one `nodes` layer and interleaves
