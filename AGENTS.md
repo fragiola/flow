@@ -316,9 +316,11 @@ gesture starts; `null` none), `panOnScroll` false, `panOnScrollMode` `"free"` (`
 `"vertical"`: the other axis' deltas are ignored), `panOnScrollSpeed` 1, `zoomActivationKey` (Meta
 on Apple platforms, Control elsewhere, from the root window's `navigator`; with `panOnScroll`, the
 wheel zooms while it is held; `null` none), `zoomOnScroll` true, `zoomOnPinch` true,
-`zoomOnDoubleClick` true, `zoomStep` 1.2, `fitView` (true or `fit-view`'s payload: once every
-visible node is measured; #38: a node's `initialWidth` / `initialHeight` count as known until it is
-measured, and the fit is not redone when the measured sizes differ), `interactive` true, `onlyRenderVisible` false, `pathOptions`
+`zoomOnDoubleClick` true, `zoomStep` 1.2, `fitView` (true or `fit-view`'s payload: once the root
+and every visible node have a size; #38: a node's `initialWidth` / `initialHeight` count as known
+until it is measured; #67: a fit made before every node was measured is redone once when they all
+are, unless the viewport moved from the fitted one meanwhile (its own animation under way is no
+move); `fitView` off never fits, `defaultViewport` or not), `interactive` true, `onlyRenderVisible` false, `pathOptions`
 (`curvature` 0.5, `borderRadius` 5, `offset` 20), `autoPan` true (`AutoPanOptions` `{ speed: 10,
 margin: 30 }`: pixels a frame at the edge, pixels from the edge it starts at), `easing` (a cubic
 ease in and out; `ViewportEasing`), `nodeOrigin` `{ x: 0, y: 0 }` (#24: the point of a node's box
@@ -386,7 +388,7 @@ otherwise and while a box is drawn),
 (minimap: `viewBox`, `viewBoxAttribute`, `scale`, `nodes`, `view`, `maskPath` for
 `fill-rule="evenodd"`), `minimap-point-to-flow { client }` (#35: a client point on the minimap
 under it, else the first, as a flow point; undefined without a sized minimap). `edge-path-by`
-merges the edge's `pathOptions` over the engine's (#35). **Questions** (`engine.is`): `interactive`, `interactive-by { kind }` (#32), `ready` (#32),
+merges the edge's `pathOptions` over the engine's (#35). **Questions** (`engine.is`): `interactive`, `interactive-by { kind }` (#32), `ready` (#32; #67: the root has a size and the fit on init is done, no node measurement awaited),
 `panning`, `node-measured`;
 `box-selecting`; `dragging`, `node-dragging`; `resizing`, `node-resizing`; `connecting`;
 `edge-reconnecting`; `node-focusable`, `edge-focusable` (keyboard: the adapter sets `tabindex="0"`).
@@ -559,11 +561,21 @@ and drops it at once on `setOptions`, when the root attaches or detaches (`destr
 at the start of the app's verbs that place or map the view (`FRESH_BOX_ACTIONS`: `fit-view`,
 `center-on`, `focus-node`, `set-viewport`, `zoom-in`, `zoom-out`, `zoom-to`, `pan-by`, their
 `can`/`check` too; `FRESH_BOX_READS`: `get` of `screen-to-flow` and `flow-to-screen`; no adapter
-calls them per render, so the per-render saving stays). The engine's own viewport writes (the
-viewport element's transform) never move or resize the root, and the root has no `ResizeObserver`
-(the observer measures nodes), so nothing else clears it. Any other read sees the box as of its
+calls them per render, so the per-render saving stays), and when the engine's `ResizeObserver`
+reports the root (#67, below). The engine's own viewport writes (the viewport element's transform)
+never move or resize the root, so nothing else clears it. Any other read sees the box as of its
 turn's first read: a root resized or moved in the same synchronous turn shows there from the next
 microtask (`tests/engine/root-box.test.ts`).
+
+**The root's size is observed** (#67): `attachRoot` has the shared `ResizeObserver` of the
+measurements (`Measurements.observeRoot`) watch the root, `detachRoot` stops it. A report of the
+root clears the cached box and reads the size; only a size other than the last flush's
+(`rootSeen`) queues a measurement flush (`rootChanged`), whose one notification carries
+`viewport: true` too, so the report `observe` makes, a move, or a layout the notification causes
+at the same size tell nothing (no resize loop). The flush runs the fit on init and `ready`, and
+the culled lists and the minimap follow the new view: a flow attached to a 0 × 0 root (a hidden
+tab, a closed dialog) becomes ready, fits and culls once the root gets a size, with no node
+measured (`tests/engine/root-size.test.ts`; E2E `examples/shared/e2e/root-size.spec.ts`).
 
 ## The React adapter (Issue #5)
 
@@ -2830,10 +2842,10 @@ none of xyflow's code):
   moved `end`. `dropped` is `true` for a release (or a keyboard confirm) and `false` for a cancel
   (Escape, `cancel-gesture`, the lock, a `pointercancel`), so "drop on the canvas adds a node"
   adds nothing on a cancel (React Flow's `onConnectEnd` fires on release only).
-- **`ready`** is told once per engine, at the first measurement flush with a sized root, every
-  shown node measured and a pending `fitView` done (`is("ready")`). Known limit: an empty flow whose
-  root measured 0 × 0 when attached is not ready until something is measured again (the root is
-  not observed).
+- **`ready`** is told once per engine, at the first measurement flush with a sized root and a
+  pending `fitView` done (`is("ready")`); it waits for no node measurement (#67: a culled flow
+  never measures its culled nodes, and React Flow's `onInit` waits for none either). The root is
+  observed, so a root sized after mount makes it come.
 
 Decisions of the interaction options and events in the adapters, the docs, examples and E2E (#33,
 Epic #34):
@@ -3117,3 +3129,17 @@ Decisions of large flows (Epic #61: #59, the core; #60, the harness and the numb
   ~0.09 s `render-layers` read by the store on each notification (as React's and Vue's), the rest
   the browser's style, layout and paint; no other adapter hot spot. Mounting fewer components per
   node or edge (or spreading the mounts over frames) would be the next step.
+
+Decisions of Epic #70 (#67, the core: the root's size, the refit, the step loop):
+
+- **The root shares the nodes' `ResizeObserver`** (`Measurements.observeRoot`): no second
+  observer and no new option. A report of the root is told only when its size differs from the
+  last measurement flush's, as part of that flush's one notification (`viewport: true`).
+- **The init fit is redone once, through the same `fitView`**: after a fit made while some node
+  was not yet measured, the flush that finds every node measured fits again with the same
+  payload, when the viewport is still the fitted one (or that fit's own animation is under way);
+  any other viewport change (a gesture, an action, new zoom limits) drops it. Equal sizes give the
+  same viewport, so nothing moves. Culled nodes that are never measured never trigger it.
+- **A step route with the target behind on one line loops `offset` aside** (below, or right for
+  vertical ends) when no `centerX` / `centerY` places the run across: the same pure
+  `orthogonalRoute` for the server, the first render and the engine, every other route unchanged.

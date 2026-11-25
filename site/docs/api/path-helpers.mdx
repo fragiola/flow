@@ -177,8 +177,11 @@ curve's middle. `SimpleBezierPathOptions` is the `PathEnds` below.
 and enters each handle along its side, each corner rounded. `stepPath(options)` is the same route
 with square corners. Each end first stands out from its node by `offset`; the route then turns
 once halfway between two ends facing each other, goes out, across and back in when the target is
-behind, and joins perpendicular sides with one or two corners. The label goes halfway along the
-route's length. Where that one turn (or the run across) sits is the `StepTurnOptions`':
+behind, and joins perpendicular sides with one or two corners. When the target is behind on the
+same line as the source (a right side facing a left side at one height), the run across is
+`offset` below the line (right of it for vertical ends): the route draws a loop, never a line back
+over itself; `centerX` / `centerY` still place that run. The label goes halfway along the route's
+length. Where that one turn (or the run across) sits is the `StepTurnOptions`':
 `stepPosition` of the way from the source, or `centerX` / `centerY` for a turn at a fixed place.
 
 `SmoothStepPathOptions` (with the `PathEnds` and the `StepTurnOptions`):

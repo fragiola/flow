@@ -280,7 +280,7 @@ through `engine.adapter.setOptions`).
 | `viewport` | `Viewport` | none | controlled viewport: a new value runs `set-viewport` |
 | `defaultViewport` | `Viewport` | `{ x: 0, y: 0, zoom: 1 }` | the viewport the flow starts at (read once) |
 | `onViewportChange` | `(viewport: Viewport, gesture: boolean) => void` | none | every viewport change; `gesture` is true for a pan, a zoom or a pinch |
-| `fitView` | `boolean \| FitViewPayload` | `false` | fits the nodes once every visible one is measured (read once) |
+| `fitView` | `boolean \| FitViewPayload` | `false` | fits the nodes once the root and every visible one have a size, and once more on the measured sizes unless the view moved (read once) |
 | `flowRef` | `FlowRef<T, F>` | none | access to the model and the engine from outside the root ([flow ref](/docs/api/primitives/flow-ref)) |
 | `minZoom` | `number` | `0.5` | the least zoom |
 | `maxZoom` | `number` | `2` | the greatest zoom |
@@ -311,7 +311,7 @@ through `engine.adapter.setOptions`).
 | `nodesFocusable` | `boolean` | `true` | nodes take focus (with `keyboard()`; a node's `focusable: false` still wins) |
 | `edgesFocusable` | `boolean` | `true` | edges take focus (with `keyboard()`; an edge's `focusable: false` still wins) |
 | `children` | `ReactNode` | none | the flow's layers: `Flow.Background`, `Flow.Viewport`, `Flow.Controls`, … |
-| `onInit` | `(event: FlowEngineEventOf<"ready">) => void` | none | `ready`: the root has a size and every shown node was measured, once |
+| `onInit` | `(event: FlowEngineEventOf<"ready">) => void` | none | `ready`: the root has a size and the `fitView` fit is done, once; it waits for no node measurement |
 | `onMoveStart` | `(event: FlowEngineEventOf<"viewport-change-start">) => void` | none | `viewport-change-start`: the viewport starts a move (a pan, the wheel, a pinch, an animation, an action) |
 | `onMoveEnd` | `(event: FlowEngineEventOf<"viewport-change-end">) => void` | none | `viewport-change-end`: the move ended (a release, the animation's end, the wheel at rest for 150 ms) |
 | `onNodeClick` | `(event: FlowEngineEventOf<"node-click">) => void` | none | `node-click`: a click on a node: a press released within `nodeClickDistance` that dragged nothing |

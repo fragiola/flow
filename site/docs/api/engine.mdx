@@ -122,7 +122,7 @@ flow), each with its own viewport.
 | `zoomOnPinch` | `boolean` | `true` | a two-finger pinch (and a trackpad's) zooms |
 | `zoomOnDoubleClick` | `boolean` | `true` | a double click on the pane zooms in |
 | `zoomStep` | `number` | `1.2` | the factor of `zoom-in` and `zoom-out` |
-| `fitView` | `boolean \| FitViewPayload` | `false` | fits the nodes once every visible node has a size: measured, given (`width`, `height`) or initial (`initialWidth`, `initialHeight`, counted until the node is measured); it runs once and is not redone when the measured sizes differ |
+| `fitView` | `boolean \| FitViewPayload` | `false` | fits the nodes once the root and every visible node have a size: measured, given (`width`, `height`) or initial (`initialWidth`, `initialHeight`, counted until the node is measured); a fit on initial sizes runs once more when every node is measured, unless the viewport moved in between |
 | `interactive` | `boolean` | `true` | whether gestures and keys may change the flow (pan and zoom stay) |
 | `onlyRenderVisible` | `boolean` | `false` | adapters render only the nodes and edges in view |
 | `pathOptions` | `PathOptions` | see [Path helpers](/docs/api/path-helpers) | the shape of the built-in edge paths |
@@ -384,7 +384,7 @@ them with the edges' layers by stacking order.
 | --- | --- | --- |
 | `"interactive"` | none | gestures and keys may change the flow |
 | `"interactive-by"` | `{ kind }` | gestures and keys of an `InteractionKind` may (`interactive` and that kind's switch) |
-| `"ready"` | none | the root has a size and every shown node was measured (the `ready` event came) |
+| `"ready"` | none | the root has a size and the fit on init is done (the `ready` event came) |
 | `"panning"` | none | the viewport is being panned by a drag or a pinch |
 | `"node-measured"` | `{ nodeId }` | its size is known (measured, or given by the document) |
 | `"box-selecting"` | none | a box selection is being drawn (`selection()`) |
@@ -409,7 +409,7 @@ viewport from it.
 | `"viewport-change"` | `viewport`, `gesture` | the viewport changed; `gesture`: by a pan, a zoom or a pinch, not an action |
 | `"viewport-change-start"` | `viewport`, `gesture` | the viewport starts a move: the first change of a pan, a wheel, a pinch, an animation or an action (`viewport` is where it starts) |
 | `"viewport-change-end"` | `viewport`, `gesture` | the move ended: the pan or pinch released, the animation done or stopped, the wheel at rest for 150 ms; an action that does not animate starts and ends at once |
-| `"ready"` | none | the root has a size and every shown node was measured, once per engine |
+| `"ready"` | none | the root has a size and the fit on init (`fitView`) is done, once per engine; the root's size is observed, so a root sized after mount makes it come |
 | `"node-click"`, `"edge-click"`, `"pane-click"` | `nodeId` / `edgeId`, `point`, `client`, `event` | a tap: a primary press released within the tap distance (`paneClickDistance`, `nodeClickDistance`) that started no gesture; a press that dragged or panned is none. Told after the selection changed, and while the flow is not interactive too |
 | `"node-double-click"`, `"edge-double-click"`, `"pane-double-click"` | the same | a double click whose two presses were taps; on the pane it also zooms in (`zoomOnDoubleClick`) |
 | `"node-context-menu"`, `"edge-context-menu"`, `"pane-context-menu"` | the same | a context menu (a right click, the menu key); the app calls `event.preventDefault()` to show its own. One a right-button pan keeps out is none |
