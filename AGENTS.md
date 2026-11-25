@@ -3141,9 +3141,11 @@ Decisions of Epic #70 (#67, the core: the root's size, the refit, the step loop)
   last measurement flush's, as part of that flush's one notification (`viewport: true`).
 - **The init fit is redone once, through the same `fitView`**: after a fit made while some node
   was not yet measured, the flush that finds every node measured fits again with the same
-  payload, when the viewport is still the fitted one (or that fit's own animation is under way);
-  any other viewport change (a gesture, an action, new zoom limits) drops it. Equal sizes give the
-  same viewport, so nothing moves. Culled nodes that are never measured never trigger it.
+  payload. The first viewport change that is not a frame of that fit's own animation (a gesture,
+  an action, a keyboard pan, new zoom limits), or a stopped animation, drops it, so a refit never
+  undoes a move. Equal sizes give the same viewport, so nothing moves. While a culled node is
+  never measured the refit waits; it comes when that node is measured or removed, if the view has
+  not moved meanwhile.
 - **A step route with the target behind on one line loops `offset` aside** (below the lower
   end, or right of the rightmost for vertical ends; ends less than a pixel apart are on one line)
   when no `centerX` / `centerY` places the run across: the same pure

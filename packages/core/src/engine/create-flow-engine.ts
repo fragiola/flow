@@ -436,15 +436,12 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     private readonly pointers = new Map<number, XY>();
     private pendingFit: FitViewPayload | undefined;
     /**
-     * the fit on init, made before every node was measured: redone once they are, unless the view
-     * moved from `at` meanwhile (its own animation under way, `animation`, is no move)
+     * the fit on init, made before every node was measured: redone once they are; the first move
+     * of the view that is not a frame of its own animation (`animation`) drops it, and so does
+     * stopping an animation
      */
     private refit:
-        | {
-              payload: FitViewPayload;
-              at: Viewport;
-              animation: (() => void) | undefined;
-          }
+        | { payload: FitViewPayload; animation: (() => void) | undefined }
         | undefined;
     /** the root's size as of the last measurement flush: its observer tells only a change */
     private rootSeen: Size | undefined;
@@ -868,6 +865,12 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
         if (gesture) this.stopViewportAnimation();
         const next = this.kept(viewport);
         if (sameViewport(next, this.current)) return this.current;
+        if (
+            !this.stopAnimation ||
+            this.refit?.animation !== this.stopAnimation
+        ) {
+            this.refit = undefined;
+        }
         if (!this.moving) {
             this.moving = { gesture };
             this.emit({
@@ -990,6 +993,7 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
     private stopViewportAnimation(): void {
         const stop = this.stopAnimation;
         if (!stop) return;
+        this.refit = undefined;
         this.stopAnimation = undefined;
         stop();
         this.settle(true);
@@ -1617,19 +1621,14 @@ class Engine<T extends FlowTypes, F extends FlowFeatures> {
                 if (!measured) {
                     this.refit = {
                         payload: fit,
-                        at: result.value as Viewport,
                         animation: this.stopAnimation,
                     };
                 }
             }
         } else if (refit && measured) {
+            // still pending: the view has not moved but for the fit's own animation
             this.refit = undefined;
-            if (
-                sameViewport(refit.at, this.current) ||
-                (refit.animation && refit.animation === this.stopAnimation)
-            ) {
-                this.fitView(refit.payload, false);
-            }
+            this.fitView(refit.payload, false);
         }
         // ready once: a sized root (and a pending fit done)
         const size = this.rootSize();

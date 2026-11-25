@@ -6,7 +6,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { FlowJson, FlowNodeInput } from "../../src/document/types";
 import { createFlowModel } from "../../src/model/create-flow-model";
-import { flowOf, mount, unmountAll } from "./harness";
+import { flowOf, installFrames, mount, unmountAll } from "./harness";
 
 afterEach(unmountAll);
 
@@ -120,6 +120,53 @@ describe("initialWidth and initialHeight", () => {
             y: 150,
             zoom: 2,
         });
+    });
+
+    it("do not have the fit redone after a set-viewport (a keyboard pan), even one undone", async () => {
+        const flow = mount(json(), {
+            engine: { fitView: { padding: 0 }, maxZoom: 4 },
+        });
+        await Promise.resolve();
+        flow.engine.run("set-viewport", { x: 10 });
+        flow.engine.run("set-viewport", { x: 0 });
+        flow.sizes.set("a", [200, 100]);
+        flow.sizes.set("b", [100, 100]);
+        flow.observer()?.trigger([flow.node("a"), flow.node("b")]);
+        await Promise.resolve();
+        expect(flow.engine.get("viewport")).toEqual({ x: 0, y: 150, zoom: 2 });
+    });
+
+    const measureAll = async (flow: ReturnType<typeof mount>) => {
+        flow.sizes.set("a", [200, 100]);
+        flow.sizes.set("b", [100, 100]);
+        flow.observer()?.trigger([flow.node("a"), flow.node("b")]);
+        await Promise.resolve();
+    };
+
+    it("have an animated fit redone when measured during its own frames", async () => {
+        const frames = installFrames();
+        const flow = mount(json(), {
+            engine: { fitView: { padding: 0, duration: 100 }, maxZoom: 4 },
+        });
+        await Promise.resolve();
+        frames.frame();
+        await measureAll(flow);
+        frames.flush();
+        expect(flow.engine.get("viewport")).toEqual({ x: 0, y: 100, zoom: 2 });
+    });
+
+    it("do not have an animated fit redone after a set-viewport during its frames", async () => {
+        const frames = installFrames();
+        const flow = mount(json(), {
+            engine: { fitView: { padding: 0, duration: 100 }, maxZoom: 4 },
+        });
+        await Promise.resolve();
+        frames.frame();
+        // a keyboard pan: a move outside a gesture
+        flow.engine.run("set-viewport", { x: 10 });
+        await measureAll(flow);
+        frames.flush();
+        expect(flow.engine.get("viewport")).toMatchObject({ x: 10 });
     });
 
     it("never fit when fitView is off, a defaultViewport kept", async () => {
