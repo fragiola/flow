@@ -149,28 +149,33 @@ export class ConnectSession {
     /**
      * A connection drawn with the keyboard from a measured handle (`keyboard()` with
      * `connection()`): its targets are the eligible handles `model.can("edge.add", …)` accepts
-     * (a vetoed one is skipped), nearest to it first; it points at the first, `next` walks them
-     * round, `connect` adds the edge to the one pointed at. Nothing when a connection is under way.
+     * (a vetoed one is skipped), nearest to it first, read again on every step (a handle rendered
+     * meanwhile is offered, a rule that changed applies); it points at the first, `next` walks them
+     * round from the one pointed at (found again by node, handle and type; gone, the one now in its
+     * place), `connect` adds the edge to the one pointed at. Nothing when a connection is under way.
      */
     keyboard(from: FlowHandle): KeyboardConnection | undefined {
         const center = from.center;
         if (this.state !== null || !center) return undefined;
         const start: ConnectStart = { from };
-        const targets = this.host
-            .handles()
-            .filter(
-                (handle) =>
-                    this.eligible(from, handle) && this.valid(start, handle),
-            )
-            .map((handle) => ({
-                handle,
-                distance: Math.hypot(
-                    (handle.center?.x ?? 0) - center.x,
-                    (handle.center?.y ?? 0) - center.y,
-                ),
-            }))
-            .sort((a, b) => a.distance - b.distance)
-            .map(({ handle }) => handle);
+        const find = () =>
+            this.host
+                .handles()
+                .filter(
+                    (handle) =>
+                        this.eligible(from, handle) &&
+                        this.valid(start, handle),
+                )
+                .map((handle) => ({
+                    handle,
+                    distance: Math.hypot(
+                        (handle.center?.x ?? 0) - center.x,
+                        (handle.center?.y ?? 0) - center.y,
+                    ),
+                }))
+                .sort((a, b) => a.distance - b.distance)
+                .map(({ handle }) => handle);
+        let targets = find();
         const source = { ...from, center };
         let index = targets.length > 0 ? 0 : -1;
         let open = true;
@@ -195,10 +200,28 @@ export class ConnectSession {
         };
         return {
             next: (by) => {
-                if (!open || targets.length < 2) return;
-                index = (index + by + targets.length) % targets.length;
+                if (!open) return;
+                const was = targets[index];
+                targets = find();
+                const count = targets.length;
+                const at = targets.findIndex(
+                    (handle) =>
+                        handle.nodeId === was?.nodeId &&
+                        handle.handleId === was.handleId &&
+                        handle.type === was.type,
+                );
+                // gone: the step lands on the one now in its place
+                index =
+                    count === 0
+                        ? -1
+                        : ((at < 0
+                              ? Math.max(index, 0) + Math.min(by, 0)
+                              : at + by) +
+                              count) %
+                          count;
                 aim();
             },
+            target: () => (open ? targets[index] : undefined),
             connect: () => {
                 if (!open) return;
                 const to = targets[index];

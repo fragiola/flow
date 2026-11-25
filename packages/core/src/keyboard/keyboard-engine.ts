@@ -11,7 +11,8 @@
 // - Escape clears the selection (a gesture under way is cancelled by the engine first).
 // With `connection()`, handles take focus too (`tabindex` in their attributes) and Enter or Space
 // on one starts a keyboard connection (Tab, Shift + Tab or the arrows walk the targets the model
-// accepts, nearest first; Enter or Space connect; Escape cancels); with `resize()`, resize handles
+// accepts, nearest first, read again on each step, the node of the one pointed at panned into view
+// as a focused node is; Enter or Space connect; Escape cancels); with `resize()`, resize handles
 // take focus and the arrows move their sides (#40: a handle's own direction over its resizer's).
 // The selection's rectangle (`nodes-selection`) takes focus as well, and its keys are a focused
 // selected node's: the arrows move the selection, the delete keys remove it, Escape clears it. Both are reached through the host's keyboard links,
@@ -73,13 +74,15 @@ function from(element: Element | undefined, event: KeyboardEvent): boolean {
  * keys of its source handle are its own: Tab and Shift + Tab or the arrows walk its targets, Enter
  * or Space connect, Escape (the engine's) cancels, as a press anywhere does. It also cancels when
  * focus leaves the handle (a field clicked, a toolbar button) and when its node goes away (a
- * delete key removed it), so a key elsewhere is never taken.
+ * delete key removed it), so a key elsewhere is never taken. Each step hands its target's node to
+ * `show` (panned into view, as a focused node is).
  */
 function connectionGesture(
     connection: KeyboardConnection,
     source: Element | undefined,
     nodeId: string,
     model: FeatureEngineHost["model"],
+    show: (nodeId: string | undefined) => void,
 ): FeatureGesture {
     const stops: (() => void)[] = [];
     const release = () => {
@@ -88,6 +91,11 @@ function connectionGesture(
     const cancel = () => {
         release();
         connection.cancel();
+    };
+    const step = (by: 1 | -1) => {
+        connection.next(by);
+        show(connection.target()?.nodeId);
+        return true;
     };
     if (source) {
         const left = () => cancel();
@@ -108,15 +116,9 @@ function connectionGesture(
         keydown: (event) => {
             if (!from(source, event)) return false;
             if (event.altKey || event.ctrlKey || event.metaKey) return false;
-            if (event.key === "Tab") {
-                connection.next(event.shiftKey ? -1 : 1);
-                return true;
-            }
-            const step = TARGET_STEPS[event.key];
-            if (step !== undefined) {
-                connection.next(step);
-                return true;
-            }
+            if (event.key === "Tab") return step(event.shiftKey ? -1 : 1);
+            const by = TARGET_STEPS[event.key];
+            if (by !== undefined) return step(by);
             if (activates(event)) {
                 release();
                 connection.connect();
@@ -179,6 +181,33 @@ export function keyboardEngine(
         if (!runMoves(model, moves, false)) return false;
         host.emit({ type: "nodes-move", nodeIds, source: "keyboard" });
         return true;
+    };
+
+    /** Pans a node not wholly in view to its centre (`panOnFocus`), the zoom kept. */
+    const show = (nodeId: string | undefined) => {
+        if (!options.panOnFocus || nodeId === undefined) return;
+        const rect = host.measured(nodeId) ? host.nodeRect(nodeId) : undefined;
+        const size = host.rootSize();
+        if (!rect || size.width <= 0 || size.height <= 0) return;
+        const viewport = host.viewport();
+        const view = viewRect(viewport, size);
+        const inside =
+            rect.x >= view.x &&
+            rect.y >= view.y &&
+            rect.x + rect.width <= view.x + view.width &&
+            rect.y + rect.height <= view.y + view.height;
+        if (!inside) {
+            host.setViewport(
+                centeredOn(
+                    {
+                        x: rect.x + rect.width / 2,
+                        y: rect.y + rect.height / 2,
+                    },
+                    viewport.zoom,
+                    size,
+                ),
+            );
+        }
     };
 
     const nodeOf = (id: string) =>
@@ -400,14 +429,15 @@ export function keyboardEngine(
                 activates(event)
             ) {
                 const connection = links.connect.start(target.handle);
-                return connection
-                    ? connectionGesture(
-                          connection,
-                          target.element,
-                          target.handle.nodeId,
-                          model,
-                      )
-                    : false;
+                if (!connection) return false;
+                show(connection.target()?.nodeId);
+                return connectionGesture(
+                    connection,
+                    target.element,
+                    target.handle.nodeId,
+                    model,
+                    show,
+                );
             }
             const nodeId = target.kind === "node" ? target.nodeId : undefined;
             const edgeId = target.kind === "edge" ? target.edgeId : undefined;
@@ -506,36 +536,7 @@ export function keyboardEngine(
             }
         },
         focus: (target) => {
-            if (
-                !options.panOnFocus ||
-                target.kind !== "node" ||
-                target.nodeId === undefined
-            )
-                return;
-            const rect = host.measured(target.nodeId)
-                ? host.nodeRect(target.nodeId)
-                : undefined;
-            const size = host.rootSize();
-            if (!rect || size.width <= 0 || size.height <= 0) return;
-            const viewport = host.viewport();
-            const view = viewRect(viewport, size);
-            const inside =
-                rect.x >= view.x &&
-                rect.y >= view.y &&
-                rect.x + rect.width <= view.x + view.width &&
-                rect.y + rect.height <= view.y + view.height;
-            if (!inside) {
-                host.setViewport(
-                    centeredOn(
-                        {
-                            x: rect.x + rect.width / 2,
-                            y: rect.y + rect.height / 2,
-                        },
-                        viewport.zoom,
-                        size,
-                    ),
-                );
-            }
+            if (target.kind === "node") show(target.nodeId);
         },
         destroy: () => {
             destroyed = true;
